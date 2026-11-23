@@ -1,4 +1,7 @@
-use super::*;
+use super::step::*;
+use crate::structured_credit::types::{CoverageTestType, Waterfall};
+use finstack_quant_core::currency::Currency;
+
 use crate::structured_credit::types::{CoverageTestAction, CoverageTestSpec, WaterfallTier};
 
 fn waterfall_with_oc_test(id: &str, trigger_level: f64) -> Waterfall {

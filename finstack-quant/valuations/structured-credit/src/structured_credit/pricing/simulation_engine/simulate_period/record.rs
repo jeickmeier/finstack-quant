@@ -1,7 +1,12 @@
 //! Recording the waterfall's payments against each tranche: interest,
 //! principal, deferred and PIK interest, net-WAC carryover and balances.
 
-use super::*;
+use super::super::period_helpers::{TrancheAccrualDates, tranche_period_interest_due};
+use super::super::state::SimulationState;
+use super::step::PeriodInputs;
+use crate::structured_credit::types::{RecipientType, TrancheSeniority, WaterfallDistribution};
+use finstack_quant_core::Result;
+use finstack_quant_core::money::Money;
 
 /// Interest shortfalls at or below this amount (in currency units) are float
 /// residue from reconstructing the paid coupon by subtraction, not deferrals.

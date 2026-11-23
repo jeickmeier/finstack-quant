@@ -21,10 +21,12 @@ from finstack_quant.statements._monte_carlo import (
     MonteCarloResults as MonteCarloResults,
 )
 from finstack_quant.statements._rollup import RollupSpec as RollupSpec
-from finstack_quant.statements._types import (
-    FinancialModelSpec as FinancialModelSpec,
+from finstack_quant.statements._types.forecast import (
     ForecastMethod as ForecastMethod,
     ForecastSpec as ForecastSpec,
+)
+from finstack_quant.statements._types.model import (
+    FinancialModelSpec as FinancialModelSpec,
     NodeId as NodeId,
     NodeSpec as NodeSpec,
     NodeType as NodeType,

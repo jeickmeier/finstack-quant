@@ -14,7 +14,10 @@ from finstack_quant.statements._capital_structure import CapitalStructureCashflo
 from finstack_quant.statements._checks import CheckReport, CheckSuiteSpec
 from finstack_quant.statements._monte_carlo import MonteCarloConfig, MonteCarloResults
 from finstack_quant.statements._rollup import RollupSpec
-from finstack_quant.statements._types import FinancialModelSpec, NumericMode
+from finstack_quant.statements._types.model import (
+    FinancialModelSpec,
+    NumericMode,
+)
 
 class StatementResult:
     """

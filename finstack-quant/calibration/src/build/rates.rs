@@ -1,7 +1,7 @@
 //! Builders for interest rate instruments from market quotes.
 
 use crate::build::BuildCtx;
-use crate::build::helpers::resolve_spot_date;
+use crate::build::spot_date::resolve_spot_date;
 use crate::quotes::Pillar;
 use crate::quotes::RateQuote;
 use finstack_quant_cashflows::builder::FloatingLegCompounding;

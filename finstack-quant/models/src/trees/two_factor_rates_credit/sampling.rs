@@ -1,5 +1,10 @@
 //! Transition probabilities, path sampling and conditional discount factors.
 
+use super::tree::{NodeTerms, held_node_terms, usual_band};
+use crate::monte_carlo::rng::philox::PhiloxRng;
+use crate::monte_carlo::traits::RandomStream;
+use finstack_quant_core::{Error, Result};
+
 use super::*;
 
 impl RatesCreditTree {

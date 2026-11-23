@@ -4,7 +4,7 @@ Two rules, both run by `mise run wasm-lint` and the `wasm-boundary` pre-commit h
 
 - `serde_wasm_bindgen::to_value` emits ES `Map`s that `JSON.stringify`
   silently drops. Every binding returns through `crate::utils::to_js_value`,
-  which uses the `json_compatible` serializer; `src/utils/mod.rs` is the only
+  which uses the `json_compatible` serializer; `src/utils/serialize.rs` is the only
   legitimate call site.
 - A JS error built from a string (`JsValue::from_str`,
   `JsValue::from(format!(..))`, `js_sys::Error::new`) has no `name` or `kind`,
@@ -35,8 +35,8 @@ def _lines(root: Path) -> list[tuple[Path, int, str]]:
 
 
 def serializer_offenders(src: Path) -> list[str]:
-    """Return `path:line: text` for every raw serializer call outside `src/utils/mod.rs`."""
-    helper = src / "utils" / "mod.rs"
+    """Return `path:line: text` for every raw serializer call outside `src/utils/serialize.rs`."""
+    helper = src / "utils" / "serialize.rs"
     return [
         f"{path}:{number}: {line.strip()}"
         for path, number, line in _lines(src)
@@ -58,7 +58,7 @@ def main(src: Path = WASM_SRC) -> int:
     status = 0
     serializer = serializer_offenders(src)
     if serializer:
-        print("Raw serde_wasm_bindgen::to_value is banned outside src/utils/mod.rs.")
+        print("Raw serde_wasm_bindgen::to_value is banned outside src/utils/serialize.rs.")
         print("It emits ES Maps that JSON.stringify drops; use crate::utils::to_js_value.")
         print("\n".join(serializer))
         status = 1

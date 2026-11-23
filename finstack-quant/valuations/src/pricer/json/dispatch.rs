@@ -5,6 +5,7 @@ use super::overrides::*;
 use crate::instruments::Instrument;
 use crate::instruments::envelope::{MAX_JSON_BYTES, instrument_load_error};
 use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
+#[cfg(feature = "json-schema")]
 use crate::instruments::pricing_overrides::{InstrumentPricingOverrides, MetricPricingOverrides};
 use crate::metrics::MetricId;
 use crate::metrics::risk::MarketHistory;

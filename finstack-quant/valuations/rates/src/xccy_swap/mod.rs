@@ -11,6 +11,8 @@
 /// XCCY swap metrics.
 pub(crate) mod metrics;
 pub(crate) mod pricing_mtm;
+#[cfg(test)]
+mod tests;
 mod types;
 
 pub use types::{XccySwap, XccySwapBuilder, XccySwapLeg};

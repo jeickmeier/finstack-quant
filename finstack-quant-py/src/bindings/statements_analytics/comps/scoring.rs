@@ -1,0 +1,693 @@
+//! Peer statistics, regression fair value, and relative-value scoring Python bindings.
+
+use super::peers::{
+    PyCompanyMetrics, PyPeerSet, dict_to_company_metrics, extractor_label, parse_extractor,
+};
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
+use finstack_quant_statements_analytics::analysis::{
+    DimensionScore, Multiple, PeerSet, PeerStats, RegressionResult, RelativeValueResult,
+    ScoreDirection, ScoringDimension, compute_multiple as core_compute_multiple,
+    peer_stats as core_peer_stats, percentile_rank as core_percentile_rank,
+    regression_fair_value as core_regression, score_relative_value as core_score,
+    z_score as core_z_score,
+};
+use pyo3::prelude::*;
+use pyo3::types::{PyAny, PyDict, PyList};
+
+use crate::errors::{core_to_py, display_to_py};
+
+/// Column schema for [`PyRelativeValueResult`] tabular exports.
+const DIMENSION_COLUMNS: [(&str, &str); 6] = [
+    ("label", "str"),
+    ("percentile", "float64"),
+    ("z_score", "float64"),
+    ("regression_residual", "float64"),
+    ("r_squared", "float64"),
+    ("weight", "float64"),
+];
+
+/// One weighted rich/cheap scoring dimension.
+///
+/// Parameters
+/// ----------
+/// label : str
+///     Human-readable label (e.g. ``"Spread vs Leverage"``).
+/// y : str
+///     Dependent metric: a canonical name (``"oas_bp"``), a custom key, or
+///     ``"multiple:<name>"`` for a valuation multiple (``"multiple:ev_ebitda"``).
+/// x : str | None
+///     Optional explanatory metric in the same notation. ``None`` (default)
+///     scores the dependent metric against its peer distribution.
+/// weight : float
+///     Keyword-only, required. Finite non-negative relative weight in the
+///     composite score; zero disables the dimension. Positive weights are
+///     normalized over usable dimensions.
+/// direction : str | None
+///     ``"higher_is_cheap"`` (spread-like) or ``"higher_is_rich"``
+///     (multiple-like). ``None`` uses the Rust ``ScoreDirection`` default,
+///     ``"higher_is_cheap"``.
+///
+/// Examples
+/// --------
+/// >>> from finstack_quant.statements_analytics import ScoringDimension
+/// >>> ScoringDimension("Spread vs Leverage", "oas_bp", "leverage", weight=1.0).direction
+/// 'higher_is_cheap'
+#[pyclass(
+    name = "ScoringDimension",
+    module = "finstack_quant.statements_analytics",
+    from_py_object
+)]
+#[derive(Clone)]
+pub struct PyScoringDimension {
+    pub(crate) inner: ScoringDimension,
+}
+
+#[pymethods]
+impl PyScoringDimension {
+    #[new]
+    #[pyo3(signature = (label, y, x=None, *, weight, direction=None))]
+    fn new(
+        label: &str,
+        y: &str,
+        x: Option<&str>,
+        weight: f64,
+        direction: Option<&str>,
+    ) -> PyResult<Self> {
+        let direction: ScoreDirection = match direction {
+            Some(direction) => direction.parse().map_err(display_to_py)?,
+            None => ScoreDirection::default(),
+        };
+        Ok(Self {
+            inner: ScoringDimension {
+                label: label.to_string(),
+                y_extractor: parse_extractor(y)?,
+                x_extractor: x.map(parse_extractor).transpose()?,
+                weight,
+                direction,
+            },
+        })
+    }
+
+    /// Dimension label.
+    #[getter]
+    fn label(&self) -> &str {
+        &self.inner.label
+    }
+
+    /// Dependent metric in ``name`` / ``multiple:<name>`` notation.
+    #[getter]
+    fn y(&self) -> String {
+        extractor_label(&self.inner.y_extractor)
+    }
+
+    /// Optional explanatory metric in ``name`` / ``multiple:<name>`` notation.
+    #[getter]
+    fn x(&self) -> Option<String> {
+        self.inner.x_extractor.as_ref().map(extractor_label)
+    }
+
+    /// Weight in the composite score.
+    #[getter]
+    fn weight(&self) -> f64 {
+        self.inner.weight
+    }
+
+    /// ``"higher_is_cheap"`` or ``"higher_is_rich"``.
+    #[getter]
+    fn direction(&self) -> PyResult<String> {
+        finstack_quant_core::wire::serde_label(&self.inner.direction).map_err(core_to_py)
+    }
+
+    fn __repr__(&self) -> String {
+        crate::bindings::repr_support::repr_from_serde("ScoringDimension", &self.inner)
+    }
+}
+
+wire_methods!(PyScoringDimension, ScoringDimension, "ScoringDimension");
+
+/// Descriptive statistics of a peer distribution.
+///
+/// Examples
+/// --------
+/// >>> from finstack_quant.statements_analytics import peer_stats
+/// >>> peer_stats([1.0, 2.0, 3.0, 4.0, 5.0]).median
+/// 3.0
+#[pyclass(
+    name = "PeerStats",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[derive(Clone)]
+pub struct PyPeerStats {
+    pub(crate) inner: PeerStats,
+}
+
+#[pymethods]
+impl PyPeerStats {
+    /// Number of observations.
+    #[getter]
+    fn count(&self) -> usize {
+        self.inner.count
+    }
+
+    /// Arithmetic mean.
+    #[getter]
+    fn mean(&self) -> f64 {
+        self.inner.mean
+    }
+
+    /// Median.
+    #[getter]
+    fn median(&self) -> f64 {
+        self.inner.median
+    }
+
+    /// Sample standard deviation.
+    #[getter]
+    fn std_dev(&self) -> f64 {
+        self.inner.std_dev
+    }
+
+    /// Minimum.
+    #[getter]
+    fn min(&self) -> f64 {
+        self.inner.min
+    }
+
+    /// Maximum.
+    #[getter]
+    fn max(&self) -> f64 {
+        self.inner.max
+    }
+
+    /// First quartile.
+    #[getter]
+    fn q1(&self) -> f64 {
+        self.inner.q1
+    }
+
+    /// Third quartile.
+    #[getter]
+    fn q3(&self) -> f64 {
+        self.inner.q3
+    }
+
+    /// Interquartile range ``q3 - q1``.
+    #[getter]
+    fn iqr(&self) -> f64 {
+        self.inner.iqr
+    }
+
+    fn __repr__(&self) -> String {
+        crate::bindings::repr_support::repr_from_serde("PeerStats", &self.inner)
+    }
+}
+
+wire_methods!(PyPeerStats, PeerStats, "PeerStats");
+
+impl PyPeerStats {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        const COLUMNS: [(&str, &str); 9] = [
+            ("count", "int64"),
+            ("mean", "float64"),
+            ("median", "float64"),
+            ("std_dev", "float64"),
+            ("min", "float64"),
+            ("max", "float64"),
+            ("q1", "float64"),
+            ("q3", "float64"),
+            ("iqr", "float64"),
+        ];
+        serde_rows_to_arrow_table(&[&self.inner], &COLUMNS)
+    }
+}
+
+tabular_methods!(PyPeerStats);
+
+/// Single-factor OLS fit evaluated at the subject.
+///
+/// Examples
+/// --------
+/// >>> from finstack_quant.statements_analytics import regression_fair_value
+/// >>> regression_fair_value([1.0, 2.0, 3.0, 4.0], [3.0, 5.0, 7.0, 9.0], 3.0, 10.0).fitted_value
+/// 7.0
+#[pyclass(
+    name = "RegressionResult",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[derive(Clone)]
+pub struct PyRegressionResult {
+    pub(crate) inner: RegressionResult,
+}
+
+#[pymethods]
+impl PyRegressionResult {
+    /// Intercept (alpha).
+    #[getter]
+    fn intercept(&self) -> f64 {
+        self.inner.intercept
+    }
+
+    /// Slope (beta).
+    #[getter]
+    fn slope(&self) -> f64 {
+        self.inner.slope
+    }
+
+    /// Coefficient of determination.
+    #[getter]
+    fn r_squared(&self) -> f64 {
+        self.inner.r_squared
+    }
+
+    /// ``intercept + slope * subject_x``.
+    #[getter]
+    fn fitted_value(&self) -> f64 {
+        self.inner.fitted_value
+    }
+
+    /// ``subject_y - fitted_value``.
+    #[getter]
+    fn residual(&self) -> f64 {
+        self.inner.residual
+    }
+
+    /// Number of observations used.
+    #[getter]
+    fn n(&self) -> usize {
+        self.inner.n
+    }
+
+    fn __repr__(&self) -> String {
+        crate::bindings::repr_support::repr_from_serde("RegressionResult", &self.inner)
+    }
+}
+
+wire_methods!(PyRegressionResult, RegressionResult, "RegressionResult");
+
+impl PyRegressionResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        const COLUMNS: [(&str, &str); 6] = [
+            ("intercept", "float64"),
+            ("slope", "float64"),
+            ("r_squared", "float64"),
+            ("fitted_value", "float64"),
+            ("residual", "float64"),
+            ("n", "int64"),
+        ];
+        serde_rows_to_arrow_table(&[&self.inner], &COLUMNS)
+    }
+}
+
+tabular_methods!(PyRegressionResult);
+
+/// Decomposed score of one dimension in a `RelativeValueResult`.
+#[pyclass(
+    name = "DimensionScore",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[derive(Clone)]
+pub struct PyDimensionScore {
+    pub(crate) inner: DimensionScore,
+}
+
+#[pymethods]
+impl PyDimensionScore {
+    /// Dimension label.
+    #[getter]
+    fn label(&self) -> &str {
+        &self.inner.label
+    }
+
+    /// Percentile rank of the subject within peers (0-1).
+    #[getter]
+    fn percentile(&self) -> f64 {
+        self.inner.percentile
+    }
+
+    /// Raw z-score of the subject versus the peer distribution.
+    #[getter]
+    fn z_score(&self) -> f64 {
+        self.inner.z_score
+    }
+
+    /// Raw regression residual in Y units, or ``None`` without explanatory X.
+    #[getter]
+    fn regression_residual(&self) -> Option<f64> {
+        self.inner.regression_residual
+    }
+
+    /// Regression R-squared, or ``None`` without explanatory X.
+    #[getter]
+    fn r_squared(&self) -> Option<f64> {
+        self.inner.r_squared
+    }
+
+    /// Dimension weight in the composite.
+    #[getter]
+    fn weight(&self) -> f64 {
+        self.inner.weight
+    }
+
+    fn __repr__(&self) -> String {
+        crate::bindings::repr_support::repr_from_serde("DimensionScore", &self.inner)
+    }
+}
+
+/// Composite rich/cheap score of a subject against its peers.
+///
+/// Examples
+/// --------
+/// >>> from finstack_quant.statements_analytics import (
+/// ...     CompanyMetrics, PeerSet, ScoringDimension, score_relative_value,
+/// ... )
+/// >>> peers = [CompanyMetrics(f"P{i}", {"leverage": float(i), "oas_bp": 100.0 * i}) for i in (1, 2, 3)]
+/// >>> peer_set = PeerSet(CompanyMetrics("SUBJ", {"leverage": 2.0, "oas_bp": 250.0}), peers, "ltm")
+/// >>> result = score_relative_value(peer_set, [ScoringDimension("Spread vs Leverage", "oas_bp", "leverage", weight=1.0)])
+/// >>> result.company_id, result.peer_count
+/// ('SUBJ', 3)
+#[pyclass(
+    name = "RelativeValueResult",
+    module = "finstack_quant.statements_analytics",
+    from_py_object
+)]
+#[derive(Clone)]
+pub struct PyRelativeValueResult {
+    pub(crate) inner: RelativeValueResult,
+}
+
+#[pymethods]
+impl PyRelativeValueResult {
+    /// Subject company id.
+    #[getter]
+    fn company_id(&self) -> &str {
+        self.inner.company_id.as_str()
+    }
+
+    /// Weighted composite score: positive = cheap, negative = rich.
+    #[getter]
+    fn composite_score(&self) -> f64 {
+        self.inner.composite_score
+    }
+
+    /// Per-dimension decomposition.
+    #[getter]
+    fn dimensions(&self) -> Vec<PyDimensionScore> {
+        self.inner
+            .dimensions
+            .iter()
+            .cloned()
+            .map(|inner| PyDimensionScore { inner })
+            .collect()
+    }
+
+    /// Confidence in ``[0, 1]`` from peer count and regression fit.
+    #[getter]
+    fn confidence(&self) -> f64 {
+        self.inner.confidence
+    }
+
+    /// Number of peers scored against.
+    #[getter]
+    fn peer_count(&self) -> usize {
+        self.inner.peer_count
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "RelativeValueResult(company_id='{}', composite_score={}, confidence={}, peer_count={}, dimensions={})",
+            self.inner.company_id,
+            self.inner.composite_score,
+            self.inner.confidence,
+            self.inner.peer_count,
+            self.inner.dimensions.len()
+        )
+    }
+}
+
+wire_methods!(
+    PyRelativeValueResult,
+    RelativeValueResult,
+    "RelativeValueResult"
+);
+
+impl PyRelativeValueResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let rows: Vec<serde_json::Value> = self
+            .inner
+            .dimensions
+            .iter()
+            .map(|dim| {
+                serde_json::json!({
+                    "label": dim.label,
+                    "percentile": dim.percentile,
+                    "z_score": dim.z_score,
+                    "regression_residual": dim.regression_residual,
+                    "r_squared": dim.r_squared,
+                    "weight": dim.weight,
+                })
+            })
+            .collect();
+        serde_rows_to_arrow_table(&rows, &DIMENSION_COLUMNS)
+    }
+}
+
+tabular_methods!(PyRelativeValueResult);
+
+/// Percentile rank of ``value`` within ``values`` (0-1 scale).
+///
+/// Uses the "fraction of values less than or equal" convention (Rust
+/// ``percentile_rank(values, value)``).
+///
+/// Parameters
+/// ----------
+/// values : list[float]
+///     Peer distribution (need not be sorted); non-finite entries are ignored.
+/// value : float
+///     The subject value to rank.
+///
+/// Returns
+/// -------
+/// float | None
+///     Percentile rank in ``[0, 1]``, or ``None`` when ``values`` is empty.
+///
+/// Examples
+/// --------
+/// >>> from finstack_quant.statements_analytics import percentile_rank
+/// >>> percentile_rank([100.0, 200.0, 300.0, 400.0, 500.0], 250.0)
+/// 0.4
+#[pyfunction]
+#[pyo3(text_signature = "(values, value)")]
+pub(super) fn percentile_rank(values: Vec<f64>, value: f64) -> Option<f64> {
+    core_percentile_rank(&values, value)
+}
+
+/// Standard (z-) score of ``value`` in the peer distribution (Rust
+/// ``z_score(values, value)``).
+///
+/// Parameters
+/// ----------
+/// values : list[float]
+///     Peer distribution; non-finite entries are ignored.
+/// value : float
+///     The subject value.
+///
+/// Returns
+/// -------
+/// float | None
+///     ``(value - mean(peers)) / stddev(peers)``, or ``None`` when fewer than
+///     two peers are provided or the peer variance is zero.
+///
+/// Examples
+/// --------
+/// >>> from finstack_quant.statements_analytics import z_score
+/// >>> z_score([1.0, 2.0, 3.0, 4.0, 5.0], 3.0)
+/// 0.0
+#[pyfunction]
+#[pyo3(text_signature = "(values, value)")]
+pub(super) fn z_score(values: Vec<f64>, value: f64) -> Option<f64> {
+    core_z_score(&values, value)
+}
+
+/// Descriptive statistics for a peer distribution (Rust ``peer_stats(values)``).
+///
+/// Parameters
+/// ----------
+/// values : list[float]
+///     Peer distribution (need not be sorted); non-finite entries are ignored.
+///
+/// Returns
+/// -------
+/// PeerStats | None
+///     Typed statistics, or ``None`` when no statistics can be computed
+///     (matching the WASM twin's ``undefined``).
+///
+/// Examples
+/// --------
+/// >>> from finstack_quant.statements_analytics import peer_stats
+/// >>> peer_stats([1.0, 2.0, 3.0, 4.0, 5.0]).count
+/// 5
+#[pyfunction]
+#[pyo3(text_signature = "(values)")]
+pub(super) fn peer_stats(values: Vec<f64>) -> Option<PyPeerStats> {
+    core_peer_stats(&values).map(|inner| PyPeerStats { inner })
+}
+
+/// Single-factor OLS fit and evaluation at the subject's X.
+///
+/// Conventions: ``fitted_value = intercept + slope * subject_x`` and
+/// ``residual = subject_y - fitted_value``.
+///
+/// Parameters
+/// ----------
+/// x_values : list[float]
+///     Peer X observations (independent variable).
+/// y_values : list[float]
+///     Peer Y observations; same length as ``x_values``.
+/// subject_x : float
+///     Subject's X value at which to evaluate the fit.
+/// subject_y : float
+///     Subject's observed Y value for the residual.
+///
+/// Returns
+/// -------
+/// RegressionResult | None
+///     Typed fit, or ``None`` if fewer than three observations are available
+///     or X has zero variance.
+///
+/// Examples
+/// --------
+/// >>> from finstack_quant.statements_analytics import regression_fair_value
+/// >>> regression_fair_value([1.0, 2.0, 3.0, 4.0], [3.0, 5.0, 7.0, 9.0], 3.0, 10.0).residual
+/// 3.0
+#[pyfunction]
+#[pyo3(text_signature = "(x_values, y_values, subject_x, subject_y)")]
+pub(super) fn regression_fair_value(
+    x_values: Vec<f64>,
+    y_values: Vec<f64>,
+    subject_x: f64,
+    subject_y: f64,
+) -> Option<PyRegressionResult> {
+    core_regression(&x_values, &y_values, subject_x, subject_y)
+        .map(|inner| PyRegressionResult { inner })
+}
+
+/// Compute a canonical valuation multiple for one company.
+///
+/// Parameters
+/// ----------
+/// company_metrics : CompanyMetrics | dict[str, float]
+///     Typed metrics or a flat ``{metric_name: value}`` dict; only the fields
+///     the multiple needs must be populated.
+/// multiple : str
+///     Serde name of the multiple: ``ev_ebitda``, ``ev_revenue``, ``ev_ebit``,
+///     ``ev_fcf``, ``pe``, ``pb``, ``ptbv``, ``p_fcf``, ``dividend_yield``,
+///     ``spread_per_turn`` or ``yield_per_coverage``.
+///
+/// Returns
+/// -------
+/// float | None
+///     Multiple value, or ``None`` when a required input is missing or the
+///     denominator is not positive.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If ``multiple`` is not a known name or a metric value is not numeric.
+///
+/// Examples
+/// --------
+/// >>> from finstack_quant.statements_analytics import compute_multiple
+/// >>> compute_multiple({"enterprise_value": 8_500.0, "ebitda": 1_000.0}, "ev_ebitda")
+/// 8.5
+#[pyfunction]
+#[pyo3(text_signature = "(company_metrics, multiple)")]
+pub(super) fn compute_multiple(
+    company_metrics: &Bound<'_, PyAny>,
+    multiple: &str,
+) -> PyResult<Option<f64>> {
+    let metrics = match company_metrics.extract::<PyRef<'_, PyCompanyMetrics>>() {
+        Ok(typed) => typed.inner.clone(),
+        _ => dict_to_company_metrics("subject", company_metrics.cast::<PyDict>()?)?,
+    };
+    let multiple: Multiple = multiple.parse().map_err(display_to_py)?;
+    Ok(core_compute_multiple(&metrics, multiple))
+}
+
+/// Extract scoring dimensions from typed objects, serde dicts, or JSON.
+fn extract_dimensions(
+    py: Python<'_>,
+    dimensions: &Bound<'_, PyAny>,
+) -> PyResult<Vec<ScoringDimension>> {
+    if let Ok(list) = dimensions.cast::<PyList>() {
+        return list
+            .iter()
+            .map(
+                |item| match item.extract::<PyRef<'_, PyScoringDimension>>() {
+                    Ok(typed) => Ok(typed.inner.clone()),
+                    _ => crate::bindings::module_utils::spec_from_py(py, &item, "dimensions"),
+                },
+            )
+            .collect();
+    }
+    crate::bindings::module_utils::spec_from_py(py, dimensions, "dimensions")
+}
+
+/// Score a subject against its peers across weighted dimensions.
+///
+/// The composite is the weighted average of the direction-adjusted dimension
+/// scores: positive = cheap, negative = rich.
+/// Unusable dimensions (missing metrics, insufficient or degenerate samples)
+/// are excluded; regression dimensions retain their regression semantics.
+///
+/// Parameters
+/// ----------
+/// peer_set : PeerSet | dict | str
+///     Typed peer set, or the canonical serde ``PeerSet`` payload as a dict or
+///     JSON string (``{"subject": ..., "peers": [...], "period_basis": "ltm"}``).
+/// dimensions : list[ScoringDimension | dict] | str
+///     Typed dimensions, canonical ``ScoringDimension`` dicts, or a JSON list.
+///
+/// Returns
+/// -------
+/// RelativeValueResult
+///     Composite score, per-dimension breakdown, confidence and peer count.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If a payload is malformed, a direction or extractor is unknown, or the
+///     weights are negative/non-finite, no positive-weight dimension is
+///     usable, or the composite cannot be represented as a finite number.
+///
+/// Examples
+/// --------
+/// >>> from finstack_quant.statements_analytics import (
+/// ...     CompanyMetrics, PeerSet, ScoringDimension, score_relative_value,
+/// ... )
+/// >>> peers = [CompanyMetrics(f"P{i}", {"pe": float(10 * i)}) for i in (1, 2, 3)]
+/// >>> peer_set = PeerSet(CompanyMetrics("SUBJ", {"pe": 30.0}), peers, "ltm")
+/// >>> score_relative_value(peer_set, [ScoringDimension("pe", "pe", weight=1.0, direction="higher_is_rich")]).composite_score < 0
+/// True
+#[pyfunction]
+#[pyo3(text_signature = "(peer_set, dimensions)")]
+pub(super) fn score_relative_value(
+    py: Python<'_>,
+    peer_set: &Bound<'_, PyAny>,
+    dimensions: &Bound<'_, PyAny>,
+) -> PyResult<PyRelativeValueResult> {
+    let peer_set: PeerSet = match peer_set.extract::<PyRef<'_, PyPeerSet>>() {
+        Ok(typed) => typed.inner.clone(),
+        _ => crate::bindings::module_utils::spec_from_py(py, peer_set, "peer_set")?,
+    };
+    let dims = extract_dimensions(py, dimensions)?;
+    let inner = core_score(&peer_set, &dims).map_err(core_to_py)?;
+    Ok(PyRelativeValueResult { inner })
+}

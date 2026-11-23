@@ -99,7 +99,7 @@ impl Check for CashReconciliation {
                 ("cash-flow components", &components),
             ],
         )?;
-        crate::checks::helpers::validate_identity_inputs(
+        crate::checks::lookup::validate_identity_inputs(
             self.id(),
             context,
             self.tolerance,

@@ -8,6 +8,11 @@
 //! reserve earns `reserve_account_rate` on its opening balance each period,
 //! routed per [`ReserveInterestDestination`].
 
+use super::state::SimulationState;
+use finstack_quant_core::Result;
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::money::Money;
+
 use super::*;
 use crate::structured_credit::types::ReserveInterestDestination;
 
@@ -173,9 +178,15 @@ pub(super) fn route_reserve_interest(
 
 #[cfg(test)]
 mod tests {
+    use super::super::pool_flows::PoolFlows;
     use super::*;
-    use crate::structured_credit::{AssetPool, DealType, PoolAsset, Tranche, TrancheStructure};
+    use crate::structured_credit::types::TrancheSeniority;
+    use crate::structured_credit::{
+        AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
+    };
     use finstack_quant_cashflows::builder::RateSpec;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::market_data::context::MarketContext;
     use time::macros::date;
 
     fn usd(amount: f64) -> Money {

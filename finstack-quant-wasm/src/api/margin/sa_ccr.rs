@@ -4,8 +4,8 @@
 //! `SaCcrNettingSetConfig`, `SaCcrTrade` and `EadResult` are plain JSON values
 //! typed by the generated TypeScript.
 
-use super::js_date;
 use crate::utils::input::{from_js_json, js_f64, js_opt_f64, js_uint};
+use crate::utils::wire::js_date;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_margin::regulatory::sa_ccr::{
     SaCcrEngine, SaCcrNettingSetConfig, SaCcrTrade, saccr_ead as saccr_ead_rs,

@@ -11,7 +11,7 @@ from finstack_quant.core.types import Attributes
 from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments._pricing import PriceExtras, MetricPricingOverrides
 
-from finstack_quant.valuations.instruments._instruments import Bond
+from finstack_quant.valuations.instruments._instruments.bond import Bond
 from finstack_quant.valuations.instruments._typed_listed import ListedFutureTerms
 
 class BondFutureSpecs(TypedDict):

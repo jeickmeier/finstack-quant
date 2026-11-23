@@ -3,8 +3,9 @@
 //! This module contains internal helpers used by the pricing engine
 //! for period-by-period simulation.
 
-use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt};
+
+use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use std::collections::VecDeque;
 

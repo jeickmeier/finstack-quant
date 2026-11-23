@@ -1,6 +1,6 @@
 //! Metric registration and calculators.
 
-use super::common::CapletInputs;
+use super::caplet::CapletInputs;
 use crate::cap_floor::CapFloor;
 use finstack_quant_core::Result;
 use finstack_quant_core::market_data::bumps::BumpSpec;
@@ -59,7 +59,7 @@ impl MetricCalculator for DeltaCalculator {
             return greek;
         }
         let is_cap = option.rate_option_type.is_cap();
-        super::common::aggregate_over_caplets(option, context, |c: CapletInputs| {
+        super::caplet::aggregate_over_caplets(option, context, |c: CapletInputs| {
             caplet_delta(is_cap, c)
         })
     }
@@ -123,7 +123,7 @@ impl MetricCalculator for GammaCalculator {
             return greek;
         }
         let is_cap = option.rate_option_type.is_cap();
-        super::common::aggregate_over_caplets(option, context, |c: CapletInputs| {
+        super::caplet::aggregate_over_caplets(option, context, |c: CapletInputs| {
             caplet_gamma(is_cap, c)
         })
     }

@@ -3,7 +3,15 @@
 //! target OC, net-WAC carryover, the reserve target, reinvestment holds,
 //! tranche triggers, redemption) and hedge payments applied.
 
-use super::*;
+use super::super::state::{SimulationState, step_down_metrics};
+use super::step::PeriodInputs;
+use crate::structured_credit::types::{
+    PaymentCalculation, PaymentType, RecipientType, TrancheSeniority, Waterfall,
+};
+use finstack_quant_core::Result;
+use finstack_quant_core::dates::DateExt;
+use finstack_quant_core::money::Money;
+
 use crate::structured_credit::pricing::resolve;
 use crate::structured_credit::types::SwapPriority;
 use std::borrow::Cow;

@@ -5,9 +5,11 @@
 //! `SimmCurvatureSensitivity` are plain JSON values typed by the generated
 //! TypeScript.
 
-use super::{js_currency, js_date, parse_label};
+use super::parse::parse_label;
 use crate::api::core::config::JsFinstackConfig;
+use crate::utils::input::js_currency;
 use crate::utils::input::{from_js_json, js_f64, js_opt_string, js_opt_uint, js_string};
+use crate::utils::wire::js_date;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_margin as fm;
 use wasm_bindgen::prelude::*;

@@ -2,7 +2,7 @@
 
 use crate::build::BuildCtx;
 use crate::build::cds::cds_accrual_start;
-use crate::build::helpers::resolve_spot_date;
+use crate::build::spot_date::resolve_spot_date;
 use crate::quotes::CdsTrancheQuote;
 use finstack_quant_cashflows::builder::RollRule;
 use finstack_quant_cashflows::builder::ScheduleParams;

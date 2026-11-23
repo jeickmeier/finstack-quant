@@ -8,7 +8,7 @@ from typing import Literal, TypedDict
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.statements import CheckReport, CheckSuiteSpec, FinancialModelSpec
-from finstack_quant.statements_analytics._valuation import StatementValuationCut
+from finstack_quant.statements_analytics._valuation.inputs import StatementValuationCut
 
 class _CashFree(TypedDict):
     kind: Literal["cash_free_debt_free"]

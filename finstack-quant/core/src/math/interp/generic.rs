@@ -11,7 +11,7 @@ use super::{
     },
     traits::InterpolationStrategy,
     types::ExtrapolationPolicy,
-    utils::{validate_finite_series, validate_knots},
+    validation::{validate_finite_series, validate_knots},
 };
 use crate::InputError;
 

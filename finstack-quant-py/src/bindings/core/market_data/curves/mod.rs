@@ -4,20 +4,24 @@ pub mod credit;
 mod cube_expiry_slice;
 pub mod discount;
 pub mod forward;
+pub mod fx_vol_surface;
 pub mod hazard;
 pub(crate) mod helpers;
 pub mod inflation;
 pub mod price;
-pub mod surfaces;
+pub mod vol_cube;
+pub mod vol_surface;
 
 pub use credit::{PyBaseCorrelationCurve, PyCreditIndexData};
 pub use cube_expiry_slice::PyVolCubeExpirySlice;
 pub use discount::PyDiscountCurve;
 pub use forward::PyForwardCurve;
+pub use fx_vol_surface::PyFxDeltaVolSurface;
 pub use hazard::PyHazardCurve;
 pub use inflation::PyInflationCurve;
 pub use price::PyPriceCurve;
-pub use surfaces::{PyFxDeltaVolSurface, PySabrParameterData, PyVolCube, PyVolSurface};
+pub use vol_cube::{PySabrParameterData, PyVolCube};
+pub use vol_surface::PyVolSurface;
 
 use pyo3::prelude::*;
 

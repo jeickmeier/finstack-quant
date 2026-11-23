@@ -43,7 +43,7 @@ fn api_sources() -> Vec<(PathBuf, String)> {
 fn no_binding_bypasses_the_json_compatible_serializer() {
     let offenders: Vec<String> = api_sources()
         .into_iter()
-        .filter(|(path, _)| !path.ends_with("utils/mod.rs"))
+        .filter(|(path, _)| !path.ends_with("utils/serialize.rs"))
         .filter(|(_, body)| body.contains("serde_wasm_bindgen::to_value"))
         .map(|(path, _)| path.display().to_string())
         .collect();

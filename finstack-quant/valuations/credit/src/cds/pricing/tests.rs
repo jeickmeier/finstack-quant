@@ -2,7 +2,7 @@
 
 #![allow(clippy::expect_used, clippy::panic)]
 
-use super::helpers::{date_from_hazard_time, haz_t, settlement_date, sp_cond_to};
+use super::conventions::{date_from_hazard_time, haz_t, settlement_date, sp_cond_to};
 use super::*;
 use crate::cds::CreditDefaultSwap;
 use crate::constants::credit;

@@ -13,7 +13,7 @@
 //! - Rho
 //! - ImpliedVol (placeholder)
 
-mod common;
+mod caplet;
 mod dv01;
 mod implied_vol;
 mod register;

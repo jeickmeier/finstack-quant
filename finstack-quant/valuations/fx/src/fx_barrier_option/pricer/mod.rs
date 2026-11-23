@@ -7,7 +7,7 @@ mod state;
 mod tests;
 
 pub(crate) use analytical::FxBarrierOptionAnalyticalPricer;
-pub use mc::FxBarrierOptionMcPricer;
+pub(crate) use mc::FxBarrierOptionMcPricer;
 pub(crate) use mc::compute_pv;
 pub(crate) use state::resolve_fx_spot;
 use state::{

@@ -16,7 +16,9 @@ from finstack_quant.core.market_data._curves.forward import ForwardCurve
 from finstack_quant.core.market_data._curves.hazard import HazardCurve
 from finstack_quant.core.market_data._curves.inflation import InflationCurve
 from finstack_quant.core.market_data._curves.price import PriceCurve
-from finstack_quant.core.market_data._curves.surfaces import FxDeltaVolSurface, VolCube, VolSurface
+from finstack_quant.core.market_data._curves.fx_vol_surface import FxDeltaVolSurface
+from finstack_quant.core.market_data._curves.vol_cube import VolCube
+from finstack_quant.core.market_data._curves.vol_surface import VolSurface
 from finstack_quant.core.market_data._fx import FxConversionPolicy, FxMatrix, FxRateResult
 from finstack_quant.core.market_data._scalars import InflationIndex, ScalarTimeSeries
 

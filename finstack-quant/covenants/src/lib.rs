@@ -83,7 +83,7 @@ pub(crate) mod series;
 pub mod templates;
 
 pub use engine::covenant_engine::{CovenantAssessment, CovenantAssessmentState, CovenantEngine};
-pub use engine::helpers::InstrumentMutator;
+pub use engine::evaluation::InstrumentMutator;
 pub use engine::types::{
     BoundKind, ConsequenceApplication, Covenant, CovenantBreach, CovenantConsequence,
     CovenantScope, CovenantSpec, CovenantType, CovenantWaiver, CovenantWindow, SpringingCondition,

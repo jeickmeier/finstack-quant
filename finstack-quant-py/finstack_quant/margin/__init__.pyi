@@ -16,14 +16,16 @@ from __future__ import annotations
 
 from typing import Any, Final
 from finstack_quant.margin import schema as schema
-from finstack_quant.margin._types import (
+from finstack_quant.margin._types.csa import (
     OtcMarginSpec as OtcMarginSpec,
     SimmCreditClassification as SimmCreditClassification,
-    ClearingStatus as ClearingStatus,
-    CollateralAssetClass as CollateralAssetClass,
     CsaSpec as CsaSpec,
     CsaSpecBuilder as CsaSpecBuilder,
     EligibleCollateralSchedule as EligibleCollateralSchedule,
+)
+from finstack_quant.margin._types.enums import (
+    ClearingStatus as ClearingStatus,
+    CollateralAssetClass as CollateralAssetClass,
     ImCollateralResult as ImCollateralResult,
     ImMethodology as ImMethodology,
     MarginCallType as MarginCallType,
@@ -58,16 +60,18 @@ from finstack_quant.margin._metrics import (
     MarginFundingCost as MarginFundingCost,
     MarginUtilization as MarginUtilization,
 )
-from finstack_quant.margin._regulatory import (
+from finstack_quant.margin._regulatory.frtb import (
     DrcPosition as DrcPosition,
-    EadResult as EadResult,
     FrtbSbaEngine as FrtbSbaEngine,
     FrtbSbaResult as FrtbSbaResult,
     FrtbSensitivities as FrtbSensitivities,
+    frtb_sba_charge as frtb_sba_charge,
+)
+from finstack_quant.margin._regulatory.saccr import (
+    EadResult as EadResult,
     SaCcrEngine as SaCcrEngine,
     SaCcrNettingSetConfig as SaCcrNettingSetConfig,
     SaCcrTrade as SaCcrTrade,
-    frtb_sba_charge as frtb_sba_charge,
     saccr_ead as saccr_ead,
 )
 

@@ -4,7 +4,7 @@
 //! classes whose members mirror the Python classes; `FrtbSbaResult` is a plain
 //! JSON value typed by the generated TypeScript.
 
-use super::js_currency;
+use crate::utils::input::js_currency;
 use crate::utils::input::{
     from_js_json, js_bool, js_f64, js_opt_string, js_opt_string_seq, js_string, js_uint,
 };

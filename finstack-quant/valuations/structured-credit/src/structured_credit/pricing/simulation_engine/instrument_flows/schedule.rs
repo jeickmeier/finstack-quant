@@ -1,17 +1,23 @@
 //! Preparation and bucketing of contractual instrument schedules onto legal periods.
 
 use super::super::exercise::{ExerciseTerms, ExerciseWindow, worst_call_period};
+use super::super::state::WRITEDOWN_DE_MINIMIS;
 use super::super::*;
 use super::types::{
     CollateralKind, FeeComponent, FeeKind, InstrumentSchedule, InterestComponent, MarginTerms,
     NameState, PeriodBucket, PeriodDefaultSource, RevolverTerms, SpreadTerms, UtilizationTerms,
 };
+use crate::structured_credit::types::StructuredCredit;
 use crate::structured_credit::types::{
     CallExercisePolicy, CollateralInstrument, InstrumentCollateral, PutExercisePolicy,
 };
 use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{CashFlowSchedule, FloatingRateParams};
+use finstack_quant_core::Result;
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_models::monte_carlo::process::cir::CirProcess;
@@ -22,6 +28,7 @@ use finstack_quant_valuations_fixed_income::revolving_credit::{
     build_credit_spread_params,
 };
 use rust_decimal::prelude::ToPrimitive;
+use std::sync::Arc;
 
 /// Bucketed instrument schedules prepared once per valuation and shared by
 /// every path.

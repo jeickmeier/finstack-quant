@@ -22,8 +22,8 @@ def _write(root: Path, relative: str, text: str) -> None:
 
 
 def test_raw_serializer_is_allowed_only_in_the_helper(tmp_path: Path) -> None:
-    """Only `src/utils/mod.rs` may call the raw serializer."""
-    _write(tmp_path, "utils/mod.rs", "serde_wasm_bindgen::to_value(&v)\n")
+    """Only `src/utils/serialize.rs` may call the raw serializer."""
+    _write(tmp_path, "utils/serialize.rs", "serde_wasm_bindgen::to_value(&v)\n")
     _write(tmp_path, "api/core/money.rs", "let out = serde_wasm_bindgen::to_value(&v);\n")
 
     offenders = _MODULE.serializer_offenders(tmp_path)
@@ -47,7 +47,7 @@ def test_string_built_errors_are_rejected_but_comments_are_not(tmp_path: Path) -
 
 def test_clean_tree_passes(tmp_path: Path) -> None:
     """A tree with no violations exits zero."""
-    _write(tmp_path, "utils/mod.rs", "serde_wasm_bindgen::to_value(&v)\n")
+    _write(tmp_path, "utils/serialize.rs", "serde_wasm_bindgen::to_value(&v)\n")
     _write(tmp_path, "api/core/money.rs", "self.inner.checked_add(o).map_err(to_js_err)\n")
 
     assert _MODULE.main(tmp_path) == 0

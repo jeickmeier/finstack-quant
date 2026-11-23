@@ -8,8 +8,8 @@
 use crate::engine::ScenarioEffect;
 use crate::engine::{ExecutionContext, HazardApplyEnv};
 use crate::error::{Error, Result};
+use crate::interpolation::calculate_interpolation_weights;
 use crate::spec::{CurveKind, OperationSpec, TenorMatchMode};
-use crate::utils::calculate_interpolation_weights;
 use crate::warning::Warning;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, Tenor};
 use finstack_quant_core::market_data::bumps::{

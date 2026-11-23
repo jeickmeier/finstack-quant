@@ -8,8 +8,9 @@
 //! plain value. A payload-free enum variant (`"simm"`, `"daily"`, `"cash"`)
 //! has no function; its twin is the TypeScript string literal.
 
-use super::{base_money, js_currency, parse_label};
+use super::parse::{base_money, parse_label};
 use crate::api::core::config::JsFinstackConfig;
+use crate::utils::input::js_currency;
 use crate::utils::input::{from_js_json, js_f64, js_opt_bool, js_opt_f64, js_string, js_uint};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_margin as fm;

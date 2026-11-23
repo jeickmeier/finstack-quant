@@ -12,7 +12,7 @@ use crate::solver::bootstrap;
 use crate::solver::global;
 use crate::solver::traits::TimeGridAndGuesses;
 use crate::solver::traits::{BootstrapTarget, GlobalSolveTarget};
-use crate::targets::util::{scheme_factor, sorted_knot_grid, validate_global_knot_grid};
+use crate::targets::setup::{scheme_factor, sorted_knot_grid, validate_global_knot_grid};
 use finstack_quant_core::FxHashMap;
 use finstack_quant_core::Result;
 use finstack_quant_core::market_data::context::MarketContext;

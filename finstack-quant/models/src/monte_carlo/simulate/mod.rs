@@ -59,9 +59,6 @@
 //!   `docs/REFERENCES.md#bennedsen-lunde-pakkanen-2017`
 
 mod fractional;
-#[cfg(test)]
-#[path = "tests/non_markov.rs"]
-mod non_markov_tests;
 mod runner;
 mod spec;
 #[cfg(test)]

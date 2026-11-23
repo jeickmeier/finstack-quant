@@ -1,6 +1,12 @@
 //! Regression policies: decision snapshots and least-squares continuation fits.
 
-use super::*;
+use super::build::*;
+use super::engine::*;
+use super::state::*;
+use finstack_quant_core::{Error, Result};
+use finstack_quant_models::monte_carlo::pricer::polynomial::{
+    PolynomialDegree, StandardizedPolynomialPolicy,
+};
 
 #[derive(Clone)]
 pub(super) struct DecisionSnapshot {

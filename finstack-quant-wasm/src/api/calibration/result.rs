@@ -6,7 +6,7 @@
 //! the result (default load limits), exactly as `calibrationResultContentHash`
 //! does.
 
-use super::{execute_error_to_js, load_result};
+use super::execute::{execute_error_to_js, load_result};
 use crate::utils::input::{js_string, json_text};
 use crate::utils::{to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;

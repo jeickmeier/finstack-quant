@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from finstack_quant.statements._types import FinancialModelSpec
+from finstack_quant.statements._types.model import FinancialModelSpec
 
 class RollupSpec:
     """

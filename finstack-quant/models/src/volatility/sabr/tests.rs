@@ -2,7 +2,7 @@
 //!
 #![allow(clippy::expect_used, clippy::panic)]
 
-use super::calibration::solve_alpha_for_atm;
+use super::calibration::calibrator::solve_alpha_for_atm;
 use super::*;
 use finstack_quant_core::market_data::surfaces::VolQuoteType;
 

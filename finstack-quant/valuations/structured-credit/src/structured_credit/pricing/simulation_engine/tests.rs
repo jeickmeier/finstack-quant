@@ -1,6 +1,35 @@
 #[cfg(test)]
 mod cases {
+    use super::super::simulate_period::simulate_period;
     use super::super::*;
+
+    use crate::structured_credit::types::{
+        CallScope, DealFees, IncentiveFeeSpec, RecipientType, StructuredCredit, TrancheCashflows,
+        Waterfall, WaterfallDistribution,
+    };
+    use finstack_quant_core::FxHashMap;
+
+    use finstack_quant_core::dates::{
+        BusinessDayConvention, Date, DateExt, DayCount, DayCountContext,
+    };
+    use finstack_quant_core::market_data::context::MarketContext;
+
+    use finstack_quant_core::market_data::term_structures::ForwardCurve;
+    use finstack_quant_core::money::Money;
+
+    use super::super::conservation::{par_acquired_at_price, recycle_reinvestment_principal};
+    use super::super::period_helpers::{
+        SimulationPeriod, collateral_asset_rate_for_period, current_collateral_wac,
+        term_rate_for_period,
+    };
+
+    use super::super::pool_flows::{
+        AssetSeasonedRates, PoolFlowRates, RatedPoolFlowRequest, SpecialServicingFees,
+        calculate_pool_flows_with_rates,
+    };
+
+    use super::super::diagnostics::{CoverageTestBreach, NonWaterfallSource, PeriodDiagnostics};
+    use super::super::state::{SimulationState, WRITEDOWN_DE_MINIMIS, step_down_metrics};
 
     use crate::structured_credit::{AssetPool, DealType, PoolAsset, Tranche, TrancheStructure};
     use finstack_quant_cashflows::builder::RateSpec;
@@ -3144,7 +3173,7 @@ mod cases {
 
     // ── Period waterfall detail and its reconciliation to tranche flows ──
 
-    use super::super::state::tranche_credit_enhancement;
+    use super::super::diagnostics::tranche_credit_enhancement;
     use crate::structured_credit::types::CallAssumption;
 
     /// The records and the booked flows are the same `Money` values: float noise

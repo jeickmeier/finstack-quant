@@ -1,0 +1,1183 @@
+"""Stub declarations mirroring ``finstack-quant-py/src/bindings/statements_analytics/ecl/model.rs``."""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from decimal import Decimal
+from datetime import date
+from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
+from typing import Any, Literal, ClassVar, NotRequired, TypedDict
+import pandas as pd
+import polars as pl
+from finstack_quant.statements_analytics._ecl.impaired import compute_impaired_ecl
+from finstack_quant.statements_analytics._ecl.staging import QualitativeFlags, Stage, StagingConfig, classify_stage
+
+class Exposure:
+    """
+    A single credit exposure at a reporting date.
+
+    Wraps the Rust ``Exposure`` and carries the two remaining-window PDs the
+    simplified SICR test compares. ``classify_stage`` reads days past due,
+    qualitative flags, rating labels, previous stage and performing periods
+    (``ead``, ``lgd`` and ``eir`` do not affect staging); ``compute_ecl`` prices
+    ``ead + undrawn * ccf`` with ``lgd``, ``eir``, ``remaining_maturity_years`` and
+    any ``ead_schedule``.
+
+    Every parameter is keyword-only. ``current_pd`` and ``origination_pd`` are
+    held by the Python object; Rust reads the other keywords as its serde
+    ``Exposure``, supplying the defaults and rejecting unknown keywords. Keywords
+    and properties carry the Rust field names.
+
+    Parameters
+    ----------
+    id : str
+        Unique identifier for the exposure.
+    ead : float
+        Drawn outstanding balance at the reporting date, in base currency.
+    lgd : float
+        Loss given default as a decimal fraction in ``[0, 1]``. For Stage 3,
+        this is the undiscounted loss fraction; allowance is current EAD less
+        discounted recovery ``(1 - lgd) * EAD``.
+    eir : float
+        Effective interest rate as a decimal annual rate, used as the IFRS 9
+        discount rate.
+    remaining_maturity_years : float
+        Remaining maturity in years.
+    current_pd : float
+        Current probability of default from reporting over
+        ``h = min(remaining_maturity_years, 30.0)`` years, as a decimal in ``[0, 1]``.
+    origination_pd : float
+        Initial-recognition expected PD for that same remaining window,
+        conditional on survival to the reporting date, as a decimal in ``[0, 1]``.
+        For original cumulative curve ``F``, elapsed years ``a`` and the capped
+        horizon ``h = min(remaining_maturity_years, 30.0)``, supply
+        ``(F(a + h) - F(a)) / (1 - F(a))``.
+    days_past_due : int
+        Days past due. Default ``0`` (performing).
+    undrawn : float
+        Undrawn commitment in the same currency as ``ead``. Default ``0.0``.
+    ccf : float
+        Credit-conversion factor applied to ``undrawn``, decimal in ``[0, 1]``.
+        Default ``0.75`` (Basel IRB revolver).
+    current_rating : str | None
+        Current rating label, used with ``origination_rating`` for the
+        rating-downgrade trigger. Default ``None``.
+    origination_rating : str | None
+        Rating label at initial recognition. Default ``None``.
+    qualitative_flags : QualitativeFlags
+        SICR and default-evidence flags. Default: no flags.
+    previous_stage : Stage | str | None
+        Stage assigned at the previous reporting date, enabling the curing
+        rules. Accepts a ``Stage`` or ``"stage1"``, ``"stage2"``, or
+        ``"stage3"``. Default ``None``.
+    consecutive_performing_periods : int
+        Performing periods since the last trigger, for curing. Default ``0``.
+    ead_schedule : list[tuple[float, float]] | None
+        Optional EAD amortisation profile as ``(time_years, ead)`` knots.
+    segments : list[str]
+        Portfolio segment keys. Default ``[]``.
+
+    Raises
+    ------
+    ValueError
+        If a required keyword is missing, a keyword is unknown, a value does
+        not have its wire form (``None`` for a non-optional field, a
+        non-finite float), or ``previous_stage`` is neither a ``Stage`` nor a
+        recognized stage string. Financial inputs are validated by staging and
+        ECL calculations.
+    TypeError
+        If a positional argument is passed.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import Exposure
+    >>> Exposure(
+    ...     id="loan",
+    ...     ead=1_000_000.0,
+    ...     lgd=0.45,
+    ...     eir=0.06,
+    ...     remaining_maturity_years=3.0,
+    ...     current_pd=0.02,
+    ...     origination_pd=0.015,
+    ... ).days_past_due
+    0
+    """
+    def __init__(
+        self,
+        *,
+        id: str,
+        ead: float,
+        lgd: float,
+        eir: float,
+        remaining_maturity_years: float,
+        current_pd: float,
+        origination_pd: float,
+        days_past_due: int = 0,
+        undrawn: float = 0.0,
+        ccf: float = 0.75,
+        current_rating: str | None = None,
+        origination_rating: str | None = None,
+        qualitative_flags: QualitativeFlags = ...,
+        previous_stage: Stage | str | None = None,
+        consecutive_performing_periods: int = 0,
+        ead_schedule: list[tuple[float, float]] | None = None,
+        segments: list[str] = ...,
+    ) -> None: ...
+    @property
+    def current_pd(self) -> float:
+        """Current reporting-date PD over the capped SICR window.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Decimal probability in ``[0, 1]`` over
+            ``min(remaining_maturity_years, 30.0)`` years, covering the same window
+            as ``origination_pd``; validated when staging runs.
+        """
+    @current_pd.setter
+    def current_pd(self, value: float) -> None:
+        """Replace the current PD used by subsequent staging calls.
+
+        Parameters
+        ----------
+        value : float
+            Decimal PD from reporting over ``min(remaining_maturity_years, 30.0)`` years.
+            Staging rejects non-finite values or probabilities outside ``[0, 1]``.
+
+        This setter stores the value, does not raise, and leaves validation to staging.
+        """
+    @property
+    def origination_pd(self) -> float:
+        """Initial-recognition expected PD for the same capped SICR window.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Decimal PD conditional on survival to reporting. For original
+            cumulative curve ``F``, age ``a`` and
+            ``h = min(remaining_maturity_years, 30.0)``, this is
+            ``(F(a + h) - F(a)) / (1 - F(a))``.
+        """
+    @origination_pd.setter
+    def origination_pd(self, value: float) -> None:
+        """Replace the original expected PD used by subsequent staging calls.
+
+        Parameters
+        ----------
+        value : float
+            Decimal PD over the same capped SICR window as ``current_pd``,
+            conditional on survival to reporting, in ``[0, 1]``.
+
+        This setter stores the value, does not raise, and leaves validation to staging.
+        """
+    @property
+    def id(self) -> str:
+        """
+        Unique identifier for the exposure.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Unique identifier for the exposure.
+        """
+    @property
+    def ead(self) -> float:
+        """
+        Drawn outstanding balance in base currency.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Drawn outstanding balance in base currency.
+        """
+    @property
+    def undrawn(self) -> float:
+        """
+        Undrawn commitment in the same currency as ``ead``.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Undrawn commitment in the same currency as ``ead``.
+        """
+    @property
+    def ccf(self) -> float:
+        """
+        Credit-conversion factor applied to ``undrawn`` (decimal in ``[0, 1]``).
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Credit-conversion factor applied to ``undrawn`` (decimal in ``[0, 1]``).
+        """
+    @property
+    def lgd(self) -> float:
+        """
+        Loss given default as a decimal fraction.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Loss given default as a decimal fraction.
+        """
+    @property
+    def eir(self) -> float:
+        """
+        Effective interest rate as a decimal annual rate.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Effective interest rate as a decimal annual rate.
+        """
+    @property
+    def remaining_maturity_years(self) -> float:
+        """
+        Remaining maturity in years.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Remaining maturity in years.
+        """
+    @property
+    def days_past_due(self) -> int:
+        """
+        Days the exposure is past due at the reporting date.
+
+        This property does not raise.
+
+        Returns
+        -------
+        int
+            Whole days past due; ``0`` for a performing exposure.
+        """
+    @property
+    def current_rating(self) -> str | None:
+        """
+        Current rating label, or ``None``.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str | None
+            Current rating label, or ``None``.
+        """
+    @property
+    def origination_rating(self) -> str | None:
+        """
+        Rating label at initial recognition, or ``None``.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str | None
+            Rating label at initial recognition, or ``None``.
+        """
+    @property
+    def qualitative_flags(self) -> QualitativeFlags:
+        """
+        SICR and default-evidence flags.
+
+        This property does not raise.
+
+        Returns
+        -------
+        QualitativeFlags
+            SICR and default-evidence flags.
+        """
+    @property
+    def previous_stage(self) -> Stage | None:
+        """
+        Stage at the previous reporting date, or ``None``.
+
+        This property does not raise.
+
+        Returns
+        -------
+        Stage | None
+            Stage at the previous reporting date, or ``None``.
+        """
+    @property
+    def consecutive_performing_periods(self) -> int:
+        """
+        Performing periods since the last trigger.
+
+        This property does not raise.
+
+        Returns
+        -------
+        int
+            Performing periods since the last trigger.
+        """
+    @property
+    def ead_schedule(self) -> list[tuple[float, float]] | None:
+        """
+        EAD amortisation profile as ``(time_years, ead)`` knots, or ``None``.
+
+        This property does not raise.
+
+        Returns
+        -------
+        list[tuple[float, float]] | None
+            EAD amortisation profile as ``(time_years, ead)`` knots, or ``None``.
+        """
+    @property
+    def segments(self) -> list[str]:
+        """
+        Portfolio segment keys.
+
+        This property does not raise.
+
+        Returns
+        -------
+        list[str]
+            Portfolio segment keys.
+        """
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export the exposure as a single-row ``ArrowTable``.
+
+        Columns: ``id``, ``ead``, ``undrawn``, ``ccf``, ``lgd``, ``eir``,
+        ``remaining_maturity_years``, ``current_pd``, ``origination_pd``, ``days_past_due``,
+        ``current_rating``, ``origination_rating``. Amounts are in the
+        exposure's base currency; ``ccf``, ``lgd`` and the PDs are decimal
+        fractions; ``eir`` is a decimal annual rate; ``remaining_maturity_years`` is
+        in years; ``days_past_due`` is whole days.
+
+        Returns
+        -------
+        ArrowTable
+            Single-row Arrow table representing the exposure.
+
+        Raises
+        ------
+        ValueError
+            If the exposure cannot be converted to an Arrow table.
+        """
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the exposure as a single-row pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow`.
+
+        Returns
+        -------
+        pd.DataFrame
+            Single-row DataFrame representing the exposure.
+
+        Raises
+        ------
+        ImportError
+            If pandas is not installed in the running interpreter.
+        ValueError
+            If the exposure cannot be converted to a pandas DataFrame.
+        """
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the exposure as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Single-row Polars frame representing the exposure.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed in the running interpreter.
+        ValueError
+            If the exposure cannot be converted to a Polars DataFrame.
+        """
+    def to_pyarrow(self) -> Any:
+        """
+        Export the exposure as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row PyArrow table representing the exposure.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed in the running interpreter.
+        ValueError
+            If the exposure cannot be converted to a PyArrow table.
+        """
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+
+class EclBucket:
+    """
+    One integration bucket of an ECL calculation.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import EclBucket
+    >>> [field for field in ("t_start", "t_end") if hasattr(EclBucket, field)]
+    ['t_start', 't_end']
+    """
+    @property
+    def t_start(self) -> float:
+        """
+        Bucket start in years.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Bucket start in years.
+        """
+    @property
+    def t_end(self) -> float:
+        """
+        Bucket end in years.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Bucket end in years.
+        """
+    @property
+    def marginal_pd(self) -> float:
+        """
+        Marginal default probability within the bucket (decimal).
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Marginal default probability within the bucket (decimal).
+        """
+    @property
+    def lgd(self) -> float:
+        """
+        Loss given default applied in the bucket (decimal).
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Loss given default applied in the bucket (decimal).
+        """
+    @property
+    def ead(self) -> float:
+        """
+        Exposure at default in the bucket, in base currency.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Exposure at default in the bucket, in base currency.
+        """
+    @property
+    def discount_factor(self) -> float:
+        """
+        Discount factor at the bucket midpoint, or at recovery for Stage 3.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Discount factor at the bucket midpoint, or at recovery for Stage 3.
+        """
+    @property
+    def ecl(self) -> float:
+        """
+        Bucket ECL contribution in base currency.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Bucket ECL contribution in base currency.
+        """
+
+class EclResult:
+    """
+    ECL for one exposure under one PD scenario, with bucket detail.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import EclResult
+    >>> EclResult.from_json("{")
+    Traceback (most recent call last):
+    ValueError: ...
+    """
+    @property
+    def exposure_id(self) -> str:
+        """
+        Exposure identifier.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Exposure identifier.
+        """
+    @property
+    def stage(self) -> Stage:
+        """
+        Stage used for the measurement horizon.
+
+        This property does not raise.
+
+        Returns
+        -------
+        Stage
+            Stage used for the measurement horizon.
+        """
+    @property
+    def ecl(self) -> float:
+        """
+        Total ECL in the exposure's base currency.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Total ECL in the exposure's base currency.
+        """
+    @property
+    def horizon(self) -> float:
+        """
+        Measurement horizon in years.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Measurement horizon in years.
+        """
+    @property
+    def buckets(self) -> list[EclBucket]:
+        """
+        Bucket-level contributions in time order.
+
+        This property does not raise.
+
+        Returns
+        -------
+        list[EclBucket]
+            Bucket-level contributions in time order.
+        """
+    @property
+    def meta(self) -> Any:
+        """
+        Result metadata (numeric mode, rounding context) as a dict.
+
+        This property does not raise.
+
+        Returns
+        -------
+        Any
+            Result metadata (numeric mode, rounding context) as a dict.
+        """
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export the buckets as an ``ArrowTable``.
+
+        Columns: ``t_start``, ``t_end`` (years), ``marginal_pd``, ``lgd``
+        (decimals), ``ead``, ``ecl`` (base currency), ``discount_factor``.
+        One row per bucket in time order.
+
+        Returns
+        -------
+        ArrowTable
+            Bucket-level ECL schedule table.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to an Arrow table.
+        """
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the buckets as a pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow`. One row per bucket in time order.
+
+        Returns
+        -------
+        pd.DataFrame
+            Bucket-level ECL schedule frame.
+
+        Raises
+        ------
+        ImportError
+            If pandas is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a pandas DataFrame.
+        """
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the buckets as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Bucket-level ECL schedule frame.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+    def to_pyarrow(self) -> Any:
+        """
+        Export the buckets as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Bucket-level ECL schedule table.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_json(self) -> str:
+        """
+        Serialize to canonical JSON.
+
+        Returns
+        -------
+        str
+            Canonical JSON encoding of this value, accepted by
+            :meth:`from_json`.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+    @staticmethod
+    def from_json(json: str) -> EclResult:
+        """
+        Deserialize from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON document produced by :meth:`to_json`, in this type's
+            canonical wire schema.
+
+        Returns
+        -------
+        EclResult
+            The value decoded from the supplied JSON document.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is not a valid ``EclResult`` document.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import EclResult
+        >>> EclResult.from_json("{")
+        Traceback (most recent call last):
+        ValueError: ...
+        """
+
+class EclScenario:
+    """Named cumulative-PD curve and optional scenario-specific LGD.
+
+    Examples
+    --------
+    >>> from decimal import Decimal
+    >>> from finstack_quant.statements_analytics import EclScenario
+    >>> downside = EclScenario(
+    ...     id="downside",
+    ...     weight=Decimal("0.2"),
+    ...     pd_schedule=[(0.0, 0.0), (1.0, 0.08)],
+    ...     lgd_override=0.55,
+    ... )
+    >>> isinstance(downside, EclScenario)
+    True
+    """
+
+    def __init__(
+        self,
+        *,
+        id: str,
+        weight: Decimal | str,
+        pd_schedule: list[tuple[float, float]] | None = None,
+        lgd_override: float | None = None,
+    ) -> None:
+        """Author the joint scenario inputs used by the Rust measurement engine.
+
+        Parameters
+        ----------
+        id : str
+            Unique nonempty identifier within the elected scenario set.
+        weight : Decimal or str
+            Exact decimal probability in [0, 1]. The request weights must sum exactly to one.
+        pd_schedule : list of pairs or None
+            Sorted year and cumulative default probability pairs. Start at (0, 0)
+            and cover the selected horizon. None records absent evidence.
+        lgd_override : float or None
+            Scenario loss fraction in [0, 1]. None uses the exposure's LGD.
+
+        Raises
+        ------
+        ValueError
+            If the weight has invalid decimal syntax or cannot be represented exactly.
+        TypeError
+            If the weight or schedule is given in an unsupported host type.
+        """
+        ...
+
+class EclScenarioOutcome:
+    """One authored scenario, its exact weight, and its allowance evidence.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import EclScenarioOutcome
+    >>> hasattr(EclScenarioOutcome, "status")
+    True
+    """
+
+    @property
+    def id(self) -> str:
+        """Get the scenario's unique request identifier.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Same identifier that was supplied in the request.
+        """
+        ...
+
+    @property
+    def weight(self) -> Decimal:
+        """Get the exact scenario probability.
+
+        Returns
+        -------
+        Decimal
+            Decimal probability from the authored scenario set.
+
+        Raises
+        ------
+        ImportError
+            If the standard decimal module is unavailable.
+        """
+        ...
+
+    @property
+    def lgd_override(self) -> float | None:
+        """Get the scenario's elected LGD override.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float or None
+            Loss fraction in [0, 1], or None when the exposure LGD applies.
+        """
+        ...
+
+    @property
+    def status(self) -> Literal["measured", "unavailable", "zero_weight"]:
+        """Identify this scenario’s appraisal status.
+
+        This property does not raise.
+
+        Returns
+        -------
+        Literal["measured", "unavailable", "zero_weight"]
+            The measured, unavailable or zero-weight state.
+        """
+        ...
+
+    @property
+    def result(self) -> EclResult | None:
+        """Get the reserve calculation and dated buckets.
+
+        This property does not raise.
+
+        Returns
+        -------
+        EclResult | None
+            The scenario calculation, or None when no measurement was made.
+        """
+        ...
+
+    @property
+    def weighted_allowance(self) -> float | None:
+        """Get the scenario’s contribution to the total reserve.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float | None
+            Allowance in exposure currency, zero for zero-weight rows, or None if unavailable.
+        """
+        ...
+
+    @property
+    def reason(self) -> str | None:
+        """Identify the evidence missing from this scenario.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str | None
+            Explanation for an unavailable row, or None otherwise.
+        """
+        ...
+
+class WeightedEclResult:
+    """Probability-weighted ECL across macro scenarios with the per-scenario
+    audit trail.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import Exposure, compute_ecl
+    >>> exp = Exposure(
+    ...     id="loan",
+    ...     ead=1_000_000.0,
+    ...     lgd=0.45,
+    ...     eir=0.06,
+    ...     remaining_maturity_years=3.0,
+    ...     current_pd=0.02,
+    ...     origination_pd=0.015,
+    ... )
+    >>> result = compute_ecl(exp, [(1.0, 0.02), (3.0, 0.06)], stage="stage2")
+    >>> result.stage.value
+    'stage2'
+    >>> list(result.to_pandas().columns)[:2]
+    ['scenario', 'weight']
+    """
+    @property
+    def exposure_id(self) -> str:
+        """
+        Exposure identifier.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Exposure identifier.
+        """
+    @property
+    def stage(self) -> Stage:
+        """
+        Stage used for the measurement horizon.
+
+        This property does not raise.
+
+        Returns
+        -------
+        Stage
+            Stage used for the measurement horizon.
+        """
+    @property
+    def ecl(self) -> float | None:
+        """
+        Probability-weighted ECL in exposure currency when all required evidence is present.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float or None
+            Probability-weighted ECL in exposure currency when all required evidence is present, or None when a positive-weight scenario is unavailable.
+        """
+    @property
+    def scenario_breakdown(self) -> list[EclScenarioOutcome]:
+        """
+        Named scenarios in request order, including rows with missing or zero-weight evidence.
+
+        This property does not raise.
+
+        Returns
+        -------
+        list[EclScenarioOutcome]
+            Named scenarios in request order, including rows with missing or zero-weight evidence.
+        """
+    @property
+    def meta(self) -> Any:
+        """
+        Result metadata (numeric mode, rounding context) as a dict.
+
+        This property does not raise.
+
+        Returns
+        -------
+        Any
+            Result metadata (numeric mode, rounding context) as a dict.
+        """
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export the scenario x bucket audit trail as an ``ArrowTable``.
+
+        Columns: ``scenario`` (scenario id), ``weight`` (decimal probability string),
+        ``t_start``, ``t_end`` (years), ``marginal_pd``, ``lgd`` (decimals),
+        ``ead``, ``ecl`` (base currency, unweighted per scenario),
+        ``discount_factor``. One row per (scenario, bucket).
+
+        Returns
+        -------
+        ArrowTable
+            Scenario-by-bucket audit trail table.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to an Arrow table.
+        """
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the scenario x bucket audit trail as a pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow`. One row per (scenario, bucket).
+
+        Returns
+        -------
+        pd.DataFrame
+            Scenario-by-bucket audit trail DataFrame.
+
+        Raises
+        ------
+        ImportError
+            If pandas is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a pandas DataFrame.
+        """
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the scenario x bucket audit trail as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Scenario-by-bucket audit trail Polars frame.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+    def to_pyarrow(self) -> Any:
+        """
+        Export the scenario x bucket audit trail as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Scenario-by-bucket audit trail PyArrow table.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_json(self) -> str:
+        """
+        Serialize to canonical JSON.
+
+        Returns
+        -------
+        str
+            Canonical JSON encoding of this value, accepted by
+            :meth:`from_json`.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+    @staticmethod
+    def from_json(json: str) -> WeightedEclResult:
+        """
+        Deserialize from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON document produced by :meth:`to_json`, in this type's
+            canonical wire schema.
+
+        Returns
+        -------
+        WeightedEclResult
+            The value decoded from the supplied JSON document.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is not a valid ``WeightedEclResult`` document.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import WeightedEclResult
+        >>> WeightedEclResult.from_json("{")
+        Traceback (most recent call last):
+        ValueError: ...
+        """
+
+def compute_ecl(
+    exposure: Exposure,
+    pd_schedule: list[tuple[float, float]],
+    stage: Stage | str,
+    bucket_width_years: float | None = None,
+) -> WeightedEclResult:
+    """Compute single-scenario ECL for one exposure.
+
+    The priced exposure at default is ``ead + undrawn * ccf``; ``lgd``, ``eir``,
+    ``remaining_maturity_years`` and any ``ead_schedule`` are read from the exposure.
+
+    Parameters
+    ----------
+    exposure : Exposure
+        The credit exposure to measure.
+    pd_schedule : list[tuple[float, float]]
+        Cumulative PD curve as ``[(time_years, cumulative_pd), ...]``, ascending
+        in time and non-decreasing in PD. A ``(0.0, 0.0)`` knot is inserted
+        when absent.
+    stage : Stage | str
+        Measurement stage (``Stage`` or serde name ``"stage1"`` or ``"stage2"``). Required: classify first with ``classify_stage`` under
+        the desk's ``StagingConfig`` and pass ``result.stage``. For Stage 3 use ``compute_impaired_ecl``.
+    bucket_width_years : float | None
+        Finite integration width of at least 0.0001 years (``0.25`` = quarterly); ``None`` uses
+        the canonical policy default.
+
+    Returns
+    -------
+    WeightedEclResult
+        ``ecl`` in base currency, the ``stage`` used, and a one-scenario
+        ``scenario_breakdown`` with bucket detail (``to_pandas()`` / ``to_arrow()``).
+
+    Raises
+    ------
+    ValueError
+        If ``stage`` is unknown, the PD or EAD schedule is invalid, or an
+        exposure input is outside its accepted range.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import Exposure, classify_stage, compute_ecl
+    >>> exp = Exposure(
+    ...     id="loan",
+    ...     ead=1_000_000.0,
+    ...     lgd=0.45,
+    ...     eir=0.06,
+    ...     remaining_maturity_years=3.0,
+    ...     current_pd=0.02,
+    ...     origination_pd=0.015,
+    ... )
+    >>> stage = classify_stage(exp).stage
+    >>> compute_ecl(exp, [(1.0, 0.02), (3.0, 0.06)], stage).ecl > 0
+    True
+    """
+
+def compute_ecl_weighted(
+    exposure: Exposure,
+    scenarios: list[EclScenario],
+    stage: Stage | str,
+    bucket_width_years: float | None = None,
+) -> WeightedEclResult:
+    """Compute probability-weighted ECL across macro scenarios.
+
+    Parameters
+    ----------
+    exposure : Exposure
+        The credit exposure to measure (EAD is ``ead + undrawn * ccf``).
+    scenarios : list[EclScenario]
+        Unique named scenarios with exact weights summing to one. Positive
+        schedules start at (0, 0) and cover the measurement horizon, and LGD
+        may be elected separately for each scenario.
+    stage : Stage | str
+        Measurement stage (required); classify first with ``classify_stage``
+        under the desk's ``StagingConfig`` and pass ``result.stage``. For Stage 3 use ``compute_impaired_ecl``.
+    bucket_width_years : float | None
+        Finite integration width of at least 0.0001 years; ``None`` uses the canonical default.
+
+    Returns
+    -------
+    WeightedEclResult
+        Per-scenario allowance evidence and aggregate ECL. The aggregate is
+        None when any positive-weight scenario lacks required evidence.
+
+    Raises
+    ------
+    ValueError
+        If ``scenarios`` is empty, weights do not sum to ``1.0``, ``stage`` is
+        unknown, a schedule is invalid, or an exposure input is out of range.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import EclScenario, Exposure, compute_ecl_weighted
+    >>> exp = Exposure(
+    ...     id="loan",
+    ...     ead=1_000_000.0,
+    ...     lgd=0.45,
+    ...     eir=0.06,
+    ...     remaining_maturity_years=1.0,
+    ...     current_pd=0.02,
+    ...     origination_pd=0.015,
+    ... )
+    >>> scenarios = [
+    ...     EclScenario(id="base", weight="0.7", pd_schedule=[(0.0, 0.0), (1.0, 0.02)]),
+    ...     EclScenario(id="down", weight="0.3", pd_schedule=[(0.0, 0.0), (1.0, 0.05)]),
+    ... ]
+    >>> len(compute_ecl_weighted(exp, scenarios, stage="stage1").scenario_breakdown)
+    2
+    """

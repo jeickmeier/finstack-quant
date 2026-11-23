@@ -8,7 +8,7 @@ import pandas as pd
 import polars as pl
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.table import ArrowTable
-from finstack_quant.valuations.instruments._instruments import Bond
+from finstack_quant.valuations.instruments._instruments.bond import Bond
 
 class BondQuoteSet:
     """

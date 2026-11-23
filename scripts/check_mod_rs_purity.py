@@ -1,22 +1,30 @@
 """Fail on logic-bearing `mod.rs` files or mixed `foo.rs` + `foo/` module roots.
 
-Every domain crate under `finstack-quant/` keeps `mod.rs` as pure module wiring
-(attributes, `mod <name>;` declarations, and `use`/`pub use` re-exports) and
-avoids mixed module roots where `foo.rs` sits beside a `foo/` directory of
-submodules or sibling `tests.rs`.
+Every Rust crate under `finstack-quant/` and `finstack-quant-wasm/` keeps
+`mod.rs` as pure module wiring (attributes, `mod <name>;` declarations, and
+`use`/`pub use` re-exports) and avoids mixed module roots where `foo.rs` sits
+beside a `foo/` directory of submodules or sibling `tests.rs`.
 
-Allowed inside `mod.rs`:
+`finstack-quant-py/` follows the same rule while allowing PyO3 submodule
+registration wiring (`fn register*`, `fn add_*`, `const EXPORTS`, and the
+`use` imports they reference) inside `mod.rs`.
+
+Allowed inside domain and WASM `mod.rs`:
 - doc comments, inner/outer attributes (`#![...]`, `#[...]`),
 - out-of-line module declarations (`mod foo;`, including `#[cfg(test)] mod tests;`),
-- `use` / `pub(...) use` imports and re-exports,
+- `pub(...) use` re-exports and at most 3 private non-glob `use` statements
+  (excluding `#[cfg(doc)]` doc-link imports),
 - `#[cfg(doctest)] struct ReadmeDoctests;`,
 - pure inline re-export umbrella modules (`pub mod foo { pub use ...; }`).
 
 Forbidden inside `mod.rs`:
 - any `fn`, `struct`, `enum`, `union`, `trait`, `impl`, `const`, `static`,
-  `type`, or `macro_rules!` item (other than `ReadmeDoctests`),
+  `type`, or `macro_rules!` item (other than `ReadmeDoctests`, or PyO3
+  registration wiring in `finstack-quant-py/`),
 - any inline `mod <name> { ... }` containing logic or inline tests (extract to
-  a sibling `.rs` file or `tests.rs`).
+  a sibling `.rs` file or `tests.rs`),
+- any private glob import (`use ...::*;`) or >3 private `use` statements in
+  domain/WASM `mod.rs` (implicit-prelude `mod.rs` pattern).
 
 `--report` lists findings without failing.
 """
@@ -31,9 +39,14 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from rust_source import SKIPPED_DIRS, is_test_file
+from rust_source import SKIPPED_DIRS
 
-DOMAIN_ROOT = "finstack-quant"
+STRICT_ROOTS = ("finstack-quant", "finstack-quant-wasm")
+PY_BINDING_ROOT = "finstack-quant-py"
+ALL_ROOTS = (*STRICT_ROOTS, PY_BINDING_ROOT)
+MAX_PRIVATE_USES_IN_MOD_RS = 3
+PY_ALLOWED_FN_PREFIXES = ("register", "add_")
+PY_ALLOWED_CONST_NAMES = frozenset({"EXPORTS"})
 FORBIDDEN_ITEMS = frozenset({
     "const",
     "enum",
@@ -203,10 +216,14 @@ def _check_mod_block(
     end: int,
     rel: str,
     findings: list[str],
+    *,
+    allow_py_registration: bool = False,
 ) -> None:
     """Inspect a module token slice `[start, end)` for non-wiring items."""
     idx = start
     pending_attrs: list[str] = []
+    private_use_count = 0
+    first_private_use_line: int | None = None
 
     while idx < end:
         tok_line, kind, text = tokens[idx]
@@ -221,19 +238,35 @@ def _check_mod_block(
 
         # Consume leading visibility and modifiers (`pub`, `pub(crate)`, `unsafe`, `async`, `default`).
         item_line = tok_line
+        is_pub = False
         while idx < end and tokens[idx][1] == "ident" and tokens[idx][2] in VISIBILITY_MODIFIERS:
             mod_kw = tokens[idx][2]
             idx += 1
-            if mod_kw == "pub" and idx < end and tokens[idx][1] == "punct" and tokens[idx][2] == "(":
-                idx = _skip_parens(tokens, idx)
+            if mod_kw == "pub":
+                is_pub = True
+                if idx < end and tokens[idx][1] == "punct" and tokens[idx][2] == "(":
+                    idx = _skip_parens(tokens, idx)
 
         if idx >= end:
             break
 
         kw_line, kw_kind, kw = tokens[idx]
         if kw_kind == "ident" and kw == "use":
+            is_cfg_doc = any(re.search(r"#\[\s*cfg\s*\(\s*doc\s*\)\s*\]", attr) for attr in pending_attrs)
             pending_attrs.clear()
-            idx = _skip_statement(tokens, idx + 1)
+            stmt_end = _skip_statement(tokens, idx + 1)
+            if not is_pub and not is_cfg_doc:
+                use_tokens = [tok[2] for tok in tokens[idx + 1 : stmt_end] if tok[1] in ("ident", "punct")]
+                has_glob = "*" in use_tokens
+                is_pyo3_prelude = allow_py_registration and "".join(use_tokens).rstrip(";") == "pyo3::prelude::*"
+                if has_glob and not is_pyo3_prelude:
+                    findings.append(
+                        f"{rel}:{kw_line}: private glob `use ...::*;` in mod.rs; import explicitly in child modules"
+                    )
+                private_use_count += 1
+                if first_private_use_line is None:
+                    first_private_use_line = kw_line
+            idx = stmt_end
             continue
 
         if kw_kind == "ident" and kw == "mod":
@@ -263,7 +296,14 @@ def _check_mod_block(
                     )
                 else:
                     sub_findings: list[str] = []
-                    _check_mod_block(tokens, body_start, body_end, rel, sub_findings)
+                    _check_mod_block(
+                        tokens,
+                        body_start,
+                        body_end,
+                        rel,
+                        sub_findings,
+                        allow_py_registration=allow_py_registration,
+                    )
                     findings.extend(sub_findings)
                 idx = cursor
                 continue
@@ -271,16 +311,18 @@ def _check_mod_block(
             continue
 
         if kw_kind == "ident" and kw in FORBIDDEN_ITEMS:
+            next_name = tokens[idx + 1][2] if idx + 1 < end and tokens[idx + 1][1] == "ident" else ""
             # Permit the README doctest marker: `#[cfg(doctest)] struct ReadmeDoctests;`
             is_readme_doctest = (
-                kw == "struct"
-                and idx + 1 < end
-                and tokens[idx + 1][1] == "ident"
-                and tokens[idx + 1][2] == "ReadmeDoctests"
-                and any("doctest" in attr for attr in pending_attrs)
+                kw == "struct" and next_name == "ReadmeDoctests" and any("doctest" in attr for attr in pending_attrs)
+            )
+            # In finstack-quant-py, permit PyO3 module registration wiring (`fn register*`, `fn add_*`, `const EXPORTS`).
+            is_py_wiring = allow_py_registration and (
+                (kw == "fn" and next_name.startswith(PY_ALLOWED_FN_PREFIXES))
+                or (kw == "const" and (next_name in PY_ALLOWED_CONST_NAMES or next_name.endswith("_EXPORTS")))
             )
             pending_attrs.clear()
-            if not is_readme_doctest:
+            if not is_readme_doctest and not is_py_wiring:
                 label = "macro_rules!" if kw == "macro_rules" else kw
                 findings.append(
                     f"{rel}:{kw_line}: `{label}` item in mod.rs; move logic/definitions to a sibling module"
@@ -294,39 +336,49 @@ def _check_mod_block(
             findings.append(f"{rel}:{kw_line}: macro invocation `{kw}!` in mod.rs; move logic to a sibling module")
         idx = _skip_statement(tokens, idx + 1)
 
+    if (
+        not allow_py_registration
+        and private_use_count > MAX_PRIVATE_USES_IN_MOD_RS
+        and first_private_use_line is not None
+    ):
+        findings.append(
+            f"{rel}:{first_private_use_line}: {private_use_count} private `use` statements in mod.rs "
+            f"(max {MAX_PRIVATE_USES_IN_MOD_RS}); import directly in child modules instead of using mod.rs as an implicit prelude"
+        )
 
-def _iter_domain_src_files(root: Path) -> Iterator[Path]:
-    """Yield every non-test `.rs` file under `finstack-quant/**/src/`."""
-    base = root / DOMAIN_ROOT
-    if not base.is_dir():
-        return
-    for path in sorted(base.rglob("*.rs")):
-        rel_parts = path.relative_to(root).parts
-        if "src" not in rel_parts:
+
+def _iter_src_files(root: Path, roots: tuple[str, ...] = ALL_ROOTS) -> Iterator[Path]:
+    """Yield every `.rs` file under `<root_dir>/**/src/` for the configured workspace roots."""
+    for sub in roots:
+        base = root / sub
+        if not base.is_dir():
             continue
-        if any(part in SKIPPED_DIRS or part.startswith(".") for part in rel_parts):
-            continue
-        if is_test_file(path):
-            continue
-        yield path
+        for path in sorted(base.rglob("*.rs")):
+            rel_parts = path.relative_to(root).parts
+            if "src" not in rel_parts:
+                continue
+            if any(part in SKIPPED_DIRS or part.startswith(".") for part in rel_parts):
+                continue
+            yield path
 
 
 def mod_rs_findings(root: Path) -> list[str]:
-    """Every logic-bearing `mod.rs` item under `finstack-quant/**/src/`, as `path:line: message`."""
+    """Every logic-bearing `mod.rs` item across domain, WASM, and Python binding crates."""
     found: list[str] = []
-    for path in _iter_domain_src_files(root):
+    for path in _iter_src_files(root):
         if path.name != "mod.rs":
             continue
         rel = path.relative_to(root).as_posix()
+        allow_py = rel.startswith(PY_BINDING_ROOT + "/")
         tokens = list(_tokenize_rust(path.read_text(encoding="utf-8", errors="ignore")))
-        _check_mod_block(tokens, 0, len(tokens), rel, found)
+        _check_mod_block(tokens, 0, len(tokens), rel, found, allow_py_registration=allow_py)
     return found
 
 
 def mixed_root_findings(root: Path) -> list[str]:
     """Every `foo.rs` paired with a sibling `foo/` directory containing `.rs` files."""
     found: list[str] = []
-    for path in _iter_domain_src_files(root):
+    for path in _iter_src_files(root):
         if path.name in NON_ROOT_SPECIAL_NAMES:
             continue
         sibling_dir = path.with_suffix("")
@@ -347,9 +399,9 @@ def main(argv: list[str] | None = None) -> int:
     for finding in found:
         print(finding)
     if found:
-        print(f"{len(found)} mod.rs purity or mixed-module-root violation(s) in domain Rust crates.")
+        print(f"{len(found)} mod.rs purity or mixed-module-root violation(s) in workspace Rust crates.")
         return 0 if args.report else 1
-    print("All domain mod.rs files are pure and no mixed module roots exist.")
+    print("All workspace mod.rs files are pure and no mixed module roots exist.")
     return 0
 
 

@@ -1,6 +1,6 @@
 //! Bond tests: floating CFKind, serde, and step-up coupon bonds.
 
-use super::*;
+use super::super::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;

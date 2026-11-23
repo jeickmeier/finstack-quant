@@ -28,7 +28,7 @@ fn horizon_result(value: &JsValue) -> Result<HorizonResult, JsValue> {
 pub fn scenario_spec_requires_instruments(
     #[wasm_bindgen(unchecked_param_type = "ScenarioSpec | string")] spec: JsValue,
 ) -> Result<bool, JsValue> {
-    Ok(super::scenario_spec(&spec, "spec")?.requires_instruments())
+    Ok(super::spec::scenario_spec(&spec, "spec")?.requires_instruments())
 }
 
 /// Report whether applying a scenario can replace or mutate instruments.
@@ -46,7 +46,7 @@ pub fn scenario_spec_requires_instruments(
 pub fn scenario_spec_mutates_instruments(
     #[wasm_bindgen(unchecked_param_type = "ScenarioSpec | string")] spec: JsValue,
 ) -> Result<bool, JsValue> {
-    Ok(super::scenario_spec(&spec, "spec")?.mutates_instruments())
+    Ok(super::spec::scenario_spec(&spec, "spec")?.mutates_instruments())
 }
 
 /// Render a horizon result as a multi-line text summary.

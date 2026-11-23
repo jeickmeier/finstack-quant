@@ -11,7 +11,7 @@ use crate::solver::global;
 use crate::solver::traits::GlobalSolveTarget;
 use crate::solver::traits::TimeGridAndGuesses;
 use crate::targets::rate_recipe::rate_calibration_recipe;
-use crate::targets::util::{
+use crate::targets::setup::{
     ContextScratch, discount_and_forward_curve_ids, prepare_rate_calibration_quotes,
     pv01_residual_weight,
 };
@@ -485,7 +485,7 @@ mod tests {
     use crate::quotes::RateQuote;
     use crate::quotes::{Pillar, QuoteId};
     use crate::solver::traits::GlobalSolveTarget;
-    use crate::targets::util::quote_annuity_proxy;
+    use crate::targets::setup::quote_annuity_proxy;
     use crate::validation::RateBounds;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::BusinessDayConvention;

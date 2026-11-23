@@ -11,7 +11,11 @@ from finstack_quant.core.dates import PeriodPlan
 from finstack_quant.core.money import Money
 from finstack_quant.statements._capital_structure import WaterfallSpec
 from finstack_quant.statements._registry import Registry
-from finstack_quant.statements._types import FinancialModelSpec, ForecastSpec, NodeSpec
+from finstack_quant.statements._types.forecast import ForecastSpec
+from finstack_quant.statements._types.model import (
+    FinancialModelSpec,
+    NodeSpec,
+)
 
 class ModelBuilder:
     """

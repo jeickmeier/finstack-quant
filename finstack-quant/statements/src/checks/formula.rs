@@ -216,11 +216,11 @@ impl FormulaCheckSpec {
         {
             node_types.insert(
                 NodeId::new(node),
-                super::helpers::validated_input_value_type(self.id(), context, node)?,
+                super::lookup::validated_input_value_type(self.id(), context, node)?,
             );
         }
         let (reporting_currency, instrument_currencies) =
-            super::helpers::validated_capital_structure_currencies(self.id(), context)?;
+            super::lookup::validated_capital_structure_currencies(self.id(), context)?;
         Ok(CheckUnits {
             node_types,
             reporting_currency,

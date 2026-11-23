@@ -1,5 +1,6 @@
+use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
+
 use super::cap_floor::validate_cap_floor_quote;
-use super::*;
 
 /// Market quote for a European swaption used in HW1F calibration.
 ///

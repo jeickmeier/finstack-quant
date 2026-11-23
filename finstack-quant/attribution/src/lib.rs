@@ -154,9 +154,10 @@ pub use detail::{
     RatesCurvesAttribution, ScalarsAttribution, SensitivityBucket, SensitivityStep, SourceLine,
     VolAttribution, WaterfallStep,
 };
-pub use result::{
-    AttributionFactor, AttributionMeta, AttributionMethod, ExecutionPolicy, PnlAttribution,
-    PnlBucket, PnlBucketShare,
+pub use result::pnl::PnlAttribution;
+pub use result::types::{
+    AttributionFactor, AttributionMeta, AttributionMethod, ExecutionPolicy, PnlBucket,
+    PnlBucketShare,
 };
 
 pub use api::{AttributionRequest, attribute_pnl, pnl_bridge};

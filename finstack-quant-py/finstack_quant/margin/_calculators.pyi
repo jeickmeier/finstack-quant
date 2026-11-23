@@ -8,7 +8,8 @@ from typing import Any
 import pandas as pd
 import polars as pl
 from finstack_quant.core.table import ArrowTable
-from finstack_quant.margin._types import CsaSpec, ImMethodology
+from finstack_quant.margin._types.csa import CsaSpec
+from finstack_quant.margin._types.enums import ImMethodology
 
 class VmResult:
     """

@@ -12,7 +12,7 @@ import polars as pl
 from finstack_quant.core.dates import Tenor
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.table import ArrowTable
-from finstack_quant.valuations.instruments._instruments import Bond
+from finstack_quant.valuations.instruments._instruments.bond import Bond
 
 class BondBreakevenConfig(TypedDict):
     """Select the native bond breakeven target and solve convention.

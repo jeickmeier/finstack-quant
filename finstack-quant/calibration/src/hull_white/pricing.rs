@@ -1,3 +1,6 @@
+use finstack_quant_core::math::solver::BrentSolver;
+use finstack_quant_models::rates::hull_white::HullWhiteParams;
+
 use super::*;
 
 pub(super) fn scheduled_bachelier_cap_floor_price(

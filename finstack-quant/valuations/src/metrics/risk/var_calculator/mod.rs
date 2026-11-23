@@ -11,6 +11,4 @@ mod engine;
 #[cfg(test)]
 mod tests;
 
-#[cfg(test)]
-use engine::*;
 pub use engine::{VarResult, calculate_var};

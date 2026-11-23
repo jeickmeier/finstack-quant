@@ -1,6 +1,6 @@
 //! Contract-local discount windows for the last hazard knot topology.
+use super::conventions::isda_standard_model_boundaries;
 use super::engine::{DiscountWindow, IsdaGrid};
-use super::helpers::isda_standard_model_boundaries;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::{FxHashMap, Result};

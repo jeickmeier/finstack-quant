@@ -4,6 +4,24 @@
 //! the single-pass candidate. It is an ignored accuracy panel, never part of a
 //! benchmark callback or a peak-memory measurement.
 
+use super::analytic::seasoned_geometric_asian_control;
+use super::inputs::{asian_drift_and_fixing_multipliers, paired_moments};
+use crate::exotics::asian_option::types::AsianOption;
+use finstack_quant_core::dates::{Date, DayCountContext};
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_models::monte_carlo::control_variate::apply_control_variate;
+use finstack_quant_models::monte_carlo::engine::PathCaptureConfig;
+use finstack_quant_models::monte_carlo::payoff::asian::{
+    Asian, AsianFixingHistory, AveragingMethod,
+};
+use finstack_quant_models::monte_carlo::pricer::path_dependent::{
+    PathDependentPricer, PathDependentPricerConfig,
+};
+use finstack_quant_models::monte_carlo::process::gbm::{GbmParams, GbmProcess};
+use finstack_quant_models::types::{OptionMarketParams, OptionType};
+use finstack_quant_valuations_core::pricer::Pricer;
+
 use super::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DayCount;

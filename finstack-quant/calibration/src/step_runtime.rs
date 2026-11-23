@@ -229,7 +229,7 @@ fn prepare_hw_cap_schedule(
             "cap/floor HW calibration requires a term index; compounded overnight quote calibration is not supported".into(),
         ));
     }
-    let start = crate::build::helpers::resolve_spot_date(
+    let start = crate::build::spot_date::resolve_spot_date(
         params.base_date,
         &convention.market_calendar_id,
         convention.market_settlement_days,

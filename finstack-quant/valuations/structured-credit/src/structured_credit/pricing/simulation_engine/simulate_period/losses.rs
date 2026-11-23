@@ -1,6 +1,10 @@
 //! Realized-loss allocation and the loss-driven period tests.
 
-use super::*;
+use super::super::state::{SimulationState, WRITEDOWN_DE_MINIMIS};
+use crate::structured_credit::types::{StructuredCredit, Waterfall};
+use finstack_quant_core::Result;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::money::Money;
 
 /// The loss-allocation policy decides whether realized loss reaches the
 /// note balances now (`WriteDown`: RMBS/CMBS realized-loss allocation) or

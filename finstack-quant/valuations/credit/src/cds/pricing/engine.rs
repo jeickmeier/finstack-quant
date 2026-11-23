@@ -1,11 +1,11 @@
 //! `CdsPricer`: premium and protection legs, protection-leg integration over the
 //! ISDA Standard Model knot grid, NPV and the prepared CDS workspace.
 
-use super::grid_cache::IsdaWindowCache;
-use super::helpers::{
+use super::conventions::{
     date_from_hazard_time, haz_t, isda_standard_model_boundaries, settlement_date, sp_cond_to,
     validate_recovery_consistency,
 };
+use super::grid_cache::IsdaWindowCache;
 use crate::cds::CreditDefaultSwap;
 use crate::constants::credit;
 use finstack_quant_core::dates::{Date, DayCountContext, HolidayCalendar};

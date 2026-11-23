@@ -12,10 +12,11 @@
 //! Convention-driven contractual schedules go through the plan-driven
 //! `hull_white` and `cap_floor_hull_white` engine steps.
 
+use finstack_quant_models::rates::hull_white::{HullWhiteCalibrationParams, HullWhiteParams};
+
 use super::{
-    CapFloorCalibrationConfig, CapFloorQuote, HullWhiteCalibrationParams, HullWhiteParams,
-    PiecewiseSigmaCalibrationConfig, SwapFrequency, SwaptionQuote,
-    bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn,
+    CapFloorCalibrationConfig, CapFloorQuote, PiecewiseSigmaCalibrationConfig, SwapFrequency,
+    SwaptionQuote, bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn,
     calibrate_hull_white_to_cap_floors_with_fn, calibrate_hull_white_to_swaptions_with_fn,
 };
 use crate::CalibrationReport;

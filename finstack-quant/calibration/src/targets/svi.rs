@@ -25,7 +25,7 @@ use crate::config::CalibrationConfig;
 use crate::constants::OrderedF64;
 use crate::quotes::MarketQuote;
 use crate::quotes::VolQuote;
-use crate::targets::util::{
+use crate::targets::setup::{
     extract_equity_option_quotes, interpolate_total_variance, resolve_equity_forward_inputs,
     resolve_equity_spot, surface_quote_residuals,
 };
@@ -69,7 +69,7 @@ pub(crate) fn solve(
         .transpose()?;
 
     let zero_rate_yield = if discount.is_none() {
-        let value = super::util::resolve_continuous_dividend_yield(
+        let value = super::setup::resolve_continuous_dividend_yield(
             &params.underlying_ticker,
             params.dividend_yield_override,
             context,

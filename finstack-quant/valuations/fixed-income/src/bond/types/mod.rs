@@ -8,9 +8,6 @@ mod traits;
 
 #[cfg(test)]
 mod tests;
-#[cfg(test)]
-#[path = "tests/stepup.rs"]
-mod tests_stepup;
 
 pub(crate) use super::cashflow_spec::CashflowSpec;
 

@@ -8,7 +8,7 @@ use finstack_quant_valuations_core::metrics::bump_surface_vol_absolute;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_valuations_core::pricer::ModelKey;
 
-use super::common::CapletInputs;
+use super::caplet::CapletInputs;
 
 /// Absolute normal-vol bump for the Hull-White market vega: 1bp of normal
 /// volatility (1e-4). Results are rescaled to per 0.01 of normal vol.
@@ -51,7 +51,7 @@ impl MetricCalculator for VegaCalculator {
         ) {
             return hull_white_surface_vega_per_pct(option, context);
         }
-        super::common::aggregate_over_caplets(option, context, |c: CapletInputs| caplet_vega(c))
+        super::caplet::aggregate_over_caplets(option, context, |c: CapletInputs| caplet_vega(c))
     }
 }
 

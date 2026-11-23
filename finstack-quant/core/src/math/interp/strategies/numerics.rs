@@ -1,6 +1,6 @@
 //! Shared finite/positive checks, safe slopes, and extrapolation kernels.
 
-use super::super::utils::exact_f64_eq;
+use super::super::validation::exact_f64_eq;
 use std::vec::Vec;
 
 #[inline]

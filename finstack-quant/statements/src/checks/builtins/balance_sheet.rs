@@ -68,7 +68,7 @@ impl Check for BalanceSheetArticulation {
             }
         }
         require_known_distinct(self.id(), context, &groups)?;
-        crate::checks::helpers::validate_identity_inputs(
+        crate::checks::lookup::validate_identity_inputs(
             self.id(),
             context,
             self.tolerance,

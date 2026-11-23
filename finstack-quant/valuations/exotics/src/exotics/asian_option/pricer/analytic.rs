@@ -1,7 +1,7 @@
 //! Analytical (Kemna-Vorst / seasoned geometric) and semi-analytical
 //! (Turnbull-Wakeman) Asian option pricers.
 
-use super::common::{
+use super::inputs::{
     analytic_inputs, asian_drift_and_fixing_multipliers, expired_valuation,
     expiry_year_fraction_or_zero, fixing_year_fractions,
 };

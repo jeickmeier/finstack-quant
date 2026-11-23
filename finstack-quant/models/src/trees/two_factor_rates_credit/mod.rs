@@ -141,16 +141,8 @@
 //! its curve projection; cf. Tuckman & Serrat, *Fixed Income Securities*,
 //! ch. 2 on floaters pricing to par), which the tests assert on the lattice.
 //!
+//! [`Error::Validation`]: finstack_quant_core::Error::Validation
 //! [`HullWhiteTree`]: super::hull_white_tree::HullWhiteTree
-
-use finstack_quant_cashflows::builder::calculate_floating_rate;
-use finstack_quant_core::math::solver::BrentSolver;
-use finstack_quant_core::{Error, Result};
-
-use crate::monte_carlo::rng::philox::PhiloxRng;
-use crate::monte_carlo::traits::RandomStream;
-
-use super::tree_framework::{NodeState, TreeValuator};
 
 pub use band_table::BandTable;
 
@@ -163,7 +155,6 @@ mod tests;
 mod tree;
 
 pub(crate) use tree::RatesCreditTransition;
-use tree::{FactorGrid, FactorRow, NodeTerms, held_node_terms, node_terms_table, usual_band};
 pub use tree::{
     HazardFloorSaturation, KAPPA_MAX, NodeCoupon, RatesCreditCalibrationTargets, RatesCreditConfig,
     RatesCreditPathCheckpoint, RatesCreditPathState, RatesCreditTree, VarianceRetention,

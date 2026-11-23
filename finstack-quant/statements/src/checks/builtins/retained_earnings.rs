@@ -89,7 +89,7 @@ impl Check for RetainedEarningsReconciliation {
                 ("other_adjustments", &self.other_adjustments),
             ],
         )?;
-        crate::checks::helpers::validate_identity_inputs(
+        crate::checks::lookup::validate_identity_inputs(
             self.id(),
             context,
             self.tolerance,

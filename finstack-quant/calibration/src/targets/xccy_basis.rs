@@ -32,7 +32,7 @@ use crate::quotes::RateQuote;
 use crate::quotes::XccyQuote;
 use crate::solver::bootstrap;
 use crate::solver::traits::BootstrapTarget;
-use crate::targets::util::{
+use crate::targets::setup::{
     ContextScratch, discount_and_forward_curve_ids, prepare_rate_calibration_quotes,
 };
 use finstack_quant_core::Result;

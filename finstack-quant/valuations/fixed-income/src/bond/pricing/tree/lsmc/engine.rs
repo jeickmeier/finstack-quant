@@ -1,5 +1,7 @@
 //! Least-squares Monte Carlo engine for option-bearing credit-risky bonds.
 
+use super::policy::*;
+use super::state::*;
 use crate::bond::Bond;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -11,9 +13,6 @@ use finstack_quant_models::trees::two_factor_rates_credit::{
     RatesCreditPathCheckpoint, RatesCreditTree,
 };
 use finstack_quant_valuations_core::instruments::pricing::monte_carlo::resolve_mc_paths;
-
-use super::policy::*;
-use super::state::*;
 
 /// Default independent-estimator budget in each training or pricing stage.
 /// With antithetic sampling each estimator averages two physical factor paths,

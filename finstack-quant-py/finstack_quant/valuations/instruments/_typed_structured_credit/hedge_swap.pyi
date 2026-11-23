@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, Literal
-from finstack_quant.valuations.instruments._typed_rates import InterestRateSwap
+from finstack_quant.valuations.instruments._typed_rates.swap import InterestRateSwap
 
 class HedgeSwap:
     """

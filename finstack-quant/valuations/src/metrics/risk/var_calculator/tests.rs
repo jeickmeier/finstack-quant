@@ -1,4 +1,4 @@
-use super::*;
+use super::engine::*;
 use crate::instruments::Instrument;
 use crate::metrics::risk::{MarketHistory, apply_market_scenario};
 use crate::metrics::risk::{MarketScenario, RiskFactorShift, RiskFactorType};

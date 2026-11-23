@@ -87,6 +87,8 @@
 
 mod discounting;
 mod primitives;
+#[cfg(test)]
+mod tests;
 mod xirr;
 
 pub use discounting::{flat_discount_factor, npv, npv_amounts};

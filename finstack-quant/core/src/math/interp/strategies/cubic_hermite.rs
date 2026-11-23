@@ -3,7 +3,7 @@
 use super::super::{
     traits::InterpolationStrategy,
     types::ExtrapolationPolicy,
-    utils::{BoundaryDecision, classify_prime_query, classify_value_query, exact_f64_eq},
+    validation::{BoundaryDecision, classify_prime_query, classify_value_query, exact_f64_eq},
 };
 use super::numerics::*;
 use std::vec::Vec;

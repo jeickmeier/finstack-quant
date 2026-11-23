@@ -1,6 +1,10 @@
 //! Calibration of the two-factor lattice: Ho-Lee theta fitting, hazard floors,
 //! correlation feasibility and variance-retention diagnostics.
 
+use super::tree::{FactorGrid, FactorRow, node_terms_table};
+use finstack_quant_core::math::solver::BrentSolver;
+use finstack_quant_core::{Error, Result};
+
 use super::*;
 
 impl RatesCreditTree {

@@ -13,7 +13,8 @@ from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.table import ArrowTable
 from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.composite import CompositeInstrument
-from finstack_quant.valuations.instruments._instruments import Bond, TermLoan
+from finstack_quant.valuations.instruments._instruments.bond import Bond
+from finstack_quant.valuations.instruments._instruments.term_loan import TermLoan
 from finstack_quant.valuations.instruments._typed_asset_backed_facility.facility import AssetBackedFacility
 from finstack_quant.valuations.instruments._typed_convertible import ConvertibleBond
 from finstack_quant.valuations.instruments._typed_credit.cds import CreditDefaultSwap
@@ -24,7 +25,9 @@ from finstack_quant.valuations.instruments._typed_equity import EquityOption
 from finstack_quant.valuations.instruments._typed_fx import FxForward, FxOption
 from finstack_quant.valuations.instruments._typed_deposit import Deposit
 from finstack_quant.valuations.instruments._typed_fra import ForwardRateAgreement
-from finstack_quant.valuations.instruments._typed_rates import CapFloor, InterestRateSwap, Swaption
+from finstack_quant.valuations.instruments._typed_rates.cap_floor import CapFloor
+from finstack_quant.valuations.instruments._typed_rates.swap import InterestRateSwap
+from finstack_quant.valuations.instruments._typed_rates.swaption import Swaption
 from finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit import RevolvingCredit
 from finstack_quant.valuations.instruments._typed_structured_credit.structured_credit import StructuredCredit
 

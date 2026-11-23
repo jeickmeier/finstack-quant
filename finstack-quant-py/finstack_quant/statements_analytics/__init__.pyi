@@ -10,18 +10,20 @@ Examples
 """
 
 from __future__ import annotations
-from finstack_quant.statements_analytics._analysis import (
+from finstack_quant.statements_analytics._analysis.explain import (
     DependencyTracer as DependencyTracer,
     DependencyTree as DependencyTree,
     Explanation as Explanation,
     ExplanationStep as ExplanationStep,
+    explain_formula as explain_formula,
+)
+from finstack_quant.statements_analytics._analysis.runners import (
     ForecastMetrics as ForecastMetrics,
     GoalSeekResult as GoalSeekResult,
     GoalSeekSpec as GoalSeekSpec,
     backtest_forecast as backtest_forecast,
     evaluate_scenario_set as evaluate_scenario_set,
     evaluate_scenario_set_with_market as evaluate_scenario_set_with_market,
-    explain_formula as explain_formula,
     generate_tornado_entries as generate_tornado_entries,
     goal_seek as goal_seek,
     run_sensitivity as run_sensitivity,
@@ -71,25 +73,29 @@ from finstack_quant.statements_analytics._templates_real_estate import (
     add_property_operating_statement as add_property_operating_statement,
     add_rent_roll as add_rent_roll,
 )
-from finstack_quant.statements_analytics._typed import (
-    BridgeChart as BridgeChart,
-    BridgeStep as BridgeStep,
+from finstack_quant.statements_analytics._typed.config import (
     ParameterSpec as ParameterSpec,
-    ScenarioDiff as ScenarioDiff,
-    ScenarioResults as ScenarioResults,
     ScenarioSet as ScenarioSet,
     SensitivityConfig as SensitivityConfig,
+    VarianceConfig as VarianceConfig,
+)
+from finstack_quant.statements_analytics._typed.results import (
+    BridgeChart as BridgeChart,
+    BridgeStep as BridgeStep,
+    ScenarioDiff as ScenarioDiff,
+    ScenarioResults as ScenarioResults,
     SensitivityResult as SensitivityResult,
     TornadoEntry as TornadoEntry,
-    VarianceConfig as VarianceConfig,
     VarianceReport as VarianceReport,
     VarianceRow as VarianceRow,
 )
-from finstack_quant.statements_analytics._comps import (
+from finstack_quant.statements_analytics._comps.peers import (
     CompanyMetrics as CompanyMetrics,
-    DimensionScore as DimensionScore,
     PeerFilter as PeerFilter,
     PeerSet as PeerSet,
+)
+from finstack_quant.statements_analytics._comps.scoring import (
+    DimensionScore as DimensionScore,
     PeerStats as PeerStats,
     RegressionResult as RegressionResult,
     RelativeValueResult as RelativeValueResult,
@@ -124,35 +130,39 @@ from finstack_quant.statements_analytics._scoring import (
     score_statement as score_statement,
     score_statement_series as score_statement_series,
 )
-from finstack_quant.statements_analytics._valuation import (
+from finstack_quant.statements_analytics._valuation.corporate import (
     CorporateAnalysis as CorporateAnalysis,
-    CorporateValuationResult as CorporateValuationResult,
-    DcfSensitivityResult as DcfSensitivityResult,
-    EquityBridge as EquityBridge,
     LboCheckMappings as LboCheckMappings,
     LboResult as LboResult,
+    dcf_sensitivity as dcf_sensitivity,
+    evaluate_dcf as evaluate_dcf,
+    evaluate_lbo as evaluate_lbo,
+    run_corporate_analysis as run_corporate_analysis,
+    WaccInputs as WaccInputs,
+    wacc as wacc,
+)
+from finstack_quant.statements_analytics._valuation.inputs import (
+    EquityBridge as EquityBridge,
     TerminalValueSpec as TerminalValueSpec,
     ValuationDiscounts as ValuationDiscounts,
-    dcf_sensitivity as dcf_sensitivity,
     DcfInputs as DcfInputs,
     DcfOptions as DcfOptions,
     StatementValuationCut as StatementValuationCut,
     TerminalFcffBasis as TerminalFcffBasis,
     DcfProjection as DcfProjection,
     CorporateDcfRequest as CorporateDcfRequest,
-    DcfSensitivityGridSpec as DcfSensitivityGridSpec,
-    DcfSensitivityGridResult as DcfSensitivityGridResult,
     evaluate_corporate_dcf as evaluate_corporate_dcf,
     evaluate_dcf_from_results as evaluate_dcf_from_results,
+)
+from finstack_quant.statements_analytics._valuation.sensitivity import (
+    CorporateValuationResult as CorporateValuationResult,
+    DcfSensitivityResult as DcfSensitivityResult,
+    DcfSensitivityGridSpec as DcfSensitivityGridSpec,
+    DcfSensitivityGridResult as DcfSensitivityGridResult,
     dcf_sensitivity_grid as dcf_sensitivity_grid,
     dcf_sensitivity_on_results as dcf_sensitivity_on_results,
     DcfDistributionResult as DcfDistributionResult,
     evaluate_dcf_monte_carlo as evaluate_dcf_monte_carlo,
-    evaluate_dcf as evaluate_dcf,
-    evaluate_lbo as evaluate_lbo,
-    run_corporate_analysis as run_corporate_analysis,
-    WaccInputs as WaccInputs,
-    wacc as wacc,
 )
 from finstack_quant.statements_analytics._capital_structure import (
     CapitalStructureSummary as CapitalStructureSummary,
@@ -185,14 +195,7 @@ from finstack_quant.statements_analytics._checks import (
     run_credit_underwriting_checks as run_credit_underwriting_checks,
     run_three_statement_checks as run_three_statement_checks,
 )
-from finstack_quant.statements_analytics._ecl import (
-    EclBucket as EclBucket,
-    EclResult as EclResult,
-    Exposure as Exposure,
-    QualitativeFlags as QualitativeFlags,
-    Stage as Stage,
-    StageResult as StageResult,
-    StagingConfig as StagingConfig,
+from finstack_quant.statements_analytics._ecl.impaired import (
     ImpairedEclScenario as ImpairedEclScenario,
     WeightedImpairedEclResult as WeightedImpairedEclResult,
     compute_impaired_ecl_weighted as compute_impaired_ecl_weighted,
@@ -200,12 +203,23 @@ from finstack_quant.statements_analytics._ecl import (
     RecoveryEvidence as RecoveryEvidence,
     ImpairedEclResult as ImpairedEclResult,
     compute_impaired_ecl as compute_impaired_ecl,
+)
+from finstack_quant.statements_analytics._ecl.model import (
+    EclBucket as EclBucket,
+    EclResult as EclResult,
+    Exposure as Exposure,
     EclScenario as EclScenario,
     EclScenarioOutcome as EclScenarioOutcome,
     WeightedEclResult as WeightedEclResult,
-    classify_stage as classify_stage,
     compute_ecl as compute_ecl,
     compute_ecl_weighted as compute_ecl_weighted,
+)
+from finstack_quant.statements_analytics._ecl.staging import (
+    QualitativeFlags as QualitativeFlags,
+    Stage as Stage,
+    StageResult as StageResult,
+    StagingConfig as StagingConfig,
+    classify_stage as classify_stage,
 )
 
 __all__ = [

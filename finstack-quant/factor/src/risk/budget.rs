@@ -4,7 +4,7 @@
 //! position (or group of positions). The budgeting engine compares actual
 //! component VaR against targets and computes utilization ratios.
 
-use super::position::PositionRiskDecomposition;
+use super::position::engine::PositionRiskDecomposition;
 use finstack_quant_core::wire::NonFiniteFields;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -277,7 +277,7 @@ pub fn evaluate_risk_budget_from_decomposition(
 
 #[cfg(test)]
 mod tests {
-    use super::super::position::{
+    use super::super::position::engine::{
         DecompositionMethod, PositionRiskDecomposition, PositionVarContribution,
         parametric_var_decomposition,
     };

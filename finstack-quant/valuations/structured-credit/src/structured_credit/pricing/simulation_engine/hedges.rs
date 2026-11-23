@@ -5,7 +5,14 @@
 //! period: a net receipt joins interest proceeds, a net payment becomes a
 //! `SwapCounterparty` fee recipient in the period waterfall.
 
-use super::*;
+use super::state::SimulationState;
+use crate::structured_credit::types::StructuredCredit;
+use finstack_quant_core::Result;
+use finstack_quant_core::cashflow::CFKind;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::money::Money;
+
 use crate::structured_credit::types::{SwapNotional, SwapPriority};
 use finstack_quant_cashflows::CashflowScheduleSource;
 use std::collections::BTreeMap;

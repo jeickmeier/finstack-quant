@@ -18,7 +18,7 @@ pub use budget::{
     evaluate_risk_budget_from_decomposition,
 };
 pub use parametric::decompose_factors;
-pub use position::{
+pub use position::engine::{
     DecompositionMethod, PositionEsContribution, PositionRiskDecomposition,
     PositionVarContribution, flatten_position_pnls, historical_var_decomposition,
     parametric_var_decomposition,

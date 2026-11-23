@@ -6,7 +6,8 @@ import datetime
 from typing import Any, Literal
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.money import Money
-from finstack_quant.valuations.instruments._instruments import Bond, TermLoan
+from finstack_quant.valuations.instruments._instruments.bond import Bond
+from finstack_quant.valuations.instruments._instruments.term_loan import TermLoan
 from finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit import RevolvingCredit
 from finstack_quant.valuations.instruments._typed_structured_credit.pool_asset import PoolAsset
 from finstack_quant.valuations.instruments._typed_structured_credit.rep_line import RepLine

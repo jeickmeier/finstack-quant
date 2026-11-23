@@ -81,12 +81,12 @@ pub use types::waterfall::spec::{
 
 pub use pricing::waterfall::execute::execute_waterfall;
 
-pub use pricing::coverage::{TestContext, TestResult};
-pub use pricing::simulation_engine::orchestration::SimulationRun;
-pub use pricing::simulation_engine::state::{
+pub use pricing::coverage::evaluator::{TestContext, TestResult};
+pub use pricing::simulation_engine::diagnostics::{
     CoverageTestBreach, CoverageTestDiagnostic, NonWaterfallPayment, NonWaterfallSource,
     PeriodDiagnostics, SimulationDiagnostics, TrancheCreditEnhancement,
 };
+pub use pricing::simulation_engine::orchestration::SimulationRun;
 pub use pricing::waterfall::execute::WaterfallContext;
 
 pub use metrics::deal_specific::abs::{

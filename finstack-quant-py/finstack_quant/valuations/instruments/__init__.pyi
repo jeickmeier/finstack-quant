@@ -25,9 +25,11 @@ True
 from __future__ import annotations
 
 from typing import Any
-from finstack_quant.valuations.instruments._instruments import (
+from finstack_quant.valuations.instruments._instruments.bond import (
     Bond as Bond,
     BondBuilder as BondBuilder,
+)
+from finstack_quant.valuations.instruments._instruments.term_loan import (
     TermLoan as TermLoan,
     TermLoanBuilder as TermLoanBuilder,
 )
@@ -105,11 +107,15 @@ from finstack_quant.valuations.instruments._typed_inflation_bond import (
     InflationLinkedBondBuilder as InflationLinkedBondBuilder,
 )
 from finstack_quant.valuations.instruments._typed_deposit import Deposit as Deposit, DepositBuilder as DepositBuilder
-from finstack_quant.valuations.instruments._typed_rates import (
+from finstack_quant.valuations.instruments._typed_rates.cap_floor import (
     CapFloor as CapFloor,
     CapFloorBuilder as CapFloorBuilder,
+)
+from finstack_quant.valuations.instruments._typed_rates.swap import (
     InterestRateSwap as InterestRateSwap,
     InterestRateSwapBuilder as InterestRateSwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_rates.swaption import (
     Swaption as Swaption,
     SwaptionBuilder as SwaptionBuilder,
 )
@@ -458,6 +464,13 @@ from finstack_quant.valuations.instruments._typed_structured_credit.tranche_anal
 )
 from finstack_quant.valuations.instruments._var import VarResult as VarResult, calculate_var as calculate_var
 
+from finstack_quant.valuations.instruments._json_validation import (
+    validate_instrument_json as validate_instrument_json,
+    validate_typed_instrument_json as validate_typed_instrument_json,
+    instrument_envelope_from_spec as instrument_envelope_from_spec,
+    pretty_instrument_json as pretty_instrument_json,
+)
+
 __all__ = [
     "AdvanceRate",
     "AmortizationEvent",
@@ -710,173 +723,3 @@ __all__ = [
     "validate_instrument_json",
     "validate_typed_instrument_json",
 ]
-
-def validate_instrument_json(
-    json: dict[str, Any] | str,
-    metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
-) -> str:
-    """
-    Validate a canonical instrument envelope and return canonical JSON.
-
-    Parameters
-    ----------
-    json : dict[str, Any] | str
-        A ``finstack_quant.instrument/1`` envelope, as a dict (the form
-        :func:`instrument_envelope_from_spec` returns) or JSON text. Bare
-        instrument payloads are rejected.
-    metric_pricing_overrides : MetricPricingOverrides or dict or str, optional
-        Metric-time overrides merged into
-        ``instrument.spec.metric_pricing_overrides`` before instrument
-        validation; ``None`` (the default) retains the envelope configuration.
-        Dict and JSON patches replace only supplied fields, including individual
-        ``bump_config`` fields; explicit ``None``/``null`` clears optional fields.
-
-    Returns
-    -------
-    str
-        Canonical serialized instrument JSON after Rust validation and
-        optional override merging.
-
-    Raises
-    ------
-    ValueError
-        If the JSON is malformed, ``metric_pricing_overrides`` is invalid
-        override JSON, the merged payload has an unknown instrument tag, or
-        instrument-specific validation fails.
-    TypeError
-        If ``json`` is neither a dict nor a string.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.valuations.instruments import TermLoan, validate_instrument_json
-    >>> validated = json.loads(validate_instrument_json(TermLoan.example().to_json()))
-    >>> validated["instrument"]["type"]
-    'term_loan'
-
-    """
-    ...
-
-def validate_typed_instrument_json(type_tag: str, json: dict[str, Any] | str) -> str:
-    """
-    Validate a payload as one exact instrument type and return the envelope.
-
-    Parameters
-    ----------
-    type_tag : str
-        Canonical instrument discriminator, such as ``"term_loan"`` or
-        ``"fx_forward"``.
-    json : dict[str, Any] | str
-        A ``finstack_quant.instrument/1`` envelope, as a dict or JSON text,
-        whose instrument type must match *type_tag*.
-
-    Returns
-    -------
-    str
-        Canonical instrument envelope for the validated instrument.
-
-    Raises
-    ------
-    ValueError
-        If ``json`` is malformed, carries a different instrument type, or
-        fails instrument validation.
-    TypeError
-        If ``json`` is neither a dict nor a string.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.valuations.instruments import TermLoan, validate_typed_instrument_json
-    >>> envelope = TermLoan.example().to_json()
-    >>> json.loads(validate_typed_instrument_json("term_loan", envelope))["instrument"]["type"]
-    'term_loan'
-
-    """
-    ...
-
-def pretty_instrument_json(json: dict[str, Any] | str) -> str:
-    """
-    Re-render a canonical instrument envelope as pretty-printed JSON.
-
-    Parameters
-    ----------
-    json : str
-        A canonical ``finstack_quant.instrument/1`` envelope.
-
-    Returns
-    -------
-    str
-        The same envelope, pretty-printed.
-
-    Raises
-    ------
-    ValueError
-        If ``json`` is malformed or cannot be rendered.
-    TypeError
-        If ``json`` is neither a dict nor a string.
-
-    Examples
-    --------
-    >>> from finstack_quant.valuations.instruments import TermLoan, pretty_instrument_json
-    >>> "term_loan" in pretty_instrument_json(TermLoan.example().to_json())
-    True
-
-    """
-    ...
-
-def instrument_envelope_from_spec(type_tag: str, spec: dict[str, Any] | str) -> dict[str, Any]:
-    """
-    Wrap a bare instrument spec in the canonical envelope after validating it.
-
-    Pure delegation to Rust ``pricer::instrument_envelope_from_spec``. This is
-    the construction route for every instrument type without a typed Python
-    class (FRA, deposit, FX spot/swap, inflation swaps, exotics, ...): build
-    the type's ``spec`` object (see
-    ``finstack_quant.valuations.schema.instrument_type_schema(type_tag)``) and
-    pass the returned envelope dict straight to :func:`price_instrument`,
-    :func:`instrument_cashflows` or any other entry point that takes an
-    instrument.
-
-    Parameters
-    ----------
-    type_tag : str
-        Canonical instrument discriminator, one of
-        ``finstack_quant.valuations.schema.instrument_types()`` (e.g.
-        ``"forward_rate_agreement"``, ``"fx_spot"``).
-    spec : dict[str, Any] | str
-        The bare ``spec`` object for that type, as a dict or JSON text. Tagged
-        ``{"type", "spec"}`` payloads and envelopes are rejected.
-
-    Returns
-    -------
-    dict[str, Any]
-        The canonical ``finstack_quant.instrument/1`` envelope, with keys
-        ``schema`` and ``instrument`` (``{"type", "spec"}``). Use
-        ``json.dumps`` when the wire text is needed.
-
-    Raises
-    ------
-    ValueError
-        If ``spec`` is not a bare object, does not deserialize as a
-        ``type_tag`` instrument (unknown tag, missing or unknown field), or
-        fails instrument validation.
-
-    Examples
-    --------
-    >>> from finstack_quant.valuations.instruments import instrument_envelope_from_spec
-    >>> envelope = instrument_envelope_from_spec(
-    ...     "fx_spot",
-    ...     {
-    ...         "id": "EURUSD-SPOT",
-    ...         "base_currency": "EUR",
-    ...         "quote_currency": "USD",
-    ...         "settlement_date": "2025-01-17",
-    ...         "quoted_spot": 1.2,
-    ...         "notional": {"amount": "1000000", "currency": "EUR"},
-    ...         "attributes": {},
-    ...     },
-    ... )
-    >>> (envelope["instrument"]["type"], envelope["instrument"]["spec"]["id"])
-    ('fx_spot', 'EURUSD-SPOT')
-    """
-    ...

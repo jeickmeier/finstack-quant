@@ -42,7 +42,7 @@ mod traits;
 /// Types, public aliases, and factory for interpolation.
 mod types;
 /// Shared helpers (validation and search).
-mod utils;
+mod validation;
 
 pub use generic::Interpolator;
 pub use strategies::cubic_hermite::CubicHermiteStrategy;
@@ -52,6 +52,6 @@ pub use strategies::piecewise_quadratic::PiecewiseQuadraticForwardStrategy;
 pub use types::{ExtrapolationPolicy, InterpStyle};
 
 pub(crate) use types::Interp;
-pub(crate) use utils::{
+pub(crate) use validation::{
     exact_f64_eq, validate_finite_series, validate_knots, validate_positive_series,
 };

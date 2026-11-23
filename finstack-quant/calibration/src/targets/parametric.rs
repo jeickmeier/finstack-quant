@@ -12,7 +12,7 @@ use crate::quotes::RateQuote;
 use crate::solver::global;
 use crate::solver::traits::GlobalSolveTarget;
 use crate::solver::traits::TimeGridAndGuesses;
-use crate::targets::util::{
+use crate::targets::setup::{
     ContextScratch, discount_and_forward_curve_ids, prepare_rate_calibration_quotes,
 };
 use finstack_quant_core::Result;

@@ -38,6 +38,7 @@ mod smile;
 #[cfg(test)]
 mod tests;
 
-pub use calibration::{SabrCalibrationOutcome, SabrCalibrator, SabrShift};
+pub use calibration::calibrator::{SabrCalibrationOutcome, SabrCalibrator};
+pub use calibration::shift::SabrShift;
 pub use parameters::SabrParameters;
 pub use smile::{ArbitrageValidationResult, ButterflyViolation, MonotonicityViolation, SabrSmile};

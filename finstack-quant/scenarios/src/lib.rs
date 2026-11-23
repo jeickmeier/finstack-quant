@@ -113,6 +113,8 @@ mod envelope;
 mod error;
 /// Horizon total return analysis.
 mod horizon;
+/// Utility helpers for scenario operations.
+mod interpolation;
 /// JSON Schema generation helpers for scenario contracts.
 #[cfg(feature = "json-schema")]
 pub mod schema;
@@ -120,8 +122,6 @@ pub mod schema;
 mod spec;
 /// Historical stress test template types and builders.
 mod templates;
-/// Utility helpers for scenario operations.
-mod utils;
 /// Structured warning enum surfaced via `ApplicationReport.warnings`.
 mod warning;
 

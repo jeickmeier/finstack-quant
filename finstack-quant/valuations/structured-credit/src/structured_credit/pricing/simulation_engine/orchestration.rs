@@ -1,3 +1,20 @@
+use super::period_helpers::SimulationPeriod;
+use super::simulate_period::simulate_period;
+use super::state::{SimulationState, StateTemplate, WRITEDOWN_DE_MINIMIS};
+use crate::structured_credit::types::{
+    CallScope, CoverageTestType, LossRecognition, StructuredCredit, TrancheCashflows,
+    TrancheSeniority, Waterfall,
+};
+use finstack_quant_core::FxHashMap;
+use finstack_quant_core::Result;
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::HolidayCalendar;
+use finstack_quant_core::dates::{
+    BusinessDayConvention, Date, DateExt, DayCount, StubKind, adjust,
+};
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::money::Money;
+
 use super::*;
 
 /// Record a residual principal distribution to a tranche at deal end: appends

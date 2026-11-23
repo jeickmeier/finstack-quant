@@ -63,22 +63,57 @@ def test_flags_logic_and_inline_tests_in_mod_rs(tmp_path: Path) -> None:
     ]
 
 
-def test_flags_mixed_module_roots_but_ignores_tests_rs(tmp_path: Path) -> None:
-    """`foo.rs` paired with `foo/` fails; `tests.rs` paired with `tests/` is allowed."""
+def test_flags_private_glob_and_implicit_prelude_uses_in_mod_rs(tmp_path: Path) -> None:
+    """Private glob imports and >3 private `use` statements in `mod.rs` are rejected."""
+    _write(
+        tmp_path / "finstack-quant/core/src/prelude/mod.rs",
+        "mod sub;\n"
+        "#[cfg(doc)]\n"
+        "use crate::doc_only::Thing;\n"
+        "use a::One;\n"
+        "use b::Two;\n"
+        "use c::Three;\n"
+        "use d::*;\n"
+        "pub use sub::Public;\n",
+    )
+    found = _MODULE.mod_rs_findings(tmp_path)
+    assert found == [
+        "finstack-quant/core/src/prelude/mod.rs:7: private glob `use ...::*;` in mod.rs; import explicitly in child modules",
+        "finstack-quant/core/src/prelude/mod.rs:4: 4 private `use` statements in mod.rs (max 3); import directly in child modules instead of using mod.rs as an implicit prelude",
+    ]
+
+
+def test_flags_mixed_module_roots_including_tests_rs(tmp_path: Path) -> None:
+    """Both `foo.rs` + `foo/` and `tests.rs` + `tests/` are rejected as mixed roots."""
     _write(tmp_path / "finstack-quant/core/src/foo.rs", "mod bar;\n")
     _write(tmp_path / "finstack-quant/core/src/foo/bar.rs", "pub fn x() {}\n")
     _write(tmp_path / "finstack-quant/core/src/baz/tests.rs", "fn t() {}\n")
     _write(tmp_path / "finstack-quant/core/src/baz/tests/extra.rs", "fn t2() {}\n")
     assert _MODULE.mixed_root_findings(tmp_path) == [
+        "finstack-quant/core/src/baz/tests.rs: mixed module root alongside `tests/`; convert to `tests/mod.rs`",
         "finstack-quant/core/src/foo.rs: mixed module root alongside `foo/`; convert to `foo/mod.rs`",
     ]
 
 
-def test_ignores_binding_crates(tmp_path: Path) -> None:
-    """Python and WASM binding crates are outside domain `finstack-quant/` scope."""
-    _write(tmp_path / "finstack-quant-py/src/bindings/core/mod.rs", "pub fn register() {}\n")
-    _write(tmp_path / "finstack-quant-wasm/src/api/core/mod.rs", "pub fn init() {}\n")
-    assert _MODULE.mod_rs_findings(tmp_path) == []
+def test_enforces_wasm_strict_and_allows_py_registration_only(tmp_path: Path) -> None:
+    """WASM `mod.rs` is strictly pure; Python `mod.rs` allows only registration wiring."""
+    _write(
+        tmp_path / "finstack-quant-py/src/bindings/core/mod.rs",
+        "mod dates;\npub(crate) const EXPORTS: &[&str] = &[];\npub fn register() {}\nfn add_classes() {}\n",
+    )
+    _write(
+        tmp_path / "finstack-quant-py/src/bindings/bad/mod.rs",
+        "pub struct PyLeaked;\nfn helper() {}\n",
+    )
+    _write(
+        tmp_path / "finstack-quant-wasm/src/api/core/mod.rs",
+        "pub fn leaked_wasm_fn() {}\n",
+    )
+    assert _MODULE.mod_rs_findings(tmp_path) == [
+        "finstack-quant-wasm/src/api/core/mod.rs:1: `fn` item in mod.rs; move logic/definitions to a sibling module",
+        "finstack-quant-py/src/bindings/bad/mod.rs:1: `struct` item in mod.rs; move logic/definitions to a sibling module",
+        "finstack-quant-py/src/bindings/bad/mod.rs:2: `fn` item in mod.rs; move logic/definitions to a sibling module",
+    ]
     assert _MODULE.mixed_root_findings(tmp_path) == []
 
 

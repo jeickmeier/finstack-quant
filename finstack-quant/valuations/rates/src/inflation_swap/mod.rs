@@ -59,6 +59,10 @@
 //! - Plan-driven calibration in `calibration::api` (Inflation step)
 
 pub(crate) mod metrics;
-mod types;
+#[cfg(test)]
+mod tests;
+mod yoy;
+mod zero_coupon;
 
-pub use types::{InflationSwap, InflationSwapBuilder, YoYInflationSwap, YoYInflationSwapBuilder};
+pub use yoy::{YoYInflationSwap, YoYInflationSwapBuilder};
+pub use zero_coupon::{InflationSwap, InflationSwapBuilder};

@@ -70,15 +70,15 @@
 //! - O'Kane, D. "Modelling Single-name and Multi-name Credit Derivatives" (2008), Chapter 5 `docs/REFERENCES.md#o-kane-2008`
 //! - Hull, J.C. & White, A. "Valuing Credit Default Swaps I: No Counterparty Default Risk" `docs/REFERENCES.md#hull-white-2000-cds`
 
+mod conventions;
 mod engine;
 mod grid_cache;
-mod helpers;
 mod metrics;
 
 #[cfg(test)]
 mod tests;
 
+pub(crate) use conventions::date_from_hazard_time;
 #[doc(hidden)]
 pub use engine::CdsPricer;
 pub use engine::PreparedCds;
-pub(crate) use helpers::date_from_hazard_time;

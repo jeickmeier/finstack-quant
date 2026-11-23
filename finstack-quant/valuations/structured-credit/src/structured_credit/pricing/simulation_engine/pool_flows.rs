@@ -1,3 +1,14 @@
+use super::period_helpers::collateral_asset_rate_for_period;
+use super::state::SimulationState;
+use crate::structured_credit::types::{
+    AdvancingPolicy, CardPortfolioSpec, DealFees, DelinquencyModel, PoolState,
+};
+use finstack_quant_core::Result;
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::{Date, DateExt, DayCountContext};
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::money::Money;
+
 use super::*;
 use crate::structured_credit::utils::amortization::level_payment_per_unit;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;

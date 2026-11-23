@@ -2,7 +2,7 @@
 //! variance reduction.
 
 use super::analytic::seasoned_geometric_asian_control;
-use super::common::{
+use super::inputs::{
     asian_drift_and_fixing_multipliers, expired_value, map_fixings_to_steps, resolve_spot,
 };
 use crate::exotics::asian_option::types::AsianOption;

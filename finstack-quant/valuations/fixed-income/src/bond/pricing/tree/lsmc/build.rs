@@ -1,6 +1,26 @@
 //! Template construction helpers: coupon, exercise, make-whole and grid utilities.
 
-use super::*;
+use super::super::bond_valuator::BondValuator;
+use super::state::*;
+use crate::bond::{Bond, CallPut, ProtectionWindow};
+use finstack_quant_cashflows::builder::{CouponType, FloatingCouponSpec};
+use finstack_quant_cashflows::builder::{
+    FloatingRateObservation, OvernightObservationSchedule, OvernightRateConstraints,
+    observed_index_fixing,
+};
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::dates::calendar_by_id_strict;
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::fixings::fixing_series_id;
+use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_core::{Error, Result};
+use finstack_quant_models::trees::two_factor_rates_credit::{
+    RatesCreditPathState, RatesCreditTree,
+};
+use rust_decimal::prelude::ToPrimitive;
+use std::collections::BTreeMap;
+use time::Duration;
 
 pub(super) fn required_date(value: Option<Date>, label: &str) -> Result<Date> {
     value.ok_or_else(|| Error::Validation(format!("floating coupon is missing {label} metadata")))

@@ -1,5 +1,11 @@
-use super::*;
-use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount};
+use super::state::SimulationState;
+use crate::structured_credit::types::{PoolState, StructuredCredit, Tranche};
+use finstack_quant_core::Result;
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCount, DayCountContext};
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::fixings;
+use finstack_quant_core::market_data::term_structures::ForwardCurve;
+
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 
 /// Resolve a collateral index fixing or project its contractual term rate.

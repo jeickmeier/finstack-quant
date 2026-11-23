@@ -1,6 +1,19 @@
 //! Dynamic floating-coupon extraction and rate-model compilation for `ReplayTemplate`.
 
-use super::super::*;
+use super::super::build::*;
+use super::super::state::*;
+use finstack_quant_cashflows::builder::{
+    CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod, FloatingRateObservation,
+    observed_index_fixing,
+};
+use finstack_quant_core::cashflow::CFKind;
+use finstack_quant_core::dates::calendar_by_id_strict;
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::market_data::fixings::fixing_series_id;
+use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_core::{Error, Result};
+use std::collections::{BTreeMap, BTreeSet};
+
 use super::TemplateInputs;
 
 impl ReplayTemplate {

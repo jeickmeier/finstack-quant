@@ -10,7 +10,7 @@ import polars as pl
 from finstack_quant.core.market_data import DiscountCurve, HazardCurve
 from finstack_quant.core.table import ArrowTable
 from finstack_quant.margin._im import SimmCalculator, SimmSensitivities
-from finstack_quant.margin._types import NettingSetId
+from finstack_quant.margin._types.enums import NettingSetId
 
 class FundingConfig:
     """

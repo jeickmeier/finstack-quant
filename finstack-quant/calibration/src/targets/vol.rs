@@ -6,7 +6,7 @@ use crate::api::schema::VolSurfaceParams;
 use crate::config::CalibrationConfig;
 use crate::quotes::MarketQuote;
 use crate::quotes::VolQuote;
-use crate::targets::util::{
+use crate::targets::setup::{
     extract_equity_option_quotes, interpolate_total_variance, resolve_equity_forward_inputs,
     resolve_equity_spot, surface_quote_residuals,
 };

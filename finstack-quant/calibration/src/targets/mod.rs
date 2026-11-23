@@ -27,14 +27,14 @@ pub(crate) mod inflation;
 pub(crate) mod parametric;
 /// Conversions between rate quotes and persisted rate-calibration recipes.
 pub(crate) mod rate_recipe;
+/// Shared utility functions for calibration targets.
+pub(crate) mod setup;
 /// Student-t copula degrees of freedom calibration.
 pub(crate) mod student_t;
 /// SVI volatility surface calibration.
 pub(crate) mod svi;
 /// Swaption volatility surface calibration.
 pub(crate) mod swaption;
-/// Shared utility functions for calibration targets.
-pub(crate) mod util;
 /// Option volatility surface calibration.
 pub(crate) mod vol;
 /// Cross-currency basis curve bootstrapping.

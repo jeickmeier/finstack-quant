@@ -96,6 +96,8 @@
 
 mod indexation;
 pub(crate) mod metrics;
+#[cfg(test)]
+mod tests;
 mod types;
 
 pub use types::{

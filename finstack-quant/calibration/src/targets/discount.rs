@@ -13,7 +13,7 @@ use crate::solver::global;
 use crate::solver::traits::TimeGridAndGuesses;
 use crate::solver::traits::{BootstrapTarget, GlobalSolveTarget};
 use crate::targets::rate_recipe::rate_calibration_recipe;
-use crate::targets::util::{
+use crate::targets::setup::{
     ContextScratch, discount_and_forward_curve_ids, prepare_rate_calibration_quotes,
     pv01_residual_weight, sorted_knot_grid, validate_global_knot_grid,
 };

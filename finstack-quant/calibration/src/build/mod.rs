@@ -10,12 +10,12 @@ pub(crate) mod cds;
 pub(crate) mod cds_tranche;
 /// Context for building instruments.
 pub(crate) mod context;
-/// Shared helper functions for builders.
-pub(crate) mod helpers;
 /// Envelope for prepared quotes.
 pub(crate) mod prepared;
 /// Builders for rates instruments.
 pub(crate) mod rates;
+/// Shared helper functions for builders.
+pub(crate) mod spot_date;
 /// Builders for cross-currency swap instruments.
 pub(crate) mod xccy;
 

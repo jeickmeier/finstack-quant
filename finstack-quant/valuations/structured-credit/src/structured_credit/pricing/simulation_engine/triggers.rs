@@ -13,7 +13,16 @@
 //! Both feed the CLO reinvestment rule: while any coverage test fails,
 //! principal proceeds are not reinvested but repay the notes.
 
-use super::*;
+use super::period_helpers::SimulationPeriod;
+use super::state::SimulationState;
+use crate::structured_credit::types::{
+    CoverageTestType, RecipientType, TrancheStructure, Waterfall,
+};
+use finstack_quant_core::Result;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::money::Money;
+
 use crate::structured_credit::pricing::coverage::TestContext;
 use crate::structured_credit::pricing::waterfall::{
     SeniorFeeInputs, coverage_inputs, evaluate_coverage_tests, senior_fee_accrual,

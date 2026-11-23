@@ -1,5 +1,9 @@
 //! Backward induction with node coupons.
 
+use super::super::tree_framework::{NodeState, TreeValuator};
+use finstack_quant_cashflows::builder::calculate_floating_rate;
+use finstack_quant_core::Result;
+
 use super::*;
 
 impl RatesCreditTree {

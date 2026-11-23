@@ -1,5 +1,17 @@
 //! Period simulation driver.
 
+use super::super::conservation::{assert_cash_conserved, recycle_reinvestment_principal};
+use super::super::period_helpers::{SimulationPeriod, live_afc_cap_rate};
+use super::super::state::{SimulationState, WRITEDOWN_DE_MINIMIS};
+use crate::structured_credit::types::{
+    LossRecognition, RecipientType, StructuredCredit, Waterfall,
+};
+use finstack_quant_core::FxHashMap;
+use finstack_quant_core::Result;
+use finstack_quant_core::dates::{Date, DateExt};
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::money::Money;
+
 use super::super::*;
 use super::cash::{AccumulationPhase, WaterfallCash};
 use super::period_waterfall::{PeriodRuleFlags, PeriodRuleFlows, insert_hedge_payments};
@@ -556,7 +568,7 @@ pub(in super::super) fn simulate_period(
     // source: the waterfall's own results).
     let coverage_tests =
         build_coverage_test_diagnostics(&period_waterfall, &waterfall_result.coverage_tests)?;
-    let record = super::super::state::PeriodDiagnostics {
+    let record = super::super::diagnostics::PeriodDiagnostics {
         interest_collections: pool_flows.interest,
         principal_collections: pool_flows
             .scheduled_principal
@@ -570,7 +582,7 @@ pub(in super::super) fn simulate_period(
         waterfall: waterfall_result,
         // Reserve interest routed to a tranche this period.
         non_waterfall_payments: std::mem::take(&mut state.pending_non_waterfall_payments),
-        ..super::super::state::PeriodDiagnostics::from_state(state, pay_date)?
+        ..super::super::diagnostics::PeriodDiagnostics::from_state(state, pay_date)?
     };
     state.period_diagnostics.push(record);
 
@@ -648,7 +660,7 @@ pub(super) fn apply_tranche_draws(
 pub(super) fn build_coverage_test_diagnostics(
     period_waterfall: &Waterfall,
     evaluated_tests: &[(String, Option<f64>, bool)],
-) -> Result<Vec<super::super::state::CoverageTestDiagnostic>> {
+) -> Result<Vec<super::super::diagnostics::CoverageTestDiagnostic>> {
     let trigger_levels: FxHashMap<&str, f64> = period_waterfall
         .coverage_tests()
         .map(|spec| (spec.id.as_str(), spec.trigger_level))
@@ -666,7 +678,7 @@ pub(super) fn build_coverage_test_diagnostics(
                     ))
                 })?;
             let ratio = *ratio;
-            Ok(super::super::state::CoverageTestDiagnostic {
+            Ok(super::super::diagnostics::CoverageTestDiagnostic {
                 test_id: test_id.clone(),
                 ratio,
                 trigger_level,

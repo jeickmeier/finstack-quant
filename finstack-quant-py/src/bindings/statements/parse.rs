@@ -1,0 +1,133 @@
+//! Period-ID and time-series argument parsing helpers for statement bindings.
+
+use crate::bindings::core::money::PyMoney;
+use finstack_quant_core::dates::PeriodId;
+use finstack_quant_statements::types::AmountOrScalar;
+use pyo3::prelude::*;
+
+/// Human-readable summary of the period-identifier grammar, appended to
+/// parse failures so a caller who wrote ``"2025-Q1"`` learns the accepted
+/// form instead of a bare "invalid input".
+pub(crate) const PERIOD_GRAMMAR: &str = "period ids are <year><kind><index> with no \
+    separators: 2025Q1 (quarter), 2025M3 (month), 2025W7 (ISO week), 2025H1 (half-year), \
+    2025D45 (day of year), 2025 or FY2025 (year); ranges are <start>..<end> in one kind, \
+    e.g. \"2025Q1..Q4\", \"2024M10..2025M03\", \"2025..2030\"";
+
+/// Parse a period identifier, mapping failures to a `ValueError` that names
+/// the offending input, the core diagnostic, and the accepted grammar.
+pub(crate) fn parse_period_id(s: &str) -> PyResult<PeriodId> {
+    s.parse().map_err(|e: finstack_quant_core::Error| {
+        crate::errors::value_error(format!("invalid period id {s:?}: {e}; {PERIOD_GRAMMAR}"))
+    })
+}
+
+/// Extract `(period, value)` pairs from a mapping, a pandas ``Series``, or a
+/// sequence of 2-tuples.
+///
+/// Anything with an ``items()`` method (``dict``, ``Mapping``, ``pd.Series``)
+/// is iterated as key/value pairs; otherwise the object is iterated as a
+/// sequence of ``(period, value)`` tuples. Keys are rendered with ``str()``
+/// so ``PeriodId`` objects and plain strings are both accepted.
+pub(crate) fn extract_period_pairs<'py>(
+    values: &Bound<'py, PyAny>,
+) -> PyResult<Vec<(String, Bound<'py, PyAny>)>> {
+    use crate::bindings::dataframe_utils::{
+        is_dataframe_like, table_column_names, table_column_to_pylist,
+    };
+    let mut out = Vec::new();
+    if is_dataframe_like(values)? {
+        let cols = table_column_names(values)?;
+        if cols.len() != 2 {
+            return Err(crate::errors::value_error(format!(
+                "period series DataFrame must have 2 columns (period, value), got {}",
+                cols.len()
+            )));
+        }
+        let keys = table_column_to_pylist(values, &cols[0])?.unwrap_or_default();
+        let vals = table_column_to_pylist(values, &cols[1])?.unwrap_or_default();
+        for (k, v) in keys.into_iter().zip(vals) {
+            out.push((k.str()?.to_string(), v));
+        }
+        return Ok(out);
+    }
+    if values.hasattr("items")? {
+        for item in values.call_method0("items")?.try_iter()? {
+            let (key, value): (Bound<'py, PyAny>, Bound<'py, PyAny>) = item?.extract()?;
+            out.push((key.str()?.to_string(), value));
+        }
+        return Ok(out);
+    }
+    for item in values.try_iter()? {
+        let (key, value): (Bound<'py, PyAny>, Bound<'py, PyAny>) = item?.extract()?;
+        out.push((key.str()?.to_string(), value));
+    }
+    Ok(out)
+}
+
+/// Extract `(PeriodId, f64)` pairs from any of the shapes accepted by
+/// [`extract_period_pairs`].
+pub(crate) fn extract_scalar_series(values: &Bound<'_, PyAny>) -> PyResult<Vec<(PeriodId, f64)>> {
+    extract_period_pairs(values)?
+        .into_iter()
+        .map(|(period, value)| Ok((parse_period_id(&period)?, value.extract::<f64>()?)))
+        .collect()
+}
+
+/// Extract `(PeriodId, Money)` pairs from any of the shapes accepted by
+/// [`extract_period_pairs`].
+pub(crate) fn extract_money_series(
+    values: &Bound<'_, PyAny>,
+) -> PyResult<Vec<(PeriodId, finstack_quant_core::money::Money)>> {
+    extract_period_pairs(values)?
+        .into_iter()
+        .map(|(period, value)| {
+            Ok((
+                parse_period_id(&period)?,
+                value.extract::<PyRef<'_, PyMoney>>()?.inner,
+            ))
+        })
+        .collect()
+}
+
+/// Extract `(PeriodId, AmountOrScalar)` pairs, accepting ``float`` or
+/// ``Money`` cells in any of the shapes accepted by [`extract_period_pairs`].
+pub(crate) fn extract_value_series(
+    values: &Bound<'_, PyAny>,
+) -> PyResult<Vec<(PeriodId, AmountOrScalar)>> {
+    extract_period_pairs(values)?
+        .into_iter()
+        .map(|(period, value)| Ok((parse_period_id(&period)?, extract_amount_or_scalar(&value)?)))
+        .collect()
+}
+
+pub(crate) fn extract_amount_or_scalar(value: &Bound<'_, PyAny>) -> PyResult<AmountOrScalar> {
+    match value.extract::<PyRef<'_, PyMoney>>() {
+        Ok(money) => Ok(AmountOrScalar::Amount(money.inner)),
+        _ => Ok(AmountOrScalar::scalar(value.extract::<f64>()?)),
+    }
+}
+
+/// Render a JSON value as a Python literal (``None`` / ``True`` / ``'text'``
+/// / ``{'k': 1.5}``) for ``__repr__`` output.
+pub(crate) fn python_literal(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::Null => "None".to_string(),
+        serde_json::Value::Bool(true) => "True".to_string(),
+        serde_json::Value::Bool(false) => "False".to_string(),
+        serde_json::Value::Number(n) => n.to_string(),
+        serde_json::Value::String(s) => {
+            format!("'{}'", s.replace('\\', "\\\\").replace('\'', "\\'"))
+        }
+        serde_json::Value::Array(items) => {
+            let inner: Vec<String> = items.iter().map(python_literal).collect();
+            format!("[{}]", inner.join(", "))
+        }
+        serde_json::Value::Object(map) => {
+            let inner: Vec<String> = map
+                .iter()
+                .map(|(k, v)| format!("'{k}': {}", python_literal(v)))
+                .collect();
+            format!("{{{}}}", inner.join(", "))
+        }
+    }
+}

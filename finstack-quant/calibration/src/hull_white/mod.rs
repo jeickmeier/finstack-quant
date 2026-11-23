@@ -46,17 +46,6 @@
 //! - Brigo, D. & Mercurio, F. (2006). *Interest Rate Models — Theory and Practice*.
 //!   Springer Finance (2nd ed.), Chapter 3. `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models`
 
-use finstack_quant_core::math::piecewise::PiecewiseConstantCurve;
-use finstack_quant_core::math::solver::BrentSolver;
-use finstack_quant_core::math::special_functions::norm_cdf;
-use std::collections::BTreeMap;
-
-use crate::CalibrationReport;
-use crate::config::CalibrationConfig;
-use crate::solver::global;
-use crate::solver::multi_start::MultiStartConfig;
-use crate::solver::traits::GlobalSolveTarget;
-
 mod cap_floor;
 mod cap_schedule;
 mod contractual_swaption;
@@ -76,7 +65,6 @@ pub use curves::{
     bootstrap_hull_white_sigma_schedule_to_cap_floors, calibrate_hull_white_to_cap_floors,
     calibrate_hull_white_to_swaptions,
 };
-use finstack_quant_models::rates::hull_white::{HullWhiteCalibrationParams, HullWhiteParams};
 pub use quotes::{CapFloorCalibrationConfig, CapFloorQuote, SwapFrequency, SwaptionQuote};
 pub(crate) use quotes::{SwaptionFloatingPeriod, SwaptionSchedule};
 pub(crate) use swaption::{

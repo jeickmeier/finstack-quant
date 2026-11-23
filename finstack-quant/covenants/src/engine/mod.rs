@@ -18,11 +18,11 @@
 //!   [`crate::CovenantMetricSource`].
 
 pub(crate) mod covenant_engine;
-pub(crate) mod helpers;
+pub(crate) mod evaluation;
 pub(crate) mod types;
 
 pub(crate) use covenant_engine::CovenantEngine;
-pub(crate) use helpers::{
+pub(crate) use evaluation::{
     headroom_for, headroom_raw_for, is_covenant_breached, spec_metric_name,
     springing_condition_met, validate_metric, validated_ratio_value,
 };

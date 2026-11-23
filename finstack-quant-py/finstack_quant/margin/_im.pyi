@@ -10,7 +10,8 @@ from finstack_quant.core.config import FinstackConfig
 from finstack_quant.core.table import ArrowTable
 from finstack_quant.margin._calculators import ImResult
 from finstack_quant.margin._im_curvature import SimmCurvatureSensitivity
-from finstack_quant.margin._types import CollateralAssetClass, EligibleCollateralSchedule
+from finstack_quant.margin._types.csa import EligibleCollateralSchedule
+from finstack_quant.margin._types.enums import CollateralAssetClass
 
 class SimmSensitivities:
     """

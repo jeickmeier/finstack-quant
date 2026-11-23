@@ -5,69 +5,26 @@
 //! stochastic pricing differ only in how they source pool SMM/MDR/recovery
 //! assumptions for each legal payment period.
 
-use crate::structured_credit::assumptions::embedded_registry;
-use crate::structured_credit::types::{
-    AdvancingPolicy, AssetPool, CallScope, CardPortfolioSpec, CoverageTestType, DealFees,
-    DelinquencyModel, EquityHistory, IncentiveFeeSpec, LiveCollateral, LossRecognition, PoolState,
-    RecipientType, StructuredCredit, Tranche, TrancheCashflows, TrancheSeniority, TrancheStructure,
-    Waterfall, WaterfallDistribution,
-};
-use finstack_quant_core::FxHashMap;
-use finstack_quant_core::Result;
-use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowParams};
-use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::HolidayCalendar;
-use finstack_quant_core::dates::{
-    BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, StubKind, adjust,
-};
-use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::fixings;
-use finstack_quant_core::market_data::term_structures::ForwardCurve;
-use finstack_quant_core::money::Money;
-use finstack_quant_models::credit::pool::{PerNameCopulaDefault, PoolGranularity};
-use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
-use finstack_quant_models::monte_carlo::traits::RandomStream;
-use std::sync::Arc;
-
-mod conservation;
+pub(super) mod conservation;
 mod delinquency;
+pub(crate) mod diagnostics;
 mod exercise;
 mod hedges;
 mod instrument_flows;
 mod instrument_paths;
 pub(crate) mod orchestration;
 pub(crate) mod period_helpers;
-mod pool_flow_source;
-mod pool_flows;
-mod recovery;
+pub(super) mod pool_flow_source;
+pub(super) mod pool_flows;
+pub(super) mod recovery;
 mod reserve;
 mod simulate_period;
 pub(crate) mod state;
 mod triggers;
 
-use conservation::{assert_cash_conserved, recycle_reinvestment_principal};
-use period_helpers::{
-    SimulationPeriod, TrancheAccrualDates, collateral_asset_rate_for_period, live_afc_cap_rate,
-    tranche_period_interest_due,
-};
-use pool_flow_source::period_averaged_monthly_rate;
-use pool_flows::{
-    AssetSeasonedRates, PeriodDefaultOutcome, PoolFlowRates, PoolFlows, RatedPoolFlowRequest,
-    SpecialServicingFees, calculate_pool_flows_with_rates,
-};
-use recovery::RecoveryQueue;
-use simulate_period::simulate_period;
-#[cfg(test)]
-pub(super) use state::CoverageTestBreach;
-pub(crate) use state::{
+pub(crate) use diagnostics::{
     NonWaterfallPayment, NonWaterfallSource, PeriodDiagnostics, SimulationDiagnostics,
 };
-use state::{SimulationState, StateTemplate, WRITEDOWN_DE_MINIMIS, step_down_metrics};
-
-#[cfg(test)]
-use conservation::par_acquired_at_price;
-#[cfg(test)]
-use period_helpers::{current_collateral_wac, term_rate_for_period};
 
 pub(crate) use instrument_flows::PreparedInstrumentSchedules;
 pub(crate) use instrument_paths::InstrumentPathFlowSource;

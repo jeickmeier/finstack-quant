@@ -3,7 +3,7 @@
 //! The explicit test-only recipe matches the frozen benchmark helper; no
 //! existing public fixture file, production counter or API is changed.
 
-use super::{
+use super::engine::{
     AccrualConfig, AccrualIndex, PeriodInputs, accrue_in_period, accrued_interest_amount,
     find_active_periods_and_elapsed,
 };

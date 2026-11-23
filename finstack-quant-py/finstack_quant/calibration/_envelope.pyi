@@ -3,15 +3,17 @@
 from collections.abc import Sequence
 from typing import Any
 from finstack_quant.calibration._config import CalibrationConfig
-from finstack_quant.calibration._quotes import (
-    CdsQuote,
+from finstack_quant.calibration._quotes.market import (
     CdsTrancheQuote,
     FxSpotDatum,
     InflationQuote,
     PriceDatum,
+    XccyQuote,
+)
+from finstack_quant.calibration._quotes.rates_vol import (
+    CdsQuote,
     RateQuote,
     VolQuote,
-    XccyQuote,
 )
 
 from finstack_quant.calibration._step_params import StepParams

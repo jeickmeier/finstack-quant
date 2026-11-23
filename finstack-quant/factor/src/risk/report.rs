@@ -34,7 +34,7 @@ use serde::{Deserialize, Serialize};
 
 use finstack_quant_core::math::linalg::flatten_square_matrix;
 
-use super::position::historical_var_decomposition_prepared;
+use super::position::engine::historical_var_decomposition_prepared;
 use super::stress::build_stress_attribution_prepared;
 use super::{
     MinTail, PositionRiskDecomposition, PreparedHistoricalScenarios, RiskBudgetResult,

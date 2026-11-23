@@ -1,10 +1,15 @@
 //! Single-period execution for schedule-driven instrument collateral.
 
 use super::super::exercise::RateView;
+use super::super::pool_flows::PoolFlows;
 use super::super::reserve::{fund_collateral_draws, replenish_reserve_from_repayments};
-use super::super::*;
+use super::super::state::SimulationState;
 use super::schedule::PreparedInstrumentSchedules;
 use super::types::{CollateralKind, NameState, PeriodBucket};
+use finstack_quant_core::Result;
+use finstack_quant_core::dates::{Date, DateExt, DayCountContext};
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::money::Money;
 
 /// Period default probability and recovery of one instrument from its hazard
 /// curve: the probability of defaulting in `(prev_date, pay_date]`

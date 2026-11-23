@@ -7,8 +7,8 @@ from typing import Any
 import pandas as pd
 import polars as pl
 from finstack_quant.core.table import ArrowTable
-from finstack_quant.statements_analytics._comps import (
-    CompanyMetrics,
+from finstack_quant.statements_analytics._comps.peers import CompanyMetrics
+from finstack_quant.statements_analytics._comps.scoring import (
     PeerStats,
     RegressionResult,
     RelativeValueResult,

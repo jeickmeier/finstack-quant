@@ -8,7 +8,8 @@
 //! `calculate` factory); the remaining functions are the twins of the Python
 //! methods and take the plain value.
 
-use super::{js_currency, js_money};
+use super::parse::js_money;
+use crate::utils::input::js_currency;
 use crate::utils::input::{from_js_json, js_f64};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_margin::metrics;

@@ -1,6 +1,18 @@
 //! `ReplayTemplate` assembly: initial balance, exercise schedule, and static grid events.
 
-use super::super::*;
+use super::super::super::bond_valuator::BondValuator;
+use super::super::build::*;
+use super::super::state::*;
+use crate::bond::pricing::return_floor::realized_distributions;
+use crate::bond::{Bond, CashflowSpec};
+use finstack_quant_core::cashflow::CFKind;
+use finstack_quant_core::dates::calendar_by_id_strict;
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::{Error, Result};
+use finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree;
+use std::collections::{BTreeMap, BTreeSet};
+use time::Duration;
 
 /// Inputs shared by the [`ReplayTemplate`] builders.
 #[derive(Clone, Copy)]

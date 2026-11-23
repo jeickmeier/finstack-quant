@@ -5,7 +5,9 @@
 //! exponential of that same state. Integrating their positive sum preserves
 //! floating payment delays without the zero-lag telescoping assumption.
 
-use super::{HullWhiteCalibrationParams, SwaptionSchedule};
+use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
+
+use super::SwaptionSchedule;
 use finstack_quant_core::math::integration::gauss_legendre_integrate_adaptive;
 use finstack_quant_core::math::special_functions::norm_cdf;
 use finstack_quant_core::{Error, Result};

@@ -1,10 +1,16 @@
 //! Deterministic schedule-backed pool flow source.
 
 use super::super::exercise::RateView;
+use super::super::pool_flow_source::period_averaged_monthly_rate;
+use super::super::pool_flows::PoolFlows;
 use super::super::*;
 use super::period::{NamePeriod, PeriodModel, hazard_period_default, run_period};
 use super::schedule::PreparedInstrumentSchedules;
 use super::types::{NameState, PeriodDefaultSource};
+use crate::structured_credit::types::StructuredCredit;
+use finstack_quant_core::Result;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 
 /// [`PoolFlowSource`] driven by instrument schedules and the deal's

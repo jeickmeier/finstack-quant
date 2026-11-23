@@ -11,7 +11,7 @@ use crate::solver::bootstrap;
 use crate::solver::global;
 use crate::solver::traits::TimeGridAndGuesses;
 use crate::solver::traits::{BootstrapTarget, GlobalSolveTarget};
-use crate::targets::util::{
+use crate::targets::setup::{
     ContextScratch, scheme_factor, sorted_knot_grid, validate_global_knot_grid,
 };
 

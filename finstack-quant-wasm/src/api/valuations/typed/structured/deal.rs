@@ -1,0 +1,622 @@
+//! Typed `StructuredCredit` and `StructuredCreditBuilder` WASM bindings.
+
+use crate::api::core::dates::JsTenor;
+use crate::api::valuations::pricing::parse_market;
+use crate::utils::input::{from_js_json, js_string};
+use crate::utils::wire::{js_date, js_wire};
+use crate::utils::{to_js_err, to_js_value};
+use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
+    DealType, StandardDealParams, StructuredCredit,
+};
+use wasm_bindgen::prelude::*;
+
+instrument_class!(
+    /// Typed wrapper for the Rust `StructuredCredit` instrument (ABS, CLO, CMBS or RMBS deal).
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { core, valuations } from "finstack-quant-wasm";
+    /// await init();
+    /// const tranche = valuations.instruments
+    ///   .trancheBuilder()
+    ///   .id("A")
+    ///   .attachPct(0)
+    ///   .detachPct(100)
+    ///   .seniority("senior")
+    ///   .originalBalance(new core.Money(100, new core.Currency("USD")))
+    ///   .couponFixed(0.05)
+    ///   .maturity("2029-01-01")
+    ///   .build();
+    /// const zero = { amount: "0", currency: "USD" as const };
+    /// const structuredCredit = valuations.instruments.StructuredCredit.example();
+    /// console.log(structuredCredit.id, structuredCredit.dealType); // "CLO-EXAMPLE", "clo"
+    /// structuredCredit.free();
+    /// ```
+    JsStructuredCredit,
+    "StructuredCredit",
+    finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit
+);
+
+instrument_surface!(
+    JsStructuredCredit,
+    "StructuredCredit",
+    JsStructuredCreditBuilder,
+    "generated.valuations.StructuredCredit"
+);
+
+factories!(JsStructuredCredit, "StructuredCredit", finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit, {
+        /// Canonical example deal (mirrors Rust `StructuredCredit::example`): a USD 100,000,000 CLO with one 7% fixed-rate collateral bond and one 6% senior note, closing 2024-01-01, legal final 2034-01-01, discounted on `USD-OIS` with the `nyse` calendar.
+        /// @returns The example deal.
+        /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+        example as example,
+});
+
+getters!(JsStructuredCredit, "StructuredCredit", |i| {
+        /// Default pricing model key from the Rust `Instrument` trait.
+        /// @returns `"discounting"` (the deterministic waterfall).
+        default_model as defaultModel: "string" => text(Instrument::default_model(i)),
+        /// Expiry date from the Rust `Instrument` trait.
+        /// @returns The expiry date, or `null` when the instrument has none.
+        expiry as expiry: "string | null" => opt_date(Instrument::expiry(i)),
+        /// Whether a stochastic prepayment, default, recovery or correlation spec is set (mirrors Rust `StructuredCredit::is_stochastic`).
+        /// @returns `true` when `priceStochastic` has specs to simulate.
+        is_stochastic as isStochastic: "boolean" => json(i.is_stochastic()),
+        /// Loss-allocation policy in force for pricing: `lossAllocation` when set, otherwise the deal-type convention.
+        /// @returns `"write_down"` or `"par_preserving"`.
+        effective_loss_allocation as effectiveLossAllocation: "NonNullable< generated.valuations.StructuredCredit['loss_allocation'] >" => json(i.effective_loss_allocation()),
+        /// Loss-recognition timing in force: `lossRecognition` when set, otherwise the deal-type convention.
+        /// @returns `"at_liquidation"` for RMBS and CMBS by default, `"at_default"` otherwise.
+        effective_loss_recognition as effectiveLossRecognition: "NonNullable< generated.valuations.StructuredCredit['loss_recognition'] >" => json(i.effective_loss_recognition()),
+        /// Whether the template waterfall pays senior fees and senior note interest from principal when interest proceeds fall short: `principalCoversSeniorInterest` when set, otherwise `true` for CLO/CBO and `false` for every other deal type.
+        /// @returns The flag in force.
+        effective_principal_covers_senior_interest as effectivePrincipalCoversSeniorInterest: "boolean" => json(i.effective_principal_covers_senior_interest()),
+        /// Deal classification (serde string).
+        /// @returns `"abs"`, `"clo"`, `"cmbs"`, `"rmbs"` ...
+        deal_type as dealType: "generated.valuations.StructuredCredit['deal_type']" => json(i.deal_type),
+        /// Collateral pool.
+        /// @returns Independent copy of the pool.
+        pool as pool: "generated.valuations.StructuredCredit['pool']" => json(i.pool),
+        /// Capital structure.
+        /// @returns Independent copy of the tranche structure.
+        tranches as tranches: "generated.valuations.StructuredCredit['tranches']" => json(i.tranches),
+        /// Deal closing (issuance) date.
+        /// @returns The closing date.
+        closing_date as closingDate: "string" => date(i.closing_date),
+        /// First tranche payment date.
+        /// @returns The first payment date.
+        first_payment_date as firstPaymentDate: "string" => date(i.first_payment_date),
+        /// Buyer settlement date for note price and spread calculations.
+        /// @returns Settlement date; `null` uses the valuation date. Payments on or before settlement belong to the seller. Model PV stays at valuation.
+        quote_settlement_date as quoteSettlementDate: "string | null" => opt_date(i.quote_settlement_date),
+        /// Legal final maturity date.
+        /// @returns The maturity date.
+        maturity as maturity: "string" => date(i.maturity),
+        /// Discount curve identifier.
+        /// @returns Curve id used for discounting.
+        discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
+        /// Payment frequency.
+        /// @returns The tranche payment tenor.
+        frequency as frequency: "Tenor" => tenor(i.frequency),
+        /// Payment calendar identifier.
+        /// @returns `null` when no calendar is set.
+        calendar_id as calendarId: "string | null" => opt_text(i.calendar_id),
+        /// Payment business-day convention string.
+        /// @returns `null` for the default convention.
+        business_day_convention as businessDayConvention: "NonNullable< generated.valuations.StructuredCredit['business_day_convention'] > | null" => json(i.business_day_convention),
+        /// Credit model as its `CreditModelConfig` serde plain object.
+        /// @returns Prepayment, default, recovery, stochastic, delinquency and card specs.
+        credit_model as creditModel: "CreditModelConfig" => json(i.credit_model),
+        /// Market conditions as their serde plain object.
+        /// @returns `MarketConditions` fields.
+        market_conditions as marketConditions: "generated.valuations.StructuredCredit['market_conditions']" => json(i.market_conditions),
+        /// Deal metadata as its serde plain object.
+        /// @returns `Metadata` fields.
+        deal_metadata as dealMetadata: "NonNullable<generated.valuations.StructuredCredit['deal_metadata']>" => json(i.deal_metadata),
+        /// Hedges settled through the waterfall.
+        /// @returns One typed `HedgeSwap` per hedge (empty when unhedged).
+        hedge_swaps as hedgeSwaps: "NonNullable<generated.valuations.StructuredCredit['hedge_swaps']>" => json(i.hedge_swaps),
+        /// Senior transaction fees as their `DealFees` serde plain object.
+        /// @returns `null` when no fee tier is attached.
+        fees as fees: "NonNullable<generated.valuations.StructuredCredit['fees']> | null" => json(i.fees),
+        /// Deal-level coverage tests as `CoverageTestSpec` serde plain objects.
+        /// @returns One plain object per test (empty when none run).
+        coverage_triggers as coverageTriggers: "NonNullable< generated.valuations.StructuredCredit['coverage_triggers'] >" => json(i.coverage_triggers),
+        /// Clean-up call pool-factor threshold (decimal).
+        /// @returns `null` when no clean-up call is set.
+        cleanup_call_decimal as cleanupCallDecimal: "NonNullable< generated.valuations.StructuredCredit['cleanup_call_decimal'] > | null" => json(i.cleanup_call_decimal),
+        /// Assumed optional redemption.
+        /// @returns `null` without a call assumption.
+        call_assumption as callAssumption: "NonNullable< generated.valuations.StructuredCredit['call_assumption'] > | null" => json(i.call_assumption),
+        /// Collateral liquidation price in percent of par.
+        /// @returns `null` for par.
+        liquidation_price_pct as liquidationPricePct: "NonNullable< generated.valuations.StructuredCredit['liquidation_price_pct'] > | null" => json(i.liquidation_price_pct),
+        /// Explicit loss-allocation policy (`"write_down"` / `"par_preserving"`).
+        /// @returns `null` for the deal-type default.
+        loss_allocation as lossAllocation: "NonNullable< generated.valuations.StructuredCredit['loss_allocation'] > | null" => json(i.loss_allocation),
+        /// Explicit loss-recognition timing (`"at_default"` / `"at_liquidation"`).
+        /// @returns `null` for the deal-type default (at liquidation for RMBS/CMBS, at default otherwise).
+        loss_recognition as lossRecognition: "NonNullable< generated.valuations.StructuredCredit['loss_recognition'] > | null" => json(i.loss_recognition),
+        /// Scheduled lender draws on notes as `TrancheDraw` serde plain objects (`tranche_id`, `date`, `amount`).
+        /// @returns Empty for a fully funded structure.
+        tranche_draws as trancheDraws: "NonNullable<generated.valuations.StructuredCredit['tranche_draws']>" => json(i.tranche_draws),
+        /// Per-period re-advance rule as its `TrancheReadvance` serde plain object (`tranche_id`, `commitment`).
+        /// @returns `null` for no re-advances.
+        tranche_readvance as trancheReadvance: "NonNullable< generated.valuations.StructuredCredit['tranche_readvance'] > | null" => json(i.tranche_readvance),
+        /// Explicit principal-covers-senior-interest flag.
+        /// @returns `null` for the deal-type default.
+        principal_covers_senior_interest as principalCoversSeniorInterest: "NonNullable< generated.valuations.StructuredCredit['principal_covers_senior_interest'] > | null" => json(i.principal_covers_senior_interest),
+        /// Collateral valuation rules for the coverage tests.
+        /// @returns `null` when performing collateral is carried at par.
+        coverage_rules as coverageRules: "NonNullable< generated.valuations.StructuredCredit['coverage_rules'] > | null" => json(i.coverage_rules),
+        /// Declarative waterfall rules as their serde plain object.
+        /// @returns `null` when no rules are layered on the base waterfall.
+        waterfall_rules as waterfallRules: "NonNullable< generated.valuations.StructuredCredit['waterfall_rules'] > | null" => json(i.waterfall_rules),
+        /// Custom priority of payments.
+        /// @returns `null` when the deal-type template applies.
+        waterfall as waterfall: "NonNullable<generated.valuations.StructuredCredit['waterfall']> | null" => json(i.waterfall),
+        /// Free-form attributes (tags and metadata).
+        /// @returns The attribute bag.
+        attributes as attributes: "generated.valuations.StructuredCredit['attributes']" => json(i.attributes),
+        /// Deterministic prepayment model.
+        /// @returns A typed copy of the spec.
+        prepayment_spec as prepaymentSpec: "NonNullable<generated.valuations.StructuredCredit['prepayment_spec']>" => json(i.credit_model.prepayment_spec),
+        /// Deterministic default model.
+        /// @returns A typed copy of the spec.
+        default_spec as defaultSpec: "NonNullable<generated.valuations.StructuredCredit['default_spec']>" => json(i.credit_model.default_spec),
+        /// Recovery rate and lag model for defaulted collateral.
+        /// @returns A typed copy of the spec.
+        recovery_spec as recoverySpec: "NonNullable<generated.valuations.StructuredCredit['recovery_spec']>" => json(i.credit_model.recovery_spec),
+        /// Stochastic prepayment specification as its serde plain object.
+        /// @returns `null` until set or enabled.
+        stochastic_prepay_spec as stochasticPrepaySpec: "NonNullable< generated.valuations.StructuredCredit['stochastic_prepay_spec'] > | null" => json(i.credit_model.stochastic_prepay_spec),
+        /// Stochastic default specification as its serde plain object.
+        /// @returns `null` until set or enabled.
+        stochastic_default_spec as stochasticDefaultSpec: "NonNullable< generated.valuations.StructuredCredit['stochastic_default_spec'] > | null" => json(i.credit_model.stochastic_default_spec),
+        /// Stochastic recovery specification as its `RecoverySpec` serde plain object.
+        /// @returns `{"type": "constant", "rate": ...}` or `{"type": "market_correlated", "mean_recovery": ..., "recovery_volatility": ..., "factor_correlation": ...}`; `null` for constant recoveries at the deterministic rate.
+        stochastic_recovery_spec as stochasticRecoverySpec: "NonNullable< generated.valuations.StructuredCredit['stochastic_recovery_spec'] > | null" => json(i.credit_model.stochastic_recovery_spec),
+        /// Default correlation structure as its serde plain object.
+        /// @returns `null` until set or enabled.
+        correlation_structure as correlationStructure: "NonNullable< generated.valuations.StructuredCredit['correlation_structure'] > | null" => json(i.credit_model.correlation_structure),
+        /// Delinquency model as its `DelinquencyModel` serde plain object.
+        /// @returns `null` when no roll-rate model is set.
+        delinquency as delinquency: "NonNullable<generated.valuations.StructuredCredit['delinquency']> | null" => json(i.credit_model.delinquency),
+        /// Card portfolio model as its `CardPortfolioSpec` serde plain object.
+        /// @returns `null` for non-card deals.
+        card as card: "NonNullable<generated.valuations.StructuredCredit['card']> | null" => json(i.credit_model.card),
+});
+
+common_getters!(JsStructuredCredit, "StructuredCredit", overrides);
+
+builder_class!(
+    /// Fluent builder for `StructuredCredit`; one setter per Rust `FinancialBuilder` setter.
+    ///
+    /// Every setter returns the builder, so calls chain; `build()` validates
+    /// and consumes it.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { valuations } from "finstack-quant-wasm";
+    /// await init();
+    /// const builder = valuations.instruments.StructuredCredit.builder();
+    /// console.log(typeof builder.build);
+    /// builder.free();
+    /// ```
+    JsStructuredCreditBuilder,
+    "StructuredCreditBuilder",
+    finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCreditBuilder,
+    JsStructuredCredit,
+    |b| b.build()
+);
+
+setters!(JsStructuredCreditBuilder, "StructuredCreditBuilder", {
+        /// Set the instrument identifier.
+        /// @param value - Unique identifier for the deal.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        id as id: "string" => id,
+        /// Set the deal-type classification.
+        /// @param value - Deal classification.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        deal_type as dealType: "generated.valuations.StructuredCredit['deal_type']" => js_wire,
+        /// Set the structured-credit asset pool backing the deal.
+        /// @param value - Asset pool definition.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        pool as pool: "generated.valuations.StructuredCredit['pool']" => from_js_json,
+        /// Set the tranche capital structure.
+        /// @param value - Tranche capital structure.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        tranches as tranches: "generated.valuations.StructuredCredit['tranches']" => from_js_json,
+        /// Set the deal closing (issuance) date.
+        /// @param value - Deal closing date.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        closing_date as closingDate: "string" => js_date,
+        /// Set the first payment date to tranches.
+        /// @param value - First payment date.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        first_payment_date as firstPaymentDate: "string" => js_date,
+        /// Set buyer settlement for prices, yields and spreads.
+        /// @param value - Settlement on or after valuation and closing. Payments on or before this date are excluded. Omission uses the valuation date.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        quote_settlement_date as quoteSettlementDate: "string" => js_date,
+        /// Set the legal final maturity date.
+        /// @param value - Legal final maturity date.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        maturity as maturity: "string" => js_date,
+        /// Set the payment calendar identifier for schedule adjustments.
+        /// @param value - Holiday calendar identifier (e.g. `"nyse"`). Required for accurate schedule generation.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        calendar_id as calendarId: "string" => id,
+        /// Set the business day convention for tranche payments.
+        /// @param value - Business day convention (e.g. `"following"`, `"modified_following"`). Defaults to `"following"` when never set.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        business_day_convention as businessDayConvention: "NonNullable<generated.valuations.StructuredCredit['business_day_convention']>" => js_wire,
+        /// Set the discount curve identifier for valuation.
+        /// @param value - Discount curve identifier.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        discount_curve_id as discountCurveId: "string" => id,
+        /// Set market conditions from a JSON object.
+        /// @param value - `MarketConditions` object with finite annual decimal `refi_rate` for Richard-Roll refinancing incentives. Negative rates are accepted. This replaces the registry default; unknown macro-factor fields fail.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        market_conditions as marketConditions: "generated.valuations.StructuredCredit['market_conditions']" => from_js_json,
+        /// Set declarative waterfall rules from a JSON object.
+        /// @param value - JSON-encoded `WaterfallRules` object (available-funds caps, step-down, shifting interest, controlled accumulation), layered onto the base waterfall.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        waterfall_rules as waterfallRules: "NonNullable<generated.valuations.StructuredCredit['waterfall_rules']>" => from_js_json,
+        /// Set senior transaction fees from a JSON object.
+        /// @param value - JSON-encoded `DealFees` object (trustee, senior management, servicing, and optional master/special servicer fees), paid ahead of every note. Optional `workout_fee_pct` (percent of the P&I collected on specially serviced loans) and `liquidation_fee_pct` (percent of liquidation proceeds) are taken inside the collateral flows. Skipped (`null`) by default.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        fees as fees: "NonNullable<generated.valuations.StructuredCredit['fees']>" => from_js_json,
+        /// Replace the whole credit model (prepayment, default, recovery, stochastic and correlation specs, delinquency and card models).
+        /// @param value - `CreditModelConfig` serde object. Later per-field setters (`prepayment_spec` ...) modify this model.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        credit_model as creditModel: "CreditModelConfig" => from_js_json,
+        /// Set the deterministic prepayment model.
+        /// @param value - Typed spec (`PrepaymentModelSpec.constant_cpr` / `psa` / `abs` / `vector` / `cmbs_with_lockout`) or its serde form.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        prepayment_spec as prepaymentSpec: "NonNullable<generated.valuations.StructuredCredit['prepayment_spec']>" => from_js_json,
+        /// Set the deterministic default model.
+        /// @param value - Typed spec (`DefaultModelSpec.constant_cdr` / `sda` / `vector` / `cumulative_loss` / `timing`) or its serde form.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        default_spec as defaultSpec: "NonNullable<generated.valuations.StructuredCredit['default_spec']>" => from_js_json,
+        /// Set the recovery model.
+        /// @param value - Typed spec (rate, lag, optional severity vector) or its serde form.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        recovery_spec as recoverySpec: "NonNullable<generated.valuations.StructuredCredit['recovery_spec']>" => from_js_json,
+        /// Set the stochastic prepayment specification used by `StructuredCredit.price_stochastic`.
+        /// @param value - `StochasticPrepaySpec` serde object (Richard-Roll or factor parameters).
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        stochastic_prepay_spec as stochasticPrepaySpec: "NonNullable<generated.valuations.StructuredCredit['stochastic_prepay_spec']>" => from_js_json,
+        /// Set the stochastic default specification used by `StructuredCredit.price_stochastic`.
+        /// @param value - `StochasticDefaultSpec` serde object.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        stochastic_default_spec as stochasticDefaultSpec: "NonNullable<generated.valuations.StructuredCredit['stochastic_default_spec']>" => from_js_json,
+        /// Set the stochastic recovery specification used by `StructuredCredit.price_stochastic`.
+        /// @param value - `RecoverySpec` serde object: `{"type": "constant", "rate": 0.4}` or `{"type": "market_correlated", "mean_recovery": 0.4, "recovery_volatility": 0.25, "factor_correlation": 0.4}` (recovery falls with the systematic factor, so heavy-default paths recover less).
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        stochastic_recovery_spec as stochasticRecoverySpec: "NonNullable<generated.valuations.StructuredCredit['stochastic_recovery_spec']>" => from_js_json,
+        /// Set the default correlation structure used by `StructuredCredit.price_stochastic`.
+        /// @param value - `CorrelationStructure` serde object (factor loadings).
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        correlation_structure as correlationStructure: "NonNullable<generated.valuations.StructuredCredit['correlation_structure']>" => from_js_json,
+        /// Set the delinquency roll-rate, advancing and modification model (ABS/RMBS asset and rep-line pools).
+        /// @param value - `DelinquencyModel` serde object: `roll_rates` (per bucket, the last rolls to charge-off), `cure_rates`, `advancing` (`{"policy": "none"}` or `{"policy": "principal_and_interest", "recoverability_cap_pct": ..., "reimburse_from_collections": false}`) and optional `modification`.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        delinquency as delinquency: "NonNullable<generated.valuations.StructuredCredit['delinquency']>" => from_js_json,
+        /// Set the card master-trust portfolio model.
+        /// @param value - `CardPortfolioSpec` serde object: `monthly_payment_rate`, `portfolio_yield` and `charge_off_rate` (annual decimals), plus the optional `seller_interest` (`Money` serde object in the pool currency) and `fixed_allocation_decimal` (decimal in `(0, 1]`) that fix the investor allocation of trust collections once the revolving period ends.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        card as card: "NonNullable<generated.valuations.StructuredCredit['card']>" => from_js_json,
+        /// Set the deal-level OC / IC coverage tests.
+        /// @param value - `CoverageTestSpec` objects (`id`, `tranche_id`, `kind` (`"oc"` / `"ic"`), `trigger_level` ratio, `action`, optional `placement` (`{"kind": "after_tranche", "tranche_id": ...}` or `{"kind": "after_junior_fees"}`) and `divert_pct`).
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        coverage_triggers as coverageTriggers: "NonNullable<generated.valuations.StructuredCredit['coverage_triggers']>" => from_js_json,
+        /// Set the collateral valuation rules for the coverage tests.
+        /// @param value - Typed `CoverageRules` or its serde form.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        coverage_rules as coverageRules: "NonNullable<generated.valuations.StructuredCredit['coverage_rules']>" => from_js_json,
+        /// Set the assumed optional redemption for price-to-call analytics.
+        /// @param value - Typed `CallAssumption` or its serde form (`date`, `price_pct`, `scope`).
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        call_assumption as callAssumption: "NonNullable<generated.valuations.StructuredCredit['call_assumption']>" => from_js_json,
+        /// Set a custom priority of payments in place of the deal-type template.
+        /// @param value - Typed `Waterfall` or its serde form (`tiers`, `currency`, optional `coverage_rules`).
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        waterfall as waterfall: "NonNullable<generated.valuations.StructuredCredit['waterfall']>" => from_js_json,
+        /// Set the interest-rate hedges settled through the waterfall.
+        /// @param value - Typed `HedgeSwap` objects, their serde plain objects, or a JSON array string.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        hedge_swaps as hedgeSwaps: "NonNullable<generated.valuations.StructuredCredit['hedge_swaps']>" => from_js_json,
+        /// Set the clean-up call pool-factor threshold.
+        /// @param value - Pool factor (decimal in `(0, 1)`, typically `0.10`) below which the deal is redeemed when the liquidation proceeds cover the notes.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        cleanup_call_decimal as cleanupCallDecimal: "number" => js_f64,
+        /// Set the collateral liquidation price used by deal calls and clean-up calls.
+        /// @param value - Percent of par the collateral realizes (`100.0` = par).
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        liquidation_price_pct as liquidationPricePct: "number" => js_f64,
+        /// Set how collateral losses reach the note balances.
+        /// @param value - `"write_down"` allocates realized losses junior-first at default (RMBS/CMBS convention); `"par_preserving"` keeps note balances at par and realizes shortfalls at legal final (CLO/ABS convention). The deal type's default applies when never set.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        loss_allocation as lossAllocation: "NonNullable<generated.valuations.StructuredCredit['loss_allocation']>" => js_wire,
+        /// Set when collateral losses are booked.
+        /// @param value - `"at_default"` books the expected net loss on the default date (CLO/ABS convention); `"at_liquidation"` books the realized loss when the claim settles after the recovery lag (RMBS/CMBS convention), which delays write-downs and every cumulative-loss trigger. The deal type's default applies when never set.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        loss_recognition as lossRecognition: "NonNullable<generated.valuations.StructuredCredit['loss_recognition']>" => js_wire,
+        /// Set the scheduled lender draws on notes after closing.
+        /// @param value - `TrancheDraw` serde objects `{"tranche_id": "A", "date": "2025-01-01", "amount": {"amount": "5000000", "currency": "USD"}}`, ascending by date; each is applied on the first payment date at or after its date, lifting the note's balance and adding the cash to principal proceeds.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        tranche_draws as trancheDraws: "NonNullable<generated.valuations.StructuredCredit['tranche_draws']>" => from_js_json,
+        /// Set the per-period re-advance of one note up to its commitment and the borrowing base while the deal revolves.
+        /// @param value - `TrancheReadvance` serde object `{"tranche_id": "A", "commitment": {"amount": "70000000", "currency": "USD"}}`; requires `coverage_rules.borrowing_base`.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        tranche_readvance as trancheReadvance: "NonNullable<generated.valuations.StructuredCredit['tranche_readvance']>" => from_js_json,
+        /// Set whether principal proceeds cover senior fees and senior interest shortfalls before any note is redeemed.
+        /// @param value - `true` for the CLO principal-waterfall convention, `false` for strictly separate accounts. The deal type's default applies when never set.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        principal_covers_senior_interest as principalCoversSeniorInterest: "boolean" => js_bool,
+        /// Set deal metadata (counterparties, identifiers).
+        /// @param value - `Metadata` serde object.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        deal_metadata as dealMetadata: "NonNullable<generated.valuations.StructuredCredit['deal_metadata']>" => from_js_json,
+        /// Set free-form attributes (tags and metadata) on the deal.
+        /// @param value - Attribute bag; a plain object populates `meta` (an optional `"tags"` list populates `tags`).
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        attributes as attributes: "generated.valuations.StructuredCredit['attributes']" => from_js_json,
+});
+
+common_setters!(
+    JsStructuredCreditBuilder,
+    "StructuredCreditBuilder",
+    overrides
+);
+
+handle_setters!(JsStructuredCreditBuilder, "StructuredCreditBuilder", {
+        /// Set the payment frequency for the structure.
+        /// @param value - Payment frequency for the structure, as a `Tenor` handle.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+        frequency as frequency => JsTenor,
+});
+
+#[wasm_bindgen(js_class = StructuredCredit)]
+impl JsStructuredCredit {
+    /// Construct a validated standard deal from its registry profile and input record.
+    /// @param dealType - Registry family: `abs`, `clo`, `cmbs` or `rmbs`; other deal types are rejected.
+    /// @param params - Canonical `StandardDealParams` object or JSON string; `calendar_id` may be null at construction but simulation requires a payment calendar, and `pool.deal_type` must be the family (`abs` also takes `auto` and `card` pools).
+    /// @returns The deal with its selected registry assumptions and validated structure.
+    /// @throws Error - Throws with kind `validation` for an unsupported profile, a pool that contradicts the family, malformed inputs or invalid deal, and `invalid_type` for a wrong JavaScript type.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { valuations } from "finstack-quant-wasm";
+    /// await init();
+    /// const example = valuations.instruments.StructuredCredit.example();
+    /// const { id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id } = example.toDict();
+    /// const deal = valuations.instruments.StructuredCredit.newStandard("clo", {
+    ///   id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id,
+    /// });
+    /// console.log(deal.dealType); // "clo"
+    /// deal.free();
+    /// example.free();
+    /// ```
+    #[wasm_bindgen(js_name = newStandard)]
+    pub fn new_standard(
+        #[wasm_bindgen(
+            js_name = "dealType",
+            unchecked_param_type = "generated.valuations.StandardDealFamily['deal_type']"
+        )]
+        deal_type: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "generated.valuations.StandardDealParams | string")]
+        params: JsValue,
+    ) -> Result<JsStructuredCredit, JsValue> {
+        let deal_type: DealType = js_wire(&deal_type, "dealType")?;
+        let params: StandardDealParams = from_js_json(&params, "params")?;
+        StructuredCredit::new_standard(deal_type, params)
+            .map(|inner| Self { inner })
+            .map_err(to_js_err)
+    }
+
+    /// Return a copy of this deal with the deal type's standard fee schedule.
+    ///
+    /// Mirrors Rust `StructuredCredit::with_standard_fees`; the receiver is not modified.
+    /// @returns A new deal carrying the standard trustee, servicing and management fees.
+    #[wasm_bindgen(js_name = withStandardFees)]
+    pub fn with_standard_fees(&self) -> JsStructuredCredit {
+        Self {
+            inner: self.inner.clone().with_standard_fees(),
+        }
+    }
+
+    /// Return a copy of this deal with the default stochastic specifications.
+    ///
+    /// Mirrors Rust `StructuredCredit::enable_stochastic`: fills the
+    /// stochastic prepayment, default and correlation specs for the deal
+    /// type. The receiver is not modified.
+    /// @returns A new deal ready for `priceStochastic`.
+    /// @throws Error - Throws with kind `validation` if the deal type has no stochastic defaults or the deal is invalid.
+    #[wasm_bindgen(js_name = enableStochastic)]
+    pub fn enable_stochastic(&self) -> Result<JsStructuredCredit, JsValue> {
+        let mut inner = self.inner.clone();
+        inner.enable_stochastic().map_err(to_js_err)?;
+        Ok(Self { inner })
+    }
+
+    /// Return a copy of this deal with every stochastic specification cleared.
+    ///
+    /// Mirrors Rust `StructuredCredit::disable_stochastic`, the inverse of
+    /// `enableStochastic`: clears the stochastic prepayment, default, recovery
+    /// and correlation specs. The receiver
+    /// is not modified.
+    /// @returns A new deal priced deterministically.
+    #[wasm_bindgen(js_name = disableStochastic)]
+    pub fn disable_stochastic(&self) -> JsStructuredCredit {
+        let mut inner = self.inner.clone();
+        inner.disable_stochastic();
+        Self { inner }
+    }
+
+    /// The waterfall this deal runs (mirrors Rust `StructuredCredit::create_waterfall`).
+    ///
+    /// Returns the explicit waterfall when one is set, otherwise the deal
+    /// type's template built from the tranches, fees and coverage triggers.
+    /// @returns `Waterfall` plain object with the payment tiers and coverage rules.
+    /// @throws Error - Throws with kind `validation` if the deal's fees or tranches cannot form a waterfall.
+    #[wasm_bindgen(js_name = createWaterfall, unchecked_return_type = "generated.valuations.Waterfall")]
+    pub fn create_waterfall(&self) -> Result<JsValue, JsValue> {
+        to_js_value(&self.inner.create_waterfall().map_err(to_js_err)?)
+    }
+
+    /// Projected cashflows of one tranche from the deterministic simulation.
+    ///
+    /// Mirrors Rust `StructuredCredit::tranche_cashflows`.
+    /// @param trancheId - Identifier of a tranche of this deal.
+    /// @param marketJson - Canonical market-context JSON (string or plain object) supplying the discount and forward curves.
+    /// @param asOf - ISO-8601 valuation date.
+    /// @returns `TrancheCashflows` plain object with total, interest, principal, PIK, deferred and writedown flows.
+    /// @throws Error - Throws with kind `not_found` if `trancheId` is not a class of the deal or a curve is missing, kind `validation` if an input is malformed, and kind `computation` if the simulation fails.
+    #[wasm_bindgen(js_name = trancheCashflows, unchecked_return_type = "generated.valuations.TrancheCashflows")]
+    pub fn tranche_cashflows(
+        &self,
+        #[wasm_bindgen(js_name = "trancheId", unchecked_param_type = "string")] tranche_id: JsValue,
+        #[wasm_bindgen(js_name = "marketJson", unchecked_param_type = "JsonInput")]
+        market_json: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+    ) -> Result<JsValue, JsValue> {
+        let tranche_id = js_string(&tranche_id, "trancheId")?;
+        let market = parse_market(&market_json)?;
+        let as_of = js_date(&as_of, "asOf")?;
+        to_js_value(
+            &self
+                .inner
+                .tranche_cashflows(&tranche_id, &market, as_of)
+                .map_err(to_js_err)?,
+        )
+    }
+
+    /// Equity-tranche return metrics (mirrors Rust `calculate_equity_metrics`).
+    /// @param marketJson - Canonical market-context JSON (string or plain object) supplying the discount and forward curves.
+    /// @param asOf - ISO-8601 valuation date.
+    /// @param purchasePricePct - Optional equity purchase price in percent of its current balance (`60` = 60%); omit to invest at par. Must be finite and non-negative.
+    /// @returns `EquityMetrics` plain object: `invested`; `irr`, an annual XIRR (ACT/365F) decimal or `null` when no rate solves; `moic`, a multiple of invested; `nav_pct`, the distributions discounted on the deal's discount curve as a percent of current balance; and `cash_on_cash`, each distribution as an unannualized decimal share of invested. `equityMetricsFieldUnits` states the units.
+    /// @throws Error - Throws with kind `not_found` if a curve is missing or the simulation records no equity tranche, kind `validation` if an input is malformed or the deal has no equity tranche, and kind `computation` if the simulation fails.
+    #[wasm_bindgen(js_name = equityMetrics, unchecked_return_type = "generated.valuations.EquityMetrics")]
+    pub fn equity_metrics(
+        &self,
+        #[wasm_bindgen(js_name = "marketJson", unchecked_param_type = "JsonInput")]
+        market_json: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+        #[wasm_bindgen(
+            js_name = "purchasePricePct",
+            unchecked_optional_param_type = "number | null"
+        )]
+        purchase_price_pct: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
+        let market = parse_market(&market_json)?;
+        let as_of = js_date(&as_of, "asOf")?;
+        let purchase_price_pct =
+            crate::utils::input::js_opt_f64(purchase_price_pct.as_ref(), "purchasePricePct")?;
+        to_js_value(
+            &finstack_quant_valuations::instruments::fixed_income::structured_credit::calculate_equity_metrics(
+                &self.inner,
+                &market,
+                as_of,
+                purchase_price_pct,
+            )
+            .map_err(to_js_err)?,
+        )
+    }
+
+    /// Monte Carlo stochastic price of the deal.
+    ///
+    /// Mirrors Rust `StructuredCredit::price_stochastic`. Call
+    /// `enableStochastic()` first when the deal carries no stochastic specs.
+    /// @param marketJson - Canonical market-context JSON (string or plain object) supplying the discount and forward curves.
+    /// @param asOf - ISO-8601 valuation date.
+    /// @param numPaths - Optional number of independent estimators; omit to use `model_config.mc_paths` (default 5,000).
+    /// @param antithetic - Optional antithetic pairing (`true` simulates `2 x numPaths` scenario paths); omit to use `model_config.mc_antithetic` (default `true`).
+    /// @returns `StochasticPricingResult` plain object with NPV, expected and unexpected loss, expected shortfall and per-tranche results.
+    /// @throws Error - Throws with kind `not_found` if a curve is missing, kind `validation` if an input is malformed or the deal has no stochastic specs, and kind `computation` if the simulation fails.
+    #[wasm_bindgen(js_name = priceStochastic, unchecked_return_type = "generated.valuations.StochasticPricingResult")]
+    pub fn price_stochastic(
+        &self,
+        #[wasm_bindgen(js_name = "marketJson", unchecked_param_type = "JsonInput")]
+        market_json: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+        #[wasm_bindgen(js_name = "numPaths", unchecked_optional_param_type = "number | null")]
+        num_paths: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "boolean | null")] antithetic: Option<
+            JsValue,
+        >,
+    ) -> Result<JsValue, JsValue> {
+        let market = parse_market(&market_json)?;
+        let as_of = js_date(&as_of, "asOf")?;
+        let num_paths = crate::utils::input::js_opt_uint(num_paths.as_ref(), "numPaths")?;
+        let antithetic = crate::utils::input::js_opt_bool(antithetic.as_ref(), "antithetic")?;
+        crate::utils::to_js_value(
+            &self
+                .inner
+                .price_stochastic(&market, as_of, num_paths, antithetic)
+                .map_err(to_js_err)?,
+        )
+    }
+
+    /// Run deterministic simulation and return all tranche flows and deal accounting.
+    /// @param marketJson - Canonical market-context JSON (string or plain object) supplying discount and forward curves.
+    /// @param asOf - Requested ISO-8601 valuation date; lifecycle policy resolves the effective date.
+    /// @returns `SimulationRun` with `tranches` keyed by tranche identifier and complete `diagnostics`.
+    /// @throws Error - Throws with kind `not_found` if a curve is missing, `validation` if the deal or dates are invalid, and `computation` if simulation fails.
+    #[wasm_bindgen(js_name = runSimulation, unchecked_return_type = "generated.valuations.SimulationRun")]
+    pub fn run_simulation(
+        &self,
+        #[wasm_bindgen(js_name = "marketJson", unchecked_param_type = "JsonInput")]
+        market_json: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+    ) -> Result<JsValue, JsValue> {
+        let market = parse_market(&market_json)?;
+        let as_of = js_date(&as_of, "asOf")?;
+        let run = self
+            .inner
+            .run_simulation(&market, as_of)
+            .map_err(to_js_err)?;
+        to_js_value(&run)
+    }
+}

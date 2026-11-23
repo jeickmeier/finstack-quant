@@ -2,9 +2,9 @@
 //! `rough_bergomi`, `rough_heston` and `cheyette_rough`, and the fractional
 //! noise choice.
 
-use super::runner::dispatch;
-use super::tests::{assert_mean, engine_states, error_message, mean_var, spec, terminal};
-use super::*;
+use super::super::runner::dispatch;
+use super::super::*;
+use super::core::{assert_mean, engine_states, error_message, mean_var, spec, terminal};
 use crate::monte_carlo::discretization::lmm_predictor_corrector::LmmPredictorCorrector;
 use crate::monte_carlo::discretization::rough_bergomi::RoughBergomiEuler;
 use crate::monte_carlo::discretization::rough_heston::RoughHestonHybrid;

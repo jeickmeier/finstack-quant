@@ -93,7 +93,7 @@ impl Check for NonFiniteCheck {
 
         for node in &selected {
             // Units must be resolved and agree between model and results.
-            crate::checks::helpers::validated_input_value_type(self.id(), context, node.as_str())?;
+            crate::checks::lookup::validated_input_value_type(self.id(), context, node.as_str())?;
             let Some(cells) = context.results.cells.get(node.as_str()) else {
                 continue;
             };

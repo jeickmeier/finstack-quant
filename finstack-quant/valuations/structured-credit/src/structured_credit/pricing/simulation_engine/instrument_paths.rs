@@ -28,6 +28,12 @@
 //! spread-linked target `clamp(θ + β(s/s₀ − 1), 0, 1)`. Zero utilization
 //! volatility freezes the utilization, as in the standalone path generator.
 
+use super::pool_flows::PoolFlows;
+use finstack_quant_core::Result;
+use finstack_quant_core::dates::{Date, DayCountContext};
+use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
+use finstack_quant_models::monte_carlo::traits::RandomStream;
+
 use super::exercise::RateView;
 use super::instrument_flows::{
     FROZEN_UTILIZATION_VOL, NamePeriod, NameState, PeriodDefaultSource, PeriodModel,
@@ -417,6 +423,7 @@ impl<S: PeriodShockSource> PoolFlowSource for InstrumentPathFlowSource<'_, S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::structured_credit::StructuredCredit;
     use crate::structured_credit::types::{
         AssetPool, CallExercisePolicy, DealType, InstrumentCollateral, PutExercisePolicy, Tranche,
         TrancheSeniority, TrancheStructure,
@@ -424,9 +431,11 @@ mod tests {
     use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec};
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::Tenor;
+    use finstack_quant_core::dates::{DayCount, Tenor};
+    use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
-    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+    use finstack_quant_core::money::Money;
     use finstack_quant_valuations_fixed_income::bond::{
         Bond, CallPut, CallPutSchedule, CashflowSpec,
     };

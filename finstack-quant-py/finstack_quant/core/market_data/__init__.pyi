@@ -33,12 +33,12 @@ from finstack_quant.core.market_data._curves.credit import (
 )
 from finstack_quant.core.market_data._curves.price import PriceCurve as PriceCurve
 from finstack_quant.core.market_data._curves.inflation import InflationCurve as InflationCurve
-from finstack_quant.core.market_data._curves.surfaces import (
-    FxDeltaVolSurface as FxDeltaVolSurface,
+from finstack_quant.core.market_data._curves.fx_vol_surface import FxDeltaVolSurface as FxDeltaVolSurface
+from finstack_quant.core.market_data._curves.vol_cube import (
     SabrParameterData as SabrParameterData,
     VolCube as VolCube,
-    VolSurface as VolSurface,
 )
+from finstack_quant.core.market_data._curves.vol_surface import VolSurface as VolSurface
 from finstack_quant.core.market_data._curves.cube_expiry_slice import VolCubeExpirySlice as VolCubeExpirySlice
 from finstack_quant.core.market_data._fx import (
     FxConversionPolicy as FxConversionPolicy,

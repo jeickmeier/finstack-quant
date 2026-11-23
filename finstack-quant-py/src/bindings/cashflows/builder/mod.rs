@@ -12,27 +12,9 @@ use crate::bindings::pydoc::pydoc;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 use pyo3::wrap_pyfunction;
+mod rates;
 
-#[doc = pydoc!("finstack_quant.cashflows.builder", "abs_to_smm")]
-#[pyfunction]
-#[pyo3(text_signature = "(speed, month)")]
-pub(crate) fn abs_to_smm(speed: f64, month: u32) -> PyResult<f64> {
-    finstack_quant_cashflows::builder::abs_to_smm(speed, month).map_err(crate::errors::core_to_py)
-}
-
-#[doc = pydoc!("finstack_quant.cashflows.builder", "annual_to_monthly")]
-#[pyfunction]
-#[pyo3(text_signature = "(annual)")]
-pub(crate) fn annual_to_monthly(annual: f64) -> PyResult<f64> {
-    finstack_quant_cashflows::builder::annual_to_monthly(annual).map_err(crate::errors::core_to_py)
-}
-
-#[doc = pydoc!("finstack_quant.cashflows.builder", "monthly_to_annual")]
-#[pyfunction]
-#[pyo3(text_signature = "(monthly)")]
-pub(crate) fn monthly_to_annual(monthly: f64) -> PyResult<f64> {
-    finstack_quant_cashflows::builder::monthly_to_annual(monthly).map_err(crate::errors::core_to_py)
-}
+pub(crate) use rates::{abs_to_smm, annual_to_monthly, monthly_to_annual};
 
 /// Register the `finstack_quant.cashflows.builder` submodule.
 pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
