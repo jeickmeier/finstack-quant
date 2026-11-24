@@ -814,11 +814,19 @@ impl HullWhiteTree {
     ///
     /// # Arguments
     ///
-    /// * `terminal_values` - Payoff values at maturity for each node
-    /// * `intermediate_value_fn` - Called at each step to adjust for early exercise/coupons
+    /// * `terminal_values` - Payoff values at maturity for each node, in the
+    ///   instrument's value units and ordered by state. Smooth any exercise
+    ///   kink in them with [`smoothed_max`] or [`smoothed_min`] first.
+    /// * `level_fn` - Called once per step, from the last step before maturity
+    ///   back to the root, with the step index and that level's discounted
+    ///   continuation values ordered by state. It adjusts the values in place
+    ///   for coupons and exercise. Apply an exercise right to the whole level
+    ///   with [`smoothed_max`] (holder) or [`smoothed_min`] (issuer) rather
+    ///   than a node-by-node `max`: a kink sampled at the nodes makes the
+    ///   price ripple with the rate level at the node spacing.
     ///
-    /// The `intermediate_value_fn` takes (step, node_idx, continuation_value) and returns
-    /// the adjusted value (e.g., max(continuation, exercise_value) for Bermudan options).
+    /// [`smoothed_max`]: crate::trees::kink_smoothing::smoothed_max
+    /// [`smoothed_min`]: crate::trees::kink_smoothing::smoothed_min
     ///
     /// # Errors
     ///
@@ -827,10 +835,10 @@ impl HullWhiteTree {
     pub fn backward_induction<F>(
         &self,
         terminal_values: &[f64],
-        intermediate_value_fn: F,
+        mut level_fn: F,
     ) -> finstack_quant_core::Result<f64>
     where
-        F: Fn(usize, usize, f64) -> f64,
+        F: FnMut(usize, &mut [f64]),
     {
         let n = self.num_steps();
 
@@ -845,7 +853,8 @@ impl HullWhiteTree {
         }
 
         // Reuse two scratch buffers across steps to avoid per-step
-        // allocation. Both are sized to the widest level: the buffers swap
+        // allocation by the rollback itself; `level_fn` may still allocate
+        // at the levels where it applies an exercise decision. Both are sized to the widest level: the buffers swap
         // every step, and interior levels can be wider than the terminal
         // level when mean reversion contracts the lattice near maturity.
         let max_nodes = self.widths.iter().copied().max().unwrap_or(1);
@@ -870,10 +879,9 @@ impl HullWhiteTree {
                 let expected_value = p_up * values[center + 1]
                     + p_mid * values[center]
                     + p_down * values[center - 1];
-                let discounted = expected_value * comp.tree_df(r_j, dt_i);
-
-                *scratch_j = intermediate_value_fn(step, idx, discounted);
+                *scratch_j = expected_value * comp.tree_df(r_j, dt_i);
             }
+            level_fn(step, &mut scratch[..num_nodes]);
 
             std::mem::swap(&mut values, &mut scratch);
         }
@@ -1119,7 +1127,7 @@ mod tests {
         let final_step = tree.num_steps();
         let terminal = vec![1.0; tree.num_nodes(final_step)];
         let value = tree
-            .backward_induction(&terminal, |_, _, cont| cont)
+            .backward_induction(&terminal, |_, _| {})
             .expect("terminal values sized to final step");
         let target_df = steep_curve.df(10.0).expect("valid");
         let error_bp = ((value - target_df) / target_df).abs() * 10000.0;
@@ -1164,7 +1172,7 @@ mod tests {
 
         let terminal = vec![0.0; tree.num_nodes(10)];
         let value = tree
-            .backward_induction(&terminal, |_, _, cont| cont)
+            .backward_induction(&terminal, |_, _| {})
             .expect("terminal values sized to final step");
 
         assert!(value.abs() < 1e-10, "Zero payoff should give zero value");
@@ -1182,7 +1190,7 @@ mod tests {
 
         let terminal = vec![1.0; tree.num_nodes(final_step)];
         let value = tree
-            .backward_induction(&terminal, |_, _, cont| cont)
+            .backward_induction(&terminal, |_, _| {})
             .expect("terminal values sized to final step");
 
         let target_df = curve.df(1.0).expect("valid");
@@ -1305,7 +1313,7 @@ mod tests {
         for bad_len in [0, expected - 1, expected + 1] {
             let terminal = vec![1.0; bad_len];
             let err = tree
-                .backward_induction(&terminal, |_, _, cont| cont)
+                .backward_induction(&terminal, |_, _| {})
                 .expect_err("mis-sized terminal values must be rejected");
             assert!(
                 err.to_string().contains("terminal_values"),
@@ -1399,7 +1407,7 @@ mod tests {
         let final_step = tree.num_steps();
         let terminal = vec![1.0; tree.num_nodes(final_step)];
         let value = tree
-            .backward_induction(&terminal, |_, _, cont| cont)
+            .backward_induction(&terminal, |_, _| {})
             .expect("terminal values sized to final step");
         let target_df = curve.df(5.0).expect("valid");
         let error_bp = ((value - target_df) / target_df).abs() * 10000.0;
@@ -1494,7 +1502,7 @@ mod tests {
         let final_step = tree.num_steps();
         let terminal = vec![1.0; tree.num_nodes(final_step)];
         let value = tree
-            .backward_induction(&terminal, |_, _, cont| cont)
+            .backward_induction(&terminal, |_, _| {})
             .expect("terminal values sized to final step");
         let target_df = steep_curve.df(10.0).expect("valid");
         let error_bp = ((value - target_df) / target_df).abs() * 10000.0;

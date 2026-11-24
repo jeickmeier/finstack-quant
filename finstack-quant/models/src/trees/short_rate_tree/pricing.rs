@@ -2,8 +2,8 @@ use finstack_quant_core::math::Compounding;
 use finstack_quant_core::{Error, Result};
 
 use crate::trees::tree_framework::{
-    NodeState, RecombiningInputs, RecombiningLattice, TreeDiscounting, TreeValuator,
-    price_recombining_tree,
+    NodeClaim, NodeState, RecombiningInputs, RecombiningLattice, TreeDiscounting, TreeValuator,
+    price_recombining_tree, resolve_level,
 };
 
 use super::black_karasinski::{BkTrinomialLattice, transition_index, transition_offsets};
@@ -52,6 +52,7 @@ impl ShortRateTree {
         }
 
         let mut scratch: Vec<f64> = Vec::new();
+        let mut claims: Vec<NodeClaim> = Vec::new();
         for step in (0..steps).rev() {
             let curr_j_max = step.min(j_max);
             let next_j_max = (step + 1).min(j_max);
@@ -62,7 +63,7 @@ impl ShortRateTree {
                 usize::MAX
             };
 
-            scratch.clear();
+            claims.clear();
             for j in 0..num_nodes {
                 let j_signed = j as i32 - curr_j_max as i32;
                 let node_probs = lattice.probs[step][j];
@@ -82,8 +83,11 @@ impl ShortRateTree {
                 let oas_shift = oas_shift_at(r)?;
                 let continuation = expected_value * comp.tree_df(r, dt) * (-oas_shift * dt).exp();
                 let state = state_for(step, r, oas_shift);
-                scratch.push(valuator.value_at_node(&state, continuation, dt)?);
+                claims.push(valuator.claim_at_node(&state, continuation, dt)?);
             }
+            scratch.clear();
+            scratch.resize(num_nodes, 0.0);
+            resolve_level(&claims, &mut scratch);
             std::mem::swap(&mut values, &mut scratch);
         }
 

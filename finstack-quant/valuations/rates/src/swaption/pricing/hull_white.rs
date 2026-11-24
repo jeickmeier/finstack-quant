@@ -12,7 +12,8 @@
 //!    maturity horizon.
 //! 2. At the terminal step, compute continuation values of zero.
 //! 3. During backward induction, at the tree step corresponding to the
-//!    swaption expiry, compute the exercise value:
+//!    swaption expiry, take the kink-smoothed maximum of the continuation
+//!    and the exercise value across the level:
 //!    - Payer: max(0, (S - K) * A * N)
 //!    - Receiver: max(0, (K - S) * A * N)
 //!
@@ -30,6 +31,7 @@ use crate::swaption::types::Swaption;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
+use finstack_quant_models::trees::kink_smoothing::smoothed_max;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::pricing::hw1f_params::{
     Hw1fParamFamily, resolve_hw1f_params,
@@ -198,25 +200,28 @@ impl SwaptionHullWhitePricer {
         let terminal: Vec<f64> = vec![0.0; tree.num_nodes(n)];
 
         // Backward induction with exercise at expiry step only
-        let pv = tree.backward_induction(&terminal, |step, node_idx, continuation| {
-            if step == exercise_step {
-                let exercise_value = cashflows.value(
-                    super::hw_cashflows::HwExerciseNode {
-                        tree: &tree,
-                        step,
-                        index: node_idx,
-                        discount: &discount,
-                    },
-                    super::hw_cashflows::HwExerciseTerms {
-                        strike,
-                        notional,
-                        option_type: swaption.option_type,
-                    },
-                );
-                continuation.max(exercise_value)
-            } else {
-                continuation
+        let pv = tree.backward_induction(&terminal, |step, values| {
+            if step != exercise_step {
+                return;
             }
+            let exercise_values: Vec<f64> = (0..values.len())
+                .map(|index| {
+                    cashflows.value(
+                        super::hw_cashflows::HwExerciseNode {
+                            tree: &tree,
+                            step,
+                            index,
+                            discount: &discount,
+                        },
+                        super::hw_cashflows::HwExerciseTerms {
+                            strike,
+                            notional,
+                            option_type: swaption.option_type,
+                        },
+                    )
+                })
+                .collect();
+            smoothed_max(values, &exercise_values);
         })?;
 
         Ok(pv)

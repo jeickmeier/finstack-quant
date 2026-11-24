@@ -1,0 +1,140 @@
+{
+  "expected": {
+    "dv01": 1956.6472849129495,
+    "npv": 138619.63015718068
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "cash_settlement_method": "par_yield",
+        "expiry": "2027-04-30",
+        "id": "USD-HULL-WHITE-1Y5Y-PAYER-SWAPTION-QUANTLIB",
+        "instrument_pricing_overrides": {
+          "model_config": {
+            "hw1f_mean_reversion": 0.03,
+            "hw1f_sigma": 0.01,
+            "tree_steps": 400
+          }
+        },
+        "notional": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "option_type": "call",
+        "sabr_params": null,
+        "settlement": "physical",
+        "underlying_fixed_leg": {
+          "business_day_convention": "unadjusted",
+          "calendar_id": "weekends_only",
+          "day_count": "act_365f",
+          "discount_curve_id": "USD-OIS",
+          "end": "2032-04-30",
+          "frequency": {
+            "count": 12,
+            "unit": "months"
+          },
+          "payment_lag_days": 0,
+          "rate": "0.042",
+          "start": "2027-04-30",
+          "stub": "none"
+        },
+        "underlying_float_leg": {
+          "business_day_convention": "unadjusted",
+          "calendar_id": "weekends_only",
+          "compounding": "simple",
+          "day_count": "act_365f",
+          "discount_curve_id": "USD-OIS",
+          "end": "2032-04-30",
+          "fixing_calendar_id": "weekends_only",
+          "forward_curve_id": "USD-OIS",
+          "frequency": {
+            "count": 12,
+            "unit": "months"
+          },
+          "index_id": "USD-OIS",
+          "payment_lag_days": 0,
+          "reset_lag_days": 0,
+          "spread_bp": "0",
+          "start": "2027-04-30",
+          "stub": "none"
+        },
+        "vol_model": "normal",
+        "vol_surface_id": "USD-SWAPTION-VOL-UNUSED"
+      },
+      "type": "swaption"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {},
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-23",
+    "description": "QuantLib native 1Y into 5Y Hull-White one-factor payer swaption.",
+    "domain": "rates.swaption",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-23",
+    "name": "usd_hull_white_1y5y_payer_swaption_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product hull_white_swaption",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43 JamshidianSwaptionEngine on HullWhite(a=0.03, sigma=0.01) over a flat 0.04 continuous Act/365F curve; single-curve annual Act/365F fixed and floating legs, unadjusted dates, physical settlement.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "hull_white_1f",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "dv01": {
+      "rel": 0.0025,
+      "tolerance_reason": "QuantLib's Jamshidian decomposition is exact for Hull-White; Finstack prices the same model on a 400-step trinomial tree, whose first-order time discretization is bounded here by one step in 400. DV01 is a 1bp parallel continuous zero shift with the model parameters held fixed."
+    },
+    "npv": {
+      "rel": 0.0025,
+      "tolerance_reason": "QuantLib's Jamshidian decomposition is exact for Hull-White; Finstack prices the same model on a 400-step trinomial tree, whose first-order time discretization is bounded here by one step in 400. DV01 is a 1bp parallel continuous zero shift with the model parameters held fixed."
+    }
+  }
+}

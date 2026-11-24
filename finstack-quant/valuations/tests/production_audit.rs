@@ -44,7 +44,8 @@ fn b8_cached_hw_risk_rebuilds_the_active_grid() {
     let prepared = prepare(&curve, 0.025);
     let probs = BermudanSwaptionTreeValuator::new(&swaption, &prepared, &curve, as_of)
         .expect("valuator")
-        .exercise_probabilities();
+        .exercise_probabilities()
+        .expect("exercise probabilities");
     let expected_time =
         probs.iter().map(|(t, p)| t * p).sum::<f64>() / probs.iter().map(|(_, p)| p).sum::<f64>();
     let mut registry = PricerRegistry::new();

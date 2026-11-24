@@ -11,6 +11,7 @@
 
 pub mod binomial_tree;
 pub mod hull_white_tree;
+pub mod kink_smoothing;
 pub mod short_rate_tree;
 pub mod tree_framework;
 pub mod two_factor_rates_credit;

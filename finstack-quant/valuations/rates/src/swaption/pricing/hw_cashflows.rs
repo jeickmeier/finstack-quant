@@ -130,6 +130,11 @@ impl HwSwaptionCashflows {
             .fold(0.0, f64::max)
     }
 
+    /// Signed value of exercising at a tree node, negative when the swap is
+    /// out of the money.
+    ///
+    /// The sign lets the lattice locate the exercise boundary between nodes;
+    /// flooring belongs to the level-wide exercise decision.
     pub(crate) fn value(&self, node: HwExerciseNode<'_>, terms: HwExerciseTerms) -> f64 {
         let HwExerciseNode {
             tree,
@@ -138,19 +143,22 @@ impl HwSwaptionCashflows {
             discount,
         } = node;
         let bond = |t| Ok::<_, std::convert::Infallible>(tree.bond_price(step, index, t, discount));
-        match self.evaluate(
+        match self.exercise_terms(
             tree.time_at_step(step),
             tree.config().kappa,
             tree.config().sigma,
             bond,
             terms,
         ) {
-            Ok((_, _, value)) => value,
+            Ok((_, _, moneyness, payoff_annuity)) => moneyness * payoff_annuity * terms.notional,
             Err(never) => match never {},
         }
     }
 
     /// Evaluate exercise cashflows, propagating failures from bond reconstruction.
+    ///
+    /// Returns the swap rate, the fixed-leg annuity and the exercise payoff
+    /// floored at zero.
     pub(crate) fn evaluate<E>(
         &self,
         t: f64,
@@ -159,12 +167,34 @@ impl HwSwaptionCashflows {
         bond: impl Fn(f64) -> std::result::Result<f64, E>,
         terms: HwExerciseTerms,
     ) -> std::result::Result<(f64, f64, f64), E> {
+        let (swap_rate, annuity, moneyness, payoff_annuity) =
+            self.exercise_terms(t, kappa, sigma, bond, terms)?;
+        Ok((
+            swap_rate,
+            annuity,
+            moneyness.max(0.0) * payoff_annuity * terms.notional,
+        ))
+    }
+
+    /// Swap rate, fixed-leg annuity, signed rate moneyness and payoff annuity
+    /// of exercising.
+    ///
+    /// The moneyness is `swap_rate - strike` for a payer and its negative for
+    /// a receiver, so it is negative when the swap is out of the money.
+    fn exercise_terms<E>(
+        &self,
+        t: f64,
+        kappa: f64,
+        sigma: f64,
+        bond: impl Fn(f64) -> std::result::Result<f64, E>,
+        terms: HwExerciseTerms,
+    ) -> std::result::Result<(f64, f64, f64, f64), E> {
         let mut annuity = 0.0;
         for &(pay, tau) in &self.fixed {
             annuity += tau * bond(pay)?;
         }
         if annuity <= 0.0 {
-            return Ok((0.0, 0.0, 0.0));
+            return Ok((0.0, 0.0, 0.0, 0.0));
         }
         let mut floating = 0.0;
         for &(start, end, pay, tau, reset) in &self.float {
@@ -198,7 +228,8 @@ impl HwSwaptionCashflows {
         Ok((
             swap_rate,
             annuity,
-            (sign * (swap_rate - terms.strike)).max(0.0) * payoff_annuity * terms.notional,
+            sign * (swap_rate - terms.strike),
+            payoff_annuity,
         ))
     }
 }

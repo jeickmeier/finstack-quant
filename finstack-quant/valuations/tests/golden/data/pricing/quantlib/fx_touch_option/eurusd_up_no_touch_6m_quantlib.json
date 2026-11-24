@@ -1,0 +1,160 @@
+{
+  "expected": {
+    "npv": 51220.40452296282
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "barrier": 1.16,
+        "barrier_direction": "up",
+        "base_currency": "EUR",
+        "day_count": "act_365f",
+        "domestic_discount_curve_id": "USD-OIS",
+        "expiry": "2026-10-30",
+        "foreign_discount_curve_id": "EUR-OIS",
+        "id": "EURUSD-UP-NO-TOUCH-6M-QUANTLIB",
+        "monitoring_start_date": "2026-04-30",
+        "payout_amount": {
+          "amount": "100000",
+          "currency": "USD"
+        },
+        "payout_timing": "at_expiry",
+        "quote_currency": "USD",
+        "touch_type": "no_touch",
+        "vol_surface_id": "EURUSD-VOL-QL"
+      },
+      "type": "fx_touch_option"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        },
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "EUR-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.4723665527410147
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        }
+      ],
+      "dividends": [],
+      "fx": {
+        "config": {
+          "cache_capacity": 256,
+          "pivot_currency": "USD"
+        },
+        "pinned_quotes": [],
+        "provider_pinned_quotes": [],
+        "provider_quotes": [],
+        "quotes": [
+          [
+            "EUR",
+            "USD",
+            1.1
+          ]
+        ]
+      },
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {},
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [
+        {
+          "expiries": [
+            0.25,
+            1.0,
+            2.0
+          ],
+          "id": "EURUSD-VOL-QL",
+          "interpolation_mode": "vol",
+          "quote_type": "black_lognormal",
+          "secondary_axis": "strike",
+          "secondary_values": [
+            0.9,
+            1.1,
+            1.3
+          ],
+          "vols_row_major": [
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1
+          ]
+        }
+      ],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-23",
+    "description": "QuantLib native six-month EUR/USD up no-touch paid at expiry.",
+    "domain": "fx.fx_touch_option",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-23",
+    "name": "eurusd_up_no_touch_6m_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product fx_no_touch",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43 AnalyticDigitalAmericanKOEngine on a Garman-Kohlhagen process: spot 1.1, flat continuous Act/365F domestic 0.04 and foreign 0.025, constant volatility 0.1, continuously monitored barrier 1.16, cash payout 100000 USD.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "black76",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "npv": {
+      "abs": 0.0005,
+      "tolerance_reason": "QuantLib and Finstack evaluate the same Rubinstein-Reiner closed form; the bound is the 5e-9 relative normal-CDF agreement between the two libraries applied to the payout."
+    }
+  }
+}

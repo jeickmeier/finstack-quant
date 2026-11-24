@@ -200,41 +200,41 @@ fn callable_bond_tree_prices_are_bit_pinned() {
     }
 
     // Ho-Lee, BDT, Black-Karasinski, then the bond-pricer BDT and Hull-White
-    // values. The first and last move by one ulp between macOS and the Linux
-    // libm on GitHub Actions.
-    const PINS: [[u64; 5]; 4] = [
+    // values, re-pinned on macOS when the lattices began kink-correcting the
+    // call decision across each level. These prices moved by one ulp between
+    // macOS and the Linux libm on GitHub Actions before; the Linux values of
+    // the new pins have not been observed yet, so one ulp either side of
+    // each macOS value is accepted.
+    const PINS: [[u64; 3]; 5] = [
         [
-            4_652_395_558_412_783_184,
-            4_652_417_570_083_781_364,
-            4_652_420_412_340_861_641,
-            4_652_412_935_098_629_610,
-            4_652_317_577_597_138_786,
+            4_652_395_789_827_066_276,
+            4_652_395_789_827_066_277,
+            4_652_395_789_827_066_278,
         ],
         [
-            4_652_395_558_412_783_183,
-            4_652_417_570_083_781_364,
-            4_652_420_412_340_861_641,
-            4_652_412_935_098_629_610,
-            4_652_317_577_597_138_786,
+            4_652_417_832_463_447_586,
+            4_652_417_832_463_447_587,
+            4_652_417_832_463_447_588,
         ],
         [
-            4_652_395_558_412_783_183,
-            4_652_417_570_083_781_364,
-            4_652_420_412_340_861_641,
-            4_652_412_935_098_629_610,
-            4_652_317_577_597_138_787,
+            4_652_420_476_970_739_278,
+            4_652_420_476_970_739_279,
+            4_652_420_476_970_739_280,
         ],
         [
-            4_652_395_558_412_783_184,
-            4_652_417_570_083_781_364,
-            4_652_420_412_340_861_641,
-            4_652_412_935_098_629_610,
-            4_652_317_577_597_138_787,
+            4_652_412_789_895_970_799,
+            4_652_412_789_895_970_800,
+            4_652_412_789_895_970_801,
+        ],
+        [
+            4_652_317_669_133_673_481,
+            4_652_317_669_133_673_482,
+            4_652_317_669_133_673_483,
         ],
     ];
     let got: [u64; 5] = bits.try_into().expect("five tree prices");
     assert!(
-        PINS.contains(&got),
+        got.iter().zip(PINS).all(|(bits, pins)| pins.contains(bits)),
         "callable bond tree prices moved off the macOS and Linux libm pins: {got:?}"
     );
 }

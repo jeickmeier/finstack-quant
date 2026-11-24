@@ -5,7 +5,10 @@ use crate::rates_credit::continuous_frp_weight;
 use finstack_quant_core::Result;
 use finstack_quant_core::math::Compounding;
 use finstack_quant_models::trees::hull_white_tree::HullWhiteTree;
-use finstack_quant_models::trees::tree_framework::{NodeState, TreeDiscounting, TreeValuator};
+use finstack_quant_models::trees::kink_smoothing::{smoothed_max, smoothed_min};
+use finstack_quant_models::trees::tree_framework::{
+    CallCap, NodeClaim, NodeState, TreeDiscounting, TreeValuator,
+};
 use finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree;
 
 impl BondValuator {
@@ -26,6 +29,33 @@ impl BondValuator {
             }
         }
         exercised_or_held
+    }
+
+    /// Apply holder put and issuer call rights across one lattice level whose
+    /// values exclude current contractual payments.
+    ///
+    /// This is the level-wide form of [`Self::apply_exercise`]: the put floor
+    /// and a frictionless call cap are kink-smoothed across neighbouring
+    /// nodes, so the model price does not ripple with the rate level at the
+    /// node spacing. A call with friction is a jump in value at the exercise
+    /// threshold rather than a kink, and keeps the node-by-node rule.
+    fn apply_exercise_level(&self, step: usize, values: &mut [f64]) {
+        if let Some(put_price) = self.put_at(step) {
+            smoothed_max(values, &vec![put_price; values.len()]);
+        }
+        if let Some(call_price) = self.call_at(step) {
+            let friction_amount =
+                self.outstanding_principal_at(step) * (self.call_friction_cents / 10_000.0);
+            if friction_amount == 0.0 {
+                smoothed_min(values, &vec![call_price; values.len()]);
+            } else {
+                for value in values.iter_mut() {
+                    if *value > call_price + friction_amount {
+                        *value = call_price;
+                    }
+                }
+            }
+        }
     }
 
     /// Terminal contractual payment with maturity exercise applied to the
@@ -71,18 +101,20 @@ impl BondValuator {
             let terminal_cf = self.terminal_value(final_step, oas_rate);
             let terminal_values = vec![terminal_cf; hw_tree.num_nodes(final_step)];
 
-            return hw_tree.backward_induction(
-                &terminal_values,
-                |step, _node_idx, continuation| {
-                    // The HW tree's backward_induction already discounts by the
-                    // short rate r(step, node). Apply the OAS as additional
-                    // discounting over this step's (possibly non-uniform) interval.
-                    let oas_adjusted =
-                        continuation * comp.tree_df(oas_rate, hw_tree.dt_at_step(step));
-
-                    self.cashflow_at_oas(step, oas_rate) + self.apply_exercise(step, oas_adjusted)
-                },
-            );
+            return hw_tree.backward_induction(&terminal_values, |step, values| {
+                // The HW tree's backward_induction already discounts by the
+                // short rate r(step, node). Apply the OAS as additional
+                // discounting over this step's (possibly non-uniform) interval.
+                let oas_df = comp.tree_df(oas_rate, hw_tree.dt_at_step(step));
+                for value in values.iter_mut() {
+                    *value *= oas_df;
+                }
+                self.apply_exercise_level(step, values);
+                let cashflow = self.cashflow_at_oas(step, oas_rate);
+                for value in values.iter_mut() {
+                    *value += cashflow;
+                }
+            });
         }
 
         // A periodic OAS is added to each node's short rate on its own
@@ -101,10 +133,15 @@ impl BondValuator {
         let terminal_values: Vec<f64> = (0..hw_tree.num_nodes(final_step))
             .map(|node_idx| self.terminal_value(final_step, node_shifts[final_step][node_idx]))
             .collect();
-        hw_tree.backward_induction(&terminal_values, |step, node_idx, continuation| {
-            let shift = node_shifts[step][node_idx];
-            let oas_adjusted = continuation * (-shift * hw_tree.dt_at_step(step)).exp();
-            self.cashflow_at_oas(step, shift) + self.apply_exercise(step, oas_adjusted)
+        hw_tree.backward_induction(&terminal_values, |step, values| {
+            let dt = hw_tree.dt_at_step(step);
+            for (value, shift) in values.iter_mut().zip(&node_shifts[step]) {
+                *value *= (-shift * dt).exp();
+            }
+            self.apply_exercise_level(step, values);
+            for (value, shift) in values.iter_mut().zip(&node_shifts[step]) {
+                *value += self.cashflow_at_oas(step, *shift);
+            }
         })
     }
 
@@ -252,6 +289,15 @@ impl TreeValuator for BondValuator {
     }
 
     fn value_at_node(&self, state: &NodeState, continuation_value: f64, dt: f64) -> Result<f64> {
+        Ok(self.claim_at_node(state, continuation_value, dt)?.value())
+    }
+
+    fn claim_at_node(
+        &self,
+        state: &NodeState,
+        continuation_value: f64,
+        dt: f64,
+    ) -> Result<NodeClaim> {
         let step = state.step;
         let oas_rate = state.oas_bp / 10_000.0;
         // The tree has already rate/OAS-discounted `continuation_value` from
@@ -277,7 +323,17 @@ impl TreeValuator for BondValuator {
             continuation_value
         };
 
-        let current_payments = self.cashflow_at_oas(step, oas_rate);
-        Ok(current_payments + self.apply_exercise(step, risky_continuation))
+        // Same rights as `apply_exercise`, left unresolved so the lattice can
+        // take the decision across the whole level.
+        Ok(NodeClaim {
+            hold: risky_continuation,
+            floor: self.put_at(step),
+            cap: self.call_at(step).map(|price| CallCap {
+                price,
+                friction: self.outstanding_principal_at(step)
+                    * (self.call_friction_cents / 10_000.0),
+            }),
+            cashflow: self.cashflow_at_oas(step, oas_rate),
+        })
     }
 }

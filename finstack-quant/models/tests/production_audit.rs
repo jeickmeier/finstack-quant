@@ -295,12 +295,91 @@ fn m1_hw_bond_option_converges_to_independent_affine_price() {
             .map(|j| (tree.bond_price(tree.num_steps(), j, maturity, &curve) - strike).max(0.0))
             .collect();
         let actual = tree
-            .backward_induction(&terminal, |_, _, value| value)
+            .backward_induction(&terminal, |_, _| {})
             .expect("rollback");
         errors.push((actual - expected).abs());
     }
     assert!(
         errors[2] < errors[0] && errors[2] < 2e-5,
         "convergence errors {errors:?}"
+    );
+}
+
+/// A payoff kink sampled at the lattice nodes makes the pricing error ripple
+/// as the strike moves across a node cell; that ripple is what turns
+/// bump-and-reprice sensitivities into noise. Kink smoothing must remove most
+/// of it against the exact Hull-White discount-bond option price.
+#[test]
+fn hw_bond_option_error_does_not_ripple_with_strike_once_the_kink_is_smoothed() {
+    use finstack_quant_core::dates::Date;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::math::special_functions::norm_cdf;
+    use finstack_quant_models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
+    use finstack_quant_models::trees::kink_smoothing::smoothed_max;
+    let rate: f64 = 0.04;
+    let kappa: f64 = 0.07;
+    let sigma: f64 = 0.02;
+    let expiry: f64 = 1.0;
+    let maturity: f64 = 5.0;
+    let curve = DiscountCurve::builder("HW-OPTION")
+        .base_date(Date::from_calendar_date(2025, time::Month::January, 1).expect("date"))
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+        .knots([(0.0, 1.0), (10.0, (-rate * 10.0).exp())])
+        .build()
+        .expect("curve");
+    let tree = HullWhiteTree::calibrate(
+        HullWhiteTreeConfig::new(kappa, sigma, 200),
+        &curve,
+        expiry,
+        &[expiry],
+    )
+    .expect("tree");
+    let last = tree.num_steps();
+    let bonds: Vec<f64> = (0..tree.num_nodes(last))
+        .map(|j| tree.bond_price(last, j, maturity, &curve))
+        .collect();
+    let bond_vol = sigma * (1.0 - (-kappa * (maturity - expiry)).exp()) / kappa
+        * ((1.0 - (-2.0 * kappa * expiry).exp()) / (2.0 * kappa)).sqrt();
+    let p_expiry = (-rate * expiry).exp();
+    let p_maturity = (-rate * maturity).exp();
+
+    // 61 strikes across roughly ten node cells around the forward bond price.
+    let mut plain_errors = Vec::new();
+    let mut smoothed_errors = Vec::new();
+    for i in 0..=60 {
+        let strike = 0.83 + 0.0005 * f64::from(i);
+        let d1 = (p_maturity / (strike * p_expiry)).ln() / bond_vol + 0.5 * bond_vol;
+        let exact = p_maturity * norm_cdf(d1).expect("valid Gaussian variate")
+            - strike * p_expiry * norm_cdf(d1 - bond_vol).expect("valid Gaussian variate");
+        let exercise: Vec<f64> = bonds.iter().map(|bond| bond - strike).collect();
+        let plain: Vec<f64> = exercise.iter().map(|value| value.max(0.0)).collect();
+        let mut smoothed = vec![0.0; exercise.len()];
+        smoothed_max(&mut smoothed, &exercise);
+        let price = |terminal: &[f64]| {
+            tree.backward_induction(terminal, |_, _| {})
+                .expect("rollback")
+        };
+        plain_errors.push(price(&plain) - exact);
+        smoothed_errors.push(price(&smoothed) - exact);
+    }
+    let spread = |errors: &[f64]| {
+        errors.iter().copied().fold(f64::MIN, f64::max)
+            - errors.iter().copied().fold(f64::MAX, f64::min)
+    };
+    let (plain, smoothed) = (spread(&plain_errors), spread(&smoothed_errors));
+    assert!(
+        smoothed < 0.25 * plain,
+        "kink smoothing left the strike ripple at {smoothed:e} against {plain:e} unsmoothed"
+    );
+    // The correction is zero-mean over the crossing position, so it must not
+    // move the price level: a plain cell average would lift the mean error by
+    // about a third of the unsmoothed ripple.
+    let mean = |errors: &[f64]| errors.iter().sum::<f64>() / errors.len() as f64;
+    let shift = (mean(&smoothed_errors) - mean(&plain_errors)).abs();
+    assert!(
+        shift < 0.1 * plain,
+        "kink smoothing moved the mean pricing error by {shift:e} against a ripple of {plain:e}"
     );
 }

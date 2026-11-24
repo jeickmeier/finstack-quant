@@ -7,7 +7,7 @@
 //!
 //! At each tree node and time step:
 //! 1. Compute continuation value (discounted expected value from child nodes)
-//! 2. At exercise dates, compute exercise value = max(0, (S - K) × A × N) for payer
+//! 2. At exercise dates, compute the signed exercise value (S - K) × A × N for payer
 //! 3. Take max(continuation, exercise) for optimal exercise decision
 //!
 //! # Usage
@@ -44,7 +44,7 @@ use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_models::rates::clock::{ModelDiscountCurve, model_time};
-use finstack_quant_models::trees::tree_framework::TreeDiscounting;
+use finstack_quant_models::trees::kink_smoothing::smoothed_max;
 
 /// Tree valuator for Bermudan swaption pricing.
 ///
@@ -151,34 +151,36 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
     /// Propagates tree backward-induction validation failures.
     pub fn price(&self) -> Result<f64> {
         let n = self.tree().num_steps();
-
-        // Terminal values: exercise value at last step if it's an exercise date
-        let terminal: Vec<f64> = (0..self.tree().num_nodes(n))
-            .map(|j| {
-                if self.exercise_steps.contains(&n) {
-                    self.exercise_value(n, j).max(0.0)
-                } else {
-                    0.0
-                }
-            })
-            .collect();
-
-        // Backward induction with exercise decisions
         self.tree()
-            .backward_induction(&terminal, |step, node_idx, continuation| {
+            .backward_induction(&self.terminal_values(n), |step, values| {
                 if self.exercise_steps.contains(&step) {
-                    let exercise = self.exercise_value(step, node_idx);
-                    continuation.max(exercise)
-                } else {
-                    continuation
+                    smoothed_max(values, &self.exercise_values(step, values.len()));
                 }
             })
     }
 
+    /// Exercise values across one tree level, ordered by state.
+    fn exercise_values(&self, step: usize, num_nodes: usize) -> Vec<f64> {
+        (0..num_nodes)
+            .map(|node_idx| self.exercise_value(step, node_idx))
+            .collect()
+    }
+
+    /// Option values at the final step: the kink-smoothed positive part of
+    /// the exercise value when that step is an exercise date, zero otherwise.
+    fn terminal_values(&self, final_step: usize) -> Vec<f64> {
+        let num_nodes = self.tree().num_nodes(final_step);
+        let mut terminal = vec![0.0; num_nodes];
+        if self.exercise_steps.contains(&final_step) {
+            smoothed_max(&mut terminal, &self.exercise_values(final_step, num_nodes));
+        }
+        terminal
+    }
+
     /// Compute exercise value at a node.
     ///
-    /// For a payer swaption: max(0, (S - K) × A × N)
-    /// For a receiver swaption: max(0, (K - S) × A × N)
+    /// For a payer swaption: (S - K) × A × N, for a receiver (K - S) × A × N.
+    /// The value is signed; the level-wide exercise decision floors it.
     fn exercise_value(&self, step: usize, node_idx: usize) -> f64 {
         self.exercise_cashflows.get(&step).map_or(0.0, |flows| {
             flows.value(
@@ -204,58 +206,24 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
     ///
     /// Uses a forward pass tracking survival probabilities through the tree,
     /// deducting mass at nodes where optimal exercise occurs.
-    pub fn exercise_probabilities(&self) -> Vec<(f64, f64)> {
+    ///
+    /// # Errors
+    ///
+    /// Propagates tree backward-induction validation failures.
+    pub fn exercise_probabilities(&self) -> Result<Vec<(f64, f64)>> {
         let n = self.tree().num_steps();
-        let comp = self.tree().config().compounding;
 
-        // 1. Backward pass: compute continuation values at each node
-        let mut cont_values: Vec<f64> = (0..self.tree().num_nodes(n))
-            .map(|j| {
-                if self.exercise_steps.contains(&n) {
-                    self.exercise_value(n, j).max(0.0)
-                } else {
-                    0.0
-                }
-            })
-            .collect();
-
-        // Store continuation values at exercise steps for forward pass comparison
+        // 1. Backward pass: record the continuation value at every exercise
+        //    step before the exercise decision is applied to it.
         let mut exercise_cont_values: finstack_quant_core::FxHashMap<usize, Vec<f64>> =
             finstack_quant_core::FxHashMap::default();
-
-        for step in (0..n).rev() {
-            let num_curr = self.tree().num_nodes(step);
-            let dt = self.tree().dt_at_step(step);
-
-            // Compute continuation values first (before exercise decision)
-            let continuations: Vec<f64> = (0..num_curr)
-                .map(|j| {
-                    let r_j = self.tree().rate_at_node(step, j);
-                    let (p_up, p_mid, p_down) = self.tree().probabilities(step, j);
-                    let center = self.tree().branch_center(step, j);
-                    let expected = p_up * cont_values[center + 1]
-                        + p_mid * cont_values[center]
-                        + p_down * cont_values[center - 1];
-                    expected * comp.tree_df(r_j, dt)
-                })
-                .collect();
-
-            if self.exercise_steps.contains(&step) {
-                exercise_cont_values.insert(step, continuations.clone());
-            }
-
-            cont_values = continuations
-                .into_iter()
-                .enumerate()
-                .map(|(j, cont)| {
-                    if self.exercise_steps.contains(&step) {
-                        cont.max(self.exercise_value(step, j))
-                    } else {
-                        cont
-                    }
-                })
-                .collect();
-        }
+        self.tree()
+            .backward_induction(&self.terminal_values(n), |step, values| {
+                if self.exercise_steps.contains(&step) {
+                    exercise_cont_values.insert(step, values.to_vec());
+                    smoothed_max(values, &self.exercise_values(step, values.len()));
+                }
+            })?;
 
         // 2. Forward pass: track survival probabilities
         let mut survival = vec![1.0]; // Start at root
@@ -308,7 +276,7 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
             }
         }
 
-        exercise_probs
+        Ok(exercise_probs)
     }
 }
 

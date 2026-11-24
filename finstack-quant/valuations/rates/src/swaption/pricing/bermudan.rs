@@ -743,7 +743,7 @@ impl Pricer for BermudanSwaptionPricer {
             let valuator =
                 BermudanSwaptionTreeValuator::new(&swaption, model, disc.as_ref(), context.as_of)?;
             let expected =
-                crate::swaption::metrics::bermudan_greeks::expected_exercise_time(&valuator);
+                crate::swaption::metrics::bermudan_greeks::expected_exercise_time(&valuator)?;
             context.computed.insert(exercise_metric, expected);
         }
         context.set_instrument(Arc::new(swaption));

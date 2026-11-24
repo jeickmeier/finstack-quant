@@ -228,15 +228,17 @@ impl MetricCalculator for BermudanGammaCalculator {
 /// OTM swaptions; normalizing by the total exercise probability removes that
 /// bias. If the swaption never exercises on the tree (`Σ pᵢ = 0`) the
 /// conditional expectation is undefined and `0.0` is returned.
-pub(crate) fn expected_exercise_time(valuator: &BermudanSwaptionTreeValuator) -> f64 {
-    let tree_probs = valuator.exercise_probabilities();
+pub(crate) fn expected_exercise_time(
+    valuator: &BermudanSwaptionTreeValuator,
+) -> finstack_quant_core::Result<f64> {
+    let tree_probs = valuator.exercise_probabilities()?;
     let total_exercise_prob: f64 = tree_probs.iter().map(|(_, p)| p).sum();
     let weighted_time: f64 = tree_probs.iter().map(|(t, p)| t * p).sum();
-    if total_exercise_prob > 1e-12 {
+    Ok(if total_exercise_prob > 1e-12 {
         weighted_time / total_exercise_prob
     } else {
         0.0
-    }
+    })
 }
 
 #[cfg(test)]
@@ -331,6 +333,6 @@ mod tests {
             .expect("Valid valuator");
 
         // Expected exercise time should be reasonable.
-        assert!(expected_exercise_time(&valuator) >= 0.0);
+        assert!(expected_exercise_time(&valuator).expect("exercise time") >= 0.0);
     }
 }

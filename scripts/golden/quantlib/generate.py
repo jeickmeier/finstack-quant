@@ -15,6 +15,7 @@ from .bonds import (
     build_floating_hazard_bond,
     build_floating_risk_free_bond,
 )
+from .commodity import build_commodity_spot_option, build_commodity_spread_call, build_commodity_spread_put
 from .common import require_supported_quantlib, write_or_check
 from .credit import build_single_name_cds
 from .deposits import build_deposit
@@ -26,6 +27,7 @@ from .fx_exotics import (
     build_fx_digital_option,
     build_quanto_option,
 )
+from .fx_touch import build_fx_no_touch, build_fx_one_touch_at_expiry, build_fx_one_touch_at_hit
 from .options import (
     build_arithmetic_asian_option,
     build_barrier_option,
@@ -43,6 +45,8 @@ from .rate_options import (
     build_black_swaption,
 )
 from .rates import build_fra, build_irs, build_sofr_future
+from .short_rate import build_hull_white_swaption
+from .stochastic_vol import build_heston_equity_call, build_heston_equity_put
 
 WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_PRICING_ROOT = WORKSPACE_ROOT / "finstack-quant/valuations/tests/golden/data/pricing/quantlib"
@@ -126,6 +130,42 @@ PRODUCTS: dict[str, tuple[str, Callable[[], dict[str, Any]]]] = {
     "fx_barrier_option_rebate_at_expiry": (
         "fx_barrier_option/eurusd_up_in_call_rebate_at_expiry_3m_quantlib.json",
         build_fx_barrier_option_rebate_at_expiry,
+    ),
+    "fx_one_touch_at_expiry": (
+        "fx_touch_option/eurusd_down_one_touch_at_expiry_6m_quantlib.json",
+        build_fx_one_touch_at_expiry,
+    ),
+    "fx_one_touch_at_hit": (
+        "fx_touch_option/eurusd_up_one_touch_at_hit_6m_quantlib.json",
+        build_fx_one_touch_at_hit,
+    ),
+    "fx_no_touch": (
+        "fx_touch_option/eurusd_up_no_touch_6m_quantlib.json",
+        build_fx_no_touch,
+    ),
+    "commodity_spot_option": (
+        "commodity_spot_option/wti_black76_call_1y_quantlib.json",
+        build_commodity_spot_option,
+    ),
+    "commodity_spread_call": (
+        "commodity_spread_option/crack_spread_kirk_call_1y_quantlib.json",
+        build_commodity_spread_call,
+    ),
+    "commodity_spread_put": (
+        "commodity_spread_option/crack_spread_kirk_put_1y_quantlib.json",
+        build_commodity_spread_put,
+    ),
+    "heston_equity_call": (
+        "equity_option/spx_heston_atm_call_1y_quantlib.json",
+        build_heston_equity_call,
+    ),
+    "heston_equity_put": (
+        "equity_option/spx_heston_otm_put_1y_quantlib.json",
+        build_heston_equity_put,
+    ),
+    "hull_white_swaption": (
+        "swaption/usd_hull_white_1y5y_payer_swaption_quantlib.json",
+        build_hull_white_swaption,
     ),
     "quanto_option": (
         "quanto_option/nky_usd_quanto_call_1y_quantlib.json",

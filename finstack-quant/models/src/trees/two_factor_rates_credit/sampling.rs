@@ -179,6 +179,12 @@ impl RatesCreditTree {
             if step == end_step {
                 break;
             }
+            // The next row's entry depends on this step's draw, so its load
+            // would wait for the draw to resolve. Both candidates (this node
+            // and the one above) sit side by side in the next row, so reading
+            // one now brings them into cache while the draw is computed.
+            std::hint::black_box(self.rate_terms.get(step + 1, rate_node));
+            std::hint::black_box(self.hazard_terms.get(step + 1, hazard_node));
             let (up_up, up_down, down_up, down_down) =
                 self.joint_probabilities(rate.up_prob, hazard.up_prob);
             rng.fill_u01(&mut uniform);

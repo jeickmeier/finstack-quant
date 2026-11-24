@@ -16,6 +16,7 @@
 //! [`TreeDiscounting`] holds the per-node discount-factor conventions shared
 //! by the short-rate and Hull-White lattices.
 
+use crate::trees::kink_smoothing::{smoothed_max, smoothed_min};
 use finstack_quant_core::Result;
 use finstack_quant_core::math::Compounding;
 
@@ -34,6 +35,160 @@ pub trait TreeValuator: Send + Sync {
     /// * `continuation_value` - Discounted expected value from child nodes
     /// * `dt` - Time step size in years
     fn value_at_node(&self, state: &NodeState, continuation_value: f64, dt: f64) -> Result<f64>;
+
+    /// The node's value split around its exercise decision.
+    ///
+    /// A valuator with a holder put or an issuer call overrides this so the
+    /// lattice can resolve the decision across a whole level with
+    /// [`resolve_level`], which corrects the exercise kink between nodes. The
+    /// default reports [`Self::value_at_node`] as a claim with no exercise
+    /// right, which resolves to that value unchanged.
+    ///
+    /// An override must keep `claim_at_node(..)?.value()` equal to
+    /// `value_at_node(..)?`.
+    ///
+    /// # Arguments
+    ///
+    /// * `state` - Typed node state: step index, OAS and the per-node values
+    ///   the tree models
+    /// * `continuation_value` - Discounted expected value from child nodes
+    /// * `dt` - Time step size in years
+    ///
+    /// # Errors
+    ///
+    /// Propagates the valuator's node-valuation failure.
+    fn claim_at_node(
+        &self,
+        state: &NodeState,
+        continuation_value: f64,
+        dt: f64,
+    ) -> Result<NodeClaim> {
+        Ok(NodeClaim::settled(self.value_at_node(
+            state,
+            continuation_value,
+            dt,
+        )?))
+    }
+}
+
+/// An issuer's right to redeem a claim at a fixed price.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CallCap {
+    /// Redemption price in the claim's value units.
+    pub price: f64,
+    /// Amount by which the hold value must exceed `price` before the issuer
+    /// calls, in the same units; zero for a frictionless call.
+    pub friction: f64,
+}
+
+/// One node's value split around its exercise decision.
+///
+/// The value is `hold`, raised to `floor` by a holder put, then capped by an
+/// issuer call, plus `cashflow`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct NodeClaim {
+    /// Value of continuing to hold, before any exercise and excluding the
+    /// payments made at this node.
+    pub hold: f64,
+    /// Holder's exercise value: the claim is worth at least this.
+    pub floor: Option<f64>,
+    /// Issuer's call right: the claim is redeemed at the cap price once the
+    /// held value exceeds it by more than the friction.
+    pub cap: Option<CallCap>,
+    /// Payments made at this node whatever the exercise decision.
+    pub cashflow: f64,
+}
+
+impl NodeClaim {
+    /// A claim with no exercise right, worth exactly `value`.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Node value in the instrument's value units.
+    #[must_use]
+    pub fn settled(value: f64) -> Self {
+        Self {
+            hold: value,
+            floor: None,
+            cap: None,
+            cashflow: 0.0,
+        }
+    }
+
+    /// The node's value with the exercise decision taken at this node alone.
+    #[must_use]
+    pub fn value(&self) -> f64 {
+        let mut value = self.hold;
+        if let Some(floor) = self.floor {
+            value = value.max(floor);
+        }
+        if let Some(cap) = self.cap
+            && value > cap.price + cap.friction
+        {
+            value = cap.price;
+        }
+        value + self.cashflow
+    }
+}
+
+/// Resolve the exercise decisions of one lattice level.
+///
+/// When every node of the level carries a put floor, or every node carries a
+/// frictionless call cap, the decision is taken with
+/// [`smoothed_max`](crate::trees::kink_smoothing::smoothed_max) or
+/// [`smoothed_min`](crate::trees::kink_smoothing::smoothed_min), which correct
+/// the exercise kink between adjacent nodes. A call with friction is a jump in
+/// value at its threshold rather than a kink, and a level whose nodes do not
+/// share the right has no boundary to locate; both keep each node's own
+/// [`NodeClaim::value`] rule. A level with no exercise right resolves to
+/// `hold + cashflow` at every node.
+///
+/// # Arguments
+///
+/// * `claims` - The level's claims ordered by state on a uniformly spaced
+///   level, in the instrument's value units.
+/// * `values` - Receives the resolved node values in the same order and
+///   units; must have the same length as `claims`.
+pub fn resolve_level(claims: &[NodeClaim], values: &mut [f64]) {
+    debug_assert_eq!(claims.len(), values.len());
+    for (value, claim) in values.iter_mut().zip(claims) {
+        *value = claim.hold;
+    }
+    let floors: Option<Vec<f64>> = claims.iter().map(|claim| claim.floor).collect();
+    match floors {
+        Some(floors) if !floors.is_empty() => smoothed_max(values, &floors),
+        _ => {
+            for (value, claim) in values.iter_mut().zip(claims) {
+                if let Some(floor) = claim.floor {
+                    *value = value.max(floor);
+                }
+            }
+        }
+    }
+    let caps: Option<Vec<f64>> = claims
+        .iter()
+        .map(|claim| {
+            claim
+                .cap
+                .filter(|cap| cap.friction == 0.0)
+                .map(|cap| cap.price)
+        })
+        .collect();
+    match caps {
+        Some(caps) if !caps.is_empty() => smoothed_min(values, &caps),
+        _ => {
+            for (value, claim) in values.iter_mut().zip(claims) {
+                if let Some(cap) = claim.cap
+                    && *value > cap.price + cap.friction
+                {
+                    *value = cap.price;
+                }
+            }
+        }
+    }
+    for (value, claim) in values.iter_mut().zip(claims) {
+        *value += claim.cashflow;
+    }
 }
 
 /// State handed to a [`TreeValuator`] at one lattice node.
@@ -263,17 +418,22 @@ pub(crate) fn price_recombining_tree<V: TreeValuator>(
         values.push(inputs.valuator.value_at_maturity(&terminal_state)?);
     }
 
+    let mut claims = Vec::with_capacity(inputs.steps + 1);
     for step in (0..inputs.steps).rev() {
         level_values(step, &mut level);
+        claims.clear();
         for (i, &node_value) in level.iter().enumerate() {
             let continuation =
                 get_df(step, i) * (inputs.prob_up * values[i + 1] + inputs.prob_down * values[i]);
             let node_state = state_for(step, i, node_value);
-            values[i] = inputs
-                .valuator
-                .value_at_node(&node_state, continuation, dt)?;
+            claims.push(
+                inputs
+                    .valuator
+                    .claim_at_node(&node_state, continuation, dt)?,
+            );
         }
         values.pop();
+        resolve_level(&claims, &mut values);
     }
 
     Ok(values[0])
@@ -397,6 +557,83 @@ impl EvolutionParams {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn claim(hold: f64, floor: Option<f64>, cap: Option<CallCap>, cashflow: f64) -> NodeClaim {
+        NodeClaim {
+            hold,
+            floor,
+            cap,
+            cashflow,
+        }
+    }
+
+    #[test]
+    fn resolve_level_matches_the_node_rule_away_from_an_exercise_boundary() {
+        let cap = Some(CallCap {
+            price: 100.0,
+            friction: 0.0,
+        });
+        // Every node is called, then every node is held: no boundary in either level.
+        for holds in [[104.0, 103.0, 102.0, 101.0], [99.0, 98.0, 97.0, 96.0]] {
+            let claims: Vec<NodeClaim> = holds
+                .iter()
+                .map(|&hold| claim(hold, Some(90.0), cap, 2.5))
+                .collect();
+            let mut values = vec![0.0; claims.len()];
+            resolve_level(&claims, &mut values);
+            for (value, claim) in values.iter().zip(&claims) {
+                assert_eq!(value.to_bits(), claim.value().to_bits());
+            }
+        }
+        // A claim with no exercise right resolves to its value unchanged.
+        let settled = [NodeClaim::settled(1.25), NodeClaim::settled(-3.5)];
+        let mut values = [0.0; 2];
+        resolve_level(&settled, &mut values);
+        assert_eq!(values, [1.25, -3.5]);
+    }
+
+    #[test]
+    fn resolve_level_corrects_only_the_nodes_beside_a_frictionless_boundary() {
+        let cap = Some(CallCap {
+            price: 100.0,
+            friction: 0.0,
+        });
+        let claims: Vec<NodeClaim> = [103.0, 101.0, 99.0, 97.0]
+            .iter()
+            .map(|&hold| claim(hold, None, cap, 0.0))
+            .collect();
+        let mut values = vec![0.0; claims.len()];
+        resolve_level(&claims, &mut values);
+        // The boundary sits midway between nodes 1 and 2 with a rise of 2:
+        // each takes back 2 * (1/2) / 24 against the plain minimum.
+        assert_eq!(values[0], 100.0);
+        assert!((values[1] - (100.0 + 1.0 / 24.0)).abs() < 1e-12);
+        assert!((values[2] - (99.0 + 1.0 / 24.0)).abs() < 1e-12);
+        assert_eq!(values[3], 97.0);
+    }
+
+    #[test]
+    fn resolve_level_keeps_the_node_rule_for_friction_and_for_mixed_rights() {
+        let frictional = Some(CallCap {
+            price: 100.0,
+            friction: 0.5,
+        });
+        let with_friction: Vec<NodeClaim> = [103.0, 100.4, 99.0]
+            .iter()
+            .map(|&hold| claim(hold, None, frictional, 1.0))
+            .collect();
+        let mut values = vec![0.0; 3];
+        resolve_level(&with_friction, &mut values);
+        assert_eq!(values, [101.0, 101.4, 100.0]);
+
+        let mixed = [
+            claim(95.0, Some(98.0), None, 0.0),
+            claim(99.0, None, None, 0.0),
+        ];
+        let mut values = [0.0; 2];
+        resolve_level(&mixed, &mut values);
+        assert_eq!(values, [98.0, 99.0]);
+    }
 
     /// W-07: equity_crr with vol·√dt underflowing to 0 must return a descriptive
     /// "degenerate" error, not silently NaN-poison the probability.

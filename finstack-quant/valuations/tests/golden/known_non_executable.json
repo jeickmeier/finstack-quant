@@ -8,7 +8,7 @@
         {
           "metric": "embedded_option_value",
           "reason": "The residual is in the option-free leg, not the call valuation: about half comes from interpolating the S23 curve between its 5Y and 7Y pillars (flat-forward here, linear in yield reproduces Bloomberg's reported spread), the rest is not identified.",
-          "evidence": "With the semiannual OAS added to each lattice rate and solved on the settlement dirty price, OAS is 4.7695% versus Bloomberg 4.771% and the option value is -19500.82 versus Bloomberg -19800.00 (1.5%). At Bloomberg's OAS the callable bond prices at 103.392 versus the 103.3975 market, and the option-free bond at 105.341 versus the 105.382 implied by Bloomberg's 8.815% option-free yield."
+          "evidence": "With the semiannual OAS added to each lattice rate and solved on the settlement dirty price, OAS is 4.7692% versus Bloomberg 4.771% and the option value is -19509.72 versus Bloomberg -19800.00 (1.5%). At Bloomberg's OAS the callable bond prices at 103.392 versus the 103.3975 market, and the option-free bond at 105.341 versus the 105.382 implied by Bloomberg's 8.815% option-free yield."
         }
       ]
     },
