@@ -70,6 +70,8 @@ node_modules/
 .coverage
 htmlcov/
 **/coverage/
+!**/src/**/coverage/
+!**/src/**/coverage/**
 !/docs-site/coverage/
 !/docs-site/coverage/*.json
 **/docs/_build/
