@@ -1,0 +1,1160 @@
+{
+  "meta": {
+    "suite_id": "merton_reference",
+    "description": "External reference fixtures for the Merton (1974) structural credit model (KMV equity inversion, distance to default, default probability, endogenous debt spread), the Black-Cox (1976) first-passage default probability, and Merton (1976) jump-diffusion European prices.",
+    "reference_source": {
+      "name": "MATLAB mertonmodel documentation; Hull (2022) Example 24.3; QuantLib (Python)",
+      "version": "1.43",
+      "vendor": "MathWorks; QuantLib Project",
+      "url": "https://www.quantlib.org/",
+      "extra": {
+        "kmv_published": "https://www.mathworks.com/help/risk/mertonmodel.html",
+        "equity_inversion": "Hull (2022), Example 24.3 (inputs, as cited by the replication); expected values from the independent Newton solve in gen_merton_golden.py, cross-checked against the R replication at https://mlozanoqf.github.io/tutorial_arf/02-merton.html",
+        "black_cox": "https://github.com/lballabio/QuantLib/blob/master/ql/pricingengines/barrier/analyticbinarybarrierengine.cpp",
+        "jump_bates_limit": "https://github.com/lballabio/QuantLib/blob/master/test-suite/batesmodel.cpp",
+        "jump_quantlib_table": "https://github.com/lballabio/QuantLib/blob/master/test-suite/jumpdiffusion.cpp",
+        "jump_series": "Merton, R. (1976), Option pricing when underlying stock returns are discontinuous, JFE 3"
+      }
+    },
+    "generated": {
+      "at": "2026-11-23T00:00:00Z",
+      "by": "gen_merton_golden.py",
+      "command": "uv run --no-project --with QuantLib==1.43 python gen_merton_golden.py",
+      "environment": {
+        "quantlib": "1.43"
+      }
+    },
+    "status": "certified",
+    "schema_version": 1,
+    "extra": {
+      "conventions": {
+        "rates": "continuously compounded annual decimals, including payout rates and dividend yields",
+        "time": "year fractions; QuantLib dates are whole 365-day years under Actual/365 Fixed",
+        "valuation_date": "none: every model input is a year fraction. QuantLib evaluation date 2026-01-15 only anchors its flat term structures",
+        "units": "asset, equity and debt values share one currency unit; volatilities, rates, spreads and probabilities are decimals; option prices are per unit of underlying",
+        "kmv_published": "debt barrier = Liability; DD and PD use the physical Drift; Maturity 1 year",
+        "equity_inversion": "E = V e^{-qT} N(d1) - B e^{-rT} N(d2), sigma_E = N(d1) e^{-qT} sigma_V V / E; DD and PD are risk-neutral (d2, N(-d2)); debt spread = -ln((V e^{-qT} - E)/(B e^{-rT}))/T. The payout terms follow this crate's documented convention; only the payout_rate = 0 cases are externally anchored",
+        "black_cox": "risk-neutral probability that V_t touches B e^{g t} before T, continuous monitoring",
+        "jump": "dS/S = (r - q - lambda k) dt + sigma dW + (J - 1) dN, ln J ~ N(mu_jump, sigma_jump^2), k = exp(mu_jump + sigma_jump^2/2) - 1; discounted prices per unit of underlying"
+      },
+      "tolerances": {
+        "kmv_published": "half a unit of the last printed digit: 5e-5 for volatility, DD and PD (4 decimals), 500 for asset value (5 significant figures at 1e7 scale)",
+        "equity_inversion": "1e-6 relative: the reference is converged to 1e-13; the production fixed point stops at a 1e-8 relative step",
+        "black_cox": "5e-9 absolute: the crate's adjudicated closed-form tolerance against QuantLib's normal CDF (see vol_models_quantlib)",
+        "jump_bates_limit": "1e-7 relative: QuantLib's own Bates-vs-Merton tolerance is 2e-8, widened for the 128-term COS expansion",
+        "jump_quantlib_table": "1e-2 absolute: the tolerance QuantLib applies to this table, whose values are printed to 2 decimals",
+        "jump_series": "1e-6 absolute: an a priori bound equal to the one this crate's COS-vs-Black-Scholes unit tests assert for the default 128-term expansion"
+      }
+    }
+  },
+  "cases": [
+    {
+      "model": "kmv_published",
+      "id": "kmv_published_matlab_firm1",
+      "reference": "MathWorks Risk Management Toolbox documentation, mertonmodel, example 'Compute the Probability of Default Using the Single-Point Approach to the Merton Model' (MertonData, Maturity 1 year); printed values transcribed",
+      "equity": 26406000.0,
+      "equity_vol": 0.7103,
+      "liability": 40000000.0,
+      "rate": 0.05,
+      "drift": 0.0306,
+      "t": 1.0,
+      "expected": {
+        "asset_value": 64210000.0,
+        "asset_value_tolerance_abs": 500.0,
+        "asset_vol": 0.301,
+        "distance_to_default": 1.5237,
+        "default_probability": 0.0638,
+        "tolerance_abs": 5e-05
+      }
+    },
+    {
+      "model": "kmv_published",
+      "id": "kmv_published_matlab_firm2",
+      "reference": "MathWorks Risk Management Toolbox documentation, mertonmodel, example 'Compute the Probability of Default Using the Single-Point Approach to the Merton Model' (MertonData, Maturity 1 year); printed values transcribed",
+      "equity": 26817000.0,
+      "equity_vol": 0.3929,
+      "liability": 35000000.0,
+      "rate": 0.05,
+      "drift": 0.03,
+      "t": 1.0,
+      "expected": {
+        "asset_value": 60109000.0,
+        "asset_value_tolerance_abs": 500.0,
+        "asset_vol": 0.1753,
+        "distance_to_default": 3.1679,
+        "default_probability": 0.0008,
+        "tolerance_abs": 5e-05
+      }
+    },
+    {
+      "model": "kmv_published",
+      "id": "kmv_published_matlab_firm3",
+      "reference": "MathWorks Risk Management Toolbox documentation, mertonmodel, example 'Compute the Probability of Default Using the Single-Point Approach to the Merton Model' (MertonData, Maturity 1 year); printed values transcribed",
+      "equity": 39770000.0,
+      "equity_vol": 0.3121,
+      "liability": 35000000.0,
+      "rate": 0.05,
+      "drift": 0.031,
+      "t": 1.0,
+      "expected": {
+        "asset_value": 73063000.0,
+        "asset_value_tolerance_abs": 500.0,
+        "asset_vol": 0.1699,
+        "distance_to_default": 4.4298,
+        "default_probability": 0.0,
+        "tolerance_abs": 5e-05
+      }
+    },
+    {
+      "model": "kmv_published",
+      "id": "kmv_published_matlab_firm4",
+      "reference": "MathWorks Risk Management Toolbox documentation, mertonmodel, example 'Compute the Probability of Default Using the Single-Point Approach to the Merton Model' (MertonData, Maturity 1 year); printed values transcribed",
+      "equity": 29470000.0,
+      "equity_vol": 0.4595,
+      "liability": 32000000.0,
+      "rate": 0.05,
+      "drift": 0.0302,
+      "t": 1.0,
+      "expected": {
+        "asset_value": 59906000.0,
+        "asset_value_tolerance_abs": 500.0,
+        "asset_vol": 0.2263,
+        "distance_to_default": 2.7916,
+        "default_probability": 0.0026,
+        "tolerance_abs": 5e-05
+      }
+    },
+    {
+      "model": "kmv_published",
+      "id": "kmv_published_matlab_firm5",
+      "reference": "MathWorks Risk Management Toolbox documentation, mertonmodel, example 'Compute the Probability of Default Using the Single-Point Approach to the Merton Model' (MertonData, Maturity 1 year); printed values transcribed",
+      "equity": 25280000.0,
+      "equity_vol": 0.6181,
+      "liability": 40000000.0,
+      "rate": 0.05,
+      "drift": 0.0305,
+      "t": 1.0,
+      "expected": {
+        "asset_value": 63231000.0,
+        "asset_value_tolerance_abs": 500.0,
+        "asset_vol": 0.2511,
+        "distance_to_default": 1.8196,
+        "default_probability": 0.0344,
+        "tolerance_abs": 5e-05
+      }
+    },
+    {
+      "model": "equity_inversion",
+      "id": "equity_inversion_hull_24_3",
+      "reference": "Hull (2022), Example 24.3 (inputs, as cited by the replication); expected values from the independent Newton solve in gen_merton_golden.py, cross-checked against the R replication at https://mlozanoqf.github.io/tutorial_arf/02-merton.html",
+      "equity": 3.0,
+      "equity_vol": 0.8,
+      "debt": 10.0,
+      "rate": 0.05,
+      "payout_rate": 0.0,
+      "t": 1.0,
+      "expected": {
+        "asset_value": 12.39538718863966,
+        "asset_vol": 0.21230471342320786,
+        "distance_to_default": 1.14082565532882,
+        "default_probability": 0.12697124106279656,
+        "debt_spread": 0.012366248775617582,
+        "tolerance_rel": 1e-06
+      }
+    },
+    {
+      "model": "equity_inversion",
+      "id": "equity_inversion_payout_1y",
+      "reference": "independent Newton solve of the Merton equity and equity-volatility equations in gen_merton_golden.py",
+      "equity": 50.0,
+      "equity_vol": 0.45,
+      "debt": 80.0,
+      "rate": 0.03,
+      "payout_rate": 0.02,
+      "t": 1.0,
+      "expected": {
+        "asset_value": 130.20107939140308,
+        "asset_vol": 0.17662760513715914,
+        "distance_to_default": 2.725818138680306,
+        "default_probability": 0.0032071164449539767,
+        "debt_spread": 0.00016382221625313784,
+        "tolerance_rel": 1e-06
+      }
+    },
+    {
+      "model": "equity_inversion",
+      "id": "equity_inversion_low_leverage_1y",
+      "reference": "independent Newton solve of the Merton equity and equity-volatility equations in gen_merton_golden.py",
+      "equity": 120.0,
+      "equity_vol": 0.4,
+      "debt": 60.0,
+      "rate": 0.04,
+      "payout_rate": 0.0,
+      "t": 1.0,
+      "expected": {
+        "asset_value": 177.6472743727093,
+        "asset_vol": 0.27020065141002747,
+        "distance_to_default": 4.030157646742665,
+        "default_probability": 2.786972864141753e-05,
+        "debt_spread": 1.595502263138741e-06,
+        "tolerance_rel": 1e-06
+      }
+    },
+    {
+      "model": "equity_inversion",
+      "id": "equity_inversion_payout_5y",
+      "reference": "independent Newton solve of the Merton equity and equity-volatility equations in gen_merton_golden.py",
+      "equity": 10.0,
+      "equity_vol": 0.6,
+      "debt": 40.0,
+      "rate": 0.02,
+      "payout_rate": 0.01,
+      "t": 5.0,
+      "expected": {
+        "asset_value": 43.50619776911643,
+        "asset_vol": 0.2074836334800903,
+        "distance_to_default": 0.05690364832987404,
+        "default_probability": 0.4773109740386431,
+        "debt_spread": 0.028513856332409347,
+        "tolerance_rel": 1e-06
+      }
+    },
+    {
+      "model": "black_cox",
+      "id": "black_cox_case1",
+      "reference": "QuantLib AnalyticBinaryBarrierEngine: down-and-in cash-or-nothing call + put (cash 1, paid at expiry) divided by the discount factor; growing barrier mapped to dividend yield payout_rate + barrier_growth_rate",
+      "asset_value": 100.0,
+      "debt_barrier": 80.0,
+      "rate": 0.05,
+      "payout_rate": 0.0,
+      "asset_vol": 0.25,
+      "barrier_growth_rate": 0.0,
+      "t": 1.0,
+      "expected": {
+        "default_probability": 0.34751451206116457,
+        "tolerance_abs": 5e-09
+      }
+    },
+    {
+      "model": "black_cox",
+      "id": "black_cox_case2",
+      "reference": "QuantLib AnalyticBinaryBarrierEngine: down-and-in cash-or-nothing call + put (cash 1, paid at expiry) divided by the discount factor; growing barrier mapped to dividend yield payout_rate + barrier_growth_rate",
+      "asset_value": 100.0,
+      "debt_barrier": 80.0,
+      "rate": 0.05,
+      "payout_rate": 0.02,
+      "asset_vol": 0.25,
+      "barrier_growth_rate": 0.0,
+      "t": 5.0,
+      "expected": {
+        "default_probability": 0.6928406311342531,
+        "tolerance_abs": 5e-09
+      }
+    },
+    {
+      "model": "black_cox",
+      "id": "black_cox_case3",
+      "reference": "QuantLib AnalyticBinaryBarrierEngine: down-and-in cash-or-nothing call + put (cash 1, paid at expiry) divided by the discount factor; growing barrier mapped to dividend yield payout_rate + barrier_growth_rate",
+      "asset_value": 100.0,
+      "debt_barrier": 70.0,
+      "rate": 0.04,
+      "payout_rate": 0.0,
+      "asset_vol": 0.3,
+      "barrier_growth_rate": 0.03,
+      "t": 3.0,
+      "expected": {
+        "default_probability": 0.5610370168601945,
+        "tolerance_abs": 5e-09
+      }
+    },
+    {
+      "model": "black_cox",
+      "id": "black_cox_case4",
+      "reference": "QuantLib AnalyticBinaryBarrierEngine: down-and-in cash-or-nothing call + put (cash 1, paid at expiry) divided by the discount factor; growing barrier mapped to dividend yield payout_rate + barrier_growth_rate",
+      "asset_value": 100.0,
+      "debt_barrier": 90.0,
+      "rate": 0.03,
+      "payout_rate": 0.01,
+      "asset_vol": 0.15,
+      "barrier_growth_rate": 0.02,
+      "t": 2.0,
+      "expected": {
+        "default_probability": 0.6517553700631555,
+        "tolerance_abs": 5e-09
+      }
+    },
+    {
+      "model": "black_cox",
+      "id": "black_cox_case5",
+      "reference": "QuantLib AnalyticBinaryBarrierEngine: down-and-in cash-or-nothing call + put (cash 1, paid at expiry) divided by the discount factor; growing barrier mapped to dividend yield payout_rate + barrier_growth_rate",
+      "asset_value": 100.0,
+      "debt_barrier": 60.0,
+      "rate": 0.02,
+      "payout_rate": 0.0,
+      "asset_vol": 0.2,
+      "barrier_growth_rate": 0.0,
+      "t": 10.0,
+      "expected": {
+        "default_probability": 0.41927123303074254,
+        "tolerance_abs": 5e-09
+      }
+    },
+    {
+      "model": "black_cox",
+      "id": "black_cox_case6",
+      "reference": "QuantLib AnalyticBinaryBarrierEngine: down-and-in cash-or-nothing call + put (cash 1, paid at expiry) divided by the discount factor; growing barrier mapped to dividend yield payout_rate + barrier_growth_rate",
+      "asset_value": 100.0,
+      "debt_barrier": 50.0,
+      "rate": 0.05,
+      "payout_rate": 0.03,
+      "asset_vol": 0.4,
+      "barrier_growth_rate": 0.05,
+      "t": 7.0,
+      "expected": {
+        "default_probability": 0.7452643009874359,
+        "tolerance_abs": 5e-09
+      }
+    },
+    {
+      "model": "black_cox",
+      "id": "black_cox_case7",
+      "reference": "QuantLib AnalyticBinaryBarrierEngine: down-and-in cash-or-nothing call + put (cash 1, paid at expiry) divided by the discount factor; growing barrier mapped to dividend yield payout_rate + barrier_growth_rate",
+      "asset_value": 150.0,
+      "debt_barrier": 100.0,
+      "rate": 0.01,
+      "payout_rate": 0.04,
+      "asset_vol": 0.35,
+      "barrier_growth_rate": 0.0,
+      "t": 2.0,
+      "expected": {
+        "default_probability": 0.5410551656272947,
+        "tolerance_abs": 5e-09
+      }
+    },
+    {
+      "model": "black_cox",
+      "id": "black_cox_case8",
+      "reference": "QuantLib AnalyticBinaryBarrierEngine: down-and-in cash-or-nothing call + put (cash 1, paid at expiry) divided by the discount factor; growing barrier mapped to dividend yield payout_rate + barrier_growth_rate",
+      "asset_value": 100.0,
+      "debt_barrier": 40.0,
+      "rate": 0.06,
+      "payout_rate": 0.0,
+      "asset_vol": 0.18,
+      "barrier_growth_rate": 0.02,
+      "t": 1.0,
+      "expected": {
+        "default_probability": 1.8069401585022009e-07,
+        "tolerance_abs": 5e-09
+      }
+    },
+    {
+      "model": "jump_bates_limit",
+      "id": "jump_bates_limit_k80_t1",
+      "reference": "QuantLib BatesEngine (Gauss-Laguerre order 144) on BatesProcess with kappa 0.5, theta = v0, vol-of-vol 1e-4, rho 0: the near-degenerate Merton-76 limit used by QuantLib test-suite/batesmodel.cpp testAnalyticAndMcVsJumpDiffusion",
+      "spot": 100.0,
+      "strike": 80.0,
+      "rate": 0.1,
+      "dividend_yield": 0.04,
+      "t": 1.0,
+      "sigma": 0.2080865204668481,
+      "mu_jump": -0.2,
+      "sigma_jump": 0.2,
+      "lambda": 2.0,
+      "expected": {
+        "call": 29.527270681328694,
+        "put": 5.8353202089731475,
+        "tolerance_rel": 1e-07
+      }
+    },
+    {
+      "model": "jump_bates_limit",
+      "id": "jump_bates_limit_k95_t1",
+      "reference": "QuantLib BatesEngine (Gauss-Laguerre order 144) on BatesProcess with kappa 0.5, theta = v0, vol-of-vol 1e-4, rho 0: the near-degenerate Merton-76 limit used by QuantLib test-suite/batesmodel.cpp testAnalyticAndMcVsJumpDiffusion",
+      "spot": 100.0,
+      "strike": 95.0,
+      "rate": 0.1,
+      "dividend_yield": 0.04,
+      "t": 1.0,
+      "sigma": 0.2080865204668481,
+      "mu_jump": -0.2,
+      "sigma_jump": 0.2,
+      "lambda": 2.0,
+      "expected": {
+        "call": 20.930376172222875,
+        "put": 10.810986970406715,
+        "tolerance_rel": 1e-07
+      }
+    },
+    {
+      "model": "jump_bates_limit",
+      "id": "jump_bates_limit_k110_t1",
+      "reference": "QuantLib BatesEngine (Gauss-Laguerre order 144) on BatesProcess with kappa 0.5, theta = v0, vol-of-vol 1e-4, rho 0: the near-degenerate Merton-76 limit used by QuantLib test-suite/batesmodel.cpp testAnalyticAndMcVsJumpDiffusion",
+      "spot": 100.0,
+      "strike": 110.0,
+      "rate": 0.1,
+      "dividend_yield": 0.04,
+      "t": 1.0,
+      "sigma": 0.2080865204668481,
+      "mu_jump": -0.2,
+      "sigma_jump": 0.2,
+      "lambda": 2.0,
+      "expected": {
+        "call": 14.156743295058012,
+        "put": 17.60991536378124,
+        "tolerance_rel": 1e-07
+      }
+    },
+    {
+      "model": "jump_bates_limit",
+      "id": "jump_bates_limit_k80_t3",
+      "reference": "QuantLib BatesEngine (Gauss-Laguerre order 144) on BatesProcess with kappa 0.5, theta = v0, vol-of-vol 1e-4, rho 0: the near-degenerate Merton-76 limit used by QuantLib test-suite/batesmodel.cpp testAnalyticAndMcVsJumpDiffusion",
+      "spot": 100.0,
+      "strike": 80.0,
+      "rate": 0.1,
+      "dividend_yield": 0.04,
+      "t": 3.0,
+      "sigma": 0.2080865204668481,
+      "mu_jump": -0.2,
+      "sigma_jump": 0.2,
+      "lambda": 2.0,
+      "expected": {
+        "call": 39.175535330130565,
+        "put": 9.748949312952247,
+        "tolerance_rel": 1e-07
+      }
+    },
+    {
+      "model": "jump_bates_limit",
+      "id": "jump_bates_limit_k95_t3",
+      "reference": "QuantLib BatesEngine (Gauss-Laguerre order 144) on BatesProcess with kappa 0.5, theta = v0, vol-of-vol 1e-4, rho 0: the near-degenerate Merton-76 limit used by QuantLib test-suite/batesmodel.cpp testAnalyticAndMcVsJumpDiffusion",
+      "spot": 100.0,
+      "strike": 95.0,
+      "rate": 0.1,
+      "dividend_yield": 0.04,
+      "t": 3.0,
+      "sigma": 0.2080865204668481,
+      "mu_jump": -0.2,
+      "sigma_jump": 0.2,
+      "lambda": 2.0,
+      "expected": {
+        "call": 33.10304631475559,
+        "put": 14.788733607803035,
+        "tolerance_rel": 1e-07
+      }
+    },
+    {
+      "model": "jump_bates_limit",
+      "id": "jump_bates_limit_k110_t3",
+      "reference": "QuantLib BatesEngine (Gauss-Laguerre order 144) on BatesProcess with kappa 0.5, theta = v0, vol-of-vol 1e-4, rho 0: the near-degenerate Merton-76 limit used by QuantLib test-suite/batesmodel.cpp testAnalyticAndMcVsJumpDiffusion",
+      "spot": 100.0,
+      "strike": 110.0,
+      "rate": 0.1,
+      "dividend_yield": 0.04,
+      "t": 3.0,
+      "sigma": 0.2080865204668481,
+      "mu_jump": -0.2,
+      "sigma_jump": 0.2,
+      "lambda": 2.0,
+      "expected": {
+        "call": 27.9339077914887,
+        "put": 20.73186839476191,
+        "tolerance_rel": 1e-07
+      }
+    },
+    {
+      "model": "jump_bates_limit",
+      "id": "jump_bates_limit_k80_t5",
+      "reference": "QuantLib BatesEngine (Gauss-Laguerre order 144) on BatesProcess with kappa 0.5, theta = v0, vol-of-vol 1e-4, rho 0: the near-degenerate Merton-76 limit used by QuantLib test-suite/batesmodel.cpp testAnalyticAndMcVsJumpDiffusion",
+      "spot": 100.0,
+      "strike": 80.0,
+      "rate": 0.1,
+      "dividend_yield": 0.04,
+      "t": 5.0,
+      "sigma": 0.2080865204668481,
+      "mu_jump": -0.2,
+      "sigma_jump": 0.2,
+      "lambda": 2.0,
+      "expected": {
+        "call": 43.870756894911594,
+        "put": 10.520134364124072,
+        "tolerance_rel": 1e-07
+      }
+    },
+    {
+      "model": "jump_bates_limit",
+      "id": "jump_bates_limit_k95_t5",
+      "reference": "QuantLib BatesEngine (Gauss-Laguerre order 144) on BatesProcess with kappa 0.5, theta = v0, vol-of-vol 1e-4, rho 0: the near-degenerate Merton-76 limit used by QuantLib test-suite/batesmodel.cpp testAnalyticAndMcVsJumpDiffusion",
+      "spot": 100.0,
+      "strike": 95.0,
+      "rate": 0.1,
+      "dividend_yield": 0.04,
+      "t": 5.0,
+      "sigma": 0.2080865204668481,
+      "mu_jump": -0.2,
+      "sigma_jump": 0.2,
+      "lambda": 2.0,
+      "expected": {
+        "call": 39.225731451030825,
+        "put": 14.973068815932816,
+        "tolerance_rel": 1e-07
+      }
+    },
+    {
+      "model": "jump_bates_limit",
+      "id": "jump_bates_limit_k110_t5",
+      "reference": "QuantLib BatesEngine (Gauss-Laguerre order 144) on BatesProcess with kappa 0.5, theta = v0, vol-of-vol 1e-4, rho 0: the near-degenerate Merton-76 limit used by QuantLib test-suite/batesmodel.cpp testAnalyticAndMcVsJumpDiffusion",
+      "spot": 100.0,
+      "strike": 110.0,
+      "rate": 0.1,
+      "dividend_yield": 0.04,
+      "t": 5.0,
+      "sigma": 0.2080865204668481,
+      "mu_jump": -0.2,
+      "sigma_jump": 0.2,
+      "lambda": 2.0,
+      "expected": {
+        "call": 35.15601881918882,
+        "put": 20.001316079780317,
+        "tolerance_rel": 1e-07
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k80_lam1_t0.1",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 80.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.1,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.0078125,
+      "sigma_jump": 0.125,
+      "lambda": 1.0,
+      "expected": {
+        "call": 20.67,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k80_lam1_t0.25",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 80.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.25,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.0078125,
+      "sigma_jump": 0.125,
+      "lambda": 1.0,
+      "expected": {
+        "call": 21.74,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k80_lam1_t0.5",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 80.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.5,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.0078125,
+      "sigma_jump": 0.125,
+      "lambda": 1.0,
+      "expected": {
+        "call": 23.63,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k80_lam5_t0.1",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 80.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.1,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.0015624999999999999,
+      "sigma_jump": 0.05590169943749474,
+      "lambda": 5.0,
+      "expected": {
+        "call": 20.65,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k80_lam5_t0.25",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 80.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.25,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.0015624999999999999,
+      "sigma_jump": 0.05590169943749474,
+      "lambda": 5.0,
+      "expected": {
+        "call": 21.7,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k80_lam5_t0.5",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 80.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.5,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.0015624999999999999,
+      "sigma_jump": 0.05590169943749474,
+      "lambda": 5.0,
+      "expected": {
+        "call": 23.61,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k80_lam10_t0.1",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 80.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.1,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.00078125,
+      "sigma_jump": 0.03952847075210474,
+      "lambda": 10.0,
+      "expected": {
+        "call": 20.64,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k80_lam10_t0.25",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 80.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.25,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.00078125,
+      "sigma_jump": 0.03952847075210474,
+      "lambda": 10.0,
+      "expected": {
+        "call": 21.7,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k80_lam10_t0.5",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 80.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.5,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.00078125,
+      "sigma_jump": 0.03952847075210474,
+      "lambda": 10.0,
+      "expected": {
+        "call": 23.61,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k90_lam1_t0.1",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 90.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.1,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.0078125,
+      "sigma_jump": 0.125,
+      "lambda": 1.0,
+      "expected": {
+        "call": 11.0,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k90_lam1_t0.25",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 90.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.25,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.0078125,
+      "sigma_jump": 0.125,
+      "lambda": 1.0,
+      "expected": {
+        "call": 12.74,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k90_lam1_t0.5",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 90.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.5,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.0078125,
+      "sigma_jump": 0.125,
+      "lambda": 1.0,
+      "expected": {
+        "call": 15.4,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k90_lam5_t0.1",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 90.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.1,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.0015624999999999999,
+      "sigma_jump": 0.05590169943749474,
+      "lambda": 5.0,
+      "expected": {
+        "call": 10.98,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k90_lam5_t0.25",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 90.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.25,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.0015624999999999999,
+      "sigma_jump": 0.05590169943749474,
+      "lambda": 5.0,
+      "expected": {
+        "call": 12.75,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k90_lam5_t0.5",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 90.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.5,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.0015624999999999999,
+      "sigma_jump": 0.05590169943749474,
+      "lambda": 5.0,
+      "expected": {
+        "call": 15.42,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k90_lam10_t0.1",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 90.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.1,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.00078125,
+      "sigma_jump": 0.03952847075210474,
+      "lambda": 10.0,
+      "expected": {
+        "call": 10.98,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k90_lam10_t0.25",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 90.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.25,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.00078125,
+      "sigma_jump": 0.03952847075210474,
+      "lambda": 10.0,
+      "expected": {
+        "call": 12.75,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k90_lam10_t0.5",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 90.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.5,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.00078125,
+      "sigma_jump": 0.03952847075210474,
+      "lambda": 10.0,
+      "expected": {
+        "call": 15.42,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k100_lam1_t0.1",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 100.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.1,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.0078125,
+      "sigma_jump": 0.125,
+      "lambda": 1.0,
+      "expected": {
+        "call": 3.42,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k100_lam1_t0.25",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 100.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.25,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.0078125,
+      "sigma_jump": 0.125,
+      "lambda": 1.0,
+      "expected": {
+        "call": 5.88,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k100_lam1_t0.5",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 100.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.5,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.0078125,
+      "sigma_jump": 0.125,
+      "lambda": 1.0,
+      "expected": {
+        "call": 8.95,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k100_lam5_t0.1",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 100.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.1,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.0015624999999999999,
+      "sigma_jump": 0.05590169943749474,
+      "lambda": 5.0,
+      "expected": {
+        "call": 3.51,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k100_lam5_t0.25",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 100.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.25,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.0015624999999999999,
+      "sigma_jump": 0.05590169943749474,
+      "lambda": 5.0,
+      "expected": {
+        "call": 5.96,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k100_lam5_t0.5",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 100.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.5,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.0015624999999999999,
+      "sigma_jump": 0.05590169943749474,
+      "lambda": 5.0,
+      "expected": {
+        "call": 9.02,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k100_lam10_t0.1",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 100.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.1,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.00078125,
+      "sigma_jump": 0.03952847075210474,
+      "lambda": 10.0,
+      "expected": {
+        "call": 3.53,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k100_lam10_t0.25",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 100.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.25,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.00078125,
+      "sigma_jump": 0.03952847075210474,
+      "lambda": 10.0,
+      "expected": {
+        "call": 5.97,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_quantlib_table",
+      "id": "jump_quantlib_table_k100_lam10_t0.5",
+      "reference": "QuantLib test-suite/jumpdiffusion.cpp reference table (after Haug, Option Pricing Formulas, 1998, p. 9; values recomputed by QuantLib, tolerance 1e-2); rows transcribed. Haug inputs: total vol v, jump share gamma, zero mean jump: sigma_jump = v*sqrt(gamma/lambda), sigma = v*sqrt(1-gamma), mu_jump = -sigma_jump^2/2",
+      "spot": 100.0,
+      "strike": 100.0,
+      "rate": 0.08,
+      "dividend_yield": 0.0,
+      "t": 0.5,
+      "sigma": 0.21650635094610965,
+      "mu_jump": -0.00078125,
+      "sigma_jump": 0.03952847075210474,
+      "lambda": 10.0,
+      "expected": {
+        "call": 9.03,
+        "tolerance_abs": 0.01
+      }
+    },
+    {
+      "model": "jump_series",
+      "id": "jump_series_case1",
+      "reference": "Merton (1976) series: Poisson(lambda*(1+k)*T)-weighted Black-Scholes prices, independent implementation in gen_merton_golden.py (400 terms)",
+      "spot": 100.0,
+      "strike": 100.0,
+      "rate": 0.05,
+      "dividend_yield": 0.0,
+      "t": 1.0,
+      "sigma": 0.2,
+      "mu_jump": -0.1,
+      "sigma_jump": 0.15,
+      "lambda": 1.0,
+      "expected": {
+        "call": 12.761288593628757,
+        "put": 7.884231043700164,
+        "tolerance_abs": 1e-06
+      }
+    },
+    {
+      "model": "jump_series",
+      "id": "jump_series_case2",
+      "reference": "Merton (1976) series: Poisson(lambda*(1+k)*T)-weighted Black-Scholes prices, independent implementation in gen_merton_golden.py (400 terms)",
+      "spot": 100.0,
+      "strike": 90.0,
+      "rate": 0.05,
+      "dividend_yield": 0.02,
+      "t": 1.0,
+      "sigma": 0.2,
+      "mu_jump": -0.1,
+      "sigma_jump": 0.15,
+      "lambda": 1.0,
+      "expected": {
+        "call": 17.16766521033848,
+        "put": 4.758446084727215,
+        "tolerance_abs": 1e-06
+      }
+    },
+    {
+      "model": "jump_series",
+      "id": "jump_series_case3",
+      "reference": "Merton (1976) series: Poisson(lambda*(1+k)*T)-weighted Black-Scholes prices, independent implementation in gen_merton_golden.py (400 terms)",
+      "spot": 100.0,
+      "strike": 110.0,
+      "rate": 0.05,
+      "dividend_yield": 0.02,
+      "t": 1.0,
+      "sigma": 0.2,
+      "mu_jump": -0.1,
+      "sigma_jump": 0.15,
+      "lambda": 1.0,
+      "expected": {
+        "call": 7.2986908538494575,
+        "put": 13.914060218252477,
+        "tolerance_abs": 1e-06
+      }
+    },
+    {
+      "model": "jump_series",
+      "id": "jump_series_case4",
+      "reference": "Merton (1976) series: Poisson(lambda*(1+k)*T)-weighted Black-Scholes prices, independent implementation in gen_merton_golden.py (400 terms)",
+      "spot": 100.0,
+      "strike": 100.0,
+      "rate": 0.03,
+      "dividend_yield": 0.01,
+      "t": 0.5,
+      "sigma": 0.15,
+      "mu_jump": 0.05,
+      "sigma_jump": 0.1,
+      "lambda": 3.0,
+      "expected": {
+        "call": 7.293573047189038,
+        "put": 6.303519088227073,
+        "tolerance_abs": 1e-06
+      }
+    },
+    {
+      "model": "jump_series",
+      "id": "jump_series_case5",
+      "reference": "Merton (1976) series: Poisson(lambda*(1+k)*T)-weighted Black-Scholes prices, independent implementation in gen_merton_golden.py (400 terms)",
+      "spot": 100.0,
+      "strike": 120.0,
+      "rate": 0.03,
+      "dividend_yield": 0.01,
+      "t": 2.0,
+      "sigma": 0.15,
+      "mu_jump": 0.05,
+      "sigma_jump": 0.1,
+      "lambda": 3.0,
+      "expected": {
+        "call": 8.660544724843776,
+        "put": 23.65242142427811,
+        "tolerance_abs": 1e-06
+      }
+    },
+    {
+      "model": "jump_series",
+      "id": "jump_series_case6",
+      "reference": "Merton (1976) series: Poisson(lambda*(1+k)*T)-weighted Black-Scholes prices, independent implementation in gen_merton_golden.py (400 terms)",
+      "spot": 100.0,
+      "strike": 80.0,
+      "rate": 0.02,
+      "dividend_yield": 0.0,
+      "t": 3.0,
+      "sigma": 0.3,
+      "mu_jump": -0.25,
+      "sigma_jump": 0.3,
+      "lambda": 0.5,
+      "expected": {
+        "call": 37.46812762229091,
+        "put": 12.809290309030793,
+        "tolerance_abs": 1e-06
+      }
+    },
+    {
+      "model": "jump_series",
+      "id": "jump_series_case7",
+      "reference": "Merton (1976) series: Poisson(lambda*(1+k)*T)-weighted Black-Scholes prices, independent implementation in gen_merton_golden.py (400 terms)",
+      "spot": 50.0,
+      "strike": 55.0,
+      "rate": 0.04,
+      "dividend_yield": 0.03,
+      "t": 0.25,
+      "sigma": 0.25,
+      "mu_jump": -0.05,
+      "sigma_jump": 0.2,
+      "lambda": 2.0,
+      "expected": {
+        "call": 1.729873693724424,
+        "put": 6.556211808971748,
+        "tolerance_abs": 1e-06
+      }
+    },
+    {
+      "model": "jump_series",
+      "id": "jump_series_case8",
+      "reference": "Merton (1976) series: Poisson(lambda*(1+k)*T)-weighted Black-Scholes prices, independent implementation in gen_merton_golden.py (400 terms)",
+      "spot": 100.0,
+      "strike": 100.0,
+      "rate": 0.05,
+      "dividend_yield": 0.0,
+      "t": 1.0,
+      "sigma": 0.2,
+      "mu_jump": 0.0,
+      "sigma_jump": 0.0,
+      "lambda": 0.0,
+      "expected": {
+        "call": 10.450583572185565,
+        "put": 5.573526022256971,
+        "tolerance_abs": 1e-06
+      }
+    }
+  ]
+}

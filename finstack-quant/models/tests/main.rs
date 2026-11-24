@@ -19,6 +19,8 @@ mod lmm_reference;
 mod lookback_commodity_regressions;
 #[path = "market_data_diff_tests.rs"]
 mod market_data_diff_tests;
+#[path = "merton_reference_tests.rs"]
+mod merton_reference_tests;
 #[path = "model_audit_regressions.rs"]
 mod model_audit_regressions;
 #[cfg(feature = "json-schema")]
