@@ -15,7 +15,13 @@ from .bonds import (
     build_floating_hazard_bond,
     build_floating_risk_free_bond,
 )
-from .commodity import build_commodity_spot_option, build_commodity_spread_call, build_commodity_spread_put
+from .carry import build_equity_future, build_fx_swap
+from .commodity import (
+    build_commodity_asian_option,
+    build_commodity_spot_option,
+    build_commodity_spread_call,
+    build_commodity_spread_put,
+)
 from .common import require_supported_quantlib, write_or_check
 from .credit import build_single_name_cds
 from .deposits import build_deposit
@@ -45,7 +51,7 @@ from .rate_options import (
     build_black_swaption,
 )
 from .rates import build_fra, build_irs, build_sofr_future
-from .short_rate import build_hull_white_swaption
+from .short_rate import build_hull_white_bermudan_swaption, build_hull_white_cap, build_hull_white_swaption
 from .stochastic_vol import build_heston_equity_call, build_heston_equity_put
 
 WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
@@ -147,6 +153,10 @@ PRODUCTS: dict[str, tuple[str, Callable[[], dict[str, Any]]]] = {
         "commodity_spot_option/wti_black76_call_1y_quantlib.json",
         build_commodity_spot_option,
     ),
+    "commodity_asian_option": (
+        "commodity_asian_option/wti_arithmetic_asian_call_1y_quantlib.json",
+        build_commodity_asian_option,
+    ),
     "commodity_spread_call": (
         "commodity_spread_option/crack_spread_kirk_call_1y_quantlib.json",
         build_commodity_spread_call,
@@ -166,6 +176,22 @@ PRODUCTS: dict[str, tuple[str, Callable[[], dict[str, Any]]]] = {
     "hull_white_swaption": (
         "swaption/usd_hull_white_1y5y_payer_swaption_quantlib.json",
         build_hull_white_swaption,
+    ),
+    "hull_white_bermudan_swaption": (
+        "bermudan_swaption/usd_hull_white_5nc1_bermudan_payer_swaption_quantlib.json",
+        build_hull_white_bermudan_swaption,
+    ),
+    "hull_white_cap": (
+        "cap_floor/usd_hull_white_cap_2y_quantlib.json",
+        build_hull_white_cap,
+    ),
+    "fx_swap": (
+        "fx_swap/eurusd_fx_swap_3m_quantlib.json",
+        build_fx_swap,
+    ),
+    "equity_future": (
+        "equity_future/spx_future_3m_quantlib.json",
+        build_equity_future,
     ),
     "quanto_option": (
         "quanto_option/nky_usd_quanto_call_1y_quantlib.json",

@@ -1,0 +1,129 @@
+{
+  "expected": {
+    "basis": 31.261707539637428,
+    "delta": 503.1261707539638,
+    "dv01": 62.718467867625805,
+    "futures_price": 5031.261707539637,
+    "npv": 10630.853769818714
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "discount_curve_id": "USD-OIS",
+        "div_yield_id": "SPX-DIVYIELD",
+        "id": "SPX-FUTURE-3M-QUANTLIB",
+        "spot_id": "SPX-SPOT",
+        "terms": {
+          "contracts": 10.0,
+          "currency": "USD",
+          "entry_price": 5010.0,
+          "last_trading_date": "2026-07-29",
+          "multiplier": 50.0,
+          "position": "long",
+          "settlement": {
+            "type": "cash"
+          },
+          "settlement_date": "2026-07-30"
+        },
+        "underlying_currency": "USD",
+        "underlying_ticker": "SPX"
+      },
+      "type": "equity_future"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {
+        "SPX-DIVYIELD": {
+          "unitless": 0.015
+        },
+        "SPX-SPOT": {
+          "price": {
+            "amount": "5000.0",
+            "currency": "USD"
+          }
+        }
+      },
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-23",
+    "description": "Three-month equity index future at cost-of-carry fair value on a QuantLib discount curve.",
+    "domain": "listed.equity_future",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-23",
+    "name": "spx_future_3m_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product equity_future",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43 FlatForward discount factor (continuous Act/365F, 0.04) to settlement 2026-07-30; fair price S*exp(-q*T)/DF with S = 5000.0, q = 0.015, T on Act/365F; long 10 contracts, multiplier 50, entry 5010.0.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "basis": {
+      "rel": 1e-09,
+      "tolerance_reason": "Cost-of-carry fair price S*exp(-q*T)/DF(T) with a QuantLib flat-curve discount factor, against the same formula in Finstack; only floating-point evaluation order differs."
+    },
+    "delta": {
+      "rel": 1e-09,
+      "tolerance_reason": "Cost-of-carry fair price S*exp(-q*T)/DF(T) with a QuantLib flat-curve discount factor, against the same formula in Finstack; only floating-point evaluation order differs."
+    },
+    "dv01": {
+      "rel": 1e-09,
+      "tolerance_reason": "Cost-of-carry fair price S*exp(-q*T)/DF(T) with a QuantLib flat-curve discount factor, against the same formula in Finstack; only floating-point evaluation order differs."
+    },
+    "futures_price": {
+      "rel": 1e-09,
+      "tolerance_reason": "Cost-of-carry fair price S*exp(-q*T)/DF(T) with a QuantLib flat-curve discount factor, against the same formula in Finstack; only floating-point evaluation order differs."
+    },
+    "npv": {
+      "rel": 1e-09,
+      "tolerance_reason": "Cost-of-carry fair price S*exp(-q*T)/DF(T) with a QuantLib flat-curve discount factor, against the same formula in Finstack; only floating-point evaluation order differs."
+    }
+  }
+}

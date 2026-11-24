@@ -89,6 +89,7 @@ class UnresolvedMetric:
 
 
 _DOMAIN_RUNNERS = {
+    "commodity.commodity_asian_option": "pricing_common",
     "commodity.commodity_spot_option": "pricing_common",
     "commodity.commodity_spread_option": "pricing_common",
     "credit.cds": "pricing_common",
@@ -112,6 +113,7 @@ _DOMAIN_RUNNERS = {
     "fx.quanto_option": "pricing_common",
     "fx.fx_forward": "pricing_common",
     "fx.fx_swap": "pricing_common",
+    "rates.bermudan_swaption": "pricing_common",
     "rates.cap_floor": "pricing_common",
     "rates.cms_option": "pricing_common",
     "rates.deposit": "pricing_common",

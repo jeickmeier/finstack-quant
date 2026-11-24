@@ -13,7 +13,8 @@ mod register;
 mod vega;
 
 pub(crate) use bermudan_greeks::{
-    BermudanDeltaCalculator, BermudanGammaCalculator, BermudanVegaCalculator,
+    BermudanDeltaCalculator, BermudanDv01Calculator, BermudanGammaCalculator,
+    BermudanVegaCalculator,
 };
 pub(crate) use delta::DeltaCalculator;
 pub(crate) use gamma::GammaCalculator;

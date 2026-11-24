@@ -163,7 +163,7 @@ scenarios:
   `finstack-quant/valuations/tests/data/quantlib_parity/`.
 
 Product builders are split by asset class: `bonds.py`, `credit.py`,
-`commodity.py`, `deposits.py`, `fx.py`, `fx_exotics.py`, `fx_touch.py`,
+`carry.py`, `commodity.py`, `deposits.py`, `fx.py`, `fx_exotics.py`, `fx_touch.py`,
 `options.py`, `rate_options.py`, `rates.py`, `short_rate.py`, `stochastic_vol.py`,
 `attribution.py`, with shared determinism helpers in `common.py`
 (fixed valuation/capture dates, QuantLib >= 1.41 floor). `generate.py` is the

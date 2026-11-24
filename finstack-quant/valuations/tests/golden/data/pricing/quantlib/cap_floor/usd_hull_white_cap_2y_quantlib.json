@@ -1,0 +1,162 @@
+{
+  "expected": {
+    "dv01": 833.8221356075483,
+    "npv": 63844.39492757998
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "calendar_id": "weekends_only",
+        "day_count": "act_360",
+        "discount_curve_id": "USD-OIS",
+        "forward_curve_id": "USD-TERM-3M",
+        "frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "id": "USD-HULL-WHITE-CAP-2Y-QUANTLIB",
+        "instrument_pricing_overrides": {
+          "model_config": {
+            "hw1f_mean_reversion": 0.03,
+            "hw1f_sigma": 0.01
+          }
+        },
+        "maturity": "2028-08-03",
+        "notional": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "rate_option_type": "cap",
+        "start_date": "2026-08-03",
+        "strike": "0.041",
+        "vol_surface_id": "USD-CAPFLOOR-VOL-UNUSED",
+        "vol_type": "normal"
+      },
+      "type": "cap_floor"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        },
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-TERM-3M",
+          "index_tenor": {
+            "count": 3,
+            "unit": "months"
+          },
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "forward"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {},
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [
+        {
+          "expiries": [
+            0.25,
+            1.0,
+            2.0
+          ],
+          "id": "USD-CAPFLOOR-VOL-UNUSED",
+          "interpolation_mode": "vol",
+          "quote_type": "normal",
+          "secondary_axis": "strike",
+          "secondary_values": [
+            0.01,
+            0.04,
+            0.1
+          ],
+          "vols_row_major": [
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01
+          ]
+        }
+      ],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-23",
+    "description": "QuantLib native two-year quarterly Hull-White one-factor cap.",
+    "domain": "rates.cap_floor",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-23",
+    "name": "usd_hull_white_cap_2y_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product hull_white_cap",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43 AnalyticCapFloorEngine on HullWhite(a=0.03, sigma=0.01) over a flat 0.04 continuous Act/365F curve; eight quarterly Act/360 caplets on a single-curve three-month index from 2026-08-03 to 2028-08-03, strike 0.041.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "hull_white_1f",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "dv01": {
+      "rel": 5e-09,
+      "tolerance_reason": "QuantLib AnalyticCapFloorEngine and Finstack both price each term caplet as an exact Hull-White discount-bond option; the bound is the 5e-9 relative normal-CDF agreement between the libraries. DV01 is a 1bp parallel continuous zero shift with the model parameters held fixed."
+    },
+    "npv": {
+      "rel": 5e-09,
+      "tolerance_reason": "QuantLib AnalyticCapFloorEngine and Finstack both price each term caplet as an exact Hull-White discount-bond option; the bound is the 5e-9 relative normal-CDF agreement between the libraries. DV01 is a 1bp parallel continuous zero shift with the model parameters held fixed."
+    }
+  }
+}

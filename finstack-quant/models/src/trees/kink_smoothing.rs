@@ -7,9 +7,9 @@
 //! the price ripples at the node spacing and bump-and-reprice sensitivities
 //! become noisy.
 //!
-//! With the difference `exercise - hold` linear between the two nodes that
-//! bracket a crossing, rising by `m` across the segment, and the crossing a
-//! fraction `θ` of the way along, the sampled sum misses the integral of the
+//! With the difference `exercise - hold` crossing zero a fraction `θ` of the way
+//! between two nodes, and changing by `m` per node spacing at the crossing,
+//! the sampled sum misses the integral of the
 //! positive part by `m·((θ - 1/2)² / 2 - 1/24)` node weights. That is the
 //! Euler-Maclaurin term for a slope discontinuity; it averages to zero over
 //! `θ`, so the correction removes the ripple without shifting the price
@@ -58,9 +58,25 @@ fn kink_corrections(differences: &[f64]) -> Vec<f64> {
         if !crosses {
             continue;
         }
-        let rise = left.abs() + right.abs();
         // Distance of the crossing from the left node, in node spacings.
-        let theta = left.abs() / rise;
+        let theta = left.abs() / (left.abs() + right.abs());
+        // Slope of the difference at the crossing, per node spacing. Centred
+        // slopes at the two bracketing nodes, blended by the crossing
+        // position, agree on both sides of a node, so the correction stays
+        // continuous as the crossing passes through it even where the
+        // difference is curved. A bracketing node on the edge of the level
+        // has no centred slope and uses the segment's own.
+        let segment_slope = right - left;
+        let centred = |index: usize| -> f64 {
+            if index > 0 && index + 1 < differences.len() {
+                let slope = 0.5 * (differences[index + 1] - differences[index - 1]);
+                if slope.is_finite() && slope * segment_slope > 0.0 {
+                    return slope;
+                }
+            }
+            segment_slope
+        };
+        let rise = ((1.0 - theta) * centred(lower) + theta * centred(lower + 1)).abs();
         let reach = 0.5 - theta;
         let excess = 0.5 * rise * reach * reach;
         let (left_excess, right_excess) = if reach > 0.0 {
@@ -220,11 +236,12 @@ mod tests {
         for i in 0..hold.len() {
             assert!((capped[i] + floored[i]).abs() < 1e-15);
         }
-        // The crossing sits a quarter of the way from node 1 to node 2 with a
-        // rise of 0.4: node 1 nets 0.4 * (1/32 - 3/96) = 0 and node 2 gives
-        // back 0.4 * (1/4) / 24.
+        // The crossing sits a quarter of the way from node 1 to node 2. The
+        // centred slopes there are 0.35 and 0.5, blended to 0.3875: node 1
+        // nets 0.3875 * (1/32 - 3/96) = 0 and node 2 gives back
+        // 0.3875 * (1/4) / 24.
         assert!(capped[1].abs() < 1e-15);
-        assert!((capped[2] - (-0.3 + 0.4 * 0.25 / 24.0)).abs() < 1e-15);
+        assert!((capped[2] - (-0.3 + 0.3875 * 0.25 / 24.0)).abs() < 1e-15);
         assert_eq!(capped[0].to_bits(), 0.0_f64.to_bits());
         assert_eq!(capped[3].to_bits(), (-0.9_f64).to_bits());
     }
@@ -238,11 +255,12 @@ mod tests {
         let mut empty: [f64; 0] = [];
         smoothed_max(&mut empty, &[]);
 
-        // A crossing exactly on a node: the node takes 1/8 - 1/24 of the rise.
+        // A crossing exactly on a node: the node takes 1/8 - 1/24 of the
+        // slope there, which is the centred (0 + 1) / 2.
         let mut level = [1.0, 1.0, 1.0];
         smoothed_max(&mut level, &[1.0, 1.0, 2.0]);
         assert_eq!(level[0], 1.0);
-        assert!((level[1] - (1.0 + 1.0 / 12.0)).abs() < 1e-15);
+        assert!((level[1] - (1.0 + 0.5 / 12.0)).abs() < 1e-15);
         assert_eq!(level[2], 2.0);
 
         // An unusable exercise value surfaces instead of being dropped.

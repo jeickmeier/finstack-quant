@@ -58,6 +58,11 @@ const EXPECTED_FAILURES: &[(&str, &[&str], &str)] = &[
     ("registry/trs_equity", &["1M", "6M"], HELD),
     ("registry/trs_fixed_income_index", &["1M", "6M"], HELD),
     ("registry/range_accrual", &["6M"], HELD),
+    (
+        "golden/quantlib/commodity_asian_option/wti_arithmetic_asian_call_1y_quantlib",
+        &["6M"],
+        "the 6M roll crosses the July and October fixings; a commodity Asian's past_fixings are instrument-held and not rolled",
+    ),
     // Not a fixing: the rolled trade has no schedule, needs lifecycle inputs,
     // or leaves its market grid.
     (
@@ -68,6 +73,11 @@ const EXPECTED_FAILURES: &[(&str, &[&str], &str)] = &[
     ("registry/agency_tba", &["1D", "1M", "6M"], NO_SCHEDULE),
     (
         "golden/regression_goldens/equity_future/spx_es_3m",
+        &["6M"],
+        "the 6M roll passes last_trading_date; the rolled future requires a settlement_price",
+    ),
+    (
+        "golden/quantlib/equity_future/spx_future_3m_quantlib",
         &["6M"],
         "the 6M roll passes last_trading_date; the rolled future requires a settlement_price",
     ),

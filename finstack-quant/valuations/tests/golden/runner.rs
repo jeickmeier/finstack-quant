@@ -40,6 +40,8 @@ fn is_pricing_domain(domain: &str) -> bool {
             | "rates.ir_future"
             | "rates.inflation_swap"
             | "rates.swaption"
+            | "rates.bermudan_swaption"
+            | "commodity.commodity_asian_option"
             | "commodity.commodity_spot_option"
             | "commodity.commodity_spread_option"
             | "exotics.barrier_option"

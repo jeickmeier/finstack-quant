@@ -6,6 +6,7 @@
 //! # Metrics
 //!
 //! - **Delta**: Parallel rate sensitivity (bump discount curve)
+//! - **DV01**: The same sensitivity per basis point
 //! - **Vega**: Volatility sensitivity (bump HW sigma)
 //! - **Gamma**: Second-order rate sensitivity
 //! - **Exercise Probabilities**: Risk-neutral exercise distribution
@@ -131,6 +132,32 @@ impl MetricCalculator for BermudanDeltaCalculator {
         }
         let (price_up, price_dn) = price_bumped_pair(swaption, context, bump_bp)?;
         Ok((price_up - price_dn) / (2.0 * bump))
+    }
+}
+
+// Bermudan DV01 Calculator
+
+/// DV01 calculator for Bermudan swaptions.
+///
+/// Reports the PV change for a one basis point parallel rise in the discount
+/// curve, from a central difference sized by the resolved `rate_bump_bp`. The
+/// Hull-White parameters are held fixed. This is [`BermudanDeltaCalculator`]
+/// expressed per basis point, the unit `dv01` carries on every other rates
+/// instrument.
+#[derive(Debug, Clone)]
+pub(crate) struct BermudanDv01Calculator;
+
+impl MetricCalculator for BermudanDv01Calculator {
+    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        let bump_bp =
+            finstack_quant_valuations_core::metrics::sensitivities::bump_config::resolve(context)?
+                .rate_bump_bp;
+        let swaption = context.instrument_as::<BermudanSwaption>()?;
+        if bump_bp <= 0.0 {
+            return Ok(0.0);
+        }
+        let (price_up, price_dn) = price_bumped_pair(swaption, context, bump_bp)?;
+        Ok((price_up - price_dn) / (2.0 * bump_bp))
     }
 }
 

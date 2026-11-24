@@ -1,8 +1,8 @@
 //! Metric registration and calculators.
 
 use super::{
-    BermudanDeltaCalculator, BermudanGammaCalculator, BermudanVegaCalculator, DeltaCalculator,
-    GammaCalculator, ImpliedVolCalculator, VegaCalculator,
+    BermudanDeltaCalculator, BermudanDv01Calculator, BermudanGammaCalculator,
+    BermudanVegaCalculator, DeltaCalculator, GammaCalculator, ImpliedVolCalculator, VegaCalculator,
 };
 use finstack_quant_valuations_core::metrics::MetricRegistry;
 
@@ -53,6 +53,7 @@ pub(crate) fn register_bermudan_swaption_metrics(
         instrument: InstrumentType::BermudanSwaption,
         metrics: [
             (Delta, BermudanDeltaCalculator),
+            (Dv01, BermudanDv01Calculator),
             (Gamma, BermudanGammaCalculator {
                 bump_bp: super::bermudan_greeks::DEFAULT_GAMMA_BUMP_BP,
             }),
@@ -74,7 +75,8 @@ pub(crate) fn register_bermudan_swaption_metrics(
             )
             // Note: UnifiedDv01Calculator and BucketedDv01 are NOT
             // registered here because BermudanSwaption::value() returns Err.
-            // Use BermudanDeltaCalculator for rate sensitivity instead.
+            // `Dv01` is the bump-and-revalue BermudanDv01Calculator, which
+            // reprices through the explicit tree pricer.
             // Theta is registered universally in crate::RATES.metrics()
             // but will fail for BermudanSwaption for the same reason.
         ]

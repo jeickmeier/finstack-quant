@@ -460,6 +460,7 @@
         "carry_total",
         "coupon_income",
         "delta",
+        "dv01",
         "expected_exercise_time",
         "expected_shortfall",
         "funding_cost",

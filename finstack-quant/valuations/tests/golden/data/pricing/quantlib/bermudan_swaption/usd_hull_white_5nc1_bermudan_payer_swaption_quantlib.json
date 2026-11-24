@@ -1,0 +1,152 @@
+{
+  "expected": {
+    "dv01": 1797.9372688269796,
+    "hw_sigma_vega": 237397.12963730708,
+    "npv": 214697.46714303436
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "bermudan_type": "co_terminal",
+        "exercise_schedule": {
+          "exercise_dates": [
+            "2027-04-30",
+            "2028-04-30",
+            "2029-04-30",
+            "2030-04-30",
+            "2031-04-30"
+          ],
+          "lockout_end": null
+        },
+        "id": "USD-HULL-WHITE-5NC1-BERMUDAN-PAYER-SWAPTION-QUANTLIB",
+        "instrument_pricing_overrides": {
+          "model_config": {
+            "hw1f_mean_reversion": 0.03,
+            "hw1f_sigma": 0.01,
+            "tree_steps": 400
+          }
+        },
+        "notional": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "option_type": "call",
+        "settlement": "physical",
+        "underlying_fixed_leg": {
+          "business_day_convention": "unadjusted",
+          "calendar_id": "weekends_only",
+          "day_count": "act_365f",
+          "discount_curve_id": "USD-OIS",
+          "end": "2032-04-30",
+          "frequency": {
+            "count": 12,
+            "unit": "months"
+          },
+          "payment_lag_days": 0,
+          "rate": "0.042",
+          "start": "2027-04-30",
+          "stub": "none"
+        },
+        "underlying_float_leg": {
+          "business_day_convention": "unadjusted",
+          "calendar_id": "weekends_only",
+          "compounding": "simple",
+          "day_count": "act_365f",
+          "discount_curve_id": "USD-OIS",
+          "end": "2032-04-30",
+          "fixing_calendar_id": "weekends_only",
+          "forward_curve_id": "USD-OIS",
+          "frequency": {
+            "count": 12,
+            "unit": "months"
+          },
+          "index_id": "USD-OIS",
+          "payment_lag_days": 0,
+          "reset_lag_days": 0,
+          "spread_bp": "0",
+          "start": "2027-04-30",
+          "stub": "none"
+        },
+        "vol_surface_id": "USD-SWAPTION-VOL-UNUSED"
+      },
+      "type": "bermudan_swaption"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {},
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-23",
+    "description": "QuantLib native Hull-White one-factor Bermudan payer swaption, five annual exercises.",
+    "domain": "rates.bermudan_swaption",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-23",
+    "name": "usd_hull_white_5nc1_bermudan_payer_swaption_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product hull_white_bermudan_swaption",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43 FdHullWhiteSwaptionEngine (800 time steps, 1600 rate steps) on HullWhite(a=0.03, sigma=0.01) over a flat 0.04 continuous Act/365F curve; co-terminal exercise into a single-curve annual Act/365F swap ending 2032-04-30, exercisable on each 30 April from 2027 to 2031, physical settlement.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "hull_white_1f",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "dv01": {
+      "rel": 0.0025,
+      "tolerance_reason": "QuantLib's finite-difference Hull-White engine (800 time by 1600 rate steps, within 1e-6 relative of the exact Jamshidian price on the European exercise) against Finstack's 400-step trinomial tree, whose first-order time discretization is bounded here by one step in 400. DV01 is a 1bp parallel continuous zero shift with the model parameters held fixed; the sigma vega is the PV change per 0.01 of Hull-White sigma from a central difference."
+    },
+    "hw_sigma_vega": {
+      "rel": 0.0025,
+      "tolerance_reason": "QuantLib's finite-difference Hull-White engine (800 time by 1600 rate steps, within 1e-6 relative of the exact Jamshidian price on the European exercise) against Finstack's 400-step trinomial tree, whose first-order time discretization is bounded here by one step in 400. DV01 is a 1bp parallel continuous zero shift with the model parameters held fixed; the sigma vega is the PV change per 0.01 of Hull-White sigma from a central difference."
+    },
+    "npv": {
+      "rel": 0.0025,
+      "tolerance_reason": "QuantLib's finite-difference Hull-White engine (800 time by 1600 rate steps, within 1e-6 relative of the exact Jamshidian price on the European exercise) against Finstack's 400-step trinomial tree, whose first-order time discretization is bounded here by one step in 400. DV01 is a 1bp parallel continuous zero shift with the model parameters held fixed; the sigma vega is the PV change per 0.01 of Hull-White sigma from a central difference."
+    }
+  }
+}

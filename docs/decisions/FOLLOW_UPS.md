@@ -97,18 +97,9 @@ resolve the stated scope question explicitly.
    `CreditFactorModelSchema::CURRENT`, reject missing, malformed or unsupported
    markers during deserialization, and retain no `schema_version` alias.
    Rejection before successful decoding does not promise first-error ordering.
-   The former representation/failure-timing discrepancy is settled; enforcement
-   and guidance corrections remain open under
+   Enforcement and guidance corrections remain open under
    [INVARIANTS.md section 8](../../INVARIANTS.md#8-credit-factor-model-schema-versioning).
-   The [Serde policy](../SERDE_STABILITY.md#object-strictness), the Python
-   [`rust_json` macro documentation](../../finstack-quant-py/src/bindings/macros.rs)
-   and the [hierarchy's](../../finstack-quant/factor/src/credit/hierarchy.rs)
-   unknown-root-field test message now state the narrow, explicitly open
-   `CreditCalibrationDiagnostics` object (unknown diagnostic keys accepted and
-   discarded; known fields keep their requiredness and meaning, including
-   computational `fold_ups`), unknown-field rejection by each object's declared
-   closure, and root additions as a coordinated v1 contract change. Still open:
-   enforcement, tracked in the
+   Still open: enforcement, tracked in the
    [credit artifact validation entry](#credit-artifact-validation), and any
    remaining guidance that still describes `schema_version` or a new schema
    version for root additions. Preserve the stable schema path/URI and the
@@ -289,15 +280,8 @@ resolve the stated scope question explicitly.
   Verify conversions and host documentation preserve the authorized polarity.
   Verify both accepted retained-earnings conventions: `MagnitudePositive`
   remains the default, while explicitly selected `InflowPositive` adds signed
-  dividends directly. Neither sign inference nor `abs()` is permitted. Negative
-  magnitude inputs currently produce warnings in the
-  [retained-earnings check](../../finstack-quant/statements/src/checks/builtins/retained_earnings.rs);
-  resolve enforcement and test the public boundary without treating those
-  warnings as strict rejection.
-  The SA-CCR [public field](../../finstack-quant/margin/src/regulatory/sa_ccr/types.rs)
-  documentation (Rust, Python and WASM) now matches the
-  [kernel's](../../finstack-quant/margin/src/regulatory/sa_ccr/replacement_cost.rs)
-  VM-only interpretation of `config.collateral` and addition of NICA. The
+  dividends directly. Neither sign inference nor `abs()` is permitted.
+  For SA-CCR, the
   [accepted complete ADR 0044 package](financial/conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components)
   requires the `variation_margin` field, explicit signed VM/NICA components
   and one derived total `C` for all consumers.
@@ -305,8 +289,8 @@ resolve the stated scope question explicitly.
   cannot prove that an upstream total was not mislabelled as VM. The
   [SA-CCR qualification entry](financial/FOLLOW_UPS.md#saccr-collateral-qualification)
   owns regulatory qualification of the margined and unmargined methodologies.
-  Representation is now accepted; runtime reconciliation and independent
-  qualification of both calculations remain open.
+  Runtime reconciliation and independent qualification of both calculations
+  remain open.
 
 <a id="clock-metadata-defaults"></a>
 
@@ -324,22 +308,16 @@ resolve the stated scope question explicitly.
   declarations rejected and no universal fallback. Model clocks remain distinct;
   supported variance conversions preserve the same physical interval. Different
   calibration origins require an explicitly owned aging/recalibration/model
-  contract rather than a relabelled grid. The current
-  [VolSurface](../../finstack-quant/core/src/market_data/surfaces/vol_surface.rs)
-  and [VolCube](../../finstack-quant/core/src/market_data/surfaces/vol_cube.rs)
-  carry expiry grids without reference-date or day-count/time-basis fields.
+  contract rather than a relabelled grid.
   Verify projection uses curve date coordinates while annualizing forwards
   with the contractual index accrual fraction, as expressed by
   [rate_between_dates](../../finstack-quant/core/src/market_data/term_structures/forward_curve/curve.rs).
   Verify date-based relative discounting `D(b,T)/D(b,v)` and
-  `zero_rate_from_df` adoption across pricers. The
+  `zero_rate_from_df` adoption across pricers, leaving lifecycle branches
+  operation-owned; test the
   [rate helper](../../finstack-quant/valuations/core/src/instruments/pricing/discounting.rs)
-  does not enforce finite model time and returns zero for `t <= 0` before
-  validating the factor. Reconcile already accepted enforcement for finite
-  positive factors/model time, leaving lifecycle branches operation-owned; test the
   bridge with justified tolerances without claiming full model-dynamics
-  equivalence. The old `common_impl::two_clock` reference has no current source
-  counterpart.
+  equivalence.
   The accepted information-set rules distinguish value dates from
   publication eligibility at an explicitly declared operation cutoff, require
   missing eligible published observations to error, and permit projection of
@@ -434,13 +412,11 @@ resolve the stated scope question explicitly.
   required host fields separately. Document narrow third-party unknown-error
   mappings with operation-appropriate failure meaning and original diagnostic
   context; do not treat every current catch-all as approved.
-  Correct the [workspace lint comment](../../Cargo.toml), which overstates
-  `match_wild_err_arm`: that lint checks `Err(_)` arms taking drastic actions,
-  not general enum-classification exhaustiveness. Establish suitable focused
-  enforcement and coverage, including review of new owner/nested variants and
-  cross-host error meaning. Do not promise compiler rejection in every consumer
-  of a cross-crate non-exhaustive enum. These are policy and future-variant
-  coverage gaps, not demonstrated misclassification of existing variants.
+  Establish suitable focused enforcement and coverage, including review of new
+  owner/nested variants and cross-host error meaning. Do not promise compiler
+  rejection in every consumer of a cross-crate non-exhaustive enum. These are
+  policy and future-variant coverage gaps, not demonstrated misclassification
+  of existing variants.
 - **Implementation and reuse review:** under
   [ADR 0037](standards/0037-simple-modular-implementation-and-reuse.md), align
   contributor and agent guidance with the accepted simplicity, modularity,
@@ -498,7 +474,7 @@ resolve the stated scope question explicitly.
   [ADR 0047](architecture/0047-credit-factor-wire-and-validation-contract.md),
   audit each consumer's preconditions so validation applies to the current
   artifact before financial use and after relevant mutation. The
-  [validator](../../finstack-quant/factor/src/credit/hierarchy.rs) does not
+  [validator](../../finstack-quant/factor/src/credit/hierarchy/model.rs) does not
   inspect `diagnostics.fold_ups`; the
   [decomposition consumer](../../finstack-quant/factor/src/credit/decomposition.rs)
   checks an out-of-range fold-up level later. Reconcile
@@ -547,7 +523,7 @@ resolve the stated scope question explicitly.
   used by each reference case, including overrides. Where no separate
   calibration tag exists, use the exact edition and immutable source/parameter
   identity without inventing a tag or requiring a new runtime metadata API.
-  The [SIMM calculator](../../finstack-quant/margin/src/calculators/im/simm.rs)
+  The [SIMM calculator](../../finstack-quant/margin/src/calculators/im/simm/calculator.rs)
   exposes historical v2.6, while `version()` reports only the methodology enum.
   Record the exact effective profile identity independently of the wire version
   and methodology edition. The accepted margin registry contract replaces the
@@ -2033,8 +2009,8 @@ requiring reproduction, adoption choices and missing validation are distinct.
   [accepted LMM scale fit](financial/calibration-rate-models/09-lmm-rebonato-calibration.md#accepted-decision-for-single-slice-lmm-loading-scale-calibration).
 
 - **Scenario specification and composition:** reconcile checked shared
-  ingress, exact identities, ordered blocks, typed operation units and
-  the single-roll and roll-only gates under the
+  ingress, exact identities, typed operation units and the roll-only
+  gate under the
   [accepted specification](financial/scenarios/01-specification-and-composition.md#accepted-decision-for-checked-scenario-specifications-and-ordered-composition).
 
 - **Scenario execution:** reconcile serial phases, candidate-only
@@ -2068,9 +2044,8 @@ requiring reproduction, adoption choices and missing validation are distinct.
   [accepted credit shock contract](financial/scenarios/07-hazard-quote-shocks.md#accepted-decision-for-native-hazard-shocks-and-exact-cds-scenario-replay).
 
 - **Scenario commodity and volatility-index shocks:** reconcile
-  dedicated relative-percent and absolute-point operations, signed
-  price and zero-level domains, and source-preserving delivery under
-  the [accepted level shock contract](financial/scenarios/08-commodity-and-vol-index.md#accepted-decision-for-typed-commodity-and-volatility-index-scenario-shocks).
+  source-preserving delivery under the
+  [accepted level shock contract](financial/scenarios/08-commodity-and-vol-index.md#accepted-decision-for-typed-commodity-and-volatility-index-scenario-shocks).
 
 - **Scenario volatility grid shocks:** reconcile exact typed source
   and axis binding, one admitted native-sigma replacement and
@@ -2228,11 +2203,6 @@ requiring reproduction, adoption choices and missing validation are distinct.
   opening weights, explicit completeness gate, independent effects and
   source-backed restoration under the
   [accepted continuous-factor attribution contract](financial/portfolio-attribution/06-continuous-factor-brinson.md#accepted-decision-for-checked-continuous-factor-attribution).
-
-- **Fixed-income attribution.** Reconcile dated coupon carry, matched opening
-  sensitivities and observed moves, the residual label, signed sector admission
-  and checked host results under the
-  [accepted fixed-income attribution contract](financial/portfolio-attribution/07-fixed-income-campisi.md#accepted-decision-for-checked-fixed-income-attribution).
 
 - **Portfolio P&L attribution.** Reconcile role-specific endpoint profiles,
   frozen tree reduction, composable reporting FX, checked Money closure
@@ -2498,8 +2468,7 @@ requiring reproduction, adoption choices and missing validation are distinct.
   [Accepted credit spread delta](financial/margin-regulatory-xva/04-frtb-credit-delta.md#accepted-decision-for-checked-credit-spread-delta).
 
 - **Equity spot and repo delta.** Reconcile qualified factor and index
-  admission, spot and repo weights, name-based mixed correlation and
-  bucket 11 aggregation through the existing result paths.
+  admission through the existing result paths.
   [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
   [Accepted equity spot and repo delta](financial/margin-regulatory-xva/05-frtb-equity-delta.md#accepted-decision-for-checked-equity-spot-and-repo-delta).
 

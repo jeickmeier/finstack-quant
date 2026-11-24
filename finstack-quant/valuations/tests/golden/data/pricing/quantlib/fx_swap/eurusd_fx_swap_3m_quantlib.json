@@ -1,0 +1,138 @@
+{
+  "expected": {
+    "dv01_domestic": -276.0112499689021,
+    "dv01_foreign": 275.3296868016623,
+    "npv": 23049.589572182274
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "base_currency": "EUR",
+        "domestic_discount_curve_id": "USD-OIS",
+        "far_date": "2026-08-05",
+        "far_rate": 1.107,
+        "foreign_discount_curve_id": "EUR-OIS",
+        "id": "EURUSD-FXSWAP-3M-QUANTLIB",
+        "near_date": "2026-05-05",
+        "near_rate": 1.1005,
+        "notional": {
+          "amount": "10000000",
+          "currency": "EUR"
+        },
+        "quote_currency": "USD"
+      },
+      "type": "fx_swap"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        },
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "EUR-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.4723665527410147
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        }
+      ],
+      "dividends": [],
+      "fx": {
+        "config": {
+          "cache_capacity": 256,
+          "pivot_currency": "USD"
+        },
+        "pinned_quotes": [],
+        "provider_pinned_quotes": [],
+        "provider_quotes": [],
+        "quotes": [
+          [
+            "EUR",
+            "USD",
+            1.1
+          ]
+        ]
+      },
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {},
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-23",
+    "description": "Three-month off-market EUR/USD FX swap valued on QuantLib discount curves.",
+    "domain": "fx.fx_swap",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-23",
+    "name": "eurusd_fx_swap_3m_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product fx_swap",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43 FlatForward discount factors (continuous Act/365F, USD 0.04, EUR 0.025); cash flows +N EUR and -N*1.1005 USD on 2026-05-05, -N EUR and +N*1.107 USD on 2026-08-05, N = 10000000; EUR leg converted at spot 1.1.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "dv01_domestic": {
+      "rel": 1e-09,
+      "tolerance_reason": "Four dated cash flows discounted on QuantLib flat curves and converted at spot, against the same covered-interest-parity valuation in Finstack; only floating-point evaluation order differs."
+    },
+    "dv01_foreign": {
+      "rel": 1e-09,
+      "tolerance_reason": "Four dated cash flows discounted on QuantLib flat curves and converted at spot, against the same covered-interest-parity valuation in Finstack; only floating-point evaluation order differs."
+    },
+    "npv": {
+      "rel": 1e-09,
+      "tolerance_reason": "Four dated cash flows discounted on QuantLib flat curves and converted at spot, against the same covered-interest-parity valuation in Finstack; only floating-point evaluation order differs."
+    }
+  }
+}

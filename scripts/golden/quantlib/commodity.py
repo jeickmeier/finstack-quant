@@ -192,3 +192,81 @@ def build_commodity_spread_call() -> dict[str, Any]:
 def build_commodity_spread_put() -> dict[str, Any]:
     """Build a one-year Kirk crack-spread put."""
     return _build_spread_option(product="commodity_spread_put", name="crack_spread_kirk_put_1y_quantlib", call=False)
+
+
+def build_commodity_asian_option() -> dict[str, Any]:
+    """Build a one-year quarterly arithmetic-average WTI call on a flat forward curve."""
+    forward, strike, volatility = 80.0, 78.0, 0.30
+    fixings = ["2026-07-30", "2026-10-30", "2027-01-30", EXPIRY]
+    evaluation_date = ql_date(VALUATION_DATE)
+    ql.Settings.instance().evaluationDate = evaluation_date
+    day_count = ql.Actual365Fixed()
+    flat_rate = ql.YieldTermStructureHandle(ql.FlatForward(evaluation_date, RATE, day_count, ql.Continuous))
+    # A dividend yield equal to the rate gives zero cost of carry, so every
+    # fixing's forward equals the flat curve level.
+    process = ql.BlackScholesMertonProcess(
+        ql.QuoteHandle(ql.SimpleQuote(forward)),
+        flat_rate,
+        flat_rate,
+        ql.BlackVolTermStructureHandle(ql.BlackConstantVol(evaluation_date, ql.NullCalendar(), volatility, day_count)),
+    )
+    option = ql.DiscreteAveragingAsianOption(
+        ql.Average.Arithmetic,
+        [ql_date(date) for date in fixings],
+        ql.PlainVanillaPayoff(ql.Option.Call, strike),
+        ql.EuropeanExercise(ql_date(EXPIRY)),
+    )
+    option.setPricingEngine(ql.TurnbullWakemanAsianEngine(process))
+    reason = (
+        "QuantLib TurnbullWakemanAsianEngine and Finstack use the same Turnbull-Wakeman moment matching on "
+        "identical fixing dates and forwards; the bound matches the equity Asian fixture's 1e-7 on a price of 6.28."
+    )
+    return {
+        "schema": SCHEMA,
+        "metadata": _captured(
+            metadata(
+                name="wti_arithmetic_asian_call_1y_quantlib",
+                domain="commodity.commodity_asian_option",
+                description="QuantLib Turnbull-Wakeman one-year quarterly arithmetic-average WTI call.",
+                product="commodity_asian_option",
+                source_detail=(
+                    f"QuantLib {ql.__version__} TurnbullWakemanAsianEngine with zero cost of carry: flat forward "
+                    f"{forward}, strike {strike}, volatility {volatility}, four quarterly fixings ending {EXPIRY}, "
+                    f"flat continuous Act/365F rate {RATE}, quantity {QUANTITY:.0f} BBL."
+                ),
+            )
+        ),
+        "kind": "pricing",
+        "model": "asian_turnbull_wakeman",
+        "market": market_snapshot(
+            [flat_discount_curve("USD-OIS", RATE), _price_curve("WTI-FORWARD", forward)],
+            surfaces=[constant_vol_surface("WTI-VOL", volatility, strikes=[40.0, 80.0, 160.0])],
+        ),
+        "instrument": {
+            "schema": "finstack_quant.instrument/1",
+            "instrument": {
+                "type": "commodity_asian_option",
+                "spec": {
+                    "id": "WTI-ARITHMETIC-ASIAN-CALL-1Y-QUANTLIB",
+                    "commodity_type": "Energy",
+                    "underlying_ticker": "CL",
+                    "unit": "BBL",
+                    "currency": "USD",
+                    "option_type": "call",
+                    "averaging_method": "arithmetic",
+                    "strike": strike,
+                    "fixing_dates": fixings,
+                    "past_fixings": [],
+                    "expiry": EXPIRY,
+                    "quantity": QUANTITY,
+                    "day_count": "act_365f",
+                    "discount_curve_id": "USD-OIS",
+                    "forward_curve_id": "WTI-FORWARD",
+                    "vol_surface_id": "WTI-VOL",
+                    "attributes": {"tags": ["golden", "quantlib"], "meta": {}},
+                },
+            },
+        },
+        "expected": {"npv": QUANTITY * option.NPV()},
+        "tolerances": {"npv": {"rel": 2e-8, "tolerance_reason": reason}},
+    }
