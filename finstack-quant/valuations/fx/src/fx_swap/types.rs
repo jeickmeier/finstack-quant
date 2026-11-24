@@ -220,17 +220,14 @@ impl FxSwap {
             business_day_convention,
             preserve_business_eom,
         } = params;
-        let calendar = finstack_quant_core::dates::calendar_by_id_strict(&format!(
-            "{base_calendar_id}+{quote_calendar_id}"
-        ))?;
-        let near_date =
-            crate::market_inputs::spot_date_from_lag(trade_date, settlement_days, calendar)?;
-        let far_date = finstack_quant_core::dates::fx::fx_forward_date(
-            near_date,
+        let calendar = crate::market_inputs::joint_calendar(&base_calendar_id, &quote_calendar_id)?;
+        let (near_date, far_date) = crate::market_inputs::roll_fx_spot_and_maturity(
+            trade_date,
+            settlement_days,
             far_tenor,
+            calendar,
             business_day_convention,
             preserve_business_eom,
-            calendar,
         )?;
 
         Self::builder()
@@ -345,6 +342,24 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxSwap {
         deps.add_discount_curve(self.foreign_discount_curve_id.clone());
         deps.add_fx_pair(self.base_currency, self.quote_currency);
         Ok(deps)
+    }
+
+    fn fx_exposure(&self) -> Option<(Currency, Currency)> {
+        Some((self.base_currency, self.quote_currency))
+    }
+
+    fn valuation_details(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> Option<finstack_quant_valuations_core::results::ValuationDetails> {
+        Some(crate::market_inputs::fx_valuation_details(
+            market,
+            self.base_currency,
+            self.quote_currency,
+            as_of,
+            false,
+        ))
     }
 
     #[tracing::instrument(

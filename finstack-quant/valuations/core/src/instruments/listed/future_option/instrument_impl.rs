@@ -310,7 +310,7 @@ macro_rules! define_future_option {
             serde::Deserialize,
         )]
         #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-        #[serde(deny_unknown_fields)]
+        #[serde(deny_unknown_fields, remote = "Self")]
         pub struct $name {
             /// Unique instrument identifier.
             pub id: finstack_quant_core::types::InstrumentId,
@@ -354,6 +354,8 @@ macro_rules! define_future_option {
             $family
             $(, require_rate_risk = $require_rate_risk)?
         );
+
+        $crate::validate_on_deserialize!($name);
 
         $(
             /// Register delta, gamma, vega, and theta for this futures option.

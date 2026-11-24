@@ -45,7 +45,8 @@ fn default_trading_days_per_year() -> f64 {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
+#[builder(validate = FxVarianceSwap::validate)]
 pub struct FxVarianceSwap {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -168,6 +169,8 @@ pub struct FxVarianceSwap {
     pub attributes: Attributes,
 }
 
+finstack_quant_valuations_core::validate_on_deserialize!(FxVarianceSwap);
+
 impl FxVarianceSwap {
     /// Validate static contract invariants shared by builders, JSON, and direct
     /// instrument pricing.
@@ -236,7 +239,13 @@ impl FxVarianceSwap {
             .build()
     }
 
-    pub(crate) fn validate_as_of(&self, context: &MarketContext, as_of: Date) -> Result<()> {
+    pub(crate) fn validate_as_of_with_dates(
+        &self,
+        context: &MarketContext,
+        as_of: Date,
+        final_observation: Date,
+        settlement: Date,
+    ) -> Result<()> {
         let dom = context.get_discount(self.domestic_discount_curve_id.as_str())?;
         let for_curve = context.get_discount(self.foreign_discount_curve_id.as_str())?;
         let dom_base = dom.base_date();
@@ -247,8 +256,6 @@ impl FxVarianceSwap {
                 as_of, dom_base, for_base
             )));
         }
-        let final_observation = self.final_observation_date()?;
-        let settlement = self.effective_settlement_date()?;
         if settlement < final_observation {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "FxVarianceSwap '{}' settlement date ({settlement}) precedes final observation ({final_observation})",
@@ -280,6 +287,12 @@ impl FxVarianceSwap {
         } else {
             format!("{}{}", self.base_currency, self.quote_currency)
         }
+    }
+
+    pub(crate) fn close_series_or_pair_id(&self) -> String {
+        self.close_series_id
+            .clone()
+            .unwrap_or_else(|| self.series_id())
     }
 
     pub(crate) fn spot_rate(&self, context: &MarketContext, as_of: Date) -> Result<f64> {
@@ -424,11 +437,7 @@ impl Instrument for FxVarianceSwap {
                 deps.add_series_id(series_id);
             }
         } else {
-            deps.add_series_id(
-                self.close_series_id
-                    .clone()
-                    .unwrap_or_else(|| self.series_id()),
-            );
+            deps.add_series_id(self.close_series_or_pair_id());
         }
         deps.add_volatility_dependency(
             finstack_quant_valuations_core::instruments::VolatilityDependency::new(
@@ -450,6 +459,20 @@ impl Instrument for FxVarianceSwap {
     )]
     fn base_value(&self, context: &MarketContext, as_of: Date) -> Result<Money> {
         pricer::compute_pv(self, context, as_of)
+    }
+
+    fn valuation_details(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Option<finstack_quant_valuations_core::results::ValuationDetails> {
+        Some(crate::market_inputs::fx_valuation_details(
+            market,
+            self.base_currency,
+            self.quote_currency,
+            as_of,
+            market.fx().is_none(),
+        ))
     }
 
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();

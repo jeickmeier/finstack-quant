@@ -7,13 +7,7 @@
 use crate::quanto_option::types::QuantoOption;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, expect_inst,
-};
-use finstack_quant_valuations_core::results::ValuationResult;
 
 use finstack_quant_models::closed_form::quanto_price;
 use finstack_quant_models::types::OptionMarketParams;
@@ -24,26 +18,19 @@ fn collect_quanto_inputs(
     curves: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<(f64, f64, f64, f64, f64, f64, f64)> {
-    use finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df;
-
     let t = inst
         .day_count
         .year_fraction(as_of, inst.expiry, DayCountContext::default())?;
 
-    // Recover continuously-compounded rates from *date-based* discount factors,
-    // mirroring `shared.rs::collect_fx_option_inputs_no_vol`. `curve.zero_rate(t, Continuous)`
-    // interpolates on the curve's own time axis, so the rate it returns does
-    // not satisfy `e^{-r·t} = df_between_dates(as_of, expiry)` whenever
-    // `as_of != base_date` or the instrument and curve day-counts differ.
-    // Using `df_between_dates` + `zero_rate_from_df` keeps the recovered rate
-    // consistent with the actual discount factor over the option's life.
-    let disc_curve = curves.get_discount(inst.domestic_discount_curve_id.as_str())?;
-    let df_dom = disc_curve.df_between_dates(as_of, inst.expiry)?;
-    let r_dom = zero_rate_from_df(df_dom, t, "QuantoOption domestic discount")?;
-
-    let for_curve = curves.get_discount(inst.foreign_discount_curve_id.as_str())?;
-    let df_for = for_curve.df_between_dates(as_of, inst.expiry)?;
-    let r_for = zero_rate_from_df(df_for, t, "QuantoOption foreign discount")?;
+    let (_df_dom, r_dom, _df_for, r_for) = crate::market_inputs::discount_rates_to(
+        curves,
+        &inst.domestic_discount_curve_id,
+        &inst.foreign_discount_curve_id,
+        as_of,
+        inst.expiry,
+        t,
+        "QuantoOption",
+    )?;
 
     let spot_scalar = curves.get_price(&inst.spot_id)?;
     let spot = finstack_quant_valuations_core::metrics::scalar_numeric_value(spot_scalar);
@@ -126,104 +113,60 @@ fn payoff_scale(inst: &QuantoOption) -> finstack_quant_core::Result<f64> {
 
 /// Expiry value: the foreign-currency intrinsic converted at the contractual
 /// fixed FX rate via [`payoff_scale`].
-fn quanto_intrinsic(quanto: &QuantoOption, spot: f64) -> std::result::Result<Money, PricingError> {
+fn quanto_intrinsic(quanto: &QuantoOption, spot: f64) -> finstack_quant_core::Result<Money> {
     let scale = payoff_scale(quanto)?;
     let strike = quanto.strike;
     let intrinsic_unit = match quanto.option_type {
         finstack_quant_models::types::OptionType::Call => (spot - strike).max(0.0),
         finstack_quant_models::types::OptionType::Put => (strike - spot).max(0.0),
     };
-    Money::from_model_value(intrinsic_unit * scale, quanto.quote_currency).map_err(|error| {
-        PricingError::from_core(
-            error,
-            finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(quanto),
-        )
-    })
+    Money::from_model_value(intrinsic_unit * scale, quanto.quote_currency)
 }
 
-/// Quanto option analytical pricer.
-pub(crate) struct QuantoOptionAnalyticalPricer;
-
-impl Pricer for QuantoOptionAnalyticalPricer {
-    fn key(&self) -> PricerKey {
-        PricerKey::new(InstrumentType::QuantoOption, ModelKey::QuantoBS)
+/// Present value of a [`QuantoOption`] under the analytical Black-Scholes quanto model.
+pub(crate) fn compute_pv(
+    quanto: &QuantoOption,
+    market: &MarketContext,
+    as_of: Date,
+) -> finstack_quant_core::Result<Money> {
+    if as_of > quanto.expiry {
+        return Ok(Money::from((0_i64, quanto.quote_currency)));
     }
 
-    #[tracing::instrument(
-        name = "quanto_option.analytical.price_dyn",
-        level = "debug",
-        skip(self, instrument, market),
-        fields(inst_id = %instrument.id(), as_of = %as_of),
-        err,
-    )]
-    fn price_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> std::result::Result<ValuationResult, PricingError> {
-        let quanto = expect_inst::<QuantoOption>(instrument, InstrumentType::QuantoOption)?;
-
-        if as_of > quanto.expiry {
-            return Ok(ValuationResult::stamped(
-                quanto.id(),
-                as_of,
-                Money::from((0_i64, quanto.quote_currency)),
-            ));
-        }
-
-        if as_of == quanto.expiry {
-            let spot = finstack_quant_valuations_core::metrics::scalar_numeric_value(
-                market.get_price(&quanto.spot_id)?,
-            );
-            return Ok(ValuationResult::stamped(
-                quanto.id(),
-                as_of,
-                quanto_intrinsic(quanto, spot)?,
-            ));
-        }
-
-        let (spot, r_dom, r_for, q, sigma_equity, sigma_fx, t) =
-            collect_quanto_inputs(quanto, market, as_of)?;
-
-        if t <= 0.0 {
-            // Zero year fraction before expiry (e.g. 30/360 month ends):
-            // settle at intrinsic, consistent with the FxOption/digital/barrier
-            // siblings, rather than returning 0.
-            return Ok(ValuationResult::stamped(
-                quanto.id(),
-                as_of,
-                quanto_intrinsic(quanto, spot)?,
-            ));
-        }
-
-        let price = quanto_price(
-            &OptionMarketParams {
-                spot,
-                strike: quanto.strike,
-                rate: r_dom,
-                volatility: sigma_equity,
-                time_to_expiry: t,
-                dividend_yield: q,
-                option_type: quanto.option_type,
-            },
-            r_for,
-            sigma_fx,
-            quanto.correlation,
+    if as_of == quanto.expiry {
+        let spot = finstack_quant_valuations_core::metrics::scalar_numeric_value(
+            market.get_price(&quanto.spot_id)?,
         );
-
-        let scale = payoff_scale(quanto)?;
-        let pv =
-            Money::from_model_value(price * scale, quanto.quote_currency).map_err(|error| {
-                finstack_quant_valuations_core::pricer::PricingError::from_core(
-                    error,
-                    finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
-                        quanto,
-                    ),
-                )
-            })?;
-        Ok(ValuationResult::stamped(quanto.id(), as_of, pv))
+        return quanto_intrinsic(quanto, spot);
     }
+
+    let (spot, r_dom, r_for, q, sigma_equity, sigma_fx, t) =
+        collect_quanto_inputs(quanto, market, as_of)?;
+
+    if t <= 0.0 {
+        // Zero year fraction before expiry (e.g. 30/360 month ends):
+        // settle at intrinsic, consistent with the FxOption/digital/barrier
+        // siblings, rather than returning 0.
+        return quanto_intrinsic(quanto, spot);
+    }
+
+    let price = quanto_price(
+        &OptionMarketParams {
+            spot,
+            strike: quanto.strike,
+            rate: r_dom,
+            volatility: sigma_equity,
+            time_to_expiry: t,
+            dividend_yield: q,
+            option_type: quanto.option_type,
+        },
+        r_for,
+        sigma_fx,
+        quanto.correlation,
+    );
+
+    let scale = payoff_scale(quanto)?;
+    Money::from_model_value(price * scale, quanto.quote_currency)
 }
 
 #[cfg(test)]
@@ -236,9 +179,11 @@ mod tests {
         VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
     };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::{CurveId, InstrumentId};
+    use finstack_quant_valuations_core::instruments::Instrument;
     use time::macros::date;
 
     /// Item 3 regression: `r_dom`/`r_for` must be recovered from *date-based*
@@ -453,30 +398,26 @@ mod tests {
             .build()
             .expect("quanto");
 
-        let result = QuantoOptionAnalyticalPricer
-            .price_dyn(&quanto, &market, as_of)
-            .expect("expiry-day valuation");
+        let result = quanto.value(&market, as_of).expect("expiry-day valuation");
 
         // Intrinsic (36 000 − 35 000) × payoff_scale, where the default
         // payoff_scale is notional / strike.
         let expected = 1_000.0 * (1_000_000.0 / 35_000.0);
         assert!(
-            (result.value.amount() - expected).abs() < 1e-9,
+            (result.amount() - expected).abs() < 1e-9,
             "expiry-day quanto must settle at quanto-adjusted intrinsic: \
              got {}, expected {expected}",
-            result.value.amount()
+            result.amount()
         );
 
         // OTM put on the same fixture is worthless at expiry.
         let mut put = quanto;
         put.option_type = finstack_quant_models::types::OptionType::Put;
-        let put_result = QuantoOptionAnalyticalPricer
-            .price_dyn(&put, &market, as_of)
-            .expect("expiry-day put valuation");
+        let put_result = put.value(&market, as_of).expect("expiry-day put valuation");
         assert!(
-            put_result.value.amount().abs() < 1e-12,
+            put_result.amount().abs() < 1e-12,
             "OTM expiry-day quanto put must be worthless, got {}",
-            put_result.value.amount()
+            put_result.amount()
         );
     }
 

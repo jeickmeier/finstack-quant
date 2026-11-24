@@ -98,7 +98,7 @@ impl std::str::FromStr for FxDeltaConventionKind {
 /// Explicit venue and premium-currency convention for FX delta reporting.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct FxDeltaConvention {
     /// Delta convention quoted by the venue.
     pub kind: FxDeltaConventionKind,
@@ -106,6 +106,25 @@ pub struct FxDeltaConvention {
     pub premium_currency: Currency,
     /// Non-empty market venue or quoting-source identifier.
     pub venue: String,
+}
+
+impl serde::Serialize for FxDeltaConvention {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        Self::serialize(self, serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for FxDeltaConvention {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        let value = Self::deserialize(deserializer)?;
+        value.validate().map_err(serde::de::Error::custom)?;
+        Ok(value)
+    }
 }
 
 impl FxDeltaConvention {
@@ -215,7 +234,7 @@ impl FxOptionDelivery {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct FxOption {
     /// Selected spot quote's fixed value-date basis.
     pub spot_basis: crate::market_inputs::FxSpotBasis,
@@ -283,6 +302,8 @@ pub struct FxOption {
     /// Attributes for scenario selection and grouping
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(FxOption);
 
 /// Inputs of [`FxOption::european`].
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -648,6 +669,18 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for FxOpt
         }
     }
 }
+type FxOptionVolScenarios = (
+    f64,
+    (
+        FxOption,
+        finstack_quant_core::market_data::context::MarketContext,
+    ),
+    (
+        FxOption,
+        finstack_quant_core::market_data::context::MarketContext,
+    ),
+);
+
 impl FxOption {
     /// Central volatility scenarios for vanna and volga.
     ///
@@ -660,7 +693,7 @@ impl FxOption {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
         requested_bump_abs: f64,
-    ) -> finstack_quant_core::Result<Option<crate::market_inputs::VolScenarios<Self>>> {
+    ) -> finstack_quant_core::Result<Option<FxOptionVolScenarios>> {
         if crate::market_inputs::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(None);
         }
@@ -802,5 +835,20 @@ mod validation_tests {
             result.is_err(),
             "FX option builder must reject identical base and quote currencies"
         );
+    }
+
+    #[test]
+    fn serde_rejects_invalid_fx_option_and_delta_convention() {
+        let valid = FxOption::example().expect("example");
+        let mut json = serde_json::to_value(&valid).expect("serialize");
+        json["strike"] = serde_json::json!(-1.0);
+        assert!(serde_json::from_value::<FxOption>(json).is_err());
+
+        let blank_conv = serde_json::json!({
+            "kind": "forward",
+            "premium_currency": "USD",
+            "venue": "   "
+        });
+        assert!(serde_json::from_value::<FxDeltaConvention>(blank_conv).is_err());
     }
 }

@@ -282,17 +282,14 @@ impl FxForward {
             business_day_convention,
             preserve_business_eom,
         } = params;
-        let calendar = finstack_quant_core::dates::calendar_by_id_strict(&format!(
-            "{base_calendar_id}+{quote_calendar_id}"
-        ))?;
-        let spot_date =
-            crate::market_inputs::spot_date_from_lag(trade_date, settlement_days, calendar)?;
-        let maturity = finstack_quant_core::dates::fx::fx_forward_date(
-            spot_date,
+        let calendar = crate::market_inputs::joint_calendar(&base_calendar_id, &quote_calendar_id)?;
+        let (spot_date, maturity) = crate::market_inputs::roll_fx_spot_and_maturity(
+            trade_date,
+            settlement_days,
             tenor,
+            calendar,
             business_day_convention,
             preserve_business_eom,
-            calendar,
         )?;
 
         Self::builder()
@@ -501,6 +498,27 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxForward {
     fn includes_valuation_date_cashflows(&self) -> bool {
         true
     }
+    fn cashflow_export_terms(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<
+        finstack_quant_valuations_core::instruments::cashflow_export::CashflowExportTerms,
+    > {
+        let mut terms = finstack_quant_valuations_core::instruments::cashflow_export::CashflowExportTerms::from_schedule(
+            finstack_quant_cashflows::CashflowProvider::cashflow_schedule(self, market, as_of)?,
+        );
+        terms
+            .currency_discount_curves
+            .insert(self.base_currency, self.foreign_discount_curve_id.clone());
+        terms
+            .currency_discount_curves
+            .insert(self.quote_currency, self.domestic_discount_curve_id.clone());
+        terms.discount_curve_id = Some(self.domestic_discount_curve_id.clone());
+        terms.reporting_currency = Some(self.quote_currency);
+        Ok(terms)
+    }
+
     fn with_bumped_fx_quote(
         &self,
         relative: f64,
@@ -962,5 +980,18 @@ mod tests {
             .unwrap();
         assert!((eur_flow.1.amount() - 1_000_000.0).abs() < 1e-10);
         assert!((usd_flow.1.amount() + 1_120_000.0).abs() < 1e-10);
+
+        let export = forward
+            .cashflow_export_terms(&market, as_of)
+            .expect("cashflow_export_terms");
+        assert_eq!(
+            export.currency_discount_curves.get(&Currency::EUR),
+            Some(&CurveId::new("EUR-OIS"))
+        );
+        assert_eq!(
+            export.currency_discount_curves.get(&Currency::USD),
+            Some(&CurveId::new("USD-OIS"))
+        );
+        assert_eq!(export.reporting_currency, Some(Currency::USD));
     }
 }

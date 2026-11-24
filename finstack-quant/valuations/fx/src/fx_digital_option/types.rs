@@ -76,7 +76,7 @@ impl std::str::FromStr for DigitalPayoutType {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 #[builder(validate = FxDigitalOption::validate)]
 pub struct FxDigitalOption {
     /// Unique instrument identifier
@@ -139,6 +139,8 @@ pub struct FxDigitalOption {
     /// Attributes for scenario selection and grouping
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(FxDigitalOption);
 
 impl FxDigitalOption {
     /// Validate FX digital option input invariants.
@@ -238,6 +240,20 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxDigitalOption
 
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
         Some(self.expiry)
+    }
+
+    fn valuation_details(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> Option<finstack_quant_valuations_core::results::ValuationDetails> {
+        Some(crate::market_inputs::fx_valuation_details(
+            market,
+            self.base_currency,
+            self.quote_currency,
+            as_of,
+            false,
+        ))
     }
 
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();

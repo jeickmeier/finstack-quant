@@ -77,11 +77,15 @@ impl Pricer for FxBarrierOptionAnalyticalPricer {
             .map_err(|error| PricingError::from_core(error, context.clone()))?;
 
         if as_of > fx_barrier.expiry {
-            return Ok(ValuationResult::stamped(
+            let mut result = ValuationResult::stamped(
                 fx_barrier.id(),
                 as_of,
                 Money::from((0_i64, fx_barrier.quote_currency)),
-            ));
+            );
+            if let Some(details) = fx_barrier.valuation_details(market, as_of) {
+                result = result.with_details(details);
+            }
+            return Ok(result);
         }
 
         if matches!(fx_barrier.monitoring, Monitoring::Discrete { .. }) {
@@ -120,6 +124,10 @@ impl Pricer for FxBarrierOptionAnalyticalPricer {
                 notional_value(fx_barrier, per_unit)
             })
             .map_err(|error| PricingError::from_core(error, context))?;
-        Ok(ValuationResult::stamped(fx_barrier.id(), as_of, pv))
+        let mut result = ValuationResult::stamped(fx_barrier.id(), as_of, pv);
+        if let Some(details) = fx_barrier.valuation_details(market, as_of) {
+            result = result.with_details(details);
+        }
+        Ok(result)
     }
 }

@@ -106,10 +106,7 @@ fn input_request<'a>(
 }
 
 /// Closed-form (Rubinstein-Reiner) touch value per unit of `inst`'s payout,
-/// in quote currency. Barrier, touch type, direction, payout timing and the
-/// payout amount come from `inst`; `r_d`/`r_f` are the continuously
-/// compounded domestic/foreign rates, `sigma` the volatility and `t` the time
-/// to expiry in years.
+/// in quote currency, delegated to `models::closed_form::barrier_rebate`.
 fn price_touch(
     inst: &FxTouchOption,
     spot: f64,
@@ -118,99 +115,32 @@ fn price_touch(
     sigma: f64,
     t: f64,
 ) -> Result<f64> {
-    let barrier = inst.barrier;
-    let touch_type = inst.touch_type;
-    let barrier_direction = inst.barrier_direction;
-    let payout_timing = inst.payout_timing;
-    let payout = inst.payout_amount.amount();
-    let already_breached = match barrier_direction {
-        BarrierDirection::Down => spot <= barrier,
-        BarrierDirection::Up => spot >= barrier,
-    };
-    if already_breached {
-        return Ok(match touch_type {
-            TouchType::OneTouch => match payout_timing {
-                PayoutTiming::AtHit => payout,
-                PayoutTiming::AtExpiry => (-r_d * t).exp() * payout,
-            },
-            TouchType::NoTouch => 0.0,
-        });
-    }
+    use finstack_quant_core::types::BarrierType;
+    use finstack_quant_models::closed_form::{BarrierParams, barrier_rebate};
 
-    let sigma2 = sigma * sigma;
-    let sqrt_t = t.sqrt();
-    let sigma_sqrt_t = sigma * sqrt_t;
-    if sigma_sqrt_t <= 0.0 || t <= 0.0 {
-        let hit = finstack_quant_models::closed_form::barrier_touch_probability(
-            spot,
-            barrier,
-            t,
-            r_d,
-            r_f,
-            0.0,
-            barrier_direction == BarrierDirection::Up,
-        ) > 0.0;
-        let payment_time = match (touch_type, hit, payout_timing) {
-            (TouchType::OneTouch, true, PayoutTiming::AtHit) => {
-                // Hitting time of S(τ) = S(0) exp((r_d - r_f) τ).
-                ((barrier / spot).ln() / (r_d - r_f)).clamp(0.0, t)
-            }
-            (TouchType::OneTouch, true, PayoutTiming::AtExpiry)
-            | (TouchType::NoTouch, false, _) => t,
-            _ => return Ok(0.0),
-        };
-        return Ok(payout * (-r_d * payment_time).exp());
-    }
-
-    let mu = (r_d - r_f - sigma2 / 2.0) / sigma2;
-    // A no-touch can only ever settle at expiry, so its value uses the
-    // *undiscounted* touch probability (survival-to-expiry) regardless of
-    // `payout_timing`. Only an at-hit one-touch folds hit-time discounting into
-    // the touch probability (the extra 2·r_d/σ² term in λ).
-    let lambda_r = match (touch_type, payout_timing) {
-        (TouchType::NoTouch, _) | (TouchType::OneTouch, PayoutTiming::AtExpiry) => 0.0,
-        (TouchType::OneTouch, PayoutTiming::AtHit) => r_d,
+    let (barrier_type, timing) = match (inst.touch_type, inst.barrier_direction) {
+        (TouchType::OneTouch, BarrierDirection::Up) => (BarrierType::UpAndOut, inst.payout_timing),
+        (TouchType::OneTouch, BarrierDirection::Down) => {
+            (BarrierType::DownAndOut, inst.payout_timing)
+        }
+        // A no-touch pays only if the barrier is never hit, so it settles at expiry.
+        (TouchType::NoTouch, BarrierDirection::Up) => {
+            (BarrierType::UpAndIn, PayoutTiming::AtExpiry)
+        }
+        (TouchType::NoTouch, BarrierDirection::Down) => {
+            (BarrierType::DownAndIn, PayoutTiming::AtExpiry)
+        }
     };
-    let lambda_sq = mu * mu + 2.0 * lambda_r / sigma2;
-    if lambda_sq < 0.0 {
-        // mu^2 + 2*r_d/sigma^2 < 0 requires r_d very negative relative to sigma^2.
-        // Surfacing this as an error beats silently returning 0 — it tells the
-        // caller their rate environment falls outside the closed-form's domain.
+    let params = BarrierParams::new(spot, inst.barrier, inst.barrier, t, r_d, r_f, sigma);
+    let value = barrier_rebate(&params, inst.payout_amount.amount(), barrier_type, timing);
+    if !value.is_finite() {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "FxTouchOption {}: lambda^2 = {lambda_sq:.6e} < 0 (r_d={r_d}, sigma={sigma}, \
-             at-hit={:?}); closed-form Rubinstein-Reiner is undefined here",
-            inst.id, payout_timing,
+            "FxTouchOption {}: closed-form touch valuation did not converge \
+             (spot={spot}, barrier={}, r_d={r_d}, r_f={r_f}, sigma={sigma}, t={t})",
+            inst.id, inst.barrier
         )));
     }
-    let lambda = lambda_sq.sqrt();
-
-    let log_hs = (barrier / spot).ln();
-    let z = log_hs / sigma_sqrt_t + lambda * sigma_sqrt_t;
-    let z_prime = log_hs / sigma_sqrt_t - lambda * sigma_sqrt_t;
-    let eta = match barrier_direction {
-        BarrierDirection::Down => 1.0,
-        BarrierDirection::Up => -1.0,
-    };
-    let s_over_h = spot / barrier;
-    let power1 = s_over_h.powf(-(mu + lambda));
-    let power2 = s_over_h.powf(-(mu - lambda));
-    let n_eta_z = finstack_quant_core::math::special_functions::norm_cdf(eta * z)?;
-    let n_eta_z_prime = finstack_quant_core::math::special_functions::norm_cdf(eta * z_prime)?;
-    let one_touch_prob = power1 * n_eta_z + power2 * n_eta_z_prime;
-
-    let df = (-r_d * t).exp();
-    Ok(match touch_type {
-        TouchType::OneTouch => match payout_timing {
-            // `one_touch_prob` already includes hit-time discounting (λ uses r_d).
-            PayoutTiming::AtHit => payout * one_touch_prob,
-            // Undiscounted touch probability, then discount the expiry payout.
-            PayoutTiming::AtExpiry => df * payout * one_touch_prob,
-        },
-        // A no-touch pays at expiry iff the barrier is never hit:
-        //   payout · e^{-r_d·T} · P(no touch) = df · payout · (1 − P_touch),
-        // with P_touch the undiscounted touch probability (λ uses lambda_r = 0).
-        TouchType::NoTouch => df * payout * (1.0 - one_touch_prob),
-    })
+    Ok(value)
 }
 
 #[cfg(test)]
@@ -462,5 +392,19 @@ mod tests {
             option.touch_type = TouchType::OneTouch;
             assert_eq!(option.value(&market, as_of).expect("miss").amount(), 0.0);
         }
+    }
+
+    #[test]
+    fn negative_rate_quadrature_converges_for_at_hit_one_touch() {
+        let mut option = build_option(date!(2025 - 01 - 01));
+        option.touch_type = TouchType::OneTouch;
+        option.barrier_direction = BarrierDirection::Down;
+        option.payout_timing = PayoutTiming::AtHit;
+        let pv = price_touch(&option, 1.20, -0.05, -0.05, 0.20, 1.0)
+            .expect("lambda^2 < 0 quadrature should succeed");
+        assert!(
+            pv.is_finite() && pv > 0.0,
+            "quadrature touch pv={pv} must be positive and finite"
+        );
     }
 }

@@ -184,8 +184,6 @@ impl FxSpot {
     ///   `settlement_date` is unset: the spot lag is counted from it on the
     ///   joint calendar. An explicit `settlement_date` ignores `as_of`.
     pub fn effective_settlement_date(&self, as_of: Date) -> Result<Date> {
-        use finstack_quant_core::dates::calendar_by_id_strict;
-
         if let Some(date) = self.settlement_date {
             Ok(date)
         } else {
@@ -200,7 +198,7 @@ impl FxSpot {
                     self.id
                 )));
             };
-            let calendar = calendar_by_id_strict(&format!("{base}+{quote}"))?;
+            let calendar = crate::market_inputs::joint_calendar(base, quote)?;
             crate::market_inputs::spot_date_from_lag(as_of, settlement_days, calendar)
         }
     }
@@ -286,6 +284,24 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxSpot {
         Ok(deps)
     }
 
+    fn fx_exposure(&self) -> Option<(Currency, Currency)> {
+        Some((self.base_currency, self.quote_currency))
+    }
+
+    fn valuation_details(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> Option<finstack_quant_valuations_core::results::ValuationDetails> {
+        Some(crate::market_inputs::fx_valuation_details(
+            market,
+            self.base_currency,
+            self.quote_currency,
+            as_of,
+            self.quoted_spot.is_some(),
+        ))
+    }
+
     #[tracing::instrument(
         name = "fx_spot.base_value",
         level = "debug",
@@ -342,20 +358,14 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
         }
 
         let flows = {
-            // Future settlement - use explicit quoted_spot if provided, otherwise query FX matrix
-            let rate = if let Some(rate) = self.quoted_spot {
-                rate
-            } else {
-                // Try market context FX matrix
-                let matrix = curves.fx_required()?;
-                let q = finstack_quant_core::money::fx::FxQuery::new(
-                    self.base_currency,
-                    self.quote_currency,
-                    as_of,
-                    finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
-                );
-                matrix.as_ref().rate(q)?.rate
-            };
+            let rate = crate::market_inputs::resolve_fx_matrix_spot(
+                curves,
+                self.base_currency,
+                self.quote_currency,
+                as_of,
+                self.quoted_spot,
+                None,
+            )?;
             let value =
                 Money::from_model_value(self.notional.amount() * rate, self.quote_currency)?;
             vec![(settle_date, value)]
@@ -786,5 +796,6 @@ mod tests {
             finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
         );
         assert!(schedule.get_flows().is_empty());
+        assert_eq!(spot.fx_exposure(), Some((Currency::EUR, Currency::USD)));
     }
 }

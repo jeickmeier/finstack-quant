@@ -514,42 +514,35 @@ impl Ndf {
             business_day_convention,
             preserve_business_eom,
         } = params;
-        use finstack_quant_core::dates::{DateExt, adjust, calendar_by_id_strict};
+        use finstack_quant_core::dates::{BusinessDayConvention, DateExt, adjust};
+
+        if fixing_offset_days < 0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "NDF fixing_offset_days must be non-negative, got {fixing_offset_days}"
+            )));
+        }
+        let offset = i32::try_from(fixing_offset_days).map_err(|_| {
+            finstack_quant_core::Error::Validation(format!(
+                "NDF fixing_offset_days magnitude too large: {fixing_offset_days}"
+            ))
+        })?;
 
         // Settlement and fixing are separate dates: the maturity is the
         // settlement date from spot; the fixing steps back from it.
         let joint_cal =
-            calendar_by_id_strict(&format!("{base_calendar_id}+{settlement_calendar_id}"))?;
-        let spot_date =
-            crate::market_inputs::spot_date_from_lag(trade_date, settlement_days, joint_cal)?;
-        let maturity = finstack_quant_core::dates::fx::fx_forward_date(
-            spot_date,
+            crate::market_inputs::joint_calendar(&base_calendar_id, &settlement_calendar_id)?;
+        let (_, maturity) = crate::market_inputs::roll_fx_spot_and_maturity(
+            trade_date,
+            settlement_days,
             tenor,
+            joint_cal,
             business_day_convention,
             preserve_business_eom,
-            joint_cal,
         )?;
-        let mut fixing_unadjusted = maturity;
-        if fixing_offset_days >= 0 {
-            let mut remaining = fixing_offset_days as u32;
-            while remaining > 0 {
-                fixing_unadjusted -= time::Duration::days(1);
-                if joint_cal.is_business_day(fixing_unadjusted)? {
-                    remaining -= 1;
-                }
-            }
-        } else {
-            let n_days = i32::try_from(fixing_offset_days.unsigned_abs()).map_err(|_| {
-                finstack_quant_core::Error::Validation(format!(
-                    "NDF fixing_offset_days magnitude too large: {}",
-                    fixing_offset_days
-                ))
-            })?;
-            fixing_unadjusted = fixing_unadjusted.add_business_days(n_days, joint_cal)?;
-        }
+        let fixing_unadjusted = maturity.add_business_days(-offset, joint_cal)?;
         let fixing_date = adjust(
             fixing_unadjusted,
-            finstack_quant_core::dates::BusinessDayConvention::Preceding,
+            BusinessDayConvention::Preceding,
             joint_cal,
         )?;
 
@@ -587,78 +580,51 @@ impl Ndf {
     /// The forward rate is estimated in the same convention as `quote_convention`:
     /// - **BasePerSettlement**: Returns base per settlement (e.g., CNY/USD)
     /// - **SettlementPerBase**: Returns settlement per base (e.g., USD/CNY)
-    fn estimate_forward_rate(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
-        use finstack_quant_core::money::fx::FxQuery;
-
+    fn estimate_forward_rate(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        df_settlement_cached: Option<f64>,
+    ) -> Result<f64> {
         if let Some(rate) = self.quoted_forward {
             Self::validate_rate("quoted_forward", rate)?;
             return Ok(rate);
         }
 
-        // Determine which direction to query based on convention.
-        //
-        // The `FxProvider::rate` contract is: the returned rate `r` satisfies
-        // `amount_in_from * r = amount_in_to`, i.e. `rate(from, to)` is quoted
-        // as units of `to` per unit of `from`. To obtain "base per settlement"
-        // we must therefore query `(from = settlement, to = base)`.
+        // The `FxProvider::rate` contract returns `to` per unit of `from`.
         let (from_currency, to_currency) = match self.quote_convention {
-            NdfQuoteConvention::BasePerSettlement => {
-                // Want base per settlement -> query settlement->base.
-                (self.settlement_currency, self.base_currency)
-            }
-            NdfQuoteConvention::SettlementPerBase => {
-                // Want settlement per base -> query base->settlement.
-                (self.base_currency, self.settlement_currency)
-            }
+            NdfQuoteConvention::BasePerSettlement => (self.settlement_currency, self.base_currency),
+            NdfQuoteConvention::SettlementPerBase => (self.base_currency, self.settlement_currency),
         };
 
-        // Try to get spot rate in the appropriate convention
-        let spot = if let Some(rate) = self.quoted_spot {
-            rate
-        } else if let Some(fx) = market.fx() {
-            match (**fx).rate(FxQuery::new(
-                from_currency,
-                to_currency,
-                as_of,
-                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
-            )) {
-                Ok(fx_rate) => fx_rate.rate,
-                Err(_) => {
-                    // Try inverse and flip
-                    let inverse = (**fx).rate(FxQuery::new(
-                        to_currency,
-                        from_currency,
-                        as_of,
-                        finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
-                    ))?;
-                    1.0 / inverse.rate
-                }
-            }
-        } else {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "NDF {} requires FxMatrix or quoted_spot to estimate a forward rate",
-                self.id
-            )));
-        };
+        let missing_msg = format!(
+            "NDF {} requires FxMatrix or quoted_spot to estimate a forward rate",
+            self.id
+        );
+        let spot = crate::market_inputs::resolve_fx_matrix_spot(
+            market,
+            from_currency,
+            to_currency,
+            as_of,
+            self.quoted_spot,
+            Some(&missing_msg),
+        )?;
 
-        let settlement_disc = market.get_discount(self.domestic_discount_curve_id.as_str())?;
-        let df_settlement = settlement_disc.df_between_dates(as_of, self.maturity)?;
+        let df_settlement = match df_settlement_cached {
+            Some(df) => df,
+            None => market
+                .get_discount(self.domestic_discount_curve_id.as_str())?
+                .df_between_dates(as_of, self.maturity)?,
+        };
 
         if let Some(ref foreign_curve_id) = self.foreign_discount_curve_id {
             let foreign_disc = market.get_discount(foreign_curve_id.as_str())?;
             let df_foreign = foreign_disc.df_between_dates(as_of, self.maturity)?;
-            // Forward rate via covered interest rate parity (Hull Ch.5)
-            // For BasePerSettlement (e.g. CNY per USD): F = S × DF_settlement / DF_base
-            //   The "base" currency is the numerator (CNY), "settlement" is denominator (USD).
-            //   CIRP: F/S = DF_denominator / DF_numerator = DF_settlement / DF_base
-            // For SettlementPerBase (e.g. USD per CNY): F = S × DF_base / DF_settlement
-            //   The "settlement" currency is the numerator (USD), "base" is denominator (CNY).
-            //   CIRP: F/S = DF_denominator / DF_numerator = DF_base / DF_settlement
-            let forward = match self.quote_convention {
-                NdfQuoteConvention::BasePerSettlement => spot * df_settlement / df_foreign,
-                NdfQuoteConvention::SettlementPerBase => spot * df_foreign / df_settlement,
+            let (df_num, df_den) = match self.quote_convention {
+                NdfQuoteConvention::BasePerSettlement => (df_settlement, df_foreign),
+                NdfQuoteConvention::SettlementPerBase => (df_foreign, df_settlement),
             };
-            return Ok(forward);
+            return crate::market_inputs::cip_forward_from_dfs(spot, df_num, df_den, "Ndf");
         }
 
         Err(finstack_quant_core::Error::Validation(format!(
@@ -679,6 +645,15 @@ impl Ndf {
     }
 
     fn settlement_amount(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
+        self.settlement_amount_with_df(market, as_of, None)
+    }
+
+    fn settlement_amount_with_df(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        df_settlement_cached: Option<f64>,
+    ) -> Result<f64> {
         let observed_fixing = if let Some(fixed_rate) = self.observed_fixing {
             fixed_rate
         } else if crate::market_inputs::event_has_occurred(self.fixing_date, as_of) {
@@ -688,7 +663,7 @@ impl Ndf {
                 self.id, self.fixing_date
             )));
         } else {
-            self.estimate_forward_rate(market, as_of)?
+            self.estimate_forward_rate(market, as_of, df_settlement_cached)?
         };
         Self::validate_rate("observed_fixing", observed_fixing)?;
         // At-market NDF: the contract rate equals the market forward, so the
@@ -755,6 +730,27 @@ impl finstack_quant_valuations_core::instruments::Instrument for Ndf {
         Ok(deps)
     }
 
+    fn fx_exposure(&self) -> Option<(Currency, Currency)> {
+        Some((self.base_currency, self.settlement_currency))
+    }
+
+    fn valuation_details(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> Option<finstack_quant_valuations_core::results::ValuationDetails> {
+        let spot_overridden = self.observed_fixing.is_some()
+            || self.quoted_forward.is_some()
+            || self.quoted_spot.is_some();
+        Some(crate::market_inputs::fx_valuation_details(
+            market,
+            self.base_currency,
+            self.settlement_currency,
+            as_of,
+            spot_overridden,
+        ))
+    }
+
     #[tracing::instrument(
         name = "ndf.base_value",
         level = "debug",
@@ -775,7 +771,8 @@ impl finstack_quant_valuations_core::instruments::Instrument for Ndf {
         let settlement_disc = market.get_discount(self.domestic_discount_curve_id.as_str())?;
         let df_settlement = settlement_disc.df_between_dates(as_of, self.maturity)?;
 
-        let settlement_amount = self.settlement_amount(market, as_of)?;
+        let settlement_amount =
+            self.settlement_amount_with_df(market, as_of, Some(df_settlement))?;
 
         let pv = settlement_amount * df_settlement;
         Money::from_model_value(pv, self.settlement_currency)
@@ -1281,5 +1278,9 @@ mod tests {
             schedule.get_meta().representation,
             finstack_quant_cashflows::builder::CashflowRepresentation::Projected
         );
+        use finstack_quant_valuations_core::instruments::Instrument;
+
+        let ndf = Ndf::example().expect("example");
+        assert_eq!(ndf.fx_exposure(), Some((Currency::CNY, Currency::USD)));
     }
 }

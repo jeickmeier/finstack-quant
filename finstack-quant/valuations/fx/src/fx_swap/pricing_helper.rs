@@ -7,13 +7,8 @@ use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::money::fx::FxQuery;
 
 use super::FxSwap;
-
-/// Minimum threshold for discount factor denominators to avoid division by zero.
-/// Values below this trigger an error rather than silent fallback.
-const DF_NEAR_ZERO_THRESHOLD: f64 = 1e-12;
 
 /// Resolved market data and computed values for FX swap pricing.
 ///
@@ -31,8 +26,6 @@ pub(crate) struct FxSwapPricingContext {
     pub(crate) df_for_far: f64,
     /// Model spot rate from FX matrix (quote per base)
     pub(crate) model_spot: f64,
-    /// Model forward rate via CIP (quote per base)
-    pub(crate) model_forward: f64,
     /// Contract near rate (explicit or as-of-to-near CIP forward)
     pub(crate) contract_near_rate: f64,
     /// Contract far rate (explicit or model forward)
@@ -75,29 +68,40 @@ impl FxSwapPricingContext {
             // Near leg has settled - use 1.0 as placeholder since include_near is false
             (1.0, 1.0)
         };
-        let df_dom_far = domestic_disc.df_between_dates(as_of, swap.far_date)?;
-        let df_for_far = foreign_disc.df_between_dates(as_of, swap.far_date)?;
+        let (df_dom_far, df_for_far) = if include_far {
+            (
+                domestic_disc.df_between_dates(as_of, swap.far_date)?,
+                foreign_disc.df_between_dates(as_of, swap.far_date)?,
+            )
+        } else {
+            // Far leg has settled - use 1.0 as placeholder since include_far is false
+            (1.0, 1.0)
+        };
 
         // Resolve model spot from FX matrix. Explicit swap contract rates define
         // exchanged cashflows; they are not valid substitutes for market spot.
-        let model_spot = if let Some(fx) = curves.fx() {
-            (**fx)
-                .rate(FxQuery::new(
-                    swap.base_currency,
-                    swap.quote_currency,
-                    as_of,
-                    finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
-                ))?
-                .rate
-        } else {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "FxSwap {} requires FxMatrix market data for {}/{}; near_rate/far_rate are contract terms and cannot be used as synthetic model spot",
-                swap.id, swap.base_currency, swap.quote_currency
-            )));
-        };
+        let missing_msg = format!(
+            "FxSwap {} requires FxMatrix market data for {}/{}; near_rate/far_rate are contract terms and cannot be used as synthetic model spot",
+            swap.id, swap.base_currency, swap.quote_currency
+        );
+        let model_spot = crate::market_inputs::resolve_fx_matrix_spot(
+            curves,
+            swap.base_currency,
+            swap.quote_currency,
+            as_of,
+            None,
+            Some(&missing_msg),
+        )?;
 
-        let model_near = Self::calculate_cip_forward(model_spot, df_dom_near, df_for_near)?;
-        let model_forward = Self::calculate_cip_forward(model_spot, df_dom_far, df_for_far)?;
+        let model_near = crate::market_inputs::cip_forward_from_dfs(
+            model_spot,
+            df_for_near,
+            df_dom_near,
+            "FxSwap",
+        )?;
+        let model_forward = crate::market_inputs::cip_forward_from_dfs(
+            model_spot, df_for_far, df_dom_far, "FxSwap",
+        )?;
 
         let contract_near_rate = swap.near_rate.unwrap_or(model_near);
         let contract_far_rate = swap.far_rate.unwrap_or(model_forward);
@@ -110,7 +114,6 @@ impl FxSwapPricingContext {
             df_for_near,
             df_for_far,
             model_spot,
-            model_forward,
             contract_near_rate,
             contract_far_rate,
             include_near,
@@ -119,65 +122,16 @@ impl FxSwapPricingContext {
         })
     }
 
-    /// Calculate an outright forward from today's spot and date-based discount factors.
-    ///
-    /// # Arguments
-    /// * `spot` - Current FX rate in quote currency per unit of base currency.
-    /// * `df_domestic` - Quote-currency discount factor from valuation to settlement.
-    /// * `df_foreign` - Base-currency discount factor over the same date interval.
-    ///
-    /// # Errors
-    /// Returns a validation error for non-positive, non-finite, or near-zero domestic
-    /// discount factors, or a non-positive or non-finite resulting forward.
-    pub(crate) fn calculate_cip_forward(
-        spot: f64,
-        df_domestic: f64,
-        df_foreign: f64,
-    ) -> Result<f64> {
-        if !df_domestic.is_finite() || df_domestic < DF_NEAR_ZERO_THRESHOLD {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Domestic discount factor ({df_domestic}) cannot produce a finite FX forward"
-            )));
-        }
-        let forward = spot * df_foreign / df_domestic;
-        if !forward.is_finite() || forward <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "FX forward must be positive and finite, got {forward}"
-            )));
-        }
-        Ok(forward)
-    }
-
-    /// Calculate PV of the foreign leg in base currency with the given DFs.
+    /// Calculate PV of the foreign leg in base currency.
     ///
     /// Foreign leg: receive base currency at near, pay base currency at far.
-    pub(crate) fn pv_foreign_leg_base_with_dfs(&self, df_for_near: f64, df_for_far: f64) -> f64 {
+    pub(crate) fn pv_foreign_leg_base(&self) -> f64 {
         let mut pv = 0.0;
         if self.include_near {
-            pv += self.notional * df_for_near;
+            pv += self.notional * self.df_for_near;
         }
         if self.include_far {
-            pv -= self.notional * df_for_far;
-        }
-        pv
-    }
-
-    /// Calculate PV of the domestic leg in quote currency with the given rates and DFs.
-    ///
-    /// Domestic leg: pay quote currency at near, receive quote currency at far.
-    pub(crate) fn pv_domestic_leg_with_params(
-        &self,
-        near_rate: f64,
-        far_rate: f64,
-        df_dom_near: f64,
-        df_dom_far: f64,
-    ) -> f64 {
-        let mut pv = 0.0;
-        if self.include_near {
-            pv -= self.notional * near_rate * df_dom_near;
-        }
-        if self.include_far {
-            pv += self.notional * far_rate * df_dom_far;
+            pv -= self.notional * self.df_for_far;
         }
         pv
     }
@@ -186,14 +140,14 @@ impl FxSwapPricingContext {
     ///
     /// Converts foreign leg to quote currency at model spot and adds domestic leg.
     pub(crate) fn total_pv(&self) -> f64 {
-        let pv_foreign_dom =
-            self.pv_foreign_leg_base_with_dfs(self.df_for_near, self.df_for_far) * self.model_spot;
-        let pv_dom_leg = self.pv_domestic_leg_with_params(
-            self.contract_near_rate,
-            self.contract_far_rate,
-            self.df_dom_near,
-            self.df_dom_far,
-        );
+        let pv_foreign_dom = self.pv_foreign_leg_base() * self.model_spot;
+        let mut pv_dom_leg = 0.0;
+        if self.include_near {
+            pv_dom_leg -= self.notional * self.contract_near_rate * self.df_dom_near;
+        }
+        if self.include_far {
+            pv_dom_leg += self.notional * self.contract_far_rate * self.df_dom_far;
+        }
         pv_foreign_dom + pv_dom_leg
     }
 
@@ -320,7 +274,8 @@ mod tests {
         let df_for_far = 0.995;
 
         let forward =
-            FxSwapPricingContext::calculate_cip_forward(spot, df_dom_far, df_for_far).unwrap();
+            crate::market_inputs::cip_forward_from_dfs(spot, df_for_far, df_dom_far, "FxSwap")
+                .unwrap();
 
         // Forward should be at premium when r_dom > r_for
         assert!(forward > spot, "Forward should be > spot");
@@ -333,10 +288,10 @@ mod tests {
 
     #[test]
     fn test_cip_forward_rejects_zero_df() {
-        let result = FxSwapPricingContext::calculate_cip_forward(1.0, 0.0, 0.99);
+        let result = crate::market_inputs::cip_forward_from_dfs(1.0, 0.99, 0.0, "FxSwap");
         assert!(result.is_err(), "Should reject zero domestic DF");
 
-        let result = FxSwapPricingContext::calculate_cip_forward(1.0, 0.95, 0.0);
+        let result = crate::market_inputs::cip_forward_from_dfs(1.0, 0.0, 0.95, "FxSwap");
         assert!(result.is_err(), "Should reject zero foreign DF");
     }
 
@@ -441,5 +396,92 @@ mod tests {
             "total_pv must equal four-cashflow per-currency discounting: \
              total_pv={total_pv} expected={expected}"
         );
+    }
+
+    #[test]
+    fn settled_fx_swap_metrics_and_details_succeed() {
+        use finstack_quant_core::types::Attributes;
+        use finstack_quant_core::{
+            currency::Currency,
+            market_data::term_structures::DiscountCurve,
+            money::{
+                Money,
+                fx::{FxMatrix, SimpleFxProvider},
+            },
+            types::InstrumentId,
+        };
+        use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
+        use finstack_quant_valuations_core::metrics::MetricId;
+        use finstack_quant_valuations_core::results::{FxValuationDetails, ValuationDetails};
+        use std::sync::Arc;
+        use time::macros::date;
+
+        let near = date!(2025 - 01 - 05);
+        let far = date!(2025 - 06 - 05);
+        let as_of = date!(2025 - 07 - 01); // Post-settlement
+        let usd = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (1.0, (-0.04_f64).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+            .build()
+            .expect("usd");
+        let eur = DiscountCurve::builder("EUR-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (1.0, (-0.02_f64).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+            .build()
+            .expect("eur");
+        let provider = SimpleFxProvider::new();
+        provider
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
+            .expect("quote");
+        let market = MarketContext::new()
+            .try_insert(usd)
+            .expect("usd")
+            .try_insert(eur)
+            .expect("eur")
+            .insert_fx(FxMatrix::new(Arc::new(provider), None));
+
+        let swap = FxSwap::builder()
+            .id(InstrumentId::new("SETTLED-SWAP"))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .near_date(near)
+            .far_date(far)
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
+            .domestic_discount_curve_id("USD-OIS".into())
+            .foreign_discount_curve_id("EUR-OIS".into())
+            .attributes(Attributes::new())
+            .build()
+            .expect("swap");
+
+        assert_eq!(swap.fx_exposure(), Some((Currency::EUR, Currency::USD)));
+        let result = swap
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[
+                    MetricId::custom("carry_pv"),
+                    MetricId::custom("forward_points"),
+                    MetricId::Dv01Domestic,
+                    MetricId::Dv01Foreign,
+                ],
+                PricingOptions::default(),
+            )
+            .expect("settled FX swap metrics must succeed");
+        assert_eq!(result.value.amount(), 0.0);
+        for (id, &val) in &result.measures {
+            assert_eq!(val, 0.0, "settled swap metric {id:?} must be 0.0");
+        }
+        assert!(matches!(
+            result.details,
+            Some(ValuationDetails::Fx(FxValuationDetails {
+                fx_triangulated: Some(false)
+            }))
+        ));
     }
 }

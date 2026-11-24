@@ -34,7 +34,7 @@ use finstack_quant_valuations_core::instruments::ListedFutureTerms;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 #[builder(validate = FxFuture::validate)]
 pub struct FxFuture {
     /// Unique instrument identifier.
@@ -80,6 +80,8 @@ pub struct FxFuture {
     #[serde(default)]
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(FxFuture);
 
 impl FxFuture {
     /// Validate currency, price, and position invariants.
@@ -199,6 +201,15 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxFuture {
     fn includes_valuation_date_cashflows(&self) -> bool {
         true
     }
+    fn with_bumped_fx_quote(
+        &self,
+        relative: f64,
+    ) -> Option<Box<dyn finstack_quant_valuations_core::instruments::Instrument>> {
+        let mut bumped = self.clone();
+        *bumped.quoted_spot.as_mut()? *= 1.0 + relative;
+        Some(Box::new(bumped))
+    }
+
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::FxFuture,
         crate::FX
@@ -241,6 +252,20 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxFuture {
 
     fn expiry(&self) -> Option<Date> {
         Some(self.terms.settlement_date)
+    }
+
+    fn valuation_details(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> Option<finstack_quant_valuations_core::results::ValuationDetails> {
+        Some(crate::market_inputs::fx_valuation_details(
+            market,
+            self.base_currency,
+            self.quote_currency(),
+            as_of,
+            self.quoted_spot.is_some(),
+        ))
     }
 
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();
@@ -310,5 +335,37 @@ mod tests {
         assert!((fair - expected_fair).abs() < 1.0e-12);
         let expected_pnl = 2.0 * 125_000.0 * (expected_fair - 1.10);
         assert!((future.npv_raw(&market, as_of).expect("pv") - expected_pnl).abs() < 1.0e-8);
+
+        use finstack_quant_valuations_core::instruments::Instrument;
+
+        // Quoted-spot FxFuture bumps its embedded quoted_spot rather than reading FxMatrix.
+        let bumped = future
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[finstack_quant_valuations_core::metrics::MetricId::Fx01],
+                finstack_quant_valuations_core::instruments::PricingOptions::default(),
+            )
+            .expect("quoted_spot Fx01 should succeed without FxMatrix");
+        let fx01 = *bumped
+            .measures
+            .get(finstack_quant_valuations_core::metrics::MetricId::Fx01.as_str())
+            .expect("fx01");
+        let expected_fx01 = 2.0 * 125_000.0 * expected_fair * 0.01;
+        assert!((fx01 - expected_fx01).abs() < 1e-6);
+        assert!(matches!(
+            bumped.details,
+            Some(
+                finstack_quant_valuations_core::results::ValuationDetails::Fx(
+                    finstack_quant_valuations_core::results::FxValuationDetails {
+                        fx_triangulated: None
+                    }
+                )
+            )
+        ));
+
+        let mut bad = serde_json::to_value(&future).expect("serialize");
+        bad["quoted_spot"] = serde_json::json!(-1.0);
+        assert!(serde_json::from_value::<FxFuture>(bad).is_err());
     }
 }

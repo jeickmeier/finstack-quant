@@ -272,11 +272,9 @@ fn standard_quanto_metrics_are_finite() {
     }
 }
 
-// Note: a negative-`r_d` regression for the touch-option `lambda^2 < 0` error
-// path is not constructed at integration-test scope because `DiscountCurve`
-// rejects DF > 1 outright (a useful input-validation defence). The contract
-// "no silent zero on lambda^2 < 0" is pinned at the unit-test level inside
-// `fx_touch_option/pricer.rs` via direct `price_touch` invocation.
+// Note: negative-`r_d` tests for the touch-option `lambda^2 < 0` quadrature
+// path live at unit-test scope inside `fx_touch_option/pricer.rs` via direct
+// `price_touch` invocation because `DiscountCurve` rejects DF > 1.
 
 /// Pins the vanna unit convention: vanna is reported per **vol point**
 /// (0.01 absolute vol) on the σ axis, consistent with Vega, not per unit
@@ -454,8 +452,10 @@ fn quanto_missing_curve_surfaces_as_not_found() {
     assert!(
         matches!(
             error,
-            finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound { .. })
+            finstack_quant_core::Error::Input(
+                finstack_quant_core::InputError::MissingCurve { ref requested, .. }
+            ) if requested == "MISSING-OIS"
         ),
-        "missing curve must stay NotFound, got {error:?}"
+        "missing curve must stay MissingCurve, got {error:?}"
     );
 }

@@ -2,7 +2,9 @@
 
 use super::{annualization_factor, get_historical_prices_with_dates, observation_dates};
 use crate::fx_variance_swap::FxVarianceSwap;
-use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_core::market_data::{
+    surfaces::VolSurface, term_structures::DiscountCurve, traits::Discounting,
+};
 use finstack_quant_core::{
     Result,
     dates::{Date, DayCountContext},
@@ -15,7 +17,36 @@ use finstack_quant_models::closed_form::bs_price_unchecked;
 use finstack_quant_models::types::OptionType;
 use finstack_quant_models::volatility::variance_replication::carr_madan_forward_variance;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df;
+use std::sync::Arc;
+
+struct VarianceReplicationContext {
+    spot: f64,
+    surface: Arc<VolSurface>,
+    dom: Arc<DiscountCurve>,
+    foreign: Arc<DiscountCurve>,
+}
+
+impl VarianceReplicationContext {
+    fn load(inst: &FxVarianceSwap, context: &MarketContext, as_of: Date) -> Result<Self> {
+        let dom = context.get_discount(inst.domestic_discount_curve_id.as_str())?;
+        let foreign = context.get_discount(inst.foreign_discount_curve_id.as_str())?;
+        let spot = inst.spot_rate(context, as_of)?;
+        if !spot.is_finite() || spot <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "FX variance forecast requires finite positive spot".into(),
+            ));
+        }
+        let surface = context.get_surface(inst.vol_surface_id.as_str())?;
+        surface.require_quote_type(VolQuoteType::BlackLognormal)?;
+        surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
+        Ok(Self {
+            spot,
+            surface,
+            dom,
+            foreign,
+        })
+    }
+}
 
 pub(super) fn require_close_to_close_forecast(inst: &FxVarianceSwap) -> Result<()> {
     if inst.realized_var_method.requires_ohlc() {
@@ -44,14 +75,7 @@ pub(super) fn remaining_squared_returns(
     historical_prices: &[f64],
 ) -> Result<(f64, usize)> {
     require_close_to_close_forecast(inst)?;
-    let dom = context.get_discount(inst.domestic_discount_curve_id.as_str())?;
-    let foreign = context.get_discount(inst.foreign_discount_curve_id.as_str())?;
-    let spot = inst.spot_rate(context, as_of)?;
-    if !spot.is_finite() || spot <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(
-            "FX variance forecast requires finite positive spot".into(),
-        ));
-    }
+    let ctx = VarianceReplicationContext::load(inst, context, as_of)?;
     let mut total = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     let mut count = 0;
     let mut prior_boundary = None;
@@ -60,9 +84,9 @@ pub(super) fn remaining_squared_returns(
         let end = window[1];
         let start_variation = match prior_boundary {
             Some((date, variation)) if date == start => variation,
-            _ => cumulative_variation(inst, context, as_of, start)?,
+            _ => cumulative_variation_with_ctx(inst, &ctx, as_of, start)?,
         };
-        let end_variation = cumulative_variation(inst, context, as_of, end)?;
+        let end_variation = cumulative_variation_with_ctx(inst, &ctx, as_of, end)?;
         prior_boundary = Some((end, end_variation));
         let raw_variation = end_variation - start_variation;
         let tolerance = 1e-12 * end_variation.abs().max(start_variation.abs()).max(1.0);
@@ -73,13 +97,14 @@ pub(super) fn remaining_squared_returns(
             )));
         }
         let variation = raw_variation.max(0.0);
-        let carry =
-            (foreign.df_between_dates(start, end)? / dom.df_between_dates(start, end)?).ln();
+        let carry = (ctx.foreign.df_between_dates(start, end)?
+            / ctx.dom.df_between_dates(start, end)?)
+        .ln();
         let partial_return = if window[0] <= as_of {
             let last_fixing = historical_prices.last().copied().ok_or_else(|| {
                 finstack_quant_core::Error::Validation("FX variance missing latest fixing".into())
             })?;
-            (spot / last_fixing).ln()
+            (ctx.spot / last_fixing).ln()
         } else {
             0.0
         };
@@ -90,9 +115,9 @@ pub(super) fn remaining_squared_returns(
     Ok((total.get_total()?, count))
 }
 
-pub(super) fn cumulative_variation(
+fn cumulative_variation_with_ctx(
     inst: &FxVarianceSwap,
-    context: &MarketContext,
+    ctx: &VarianceReplicationContext,
     as_of: Date,
     end: Date,
 ) -> Result<f64> {
@@ -102,7 +127,18 @@ pub(super) fn cumulative_variation(
     let t = inst
         .day_count
         .year_fraction(as_of, end, DayCountContext::default())?;
-    Ok(replicated_variance_to(inst, context, as_of, end)? * t)
+    Ok(replicated_variance_with_ctx(inst, ctx, as_of, end)? * t)
+}
+
+#[cfg(test)]
+pub(super) fn cumulative_variation(
+    inst: &FxVarianceSwap,
+    context: &MarketContext,
+    as_of: Date,
+    end: Date,
+) -> Result<f64> {
+    let ctx = VarianceReplicationContext::load(inst, context, as_of)?;
+    cumulative_variation_with_ctx(inst, &ctx, as_of, end)
 }
 
 pub(crate) fn remaining_forward_variance(
@@ -122,10 +158,21 @@ pub(crate) fn remaining_forward_variance(
     Ok(annualization_factor(inst) * sum / count as f64)
 }
 
-/// Smile-replicated annualized quadratic variation from as-of to one boundary.
+#[cfg(test)]
 pub(super) fn replicated_variance_to(
     inst: &FxVarianceSwap,
     context: &MarketContext,
+    as_of: Date,
+    final_observation_date: Date,
+) -> Result<f64> {
+    let ctx = VarianceReplicationContext::load(inst, context, as_of)?;
+    replicated_variance_with_ctx(inst, &ctx, as_of, final_observation_date)
+}
+
+/// Smile-replicated annualized quadratic variation from as-of to one boundary.
+fn replicated_variance_with_ctx(
+    inst: &FxVarianceSwap,
+    ctx: &VarianceReplicationContext,
     as_of: Date,
     final_observation_date: Date,
 ) -> Result<f64> {
@@ -136,36 +183,21 @@ pub(super) fn replicated_variance_to(
         return Ok(0.0);
     }
 
-    let spot = inst.spot_rate(context, as_of)?;
-    let surface = context.get_surface(inst.vol_surface_id.as_str())?;
-    surface.require_quote_type(VolQuoteType::BlackLognormal)?;
-    surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
-    let dom = context.get_discount(inst.domestic_discount_curve_id.as_str())?;
-    let for_curve = context.get_discount(inst.foreign_discount_curve_id.as_str())?;
-    // Date-based discount factors: `df_between_dates(as_of, maturity)` resolves the
-    // year fraction on the curve's own time axis as a ratio `df(to)/df(from)`, so it
-    // correctly represents the forward DF over `[as_of, maturity]` regardless of
-    // where `as_of` sits relative to the curve's `base_date`.
-    //
-    // The previous code called `curve.df(yf(as_of, maturity))`, which looks up the
-    // *spot* DF at `yf(as_of, maturity)` years from the curve's `base_date` — i.e.
-    // the DF from `base_date` to roughly `base_date + yf(as_of, mat)`, not from
-    // `as_of` to `mat`.  For a non-flat term structure (or any `as_of != base_date`)
-    // this gives the wrong rate and therefore the wrong GK forward.  The terminal-PV
-    // discount in this same function was already corrected to use `df_between_dates`
-    // (see lines 66, 83); this aligns the forward-recovery path with that fix.
-    let df_dom = dom.df_between_dates(as_of, final_observation_date)?;
-    let df_for = for_curve.df_between_dates(as_of, final_observation_date)?;
-
-    let r_d = zero_rate_from_df(df_dom, t, "FxVarianceSwap domestic discount")?;
-    let r_f = zero_rate_from_df(df_for, t, "FxVarianceSwap foreign discount")?;
-    let fwd = spot * ((r_d - r_f) * t).exp();
-    let strikes = surface.secondary_values();
+    let (_, r_d, _, r_f) = crate::market_inputs::discount_rates_for_curves(
+        ctx.dom.as_ref(),
+        ctx.foreign.as_ref(),
+        as_of,
+        final_observation_date,
+        t,
+        "FxVarianceSwap",
+    )?;
+    let fwd = ctx.spot * ((r_d - r_f) * t).exp();
+    let strikes = ctx.surface.secondary_values();
     let vol_fn = |t_exp: f64, k: f64| {
-        finstack_quant_models::volatility::get_surface_vol_clamped(&surface, t_exp, k)
+        finstack_quant_models::volatility::get_surface_vol_clamped(&ctx.surface, t_exp, k)
     };
     let bs_fn = |k: f64, v: f64, opt: OptionType| -> f64 {
-        bs_price_unchecked(spot, k, r_d, r_f, v, t, opt)
+        bs_price_unchecked(ctx.spot, k, r_d, r_f, v, t, opt)
     };
     carr_madan_forward_variance(strikes, fwd, r_d, t, vol_fn, bs_fn).ok_or_else(|| {
         finstack_quant_core::Error::Calibration {

@@ -57,7 +57,12 @@ fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
     );
     registry.register(crate::fx_barrier_option::pricer::FxBarrierOptionMcPricer::default())?;
     registry.register(crate::fx_barrier_option::pricer::FxBarrierOptionAnalyticalPricer)?;
-    registry.register(crate::quanto_option::pricer::QuantoOptionAnalyticalPricer)?;
+    register_generic!(
+        registry,
+        InstrumentType::QuantoOption,
+        crate::quanto_option::QuantoOption,
+        ModelKey::QuantoBS
+    );
     Ok(())
 }
 

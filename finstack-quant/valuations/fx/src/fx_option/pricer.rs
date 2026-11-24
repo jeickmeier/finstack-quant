@@ -77,7 +77,7 @@ pub(crate) fn compute_pv(inst: &FxOption, curves: &MarketContext, as_of: Date) -
         let intrinsic = inst
             .option_type
             .intrinsic(spot * df_foreign / df_domestic, inst.strike);
-        return Money::new(
+        return Money::from_model_value(
             intrinsic * df_domestic * signed_notional,
             inst.quote_currency,
         );
@@ -88,11 +88,11 @@ pub(crate) fn compute_pv(inst: &FxOption, curves: &MarketContext, as_of: Date) -
             OptionType::Call => spot * (-r_f * t).exp(),
             OptionType::Put => 0.0,
         };
-        return Money::new(unit_price * signed_notional, inst.quote_currency);
+        return Money::from_model_value(unit_price * signed_notional, inst.quote_currency);
     }
 
     let price = bs_price_unchecked(spot, inst.strike, r_d, r_f, sigma, t, inst.option_type);
-    Money::new(price * signed_notional, inst.quote_currency)
+    Money::from_model_value(price * signed_notional, inst.quote_currency)
 }
 
 pub(crate) fn input_request<'a>(
@@ -751,5 +751,41 @@ mod delegation_tests {
         };
         let pv_override = compute_pv(&override_opt, &market_ok, as_of).expect("override pv");
         assert!((pv_bridged.amount() - pv_override.amount()).abs() < 1e-10);
+    }
+
+    #[test]
+    fn deep_otm_pv_flushes_subnormal_without_conversion_overflow() {
+        use crate::fx_option::FxOptionDelivery;
+        use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+
+        let as_of = date!(2025 - 01 - 01);
+        let expiry = date!(2025 - 02 - 01);
+        let option = FxOption::builder()
+            .spot_basis(crate::FxSpotBasis::Cash)
+            .delivery(FxOptionDelivery::CashAtExpiry)
+            .id(InstrumentId::new("FXOPT-DEEP-OTM"))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .strike(10.0)
+            .option_type(OptionType::Call)
+            .delta_convention(
+                FxDeltaConvention::new(FxDeltaConventionKind::Forward, Currency::USD, "test")
+                    .expect("delta convention"),
+            )
+            .expiry(expiry)
+            .notional(Money::from((1_i64, Currency::EUR)))
+            .domestic_discount_curve_id(CurveId::new("USD-OIS"))
+            .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
+            .vol_surface_id(CurveId::new("EURUSD-VOL"))
+            .instrument_pricing_overrides(
+                InstrumentPricingOverrides::default().with_implied_volatility(0.05),
+            )
+            .attributes(Attributes::new())
+            .build()
+            .expect("deep OTM option");
+
+        let market = build_market(as_of);
+        let pv = compute_pv(&option, &market, as_of).expect("deep OTM PV should not overflow");
+        assert_eq!(pv, Money::from((0_i64, Currency::USD)));
     }
 }

@@ -145,14 +145,7 @@ pub(super) fn collect_fx_barrier_inputs(
     as_of: Date,
     spot: f64,
 ) -> finstack_quant_core::Result<FxOptionInputs> {
-    let inputs = collect_fx_option_inputs_at_spot(input_request(inst, curves, as_of), spot)?;
-    if !inputs.sigma.is_finite() || inputs.sigma < 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "FxBarrierOption volatility must be finite and non-negative, got {}",
-            inputs.sigma
-        )));
-    }
-    Ok(inputs)
+    collect_fx_option_inputs_at_spot(input_request(inst, curves, as_of), spot)
 }
 
 /// FX barrier state at a valuation date on or before expiry.

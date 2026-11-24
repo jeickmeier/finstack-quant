@@ -5,7 +5,6 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::types::{CurveId, PriceId};
 use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 
@@ -97,17 +96,7 @@ pub(crate) fn resolve_fx_spot(
         Some(spot_id) => finstack_quant_valuations_core::metrics::scalar_numeric_value(
             market.get_price(spot_id)?,
         ),
-        None => {
-            market
-                .fx_required()?
-                .rate(FxQuery::new(
-                    base_currency,
-                    quote_currency,
-                    as_of,
-                    finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
-                ))?
-                .rate
-        }
+        None => resolve_fx_matrix_spot(market, base_currency, quote_currency, as_of, None, None)?,
     };
     if !spot.is_finite() || spot <= 0.0 {
         return Err(finstack_quant_core::Error::Validation(format!(
@@ -138,6 +127,46 @@ pub(crate) fn collect_fx_option_inputs_no_vol(
     collect_fx_option_inputs_no_vol_at_spot(request, spot)
 }
 
+/// Date-based discount factors and consistent continuous zero rates on `[as_of, end]` for `t`.
+pub(crate) fn discount_rates_for_curves(
+    domestic_disc: &dyn Discounting,
+    foreign_disc: &dyn Discounting,
+    as_of: Date,
+    end: Date,
+    t: f64,
+    rate_context: &str,
+) -> finstack_quant_core::Result<(f64, f64, f64, f64)> {
+    use finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df;
+
+    let df_dom = domestic_disc.df_between_dates(as_of, end)?;
+    let df_for = foreign_disc.df_between_dates(as_of, end)?;
+    let r_dom = zero_rate_from_df(df_dom, t, &format!("{rate_context} domestic discount"))?;
+    let r_for = zero_rate_from_df(df_for, t, &format!("{rate_context} foreign discount"))?;
+    Ok((df_dom, r_dom, df_for, r_for))
+}
+
+/// Look up domestic and foreign discount curves and compute date-based DFs and zero rates.
+pub(crate) fn discount_rates_to(
+    market: &MarketContext,
+    domestic_id: &CurveId,
+    foreign_id: &CurveId,
+    as_of: Date,
+    end: Date,
+    t: f64,
+    rate_context: &str,
+) -> finstack_quant_core::Result<(f64, f64, f64, f64)> {
+    let domestic_disc = market.get_discount(domestic_id.as_str())?;
+    let foreign_disc = market.get_discount(foreign_id.as_str())?;
+    discount_rates_for_curves(
+        domestic_disc.as_ref(),
+        foreign_disc.as_ref(),
+        as_of,
+        end,
+        t,
+        rate_context,
+    )
+}
+
 fn collect_fx_option_inputs_no_vol_at_spot(
     request: FxOptionInputRequest<'_>,
     spot: f64,
@@ -165,33 +194,27 @@ fn collect_fx_option_inputs_no_vol_at_spot(
         foreign_disc.as_ref(),
         request.as_of,
     )?;
-    let df_d = domestic_disc.df_between_dates(request.as_of, request.delivery)?;
-    let df_f = foreign_disc.df_between_dates(request.as_of, request.delivery)?;
     let t = request.day_count.year_fraction(
         request.as_of,
         request.expiry,
         DayCountContext::default(),
     )?;
-    let r_domestic =
-        finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df(
-            df_d,
-            t,
-            &format!("{} domestic discount", request.rate_context),
-        )?;
-    let r_foreign =
-        finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df(
-            df_f,
-            t,
-            &format!("{} foreign discount", request.rate_context),
-        )?;
+    let (df_domestic, r_domestic, df_foreign, r_foreign) = discount_rates_for_curves(
+        domestic_disc.as_ref(),
+        foreign_disc.as_ref(),
+        request.as_of,
+        request.delivery,
+        t,
+        request.rate_context,
+    )?;
 
     Ok(FxOptionInputsNoVol {
         spot,
         r_domestic,
         r_foreign,
         t,
-        df_domestic: df_d,
-        df_foreign: df_f,
+        df_domestic,
+        df_foreign,
     })
 }
 

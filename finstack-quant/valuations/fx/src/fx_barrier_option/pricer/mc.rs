@@ -203,6 +203,8 @@ impl Pricer for FxBarrierOptionMcPricer {
             result = result.with_details(
                 finstack_quant_valuations_core::results::ValuationDetails::MonteCarlo(diagnostics),
             );
+        } else if let Some(details) = fx_barrier.valuation_details(market, as_of) {
+            result = result.with_details(details);
         }
         Ok(result)
     }

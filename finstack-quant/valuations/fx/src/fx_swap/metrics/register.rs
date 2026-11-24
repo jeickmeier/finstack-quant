@@ -47,27 +47,19 @@ pub(crate) struct CarryPv;
 impl MetricCalculator for CarryPv {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let fx_swap: &FxSwap = context.instrument_as()?;
+        if crate::market_inputs::event_has_occurred(fx_swap.far_date, context.as_of) {
+            return Ok(0.0);
+        }
         let curves = std::sync::Arc::clone(&context.curves);
         let as_of = context.as_of;
 
         // Use shared pricing context for consistent calculations
         let ctx = FxSwapPricingContext::build(fx_swap, &curves, as_of)?;
 
-        // Carry PV: model-implied near value minus model-implied far value
-        // This captures the benefit/cost of the interest rate differential
-        let term1 = if ctx.include_near {
-            ctx.notional * ctx.model_spot * ctx.df_for_near
-        } else {
-            0.0
-        };
-        let term2 = if ctx.include_far {
-            ctx.notional * ctx.model_forward * ctx.df_dom_far
-        } else {
-            0.0
-        };
-
-        let carry_pv = term1 - term2;
-        Ok(carry_pv)
+        // Since model_forward * df_dom_far == model_spot * df_for_far,
+        // Carry PV = model_spot * (notional * df_for_near - notional * df_for_far)
+        //          = pv_foreign_leg_base * model_spot.
+        Ok(ctx.pv_foreign_leg_base() * ctx.model_spot)
     }
 }
 
@@ -86,6 +78,9 @@ pub(crate) struct ForwardPoints;
 impl MetricCalculator for ForwardPoints {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let fx_swap: &FxSwap = context.instrument_as()?;
+        if crate::market_inputs::event_has_occurred(fx_swap.far_date, context.as_of) {
+            return Ok(0.0);
+        }
         let curves = std::sync::Arc::clone(&context.curves);
         let as_of = context.as_of;
 

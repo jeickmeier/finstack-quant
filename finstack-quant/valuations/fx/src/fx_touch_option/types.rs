@@ -61,7 +61,7 @@ use finstack_quant_core::types::{BarrierDirection, PayoutTiming};
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 #[builder(validate = FxTouchOption::validate)]
 pub struct FxTouchOption {
     /// Unique instrument identifier
@@ -143,6 +143,8 @@ pub struct FxTouchOption {
     /// Attributes for scenario selection and grouping
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(FxTouchOption);
 
 impl FxTouchOption {
     /// Validate FX touch option input invariants.
@@ -270,6 +272,20 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxTouchOption {
         Some(self.expiry)
     }
 
+    fn valuation_details(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> Option<finstack_quant_valuations_core::results::ValuationDetails> {
+        Some(crate::market_inputs::fx_valuation_details(
+            market,
+            self.base_currency,
+            self.quote_currency,
+            as_of,
+            false,
+        ))
+    }
+
     /// Roll the observed touch state with spot held at its `as_of` level.
     ///
     /// When the roll passes `monitoring_start_date` (or reaches expiry) and
@@ -325,13 +341,79 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for FxTou
         let mut greeks = finstack_quant_valuations_core::instruments::OptionGreeks::default();
         match request.greek {
             finstack_quant_valuations_core::instruments::OptionGreekKind::Delta => {
-                greeks.delta = self.option_delta(market, as_of, request.bumps)?
+                greeks.delta = crate::market_inputs::option_spot_delta(
+                    self,
+                    crate::market_inputs::FxSpotGreekSpec {
+                        day_count: self.day_count,
+                        expiry: self.expiry,
+                        bump_pct: request.bumps.spot_bump_decimal,
+                    },
+                    as_of,
+                    || {
+                        crate::market_inputs::resolve_fx_matrix_spot(
+                            market,
+                            self.base_currency,
+                            self.quote_currency,
+                            as_of,
+                            None,
+                            None,
+                        )
+                    },
+                    |pct| {
+                        crate::market_inputs::fx_matrix_bumped_market(
+                            market,
+                            self.base_currency,
+                            self.quote_currency,
+                            as_of,
+                            pct,
+                        )
+                    },
+                )?
             }
             finstack_quant_valuations_core::instruments::OptionGreekKind::Gamma => {
-                greeks.gamma = self.option_gamma(market, as_of, request.bumps)?
+                greeks.gamma = crate::market_inputs::option_spot_gamma(
+                    self,
+                    crate::market_inputs::FxSpotGreekSpec {
+                        day_count: self.day_count,
+                        expiry: self.expiry,
+                        bump_pct: request.bumps.spot_bump_decimal,
+                    },
+                    market,
+                    as_of,
+                    || {
+                        crate::market_inputs::resolve_fx_matrix_spot(
+                            market,
+                            self.base_currency,
+                            self.quote_currency,
+                            as_of,
+                            None,
+                            None,
+                        )
+                    },
+                    |pct| {
+                        crate::market_inputs::fx_matrix_bumped_market(
+                            market,
+                            self.base_currency,
+                            self.quote_currency,
+                            as_of,
+                            pct,
+                        )
+                    },
+                )?
             }
             finstack_quant_valuations_core::instruments::OptionGreekKind::Vega => {
-                greeks.vega = self.option_vega(market, as_of, request.bumps)?
+                greeks.vega = crate::market_inputs::option_vega(
+                    self,
+                    crate::market_inputs::FxVolGreekSpec {
+                        day_count: self.day_count,
+                        expiry: self.expiry,
+                        overrides: &self.instrument_pricing_overrides,
+                        surface_id: self.vol_surface_id.as_str(),
+                    },
+                    market,
+                    as_of,
+                    request.bumps,
+                )?
             }
             finstack_quant_valuations_core::instruments::OptionGreekKind::Rho => {
                 greeks.rho_bp = crate::market_inputs::discount_rho_greek(
@@ -358,132 +440,6 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for FxTou
             _ => {}
         }
         Ok(greeks)
-    }
-}
-impl FxTouchOption {
-    /// Quote-per-base spot read from the FX matrix, as touch pricing reads it.
-    fn matrix_spot(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<f64> {
-        Ok(market
-            .fx_required()?
-            .rate(finstack_quant_core::money::fx::FxQuery::new(
-                self.base_currency,
-                self.quote_currency,
-                as_of,
-                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
-            ))?
-            .rate)
-    }
-
-    /// Market with the FX matrix spot bumped relatively by `bump_pct`; the
-    /// base market is left untouched.
-    fn spot_bumped_market(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-        bump_pct: f64,
-    ) -> finstack_quant_core::Result<finstack_quant_core::market_data::context::MarketContext> {
-        crate::market_inputs::fx_matrix_bumped_market(
-            market,
-            self.base_currency,
-            self.quote_currency,
-            as_of,
-            bump_pct,
-        )
-    }
-
-    fn option_delta(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        if crate::market_inputs::greeks_expired(self.day_count, as_of, self.expiry)? {
-            return Ok(Some(0.0));
-        }
-
-        let current_spot = self.matrix_spot(market, as_of)?;
-        if current_spot * bumps.spot_bump_decimal <= 0.0 {
-            return Ok(Some(0.0));
-        }
-        Ok(Some(crate::market_inputs::spot_delta(
-            self,
-            as_of,
-            current_spot,
-            bumps.spot_bump_decimal,
-            |pct| self.spot_bumped_market(market, as_of, pct),
-        )?))
-    }
-    fn option_gamma(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_valuations_core::instruments::Instrument;
-
-        if crate::market_inputs::greeks_expired(self.day_count, as_of, self.expiry)? {
-            return Ok(Some(0.0));
-        }
-
-        let base_pv = self.value(market, as_of)?.amount();
-        let current_spot = self.matrix_spot(market, as_of)?;
-        Ok(Some(crate::market_inputs::spot_gamma(
-            self,
-            as_of,
-            base_pv,
-            current_spot,
-            bumps.spot_bump_decimal,
-            |pct| self.spot_bumped_market(market, as_of, pct),
-        )?))
-    }
-    fn option_vega(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_valuations_core::instruments::Instrument;
-
-        if crate::market_inputs::greeks_expired(self.day_count, as_of, self.expiry)? {
-            return Ok(Some(0.0));
-        }
-
-        if self
-            .instrument_pricing_overrides
-            .market_quotes
-            .implied_volatility
-            == Some(0.0)
-        {
-            let bump = bumps.vol_bump_decimal;
-            let (up, market_up) = finstack_quant_valuations_core::metrics::bump_active_volatility(
-                self,
-                market,
-                self.vol_surface_id.as_str(),
-                bump,
-            )?;
-            return Ok(Some(
-                (up.value(&market_up, as_of)?.amount() - self.value(market, as_of)?.amount())
-                    / (bump * finstack_quant_valuations_core::metrics::VOL_POINTS_PER_ABSOLUTE_VOL),
-            ));
-        }
-
-        let (vol_bump, (up, market_up), (down, market_down)) =
-            crate::market_inputs::active_vol_scenarios(
-                self,
-                &self.instrument_pricing_overrides,
-                market,
-                self.vol_surface_id.as_str(),
-                bumps.vol_bump_decimal,
-            )?;
-        let pv_up = up.value(&market_up, as_of)?.amount();
-        let pv_down = down.value(&market_down, as_of)?.amount();
-        let width =
-            2.0 * vol_bump * finstack_quant_valuations_core::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
-        Ok(Some((pv_up - pv_down) / width))
     }
 }
 

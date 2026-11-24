@@ -17,17 +17,15 @@ pub(crate) fn compute_pv(
     context: &MarketContext,
     as_of: Date,
 ) -> Result<Money> {
-    let settlement_date = inst.effective_settlement_date()?;
+    let obs_dates = observation_dates(inst)?;
+    let final_observation = obs_dates.last().copied().unwrap_or(inst.maturity);
+    let settlement_date = inst.settlement_date.unwrap_or(final_observation);
     if as_of > settlement_date {
         return Ok(Money::from((0_i64, inst.notional.currency())));
     }
-    inst.validate_as_of(context, as_of)?;
+    inst.validate_as_of_with_dates(context, as_of, final_observation, settlement_date)?;
 
     let dom = context.get_discount(inst.domestic_discount_curve_id.as_str())?;
-
-    // Compute observation dates once per pricing call. Each branch below would
-    // otherwise rebuild this 1-3 times via the helper functions.
-    let obs_dates = observation_dates(inst)?;
     let expected_var = expected_variance_with_dates(inst, context, as_of, &obs_dates)?;
     let df = dom.df_between_dates(as_of, settlement_date)?;
     inst.payoff(expected_var)?.checked_mul_f64(df)
@@ -68,10 +66,7 @@ pub(super) fn get_historical_prices_with_dates(
     as_of: Date,
     obs_dates: &[Date],
 ) -> Result<Vec<f64>> {
-    let close_id_owned = inst
-        .close_series_id
-        .clone()
-        .unwrap_or_else(|| inst.series_id());
+    let close_id_owned = inst.close_series_or_pair_id();
     if let Ok(series) = context.get_series(&close_id_owned) {
         let dates: Vec<Date> = obs_dates.iter().copied().filter(|&d| d <= as_of).collect();
         if !dates.is_empty() {
@@ -105,10 +100,7 @@ pub(super) fn get_historical_ohlc_with_dates(
     as_of: Date,
     obs_dates: &[Date],
 ) -> Result<OhlcVecs> {
-    let default_close = inst
-        .close_series_id
-        .clone()
-        .unwrap_or_else(|| inst.series_id());
+    let default_close = inst.close_series_or_pair_id();
 
     let method_label = inst.realized_var_method;
     let inst_id = inst.id.as_str().to_owned();
@@ -175,10 +167,7 @@ pub(super) fn partial_realized_variance_with_dates(
         let (open, high, low, close) =
             get_historical_ohlc_with_dates(inst, context, as_of, obs_dates)?;
 
-        let close_id = inst
-            .close_series_id
-            .clone()
-            .unwrap_or_else(|| inst.series_id());
+        let close_id = inst.close_series_or_pair_id();
         let anchor = preceding_close(
             inst.realized_var_method,
             inst.previous_close_date,
