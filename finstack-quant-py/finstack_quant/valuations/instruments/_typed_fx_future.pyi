@@ -406,6 +406,66 @@ class FxFuture:
         """
         ...
 
+    @property
+    def base_currency(self) -> str:
+        """Read the contract's base currency.
+
+        Returns
+        -------
+        str
+            ISO currency code in the denominator of quote currency per unit of base currency.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def domestic_discount_curve_id(self) -> str:
+        """Read the contract's domestic discount curve identifier.
+
+        Returns
+        -------
+        str
+            Market identifier of the quote-currency discount curve.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def foreign_discount_curve_id(self) -> str:
+        """Read the contract's foreign discount curve identifier.
+
+        Returns
+        -------
+        str
+            Market identifier of the base-currency discount curve.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def quoted_spot(self) -> float | None:
+        """Read the contract's explicit quoted FX spot override.
+
+        Returns
+        -------
+        float | None
+            Positive spot override in quote currency per unit of base currency, or ``None`` if resolved from market FX data.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
 class FxFutureBuilder:
     """Fluent builder for listed contracts with explicit lifecycle terms.
 

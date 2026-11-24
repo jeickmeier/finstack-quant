@@ -60,14 +60,9 @@ macro_rules! instrument_class {
 /// entry point, `toDict`, `marketDependencies`, and `price` / `metric`.
 ///
 /// `$dict` is the TypeScript type of `toDict()` (the class's generated spec
-/// type). The `unpriced` form omits `price` / `metric` for classes that
-/// already get them from another macro (the FX classes, through `fx_class!`).
+/// type).
 macro_rules! instrument_surface {
     ($ty:ident, $js:literal, $builder:ident, $dict:literal) => {
-        instrument_surface!($ty, $js, $builder, $dict, unpriced);
-        instrument_pricing!($ty, $js);
-    };
-    ($ty:ident, $js:literal, $builder:ident, $dict:literal, unpriced) => {
         #[wasm_bindgen(js_class = $js)]
         impl $ty {
             /// Create a fluent builder (mirrors the Rust `builder()`).
@@ -97,6 +92,72 @@ macro_rules! instrument_surface {
             #[wasm_bindgen(unchecked_return_type = "generated.valuations.MarketDependencies")]
             pub fn market_dependencies(&self) -> Result<JsValue, JsValue> {
                 $crate::api::valuations::typed::market_dependencies(&self.inner)
+            }
+        }
+        instrument_pricing!($ty, $js);
+    };
+}
+
+/// Expose `toBuilder()` cloning a typed instrument back into its fluent builder.
+macro_rules! to_builder_method {
+    ($(#[$doc:meta])* $ty:ident, $js:literal, $bty:ident) => {
+        #[finstack_quant_wasm_macros::plain_docs]
+        #[wasm_bindgen(js_class = $js)]
+        impl $ty {
+            $(#[$doc])*
+            #[wasm_bindgen(js_name = toBuilder)]
+            pub fn to_builder(&self) -> $bty {
+                $bty {
+                    inner: $crate::api::valuations::typed::Staged::new(self.inner.to_builder()),
+                }
+            }
+        }
+    };
+}
+
+/// Expose the complete selected-model Greek bundle (`greeks(...)`) on an option class.
+#[rustfmt::skip]
+macro_rules! option_greeks_bundle {
+    ($rust_name:ident, $js_name:literal) => {
+        #[wasm_bindgen(js_class = $js_name)]
+        impl $rust_name {
+            /// Compute every Greek that applies to this instrument as a JavaScript object.
+            /// @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+            /// @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+            /// @param extras - Optional pricing configuration and overrides accepted by `price`.
+            /// @returns Map of Greek name to value, with keys in the Rust
+            /// `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`, …);
+            /// only the Greeks that apply to the instrument are present.
+            ///
+            /// # Errors
+            ///
+            /// Throws a JavaScript exception if the instrument or market JSON,
+            /// `asOf`, or `model` is invalid; required market data is missing;
+            /// pricing fails; a returned Greek is non-finite; or the result cannot
+            /// be converted to a JavaScript value.
+            #[wasm_bindgen(unchecked_return_type = "Record<string, number>")]
+            pub fn greeks(
+                &self,
+                #[wasm_bindgen(js_name = "marketJson", unchecked_param_type = "JsonInput")]
+                market_json: JsValue,
+                #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+                #[wasm_bindgen(unchecked_optional_param_type = "string | null")] model: Option<
+                    JsValue,
+                >,
+                #[wasm_bindgen(unchecked_optional_param_type = "generated.valuations.PriceExtras | JsonInput | null")]
+                extras: Option<JsValue>,
+            ) -> Result<JsValue, JsValue> {
+                let market_json = $crate::utils::input::json_text(&market_json, "marketJson")?;
+                let as_of = $crate::utils::input::js_string(&as_of, "asOf")?;
+                let model = $crate::utils::input::js_opt_string(model.as_ref(), "model")?;
+                $crate::api::valuations::typed::option_greeks(
+                    Box::new(self.inner.clone()),
+                    &market_json,
+                    &as_of,
+                    model.as_deref(),
+                    extras.as_ref(),
+                )
             }
         }
     };

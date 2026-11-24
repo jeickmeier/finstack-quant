@@ -60,18 +60,6 @@ impl PyFxSpot {
         instrument_expiry(py, &self.inner)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_spot", "FxSpot.base_currency")]
-    #[getter]
-    fn base_currency(&self) -> String {
-        self.inner.base_currency.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_spot", "FxSpot.quote_currency")]
-    #[getter]
-    fn quote_currency(&self) -> String {
-        self.inner.quote_currency.to_string()
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_spot", "FxSpot.settlement_date")]
     #[getter]
     fn settlement_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -80,52 +68,45 @@ impl PyFxSpot {
             .map(|value| crate::bindings::date_utils::date_to_py(py, value))
             .transpose()
     }
+}
+
+crate::bindings::macros::py_getters!(PyFxSpot |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_spot", "FxSpot.base_currency")]
+    base_currency -> String = s.inner.base_currency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_spot", "FxSpot.quote_currency")]
+    quote_currency -> String = s.inner.quote_currency.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_spot", "FxSpot.settlement_days")]
-    #[getter]
-    fn settlement_days(&self) -> Option<u32> {
-        self.inner.settlement_days
-    }
+    settlement_days -> Option<u32> = s.inner.settlement_days;
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_spot", "FxSpot.quoted_spot")]
-    #[getter]
-    fn quoted_spot(&self) -> Option<f64> {
-        self.inner.quoted_spot
-    }
+    quoted_spot -> Option<f64> = s.inner.quoted_spot;
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_spot", "FxSpot.domestic_discount_curve_id")]
-    #[getter]
-    fn domestic_discount_curve_id(&self) -> Option<String> {
-        self.inner
-            .domestic_discount_curve_id
-            .as_ref()
-            .map(ToString::to_string)
-    }
+    domestic_discount_curve_id -> Option<String> = s
+        .inner
+        .domestic_discount_curve_id
+        .as_ref()
+        .map(ToString::to_string);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_spot", "FxSpot.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_spot", "FxSpot.base_calendar_id")]
-    #[getter]
-    fn base_calendar_id(&self) -> Option<String> {
-        self.inner
-            .base_calendar_id
-            .as_ref()
-            .map(ToString::to_string)
-    }
+    base_calendar_id -> Option<String> = s
+        .inner
+        .base_calendar_id
+        .as_ref()
+        .map(ToString::to_string);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_spot", "FxSpot.quote_calendar_id")]
-    #[getter]
-    fn quote_calendar_id(&self) -> Option<String> {
-        self.inner
-            .quote_calendar_id
-            .as_ref()
-            .map(ToString::to_string)
-    }
-}
+    quote_calendar_id -> Option<String> = s
+        .inner
+        .quote_calendar_id
+        .as_ref()
+        .map(ToString::to_string);
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_spot", "FxSpotBuilder")]
 #[pyclass(
@@ -237,9 +218,12 @@ impl PyFxSpotBuilder {
     }
 }
 
-/// Register the bond future and its builder.
+/// Register the FX spot and its builder.
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyFxSpot>()?;
     module.add_class::<PyFxSpotBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["FxSpot", "FxSpotBuilder"];

@@ -6,15 +6,22 @@ use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfBuilder};
 use wasm_bindgen::prelude::*;
 
-use super::fx::JsNdf;
-
-instrument_surface!(
-    JsNdf,
-    "Ndf",
-    JsNdfBuilder,
-    "generated.valuations.Ndf",
-    unpriced
+instrument_class!(
+    /// Typed WASM wrapper for the Rust FX instrument Ndf.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { valuations, type JsonInput } from "finstack-quant-wasm";
+    /// await init();
+    /// // The canonical `ndf` envelope published with the instrument schema.
+    /// const [envelope] = valuations.schema.instrumentSchema("ndf").examples as JsonInput[];
+    /// const ndf = valuations.instruments.Ndf.fromJson(envelope);
+    /// console.log(ndf.id);
+    /// ndf.free();
+    /// ```
+    JsNdf, "Ndf", Ndf
 );
+instrument_surface!(JsNdf, "Ndf", JsNdfBuilder, "generated.valuations.Ndf");
 factories!(JsNdf, "Ndf", Ndf, {
     /// Construct the native example for this instrument.
     /// @returns Validated contract with its lifecycle and market dependencies.
@@ -93,17 +100,11 @@ builder_class!(
     JsNdfBuilder, "NdfBuilder", NdfBuilder, JsNdf, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = Ndf)]
-impl JsNdf {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsNdfBuilder {
-        JsNdfBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsNdf, "Ndf", JsNdfBuilder
+);
 
 setters!(JsNdfBuilder, "NdfBuilder", {
     /// Set the stable contract identifier.

@@ -5,14 +5,33 @@ use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::fx::fx_spot::{FxSpot, FxSpotBuilder};
 use wasm_bindgen::prelude::*;
 
-use super::fx::JsFxSpot;
-
+instrument_class!(
+    /// Typed WASM wrapper for the Rust FX instrument FxSpot.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { valuations } from "finstack-quant-wasm";
+    /// await init();
+    /// const envelope = valuations.instruments.instrumentEnvelopeFromSpec("fx_spot", {
+    ///   id: "EURUSD-SPOT",
+    ///   base_currency: "EUR",
+    ///   quote_currency: "USD",
+    ///   settlement_date: "2025-01-17",
+    ///   quoted_spot: 1.1,
+    ///   notional: { amount: "1000000", currency: "EUR" },
+    ///   attributes: {},
+    /// });
+    /// const spot = valuations.instruments.FxSpot.fromJson(envelope);
+    /// console.log(JSON.parse(spot.toJson()).instrument.type);
+    /// spot.free();
+    /// ```
+    JsFxSpot, "FxSpot", FxSpot
+);
 instrument_surface!(
     JsFxSpot,
     "FxSpot",
     JsFxSpotBuilder,
-    "generated.valuations.FxSpot",
-    unpriced
+    "generated.valuations.FxSpot"
 );
 factories!(JsFxSpot, "FxSpot", FxSpot, {
     /// Construct the native example for this instrument.
@@ -74,17 +93,11 @@ builder_class!(
     JsFxSpotBuilder, "FxSpotBuilder", FxSpotBuilder, JsFxSpot, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = FxSpot)]
-impl JsFxSpot {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsFxSpotBuilder {
-        JsFxSpotBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsFxSpot, "FxSpot", JsFxSpotBuilder
+);
 
 setters!(JsFxSpotBuilder, "FxSpotBuilder", {
     /// Set the stable contract identifier.

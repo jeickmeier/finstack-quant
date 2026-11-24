@@ -86,18 +86,6 @@ impl PyQuantoOption {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.underlying_ticker")]
-    #[getter]
-    fn underlying_ticker(&self) -> String {
-        self.inner.underlying_ticker.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.strike")]
-    #[getter]
-    fn strike(&self) -> f64 {
-        self.inner.strike
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.option_type")]
     #[getter]
     fn option_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -110,93 +98,63 @@ impl PyQuantoOption {
         crate::bindings::date_utils::date_to_py(py, self.inner.expiry)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.quantity")]
-    #[getter]
-    fn quantity(&self) -> Option<f64> {
-        self.inner.quantity
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.payoff_fx_rate")]
-    #[getter]
-    fn payoff_fx_rate(&self) -> Option<f64> {
-        self.inner.payoff_fx_rate
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.base_currency")]
-    #[getter]
-    fn base_currency(&self) -> String {
-        self.inner.base_currency.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.quote_currency")]
-    #[getter]
-    fn quote_currency(&self) -> String {
-        self.inner.quote_currency.to_string()
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.correlation")]
     #[getter]
     fn correlation<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.correlation)
     }
+}
+
+crate::bindings::macros::py_getters!(PyQuantoOption |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.underlying_ticker")]
+    underlying_ticker -> String = s.inner.underlying_ticker.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.strike")]
+    strike -> f64 = s.inner.strike;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.notional")]
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.quantity")]
+    quantity -> Option<f64> = s.inner.quantity;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.payoff_fx_rate")]
+    payoff_fx_rate -> Option<f64> = s.inner.payoff_fx_rate;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.base_currency")]
+    base_currency -> String = s.inner.base_currency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.quote_currency")]
+    quote_currency -> String = s.inner.quote_currency.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.day_count")]
-    #[getter]
-    fn day_count(&self) -> PyDayCount {
-        PyDayCount::from_inner(self.inner.day_count)
-    }
+    day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.domestic_discount_curve_id")]
-    #[getter]
-    fn domestic_discount_curve_id(&self) -> String {
-        self.inner.domestic_discount_curve_id.to_string()
-    }
+    domestic_discount_curve_id -> String = s.inner.domestic_discount_curve_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.foreign_discount_curve_id")]
-    #[getter]
-    fn foreign_discount_curve_id(&self) -> String {
-        self.inner.foreign_discount_curve_id.to_string()
-    }
+    foreign_discount_curve_id -> String = s.inner.foreign_discount_curve_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.spot_id")]
-    #[getter]
-    fn spot_id(&self) -> String {
-        self.inner.spot_id.to_string()
-    }
+    spot_id -> String = s.inner.spot_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.vol_surface_id")]
-    #[getter]
-    fn vol_surface_id(&self) -> String {
-        self.inner.vol_surface_id.to_string()
-    }
+    vol_surface_id -> String = s.inner.vol_surface_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.div_yield_id")]
-    #[getter]
-    fn div_yield_id(&self) -> Option<String> {
-        self.inner.div_yield_id.as_ref().map(ToString::to_string)
-    }
+    div_yield_id -> Option<String> = s.inner.div_yield_id.as_ref().map(ToString::to_string);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.fx_spot_id")]
-    #[getter]
-    fn fx_spot_id(&self) -> Option<String> {
-        self.inner.fx_spot_id.as_ref().map(ToString::to_string)
-    }
+    fx_spot_id -> Option<String> = s.inner.fx_spot_id.as_ref().map(ToString::to_string);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.fx_vol_surface_id")]
-    #[getter]
-    fn fx_vol_surface_id(&self) -> Option<String> {
-        self.inner
-            .fx_vol_surface_id
-            .as_ref()
-            .map(ToString::to_string)
-    }
-}
+    fx_vol_surface_id -> Option<String> = s
+        .inner
+        .fx_vol_surface_id
+        .as_ref()
+        .map(ToString::to_string);
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOptionBuilder")]
 #[pyclass(
@@ -381,9 +339,12 @@ impl PyQuantoOptionBuilder {
     }
 }
 
-/// Register the bond future and its builder.
+/// Register the quanto option and its builder.
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyQuantoOption>()?;
     module.add_class::<PyQuantoOptionBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["QuantoOption", "QuantoOptionBuilder"];

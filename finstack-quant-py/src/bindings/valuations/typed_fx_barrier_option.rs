@@ -86,24 +86,6 @@ impl PyFxBarrierOption {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.strike")]
-    #[getter]
-    fn strike(&self) -> f64 {
-        self.inner.strike
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.barrier")]
-    #[getter]
-    fn barrier(&self) -> f64 {
-        self.inner.barrier
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.rebate")]
-    #[getter]
-    fn rebate(&self) -> Option<PyMoney> {
-        self.inner.rebate.map(PyMoney::from_inner)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.rebate_timing")]
     #[getter]
     fn rebate_timing<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -137,66 +119,50 @@ impl PyFxBarrierOption {
             .transpose()
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.observed_barrier_breached")]
-    #[getter]
-    fn observed_barrier_breached(&self) -> Option<bool> {
-        self.inner.observed_barrier_breached
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.base_currency")]
-    #[getter]
-    fn base_currency(&self) -> String {
-        self.inner.base_currency.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.quote_currency")]
-    #[getter]
-    fn quote_currency(&self) -> String {
-        self.inner.quote_currency.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.day_count")]
-    #[getter]
-    fn day_count(&self) -> PyDayCount {
-        PyDayCount::from_inner(self.inner.day_count)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.monitoring")]
     #[getter]
     fn monitoring<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.monitoring)
     }
+}
+
+crate::bindings::macros::py_getters!(PyFxBarrierOption |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.strike")]
+    strike -> f64 = s.inner.strike;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.barrier")]
+    barrier -> f64 = s.inner.barrier;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.rebate")]
+    rebate -> Option<PyMoney> = s.inner.rebate.map(PyMoney::from_inner);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.observed_barrier_breached")]
+    observed_barrier_breached -> Option<bool> = s.inner.observed_barrier_breached;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.notional")]
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.base_currency")]
+    base_currency -> String = s.inner.base_currency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.quote_currency")]
+    quote_currency -> String = s.inner.quote_currency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.day_count")]
+    day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.domestic_discount_curve_id")]
-    #[getter]
-    fn domestic_discount_curve_id(&self) -> String {
-        self.inner.domestic_discount_curve_id.to_string()
-    }
+    domestic_discount_curve_id -> String = s.inner.domestic_discount_curve_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.foreign_discount_curve_id")]
-    #[getter]
-    fn foreign_discount_curve_id(&self) -> String {
-        self.inner.foreign_discount_curve_id.to_string()
-    }
+    foreign_discount_curve_id -> String = s.inner.foreign_discount_curve_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.fx_spot_id")]
-    #[getter]
-    fn fx_spot_id(&self) -> Option<String> {
-        self.inner.fx_spot_id.as_ref().map(ToString::to_string)
-    }
+    fx_spot_id -> Option<String> = s.inner.fx_spot_id.as_ref().map(ToString::to_string);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.vol_surface_id")]
-    #[getter]
-    fn vol_surface_id(&self) -> String {
-        self.inner.vol_surface_id.to_string()
-    }
-}
+    vol_surface_id -> String = s.inner.vol_surface_id.to_string();
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOptionBuilder")]
 #[pyclass(
@@ -385,9 +351,12 @@ impl PyFxBarrierOptionBuilder {
     }
 }
 
-/// Register the bond future and its builder.
+/// Register the FX barrier option and its builder.
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyFxBarrierOption>()?;
     module.add_class::<PyFxBarrierOptionBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["FxBarrierOption", "FxBarrierOptionBuilder"];

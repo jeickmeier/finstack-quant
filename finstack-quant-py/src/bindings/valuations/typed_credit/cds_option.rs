@@ -3,14 +3,13 @@
 
 use pyo3::prelude::*;
 
-use crate::bindings::core::money::{PyMoney, decimal_from_py, decimal_to_py, is_python_decimal};
+use crate::bindings::core::money::{PyMoney, decimal_to_py};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::json_bridge::serde_to_py;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionStrike;
 use finstack_quant_valuations::market::conventions::CdsConvention;
-use rust_decimal::Decimal;
 
 use super::super::convert::enum_from_str;
 use super::super::convert::{
@@ -183,19 +182,6 @@ crate::bindings::macros::py_getters!(PyCdsOption |s| {
 pub struct PyCdsOptionBuilder {
     inner: Option<CdsOptionBuilder>,
     fields: Vec<(&'static str, String)>,
-}
-
-/// Parse a ``decimal.Decimal | str | int | float | Bps | Rate`` in basis points.
-fn decimal_arg(value: &Bound<'_, PyAny>) -> PyResult<Decimal> {
-    if is_python_decimal(value)? {
-        return decimal_from_py(value);
-    }
-    if value.is_instance_of::<pyo3::types::PyString>() {
-        let text: String = value.extract()?;
-        return finstack_quant_core::decimal::parse_decimal(&text).map_err(core_to_py);
-    }
-    let bp = crate::bindings::extract::extract_basis_points(value, "coupon_bp")?;
-    super::super::convert::decimal_from_f64(bp, "coupon_bp")
 }
 
 #[pymethods]
@@ -401,7 +387,7 @@ impl PyCdsOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let convention = enum_from_str::<CdsConvention>(value, "convention")?;
+        let convention = enum_from_str::<CdsConvention>(value, "underlying_convention")?;
         builder_set!(
             slf,
             underlying_convention,
@@ -472,7 +458,7 @@ impl PyCdsOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let coupon = decimal_arg(value)?;
+        let coupon = crate::bindings::cashflows::builder::specs::decimal_bps_from_any(value)?;
         builder_set!(slf, coupon_bp, coupon.to_string(), |b: CdsOptionBuilder| b
             .coupon_bp(coupon))
     }

@@ -86,24 +86,6 @@ impl PyFxDigitalOption {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_digital_option", "FxDigitalOption.base_currency")]
-    #[getter]
-    fn base_currency(&self) -> String {
-        self.inner.base_currency.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_digital_option", "FxDigitalOption.quote_currency")]
-    #[getter]
-    fn quote_currency(&self) -> String {
-        self.inner.quote_currency.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_digital_option", "FxDigitalOption.strike")]
-    #[getter]
-    fn strike(&self) -> f64 {
-        self.inner.strike
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_digital_option", "FxDigitalOption.option_type")]
     #[getter]
     fn option_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -116,48 +98,41 @@ impl PyFxDigitalOption {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.payout_type)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_digital_option", "FxDigitalOption.payout_amount")]
-    #[getter]
-    fn payout_amount(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.payout_amount)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_digital_option", "FxDigitalOption.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::date_utils::date_to_py(py, self.inner.expiry)
     }
+}
+
+crate::bindings::macros::py_getters!(PyFxDigitalOption |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_digital_option", "FxDigitalOption.base_currency")]
+    base_currency -> String = s.inner.base_currency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_digital_option", "FxDigitalOption.quote_currency")]
+    quote_currency -> String = s.inner.quote_currency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_digital_option", "FxDigitalOption.strike")]
+    strike -> f64 = s.inner.strike;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_digital_option", "FxDigitalOption.payout_amount")]
+    payout_amount -> PyMoney = PyMoney::from_inner(s.inner.payout_amount);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_digital_option", "FxDigitalOption.day_count")]
-    #[getter]
-    fn day_count(&self) -> PyDayCount {
-        PyDayCount::from_inner(self.inner.day_count)
-    }
+    day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_digital_option", "FxDigitalOption.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_digital_option", "FxDigitalOption.domestic_discount_curve_id")]
-    #[getter]
-    fn domestic_discount_curve_id(&self) -> String {
-        self.inner.domestic_discount_curve_id.to_string()
-    }
+    domestic_discount_curve_id -> String = s.inner.domestic_discount_curve_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_digital_option", "FxDigitalOption.foreign_discount_curve_id")]
-    #[getter]
-    fn foreign_discount_curve_id(&self) -> String {
-        self.inner.foreign_discount_curve_id.to_string()
-    }
+    foreign_discount_curve_id -> String = s.inner.foreign_discount_curve_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_digital_option", "FxDigitalOption.vol_surface_id")]
-    #[getter]
-    fn vol_surface_id(&self) -> String {
-        self.inner.vol_surface_id.to_string()
-    }
-}
+    vol_surface_id -> String = s.inner.vol_surface_id.to_string();
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_digital_option", "FxDigitalOptionBuilder")]
 #[pyclass(
@@ -293,9 +268,12 @@ impl PyFxDigitalOptionBuilder {
     }
 }
 
-/// Register the bond future and its builder.
+/// Register the FX digital option and its builder.
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyFxDigitalOption>()?;
     module.add_class::<PyFxDigitalOptionBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["FxDigitalOption", "FxDigitalOptionBuilder"];

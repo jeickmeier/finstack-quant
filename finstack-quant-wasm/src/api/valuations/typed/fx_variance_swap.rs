@@ -8,14 +8,26 @@ use finstack_quant_valuations::instruments::fx::fx_variance_swap::{
 };
 use wasm_bindgen::prelude::*;
 
-use super::fx::JsFxVarianceSwap;
-
+instrument_class!(
+    /// Typed WASM wrapper for the Rust FX instrument FxVarianceSwap.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { valuations, type JsonInput } from "finstack-quant-wasm";
+    /// await init();
+    /// // The canonical `fx_variance_swap` envelope published with the instrument schema.
+    /// const [envelope] = valuations.schema.instrumentSchema("fx_variance_swap").examples as JsonInput[];
+    /// const swap = valuations.instruments.FxVarianceSwap.fromJson(envelope);
+    /// console.log(swap.id);
+    /// swap.free();
+    /// ```
+    JsFxVarianceSwap, "FxVarianceSwap", FxVarianceSwap
+);
 instrument_surface!(
     JsFxVarianceSwap,
     "FxVarianceSwap",
     JsFxVarianceSwapBuilder,
-    "generated.valuations.FxVarianceSwap",
-    unpriced
+    "generated.valuations.FxVarianceSwap"
 );
 factories!(JsFxVarianceSwap, "FxVarianceSwap", FxVarianceSwap, {
     /// Construct the native example for this instrument.
@@ -125,17 +137,11 @@ builder_class!(
     JsFxVarianceSwapBuilder, "FxVarianceSwapBuilder", FxVarianceSwapBuilder, JsFxVarianceSwap, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = FxVarianceSwap)]
-impl JsFxVarianceSwap {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsFxVarianceSwapBuilder {
-        JsFxVarianceSwapBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsFxVarianceSwap, "FxVarianceSwap", JsFxVarianceSwapBuilder
+);
 
 setters!(JsFxVarianceSwapBuilder, "FxVarianceSwapBuilder", {
     /// Set the stable contract identifier.

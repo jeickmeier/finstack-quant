@@ -1871,6 +1871,7 @@ export default [
   {
     "path": "#/$defs/d_acd6c3d775d926e416ed/properties/realized_loss",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/CdsTranche/properties/realized_loss",
+    "default": 0,
     "description": "Realized (settled) loss on the reference pool as a decimal fraction of\nthe original portfolio notional, in `[0, 1]`.",
     "format": "double"
   },

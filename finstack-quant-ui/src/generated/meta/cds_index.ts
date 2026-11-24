@@ -1016,6 +1016,7 @@ export default [
   {
     "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/constituents",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/constituents",
+    "default": [],
     "description": "Optional list of constituents when using `IndexPricing::Constituents`"
   },
   {

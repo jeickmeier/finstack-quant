@@ -61,17 +61,11 @@ builder_class!(
     JsFxFutureOptionBuilder, "FxFutureOptionBuilder", FxFutureOptionBuilder, JsFxFutureOption, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = FxFutureOption)]
-impl JsFxFutureOption {
+to_builder_method!(
     /// Seed an independent builder from the complete option contract.
     /// @returns Builder carrying exercise, settlement, mark and pricing inputs.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsFxFutureOptionBuilder {
-        JsFxFutureOptionBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsFxFutureOption, "FxFutureOption", JsFxFutureOptionBuilder
+);
 
 setters!(JsFxFutureOptionBuilder, "FxFutureOptionBuilder", {
     /// Set the stable contract identifier.

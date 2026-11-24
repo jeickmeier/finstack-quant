@@ -61,15 +61,14 @@ impl PyFxFutureOption {
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         instrument_expiry(py, &self.inner)
     }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_future_option", "FxFutureOption.terms")]
-    #[getter]
-    fn terms(&self) -> PyFutureOptionTerms {
-        PyFutureOptionTerms {
-            inner: self.inner.terms.clone(),
-        }
-    }
 }
+
+crate::bindings::macros::py_getters!(PyFxFutureOption |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_future_option", "FxFutureOption.terms")]
+    terms -> PyFutureOptionTerms = PyFutureOptionTerms {
+        inner: s.inner.terms.clone(),
+    };
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_future_option", "FxFutureOptionBuilder")]
 #[pyclass(
@@ -108,9 +107,12 @@ impl PyFxFutureOptionBuilder {
     }
 }
 
-/// Register the bond future and its builder.
+/// Register the FX future option and its builder.
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyFxFutureOption>()?;
     module.add_class::<PyFxFutureOptionBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["FxFutureOption", "FxFutureOptionBuilder"];

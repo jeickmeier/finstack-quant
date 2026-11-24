@@ -238,8 +238,7 @@ instrument_envelope_methods!(
     CdsIndex,
     builder = PyCdsIndexBuilder("CdsIndexBuilder", fields),
     seed =
-        finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex::builder()
-            .constituents(Vec::new()),
+        finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex::builder(),
 );
 instrument_pricing_methods!(
     PyCdsIndex,

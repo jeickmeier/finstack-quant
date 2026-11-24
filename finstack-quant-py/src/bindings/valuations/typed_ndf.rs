@@ -61,18 +61,6 @@ impl PyNdf {
         instrument_expiry(py, &self.inner)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.base_currency")]
-    #[getter]
-    fn base_currency(&self) -> String {
-        self.inner.base_currency.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.settlement_currency")]
-    #[getter]
-    fn settlement_currency(&self) -> String {
-        self.inner.settlement_currency.to_string()
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.fixing_date")]
     #[getter]
     fn fixing_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -85,43 +73,10 @@ impl PyNdf {
         crate::bindings::date_utils::date_to_py(py, self.inner.maturity)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.contract_rate")]
-    #[getter]
-    fn contract_rate(&self) -> Option<f64> {
-        self.inner.contract_rate
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.domestic_discount_curve_id")]
-    #[getter]
-    fn domestic_discount_curve_id(&self) -> String {
-        self.inner.domestic_discount_curve_id.to_string()
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.quote_convention")]
     #[getter]
     fn quote_convention<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.quote_convention)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.foreign_discount_curve_id")]
-    #[getter]
-    fn foreign_discount_curve_id(&self) -> Option<String> {
-        self.inner
-            .foreign_discount_curve_id
-            .as_ref()
-            .map(ToString::to_string)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.observed_fixing")]
-    #[getter]
-    fn observed_fixing(&self) -> Option<f64> {
-        self.inner.observed_fixing
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.fixing_source")]
@@ -129,37 +84,54 @@ impl PyNdf {
     fn fixing_source<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.fixing_source)
     }
+}
+
+crate::bindings::macros::py_getters!(PyNdf |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.base_currency")]
+    base_currency -> String = s.inner.base_currency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.settlement_currency")]
+    settlement_currency -> String = s.inner.settlement_currency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.notional")]
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.contract_rate")]
+    contract_rate -> Option<f64> = s.inner.contract_rate;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.domestic_discount_curve_id")]
+    domestic_discount_curve_id -> String = s.inner.domestic_discount_curve_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.foreign_discount_curve_id")]
+    foreign_discount_curve_id -> Option<String> = s
+        .inner
+        .foreign_discount_curve_id
+        .as_ref()
+        .map(ToString::to_string);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.observed_fixing")]
+    observed_fixing -> Option<f64> = s.inner.observed_fixing;
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.quoted_spot")]
-    #[getter]
-    fn quoted_spot(&self) -> Option<f64> {
-        self.inner.quoted_spot
-    }
+    quoted_spot -> Option<f64> = s.inner.quoted_spot;
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.quoted_forward")]
-    #[getter]
-    fn quoted_forward(&self) -> Option<f64> {
-        self.inner.quoted_forward
-    }
+    quoted_forward -> Option<f64> = s.inner.quoted_forward;
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.base_calendar_id")]
-    #[getter]
-    fn base_calendar_id(&self) -> Option<String> {
-        self.inner
-            .base_calendar_id
-            .as_ref()
-            .map(ToString::to_string)
-    }
+    base_calendar_id -> Option<String> = s
+        .inner
+        .base_calendar_id
+        .as_ref()
+        .map(ToString::to_string);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.settlement_calendar_id")]
-    #[getter]
-    fn settlement_calendar_id(&self) -> Option<String> {
-        self.inner
-            .settlement_calendar_id
-            .as_ref()
-            .map(ToString::to_string)
-    }
-}
+    settlement_calendar_id -> Option<String> = s
+        .inner
+        .settlement_calendar_id
+        .as_ref()
+        .map(ToString::to_string);
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "NdfBuilder")]
 #[pyclass(
@@ -320,9 +292,12 @@ impl PyNdfBuilder {
     }
 }
 
-/// Register the bond future and its builder.
+/// Register the NDF and its builder.
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyNdf>()?;
     module.add_class::<PyNdfBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["Ndf", "NdfBuilder"];

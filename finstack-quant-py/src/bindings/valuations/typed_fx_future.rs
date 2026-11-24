@@ -1,9 +1,8 @@
 //! A listed currency future with quote-currency variation margin.
 
-use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
-use finstack_quant_core::types::InstrumentId;
+use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fx::fx_future::{FxFuture, FxFutureBuilder};
 use pyo3::prelude::*;
 
@@ -60,15 +59,26 @@ impl PyFxFuture {
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         instrument_expiry(py, &self.inner)
     }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_future", "FxFuture.terms")]
-    #[getter]
-    fn terms(&self) -> PyListedFutureTerms {
-        PyListedFutureTerms {
-            inner: self.inner.terms.clone(),
-        }
-    }
 }
+
+crate::bindings::macros::py_getters!(PyFxFuture |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_future", "FxFuture.terms")]
+    terms -> PyListedFutureTerms = PyListedFutureTerms {
+        inner: s.inner.terms.clone(),
+    };
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_future", "FxFuture.base_currency")]
+    base_currency -> String = s.inner.base_currency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_future", "FxFuture.domestic_discount_curve_id")]
+    domestic_discount_curve_id -> String = s.inner.domestic_discount_curve_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_future", "FxFuture.foreign_discount_curve_id")]
+    foreign_discount_curve_id -> String = s.inner.foreign_discount_curve_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_future", "FxFuture.quoted_spot")]
+    quoted_spot -> Option<f64> = s.inner.quoted_spot;
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_future", "FxFutureBuilder")]
 #[pyclass(
@@ -102,16 +112,16 @@ impl PyFxFutureBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let value = py_to_serde(value.py(), value, "base_currency")?;
+        let value = crate::bindings::core::currency::extract_currency(value)?;
         builder_set!(slf, |b: FxFutureBuilder| b.base_currency(value))
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_future", "FxFutureBuilder.domestic_discount_curve_id")]
     fn domestic_discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
-        value: &Bound<'_, PyAny>,
+        value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let value = py_to_serde(value.py(), value, "domestic_discount_curve_id")?;
+        let value = CurveId::new(value);
         builder_set!(slf, |b: FxFutureBuilder| b
             .domestic_discount_curve_id(value))
     }
@@ -119,18 +129,17 @@ impl PyFxFutureBuilder {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_future", "FxFutureBuilder.foreign_discount_curve_id")]
     fn foreign_discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
-        value: &Bound<'_, PyAny>,
+        value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let value = py_to_serde(value.py(), value, "foreign_discount_curve_id")?;
+        let value = CurveId::new(value);
         builder_set!(slf, |b: FxFutureBuilder| b.foreign_discount_curve_id(value))
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_future", "FxFutureBuilder.quoted_spot")]
     fn quoted_spot<'py>(
         mut slf: PyRefMut<'py, Self>,
-        value: &Bound<'_, PyAny>,
+        value: Option<f64>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let value = py_to_serde(value.py(), value, "quoted_spot")?;
         builder_set!(slf, |b: FxFutureBuilder| b.quoted_spot_opt(value))
     }
 
@@ -144,9 +153,12 @@ impl PyFxFutureBuilder {
     }
 }
 
-/// Register the bond future and its builder.
+/// Register the FX future and its builder.
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyFxFuture>()?;
     module.add_class::<PyFxFutureBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["FxFuture", "FxFutureBuilder"];

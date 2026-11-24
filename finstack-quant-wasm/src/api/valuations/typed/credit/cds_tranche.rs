@@ -82,7 +82,7 @@ getters!(JsCdsTranche, "CdsTranche", |i| {
         start_date as startDate: "string | null" => opt_date(i.start_date),
         /// Realized portfolio loss so far.
         /// @returns Fraction of the original portfolio notional.
-        realized_loss as realizedLoss: "generated.valuations.CdsTranche['realized_loss']" => json(i.realized_loss),
+        realized_loss as realizedLoss: "NonNullable<generated.valuations.CdsTranche['realized_loss']>" => json(i.realized_loss),
         /// Contractual date regime of the coupon schedule.
         /// @returns `"standard"` for the CDS roll dates (20th of Mar/Jun/Sep/Dec); `"bespoke"` for a `frequency`/`stub` schedule.
         date_regime as dateRegime: "generated.valuations.CdsTranche['date_regime']" => json(i.date_regime),

@@ -91,7 +91,7 @@ getters!(JsCdsOption, "CdsOption", |i| {
         realized_loss as realizedLoss: "number" => json(i.realized_loss),
         /// Running coupon of the underlying CDS in basis points.
         /// @returns The coupon, or `null` when the strike spread is the coupon.
-        coupon_bp as couponBp: "number | null" => json(i.coupon_bp.and_then(|d| rust_decimal::prelude::ToPrimitive::to_f64(&d))),
+        coupon_bp as couponBp: "number | null" => opt_dec(i.coupon_bp),
 });
 
 common_getters!(JsCdsOption, "CdsOption");
@@ -106,10 +106,10 @@ factories!(JsCdsOption, "CdsOption", finstack_quant_valuations::instruments::cre
 builder_class!(
     /// Fluent builder for `CdsOption`; one setter per Rust `FinancialBuilder` setter.
     ///
-    /// Required: `id`, `strike`, `optionType`, `exerciseStyle`, `expiry`,
+    /// Required: `id`, `strike`, `optionType`, `expiry`,
     /// `underlyingMaturity`, `notional`, `settlement`, `recoveryRate`,
-    /// `discountCurveId`, `creditCurveId`, `volSurfaceId` and
-    /// `underlyingIsIndex`. Every setter returns the builder, so calls chain;
+    /// `discountCurveId`, `creditCurveId`, and `volSurfaceId` (`underlyingIsIndex`
+    /// defaults to `false`). Every setter returns the builder, so calls chain;
     /// `build()` validates and consumes it.
     ///
     /// @example

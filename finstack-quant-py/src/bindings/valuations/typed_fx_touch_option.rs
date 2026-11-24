@@ -86,24 +86,6 @@ impl PyFxTouchOption {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_touch_option", "FxTouchOption.base_currency")]
-    #[getter]
-    fn base_currency(&self) -> String {
-        self.inner.base_currency.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_touch_option", "FxTouchOption.quote_currency")]
-    #[getter]
-    fn quote_currency(&self) -> String {
-        self.inner.quote_currency.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_touch_option", "FxTouchOption.barrier")]
-    #[getter]
-    fn barrier(&self) -> f64 {
-        self.inner.barrier
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_touch_option", "FxTouchOption.touch_type")]
     #[getter]
     fn touch_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -114,12 +96,6 @@ impl PyFxTouchOption {
     #[getter]
     fn barrier_direction<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.barrier_direction)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_touch_option", "FxTouchOption.payout_amount")]
-    #[getter]
-    fn payout_amount(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.payout_amount)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_touch_option", "FxTouchOption.payout_timing")]
@@ -142,37 +118,36 @@ impl PyFxTouchOption {
             .map(|value| crate::bindings::date_utils::date_to_py(py, value))
             .transpose()
     }
+}
+
+crate::bindings::macros::py_getters!(PyFxTouchOption |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_touch_option", "FxTouchOption.base_currency")]
+    base_currency -> String = s.inner.base_currency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_touch_option", "FxTouchOption.quote_currency")]
+    quote_currency -> String = s.inner.quote_currency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_touch_option", "FxTouchOption.barrier")]
+    barrier -> f64 = s.inner.barrier;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_touch_option", "FxTouchOption.payout_amount")]
+    payout_amount -> PyMoney = PyMoney::from_inner(s.inner.payout_amount);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_touch_option", "FxTouchOption.day_count")]
-    #[getter]
-    fn day_count(&self) -> PyDayCount {
-        PyDayCount::from_inner(self.inner.day_count)
-    }
+    day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_touch_option", "FxTouchOption.domestic_discount_curve_id")]
-    #[getter]
-    fn domestic_discount_curve_id(&self) -> String {
-        self.inner.domestic_discount_curve_id.to_string()
-    }
+    domestic_discount_curve_id -> String = s.inner.domestic_discount_curve_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_touch_option", "FxTouchOption.foreign_discount_curve_id")]
-    #[getter]
-    fn foreign_discount_curve_id(&self) -> String {
-        self.inner.foreign_discount_curve_id.to_string()
-    }
+    foreign_discount_curve_id -> String = s.inner.foreign_discount_curve_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_touch_option", "FxTouchOption.vol_surface_id")]
-    #[getter]
-    fn vol_surface_id(&self) -> String {
-        self.inner.vol_surface_id.to_string()
-    }
+    vol_surface_id -> String = s.inner.vol_surface_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_touch_option", "FxTouchOption.observed_barrier_breached")]
-    #[getter]
-    fn observed_barrier_breached(&self) -> Option<bool> {
-        self.inner.observed_barrier_breached
-    }
-}
+    observed_barrier_breached -> Option<bool> = s.inner.observed_barrier_breached;
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_touch_option", "FxTouchOptionBuilder")]
 #[pyclass(
@@ -329,9 +304,12 @@ impl PyFxTouchOptionBuilder {
     }
 }
 
-/// Register the bond future and its builder.
+/// Register the FX touch option and its builder.
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyFxTouchOption>()?;
     module.add_class::<PyFxTouchOptionBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["FxTouchOption", "FxTouchOptionBuilder"];

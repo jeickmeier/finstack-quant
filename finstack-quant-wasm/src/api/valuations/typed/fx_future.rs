@@ -39,6 +39,18 @@ getters!(JsFxFuture, "FxFuture", |i| {
     /// Return the contract's position and lifecycle terms.
     /// @returns Independent copy of position, lifecycle dates and exchange marks.
     terms as terms: "generated.valuations.ListedFutureTerms" => json(i.terms),
+    /// Read the contract's base currency.
+    /// @returns ISO currency in the denominator of quote currency per unit of base currency.
+    base_currency as baseCurrency: "string" => text(i.base_currency),
+    /// Read the contract's domestic discount curve id.
+    /// @returns Market identifier of the quote-currency discount curve.
+    domestic_discount_curve_id as domesticDiscountCurveId: "string" => text(i.domestic_discount_curve_id),
+    /// Read the contract's foreign discount curve id.
+    /// @returns Market identifier of the base-currency discount curve.
+    foreign_discount_curve_id as foreignDiscountCurveId: "string" => text(i.foreign_discount_curve_id),
+    /// Read the contract's quoted spot.
+    /// @returns Optional positive spot override in quote currency per unit of base currency, or null.
+    quoted_spot as quotedSpot: "number | null" => json(i.quoted_spot),
 });
 common_getters!(JsFxFuture, "FxFuture");
 
@@ -59,17 +71,11 @@ builder_class!(
     JsFxFutureBuilder, "FxFutureBuilder", FxFutureBuilder, JsFxFuture, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = FxFuture)]
-impl JsFxFuture {
+to_builder_method!(
     /// Seed an independent builder from the complete listed contract.
     /// @returns Builder carrying settlement, exchange marks and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsFxFutureBuilder {
-        JsFxFutureBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsFxFuture, "FxFuture", JsFxFutureBuilder
+);
 
 setters!(JsFxFutureBuilder, "FxFutureBuilder", {
     /// Set the stable contract identifier.

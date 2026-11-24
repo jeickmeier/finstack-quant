@@ -37,7 +37,6 @@ pub mod basis_swap;
 pub mod basket;
 pub mod bermudan_swaption;
 pub mod callable_range_accrual;
-pub mod cds_option;
 pub mod cliquet_option;
 pub mod cms_option;
 pub mod cms_spread_option;

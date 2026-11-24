@@ -70,7 +70,7 @@ getters!(JsCdsIndex, "CdsIndex", |i| {
         pricing as pricing: "generated.valuations.CdsIndex['pricing']" => json(i.pricing),
         /// Constituent rows.
         /// @returns Typed rows; empty in `single_curve` mode.
-        constituents as constituents: "generated.valuations.CdsIndex['constituents']" => json(i.constituents),
+        constituents as constituents: "NonNullable<generated.valuations.CdsIndex['constituents']>" => json(i.constituents),
         /// Number of names in the pool.
         /// @returns The count, or `null` when unset.
         num_constituents as numConstituents: "NonNullable<generated.valuations.CdsIndex['num_constituents']> | null" => json(i.num_constituents),
@@ -193,7 +193,7 @@ setters!(JsCdsIndexBuilder, "CdsIndexBuilder", {
         /// @param value - Constituent rows as typed `CdsIndexConstituent` objects, plain objects with `credit` (`reference_entity`, `recovery_rate`, `credit_curve_id`), `weight` and optional `defaulted`, or a JSON array of the same shape.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        constituents as constituents: "generated.valuations.CdsIndex['constituents']" => from_js_json,
+        constituents as constituents: "NonNullable<generated.valuations.CdsIndex['constituents']>" => from_js_json,
         /// Set the number of reference entities in the index pool.
         /// @param value - Number of names in the index pool, e.g. `125` for CDX.NA.IG; required for portfolio-level analytics (e.g. jump-to-default) when `constituents` is empty.
         /// @returns The builder, for chaining.

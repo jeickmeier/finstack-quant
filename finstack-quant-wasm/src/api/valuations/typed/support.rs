@@ -70,6 +70,11 @@ pub(crate) mod get {
         Ok(JsValue::from_f64(value.as_f64()))
     }
 
+    /// An optional `Decimal` as a JavaScript number or `null`.
+    pub(crate) fn opt_dec(value: &Option<Decimal>) -> Js {
+        value.as_ref().map_or(Ok(JsValue::NULL), dec)
+    }
+
     /// A `(payment date, amount)` pair as `[isoDate, Money]`, or `null`.
     pub(crate) fn dated_money(value: &Option<(Date, Money)>) -> Js {
         let Some((paid, amount)) = value else {

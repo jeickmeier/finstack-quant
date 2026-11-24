@@ -515,12 +515,12 @@ class FxVarianceSwap:
         ...
 
     @property
-    def observation_frequency(self) -> dict[str, object] | Tenor:
+    def observation_frequency(self) -> dict[str, object]:
         """Read the contract's observation frequency.
 
         Returns
         -------
-        dict[str, object] | Tenor
+        dict[str, object]
             Observation frequency
 
         Notes

@@ -4623,6 +4623,7 @@ export default [
   {
     "path": "#/$defs/CdsIndex/properties/constituents",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/constituents",
+    "default": [],
     "description": "Optional list of constituents when using `IndexPricing::Constituents`"
   },
   {
@@ -5167,6 +5168,7 @@ export default [
   {
     "path": "#/$defs/CdsTranche/properties/realized_loss",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/realized_loss",
+    "default": 0,
     "description": "Realized (settled) loss on the reference pool as a decimal fraction of\nthe original portfolio notional, in `[0, 1]`.",
     "format": "double"
   },

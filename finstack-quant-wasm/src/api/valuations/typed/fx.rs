@@ -20,171 +20,16 @@
 use crate::api::core::currency::JsCurrency;
 use crate::api::core::dates::JsDayCount;
 use crate::api::core::money::JsMoney;
-use crate::utils::input::{from_js_json, js_f64, js_opt_string, js_string, json_text};
+use crate::api::valuations::pricing::parse_market;
+use crate::utils::input::{from_js_json, js_f64};
 use crate::utils::to_js_err;
+use crate::utils::wire::js_date;
+use finstack_quant_valuations::instruments;
 use finstack_quant_valuations::instruments::Instrument;
 use wasm_bindgen::prelude::*;
 
-macro_rules! fx_class {
-    ($(#[$doc:meta])* $rust_name:ident, $js_name:literal, $rust_ty:ty) => {
-        instrument_class!(
-            #[doc = concat!("Typed WASM wrapper for the Rust FX instrument ", $js_name, ".")]
-            $(#[$doc])*
-            $rust_name,
-            $js_name,
-            $rust_ty
-        );
-        instrument_pricing!($rust_name, $js_name);
-    };
-}
-
-/// Expose the complete selected-model Greek bundle on an FX option class.
-macro_rules! fx_greeks_bundle {
-    ($rust_name:ident, $js_name:literal) => {
-        #[wasm_bindgen(js_class = $js_name)]
-        impl $rust_name {
-            /// Compute every Greek that applies to this instrument as a JavaScript object.
-            /// @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-            /// @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-            /// @param extras - Optional pricing configuration and overrides accepted by `price`.
-            /// @returns Map of Greek name to value, with keys in the Rust
-            /// `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`, …);
-            /// only the Greeks that apply to the instrument are present.
-            ///
-            /// # Errors
-            ///
-            /// Throws a JavaScript exception if the instrument or market JSON,
-            /// `asOf`, or `model` is invalid; required market data is missing;
-            /// pricing fails; a returned Greek is non-finite; or the result cannot
-            /// be converted to a JavaScript value.
-            #[wasm_bindgen(unchecked_return_type = "Record<string, number>")]
-            pub fn greeks(
-                &self,
-                #[wasm_bindgen(js_name = "marketJson", unchecked_param_type = "JsonInput")]
-                market_json: JsValue,
-                #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
-                #[wasm_bindgen(unchecked_optional_param_type = "string | null")] model: Option<
-                    JsValue,
-                >,
-                            #[wasm_bindgen(unchecked_optional_param_type = "generated.valuations.PriceExtras | JsonInput | null")]
-                extras: Option<JsValue>,
-            ) -> Result<JsValue, JsValue> {
-                let market_json = json_text(&market_json, "marketJson")?;
-                let as_of = js_string(&as_of, "asOf")?;
-                let model = js_opt_string(model.as_ref(), "model")?;
-                super::option_greeks(
-                    Box::new(self.inner.clone()),
-                    &market_json,
-                    &as_of,
-                    model.as_deref(),
-                    extras.as_ref(),
-                )
-            }
-        }
-    };
-}
-
-/// Emit an FX option class: the `fx_class!` surface plus one method per
-/// applicable Greek (through `greek_methods!`) and `greeks()`.
-///
-/// Each Greek entry is `(method, jsName, "metric_id", "summary doc", "@returns doc")`. The
-/// method list is pinned against the Rust metric registry by
-/// `tests::option_greek_methods_match_the_metric_registry`.
-macro_rules! fx_option_class {
-    (
-        $(#[$doc:meta])* $rust_name:ident, $js_name:literal, $rust_ty:ty, $instrument_type:ident,
-        [$(($method:ident, $js_method:ident, $metric:literal, $summary:literal, $returns:literal)),+ $(,)?]
-    ) => {
-        fx_class!($(#[$doc])* $rust_name, $js_name, $rust_ty);
-
-        impl $rust_name {
-            /// Metric IDs of the Greek methods this class exposes, in
-            /// `STANDARD_OPTION_GREEKS` order.
-            #[cfg(test)]
-            const GREEK_METHODS: &'static [&'static str] = &[$($metric),+];
-            /// Rust instrument type whose registry decides which Greeks apply.
-            #[cfg(test)]
-            const INSTRUMENT_TYPE: finstack_quant_valuations::pricer::InstrumentType =
-                finstack_quant_valuations::pricer::InstrumentType::$instrument_type;
-        }
-
-        // `#[doc = ...]` attributes, so the per-Greek `$summary` and `$returns`
-        // literals sit beside the shared lines in one doc block.
-        greek_methods!($rust_name, $js_name, {
-            $(
-                #[doc = $summary]
-                #[doc = " @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data."]
-                #[doc = " @param asOf - ISO-8601 valuation date used to resolve date-dependent market data."]
-                #[doc = " @param model - Optional pricing-model identifier; omit to use the instrument's default model."]
-                #[doc = $returns]
-                #[doc = ""]
-                #[doc = " # Errors"]
-                #[doc = ""]
-                #[doc = " Throws a JavaScript exception if the instrument or market JSON,"]
-                #[doc = " `asOf`, or `model` is invalid; required market data is missing;"]
-                #[doc = " pricing fails; or the Greek is not produced by the selected model."]
-                $method as $js_method => $metric,
-            )+
-        });
-
-        fx_greeks_bundle!($rust_name, $js_name);
-    };
-}
-
-/// An FX option class whose Greek methods start with spot delta, gamma, vega,
-/// theta, domestic rho and foreign rho.
-///
-/// `$theta_returns` documents the class's theta; each `$extra` appends one
-/// more Greek entry in the `fx_option_class!` form.
-macro_rules! fx_option {
-    (
-        $(#[$doc:meta])* $rust_name:ident, $js_name:literal, $rust_ty:ty, $instrument_type:ident,
-        $theta_returns:literal $(, $extra:tt)* $(,)?
-    ) => {
-        fx_option_class!(
-            $(#[$doc])* $rust_name, $js_name, $rust_ty, $instrument_type,
-            [
-                (delta, delta, "delta", "Spot delta of the option.", "@returns Cash delta `dPV/dS`: PV change per unit move in the spot rate, including notional scaling."),
-                (gamma, gamma, "gamma", "Spot gamma of the option.", "@returns Cash gamma `d²PV/dS²`: PV per unit-spot squared, including notional scaling."),
-                (vega, vega, "vega", "Vega of the option.", "@returns Cash vega: PV change for a 1 vol-point (0.01 absolute) move in implied volatility."),
-                (theta, theta, "theta", "Theta of the option.", $theta_returns),
-                (rho, rho, "rho", "Domestic rate rho of the option.", "@returns Domestic rho: PV change for a 1bp (0.0001) move in the domestic discount rate."),
-                (foreign_rho, foreignRho, "foreign_rho", "Foreign rate rho of the option.", "@returns Foreign rho: PV change for a 1bp (0.0001) move in the foreign discount rate."),
-                $($extra),*
-            ]
-        );
-    };
-}
-
-use crate::api::valuations::pricing::parse_market;
-use crate::utils::wire::js_date;
-use finstack_quant_valuations::instruments;
-
-fx_class!(
-    ///
-    /// @example
-    /// ```typescript
-    /// import init, { valuations } from "finstack-quant-wasm";
-    /// await init();
-    /// const envelope = valuations.instruments.instrumentEnvelopeFromSpec("fx_spot", {
-    ///   id: "EURUSD-SPOT",
-    ///   base_currency: "EUR",
-    ///   quote_currency: "USD",
-    ///   settlement_date: "2025-01-17",
-    ///   quoted_spot: 1.1,
-    ///   notional: { amount: "1000000", currency: "EUR" },
-    ///   attributes: {},
-    /// });
-    /// const spot = valuations.instruments.FxSpot.fromJson(envelope);
-    /// console.log(JSON.parse(spot.toJson()).instrument.type);
-    /// spot.free();
-    /// ```
-    JsFxSpot,
-    "FxSpot",
-    instruments::fx::fx_spot::FxSpot
-);
-fx_class!(
+instrument_class!(
+    /// Typed WASM wrapper for the Rust FX instrument FxForward.
     ///
     /// @example
     /// ```typescript
@@ -198,85 +43,8 @@ fx_class!(
     "FxForward",
     instruments::fx::fx_forward::FxForward
 );
-fx_class!(
-    ///
-    /// @example
-    /// ```typescript
-    /// import init, { valuations, type JsonInput } from "finstack-quant-wasm";
-    /// await init();
-    /// // The canonical `fx_swap` envelope published with the instrument schema.
-    /// const [envelope] = valuations.schema.instrumentSchema("fx_swap").examples as JsonInput[];
-    /// const swap = valuations.instruments.FxSwap.fromJson(envelope);
-    /// console.log(swap.id);
-    /// swap.free();
-    /// ```
-    JsFxSwap,
-    "FxSwap",
-    instruments::fx::fx_swap::FxSwap
-);
-fx_class!(
-    ///
-    /// @example
-    /// ```typescript
-    /// import init, { valuations, type JsonInput } from "finstack-quant-wasm";
-    /// await init();
-    /// // The canonical `ndf` envelope published with the instrument schema.
-    /// const [envelope] = valuations.schema.instrumentSchema("ndf").examples as JsonInput[];
-    /// const ndf = valuations.instruments.Ndf.fromJson(envelope);
-    /// console.log(ndf.id);
-    /// ndf.free();
-    /// ```
-    JsNdf,
-    "Ndf",
-    instruments::fx::ndf::Ndf
-);
-fx_class!(
-    ///
-    /// @example
-    /// ```typescript
-    /// import init, { valuations, type JsonInput } from "finstack-quant-wasm";
-    /// await init();
-    /// // The canonical `fx_variance_swap` envelope published with the instrument schema.
-    /// const [envelope] = valuations.schema.instrumentSchema("fx_variance_swap").examples as JsonInput[];
-    /// const swap = valuations.instruments.FxVarianceSwap.fromJson(envelope);
-    /// console.log(swap.id);
-    /// swap.free();
-    /// ```
-    JsFxVarianceSwap,
-    "FxVarianceSwap",
-    instruments::fx::fx_variance_swap::FxVarianceSwap
-);
-
-/// An FX option class exposing every standard Greek: the `fx_option!` six
-/// plus vanna and volga.
-macro_rules! fx_option_with_all_greeks {
-    ($(#[$doc:meta])* $rust_name:ident, $js_name:literal, $rust_ty:ty, $instrument_type:ident, $theta_returns:literal) => {
-        fx_option!(
-            $(#[$doc])*
-            $rust_name,
-            $js_name,
-            $rust_ty,
-            $instrument_type,
-            $theta_returns,
-            (
-                vanna,
-                vanna,
-                "vanna",
-                "Vanna of the option.",
-                "@returns Vanna `d²PV/(dS dσ)`: PV per unit spot per vol point (0.01 absolute vol)."
-            ),
-            (
-                volga,
-                volga,
-                "volga",
-                "Volga of the option.",
-                "@returns Volga `d²PV/dσ²`: PV per vol-point squared (0.01 absolute vol)."
-            ),
-        );
-    };
-}
-
-fx_class!(
+instrument_class!(
+    /// Typed WASM wrapper for the Rust FX instrument FxOption.
     ///
     /// @example
     /// ```typescript
@@ -290,80 +58,7 @@ fx_class!(
     "FxOption",
     instruments::fx::fx_option::FxOption
 );
-fx_greeks_bundle!(JsFxOption, "FxOption");
-// `QuantoOption` keeps the universal theta-horizon P&L.
-fx_option_with_all_greeks!(
-    ///
-    /// @example
-    /// ```typescript
-    /// import init, { valuations, type JsonInput } from "finstack-quant-wasm";
-    /// await init();
-    /// // The canonical `quanto_option` envelope published with the instrument schema.
-    /// const [envelope] = valuations.schema.instrumentSchema("quanto_option").examples as JsonInput[];
-    /// const option = valuations.instruments.QuantoOption.fromJson(envelope);
-    /// console.log(option.id);
-    /// option.free();
-    /// ```
-    JsQuantoOption,
-    "QuantoOption",
-    instruments::fx::quanto_option::QuantoOption,
-    QuantoOption,
-    "@returns Theta: P&L over the theta horizon (default one day, capped at expiry) with spot held at its `asOf` level, so a roll into the monitoring window observes that spot; not annualized."
-);
-fx_option!(
-    ///
-    /// @example
-    /// ```typescript
-    /// import init, { valuations, type JsonInput } from "finstack-quant-wasm";
-    /// await init();
-    /// // The canonical `fx_digital_option` envelope published with the instrument schema.
-    /// const [envelope] = valuations.schema.instrumentSchema("fx_digital_option").examples as JsonInput[];
-    /// const option = valuations.instruments.FxDigitalOption.fromJson(envelope);
-    /// console.log(option.id);
-    /// option.free();
-    /// ```
-    JsFxDigitalOption,
-    "FxDigitalOption",
-    instruments::fx::fx_digital_option::FxDigitalOption,
-    FxDigitalOption,
-    "@returns Model theta per day on the `metric_pricing_overrides.theta_day_basis` day count (default 365 calendar days): analytic for cash-or-nothing payouts, a one-day finite-difference decay for asset-or-nothing; not annualized."
-);
-fx_option!(
-    ///
-    /// @example
-    /// ```typescript
-    /// import init, { valuations, type JsonInput } from "finstack-quant-wasm";
-    /// await init();
-    /// // The canonical `fx_touch_option` envelope published with the instrument schema.
-    /// const [envelope] = valuations.schema.instrumentSchema("fx_touch_option").examples as JsonInput[];
-    /// const option = valuations.instruments.FxTouchOption.fromJson(envelope);
-    /// console.log(option.id);
-    /// option.free();
-    /// ```
-    JsFxTouchOption,
-    "FxTouchOption",
-    instruments::fx::fx_touch_option::FxTouchOption,
-    FxTouchOption,
-    "@returns Theta: P&L over the theta horizon (default one day, capped at expiry) with spot held at its `asOf` level, so a roll into the monitoring window observes that spot; not annualized."
-);
-fx_option_with_all_greeks!(
-    ///
-    /// @example
-    /// ```typescript
-    /// import init, { valuations, type JsonInput } from "finstack-quant-wasm";
-    /// await init();
-    /// // The canonical `fx_barrier_option` envelope published with the instrument schema.
-    /// const [envelope] = valuations.schema.instrumentSchema("fx_barrier_option").examples as JsonInput[];
-    /// const option = valuations.instruments.FxBarrierOption.fromJson(envelope);
-    /// console.log(option.id);
-    /// option.free();
-    /// ```
-    JsFxBarrierOption,
-    "FxBarrierOption",
-    instruments::fx::fx_barrier_option::FxBarrierOption,
-    FxBarrierOption,
-    "@returns Theta: P&L over the theta horizon (default one day, capped at expiry) with spot held at its `asOf` level, so a roll into the monitoring window observes that spot; not annualized."
-);
+option_greeks_bundle!(JsFxOption, "FxOption");
 
 #[wasm_bindgen(js_class = FxForward)]
 impl JsFxForward {
@@ -560,6 +255,11 @@ mod tests {
 
     #[test]
     fn option_greek_methods_match_the_metric_registry() {
+        use super::super::{
+            fx_barrier_option::JsFxBarrierOption, fx_digital_option::JsFxDigitalOption,
+            fx_touch_option::JsFxTouchOption, quanto_option::JsQuantoOption,
+        };
+
         let classes: [(&[&str], InstrumentType); 4] = [
             (
                 JsQuantoOption::GREEK_METHODS,
@@ -592,8 +292,7 @@ instrument_surface!(
     JsFxForward,
     "FxForward",
     JsFxForwardBuilder,
-    "generated.valuations.FxForward",
-    unpriced
+    "generated.valuations.FxForward"
 );
 
 getters!(JsFxForward, "FxForward", |i| {
@@ -733,8 +432,7 @@ instrument_surface!(
     JsFxOption,
     "FxOption",
     JsFxOptionBuilder,
-    "generated.valuations.FxOption",
-    unpriced
+    "generated.valuations.FxOption"
 );
 
 getters!(JsFxOption, "FxOption", |i| {

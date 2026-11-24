@@ -9,15 +9,144 @@ use finstack_quant_valuations::instruments::fx::fx_barrier_option::{
 };
 use wasm_bindgen::prelude::*;
 
-use super::fx::JsFxBarrierOption;
-
+instrument_class!(
+    /// Typed WASM wrapper for the Rust FX instrument FxBarrierOption.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { valuations, type JsonInput } from "finstack-quant-wasm";
+    /// await init();
+    /// // The canonical `fx_barrier_option` envelope published with the instrument schema.
+    /// const [envelope] = valuations.schema.instrumentSchema("fx_barrier_option").examples as JsonInput[];
+    /// const option = valuations.instruments.FxBarrierOption.fromJson(envelope);
+    /// console.log(option.id);
+    /// option.free();
+    /// ```
+    JsFxBarrierOption,
+    "FxBarrierOption",
+    FxBarrierOption
+);
 instrument_surface!(
     JsFxBarrierOption,
     "FxBarrierOption",
     JsFxBarrierOptionBuilder,
-    "generated.valuations.FxBarrierOption",
-    unpriced
+    "generated.valuations.FxBarrierOption"
 );
+impl JsFxBarrierOption {
+    #[cfg(test)]
+    pub(crate) const GREEK_METHODS: &'static [&'static str] = &[
+        "delta",
+        "gamma",
+        "vega",
+        "theta",
+        "rho",
+        "foreign_rho",
+        "vanna",
+        "volga",
+    ];
+    #[cfg(test)]
+    pub(crate) const INSTRUMENT_TYPE: finstack_quant_valuations::pricer::InstrumentType =
+        finstack_quant_valuations::pricer::InstrumentType::FxBarrierOption;
+}
+greek_methods!(JsFxBarrierOption, "FxBarrierOption", {
+    /// Spot delta of the option.
+    /// @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+    /// @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+    /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+    /// @returns Cash delta `dPV/dS`: PV change per unit move in the spot rate, including notional scaling.
+    ///
+    /// # Errors
+    ///
+    /// Throws a JavaScript exception if the instrument or market JSON,
+    /// `asOf`, or `model` is invalid; required market data is missing;
+    /// pricing fails; or the Greek is not produced by the selected model.
+    delta as delta => "delta",
+    /// Spot gamma of the option.
+    /// @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+    /// @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+    /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+    /// @returns Cash gamma `d²PV/dS²`: PV per unit-spot squared, including notional scaling.
+    ///
+    /// # Errors
+    ///
+    /// Throws a JavaScript exception if the instrument or market JSON,
+    /// `asOf`, or `model` is invalid; required market data is missing;
+    /// pricing fails; or the Greek is not produced by the selected model.
+    gamma as gamma => "gamma",
+    /// Vega of the option.
+    /// @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+    /// @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+    /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+    /// @returns Cash vega: PV change for a 1 vol-point (0.01 absolute) move in implied volatility.
+    ///
+    /// # Errors
+    ///
+    /// Throws a JavaScript exception if the instrument or market JSON,
+    /// `asOf`, or `model` is invalid; required market data is missing;
+    /// pricing fails; or the Greek is not produced by the selected model.
+    vega as vega => "vega",
+    /// Theta of the option.
+    /// @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+    /// @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+    /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+    /// @returns Theta: P&L over the theta horizon (default one day, capped at expiry) with spot held at its `asOf` level, so a roll into the monitoring window observes that spot; not annualized.
+    ///
+    /// # Errors
+    ///
+    /// Throws a JavaScript exception if the instrument or market JSON,
+    /// `asOf`, or `model` is invalid; required market data is missing;
+    /// pricing fails; or the Greek is not produced by the selected model.
+    theta as theta => "theta",
+    /// Domestic rate rho of the option.
+    /// @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+    /// @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+    /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+    /// @returns Domestic rho: PV change for a 1bp (0.0001) move in the domestic discount rate.
+    ///
+    /// # Errors
+    ///
+    /// Throws a JavaScript exception if the instrument or market JSON,
+    /// `asOf`, or `model` is invalid; required market data is missing;
+    /// pricing fails; or the Greek is not produced by the selected model.
+    rho as rho => "rho",
+    /// Foreign rate rho of the option.
+    /// @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+    /// @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+    /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+    /// @returns Foreign rho: PV change for a 1bp (0.0001) move in the foreign discount rate.
+    ///
+    /// # Errors
+    ///
+    /// Throws a JavaScript exception if the instrument or market JSON,
+    /// `asOf`, or `model` is invalid; required market data is missing;
+    /// pricing fails; or the Greek is not produced by the selected model.
+    foreign_rho as foreignRho => "foreign_rho",
+    /// Vanna of the option.
+    /// @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+    /// @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+    /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+    /// @returns Vanna `d²PV/(dS dσ)`: PV per unit spot per vol point (0.01 absolute vol).
+    ///
+    /// # Errors
+    ///
+    /// Throws a JavaScript exception if the instrument or market JSON,
+    /// `asOf`, or `model` is invalid; required market data is missing;
+    /// pricing fails; or the Greek is not produced by the selected model.
+    vanna as vanna => "vanna",
+    /// Volga of the option.
+    /// @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+    /// @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+    /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+    /// @returns Volga `d²PV/dσ²`: PV per vol-point squared (0.01 absolute vol).
+    ///
+    /// # Errors
+    ///
+    /// Throws a JavaScript exception if the instrument or market JSON,
+    /// `asOf`, or `model` is invalid; required market data is missing;
+    /// pricing fails; or the Greek is not produced by the selected model.
+    volga as volga => "volga",
+});
+option_greeks_bundle!(JsFxBarrierOption, "FxBarrierOption");
 factories!(JsFxBarrierOption, "FxBarrierOption", FxBarrierOption, {
     /// Construct the native example for this instrument.
     /// @returns Validated contract with its lifecycle and market dependencies.
@@ -102,17 +231,11 @@ builder_class!(
     JsFxBarrierOptionBuilder, "FxBarrierOptionBuilder", FxBarrierOptionBuilder, JsFxBarrierOption, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = FxBarrierOption)]
-impl JsFxBarrierOption {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsFxBarrierOptionBuilder {
-        JsFxBarrierOptionBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsFxBarrierOption, "FxBarrierOption", JsFxBarrierOptionBuilder
+);
 
 setters!(JsFxBarrierOptionBuilder, "FxBarrierOptionBuilder", {
     /// Set the stable contract identifier.

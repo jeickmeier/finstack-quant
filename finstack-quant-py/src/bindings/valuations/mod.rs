@@ -250,8 +250,6 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
         "InterestRateFutureBuilder",
         "EquityFuture",
         "EquityFutureBuilder",
-        "FxFuture",
-        "FxFutureBuilder",
         "VolatilityIndexFuture",
         "VolatilityIndexFutureBuilder",
         "ListedFutureTerms",
@@ -260,13 +258,13 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
         "InterestRateFutureOptionBuilder",
         "EquityFutureOption",
         "EquityFutureOptionBuilder",
-        "FxFutureOption",
-        "FxFutureOptionBuilder",
         "VolatilityIndexFutureOption",
         "VolatilityIndexFutureOptionBuilder",
         "ForwardRateAgreement",
         "ForwardRateAgreementBuilder",
     ]);
+    exports.extend_from_slice(typed_fx_future::EXPORTS);
+    exports.extend_from_slice(typed_fx_future_option::EXPORTS);
     exports.extend_from_slice(typed_credit::EXPORTS);
     exports.extend_from_slice(typed_convertible::EXPORTS);
     exports.extend_from_slice(convertible_spot_ladder::EXPORTS);
@@ -329,8 +327,6 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     ]);
     exports.extend_from_slice(&["CommodityFutureOption", "CommodityFutureOptionBuilder"]);
     exports.extend_from_slice(&[
-        "FxSpot",
-        "FxSpotBuilder",
         "CommodityForward",
         "CommodityForwardBuilder",
         "CommodityFuture",
@@ -345,8 +341,6 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
         "CommoditySwapBuilder",
         "CommoditySwaption",
         "CommoditySwaptionBuilder",
-        "FxVarianceSwap",
-        "FxVarianceSwapBuilder",
         "VarianceSwap",
         "VarianceSwapBuilder",
         "EquityTotalReturnSwap",
@@ -357,22 +351,15 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
         "FiIndexTotalReturnSwapBuilder",
     ]);
     exports.extend_from_slice(&["Equity", "EquityBuilder"]);
-    exports.extend_from_slice(&[
-        "Repo",
-        "RepoBuilder",
-        "FxSwap",
-        "FxSwapBuilder",
-        "Ndf",
-        "NdfBuilder",
-        "QuantoOption",
-        "QuantoOptionBuilder",
-        "FxDigitalOption",
-        "FxDigitalOptionBuilder",
-        "FxTouchOption",
-        "FxTouchOptionBuilder",
-        "FxBarrierOption",
-        "FxBarrierOptionBuilder",
-    ]);
+    exports.extend_from_slice(&["Repo", "RepoBuilder"]);
+    exports.extend_from_slice(typed_fx_spot::EXPORTS);
+    exports.extend_from_slice(typed_fx_swap::EXPORTS);
+    exports.extend_from_slice(typed_ndf::EXPORTS);
+    exports.extend_from_slice(typed_fx_variance_swap::EXPORTS);
+    exports.extend_from_slice(typed_quanto_option::EXPORTS);
+    exports.extend_from_slice(typed_fx_digital_option::EXPORTS);
+    exports.extend_from_slice(typed_fx_touch_option::EXPORTS);
+    exports.extend_from_slice(typed_fx_barrier_option::EXPORTS);
     exports.extend_from_slice(typed_fx::EXPORTS);
     exports.extend_from_slice(typed_structured_credit::EXPORTS);
     exports.extend_from_slice(typed_revolving_credit::EXPORTS);

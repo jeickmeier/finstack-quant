@@ -159,7 +159,7 @@ instrument_envelope_methods!(
     PyCdsTranche("CdsTranche", module = "finstack_quant.valuations.instruments._typed_credit.cds_tranche"),
     CdsTranche,
     builder = PyCdsTrancheBuilder("CdsTrancheBuilder", fields),
-    seed = finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche::builder().realized_loss(0.0),
+    seed = finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche::builder(),
 );
 instrument_pricing_methods!(
     PyCdsTranche,

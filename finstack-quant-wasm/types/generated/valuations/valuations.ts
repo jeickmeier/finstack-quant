@@ -11741,7 +11741,7 @@ export interface CdsIndex {
   /**
    * Optional list of constituents when using `IndexPricing::Constituents`
    */
-  constituents: CdsIndexConstituent[];
+  constituents?: CdsIndexConstituent[];
   /**
    * Regional ISDA convention
    */
@@ -11961,7 +11961,7 @@ export interface CdsTranche {
    * Realized (settled) loss on the reference pool as a decimal fraction of
    * the original portfolio notional, in `[0, 1]`.
    */
-  realized_loss: number;
+  realized_loss?: number;
   /**
    * Scenario-only pricing adjustments.
    */

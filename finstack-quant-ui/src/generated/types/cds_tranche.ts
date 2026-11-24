@@ -346,7 +346,7 @@ export interface DAcd6C3D775D926E416Ed {
    * Realized (settled) loss on the reference pool as a decimal fraction of
    * the original portfolio notional, in `[0, 1]`.
    */
-  realized_loss: number;
+  realized_loss?: number;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   /**
    * Series number (e.g., 37)

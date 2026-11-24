@@ -63,36 +63,6 @@ impl PyFxVarianceSwap {
         instrument_expiry(py, &self.inner)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.base_currency")]
-    #[getter]
-    fn base_currency(&self) -> String {
-        self.inner.base_currency.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.quote_currency")]
-    #[getter]
-    fn quote_currency(&self) -> String {
-        self.inner.quote_currency.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.spot_id")]
-    #[getter]
-    fn spot_id(&self) -> Option<String> {
-        self.inner.spot_id.as_ref().map(ToString::to_string)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.strike_variance")]
-    #[getter]
-    fn strike_variance(&self) -> f64 {
-        self.inner.strike_variance
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.start_date")]
     #[getter]
     fn start_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -120,64 +90,10 @@ impl PyFxVarianceSwap {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.observation_frequency)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.base_calendar_id")]
-    #[getter]
-    fn base_calendar_id(&self) -> String {
-        self.inner.base_calendar_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.quote_calendar_id")]
-    #[getter]
-    fn quote_calendar_id(&self) -> String {
-        self.inner.quote_calendar_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.observation_business_day_convention")]
-    #[getter]
-    fn observation_business_day_convention(&self) -> PyResult<String> {
-        super::convert::enum_to_py_string(&self.inner.observation_business_day_convention)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.observation_end_of_month")]
-    #[getter]
-    fn observation_end_of_month(&self) -> bool {
-        self.inner.observation_end_of_month
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.realized_var_method")]
     #[getter]
     fn realized_var_method<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.realized_var_method)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.trading_days_per_year")]
-    #[getter]
-    fn trading_days_per_year(&self) -> f64 {
-        self.inner.trading_days_per_year
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.open_series_id")]
-    #[getter]
-    fn open_series_id(&self) -> Option<String> {
-        self.inner.open_series_id.as_ref().map(ToString::to_string)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.high_series_id")]
-    #[getter]
-    fn high_series_id(&self) -> Option<String> {
-        self.inner.high_series_id.as_ref().map(ToString::to_string)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.low_series_id")]
-    #[getter]
-    fn low_series_id(&self) -> Option<String> {
-        self.inner.low_series_id.as_ref().map(ToString::to_string)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.close_series_id")]
-    #[getter]
-    fn close_series_id(&self) -> Option<String> {
-        self.inner.close_series_id.as_ref().map(ToString::to_string)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.previous_close_date")]
@@ -194,31 +110,65 @@ impl PyFxVarianceSwap {
     fn side<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.side)
     }
+}
+
+crate::bindings::macros::py_getters!(PyFxVarianceSwap |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.base_currency")]
+    base_currency -> String = s.inner.base_currency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.quote_currency")]
+    quote_currency -> String = s.inner.quote_currency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.spot_id")]
+    spot_id -> Option<String> = s.inner.spot_id.as_ref().map(ToString::to_string);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.notional")]
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.strike_variance")]
+    strike_variance -> f64 = s.inner.strike_variance;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.base_calendar_id")]
+    base_calendar_id -> String = s.inner.base_calendar_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.quote_calendar_id")]
+    quote_calendar_id -> String = s.inner.quote_calendar_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.observation_business_day_convention")]
+    observation_business_day_convention -> PyResult<String> =
+        super::convert::enum_to_py_string(&s.inner.observation_business_day_convention);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.observation_end_of_month")]
+    observation_end_of_month -> bool = s.inner.observation_end_of_month;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.trading_days_per_year")]
+    trading_days_per_year -> f64 = s.inner.trading_days_per_year;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.open_series_id")]
+    open_series_id -> Option<String> = s.inner.open_series_id.as_ref().map(ToString::to_string);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.high_series_id")]
+    high_series_id -> Option<String> = s.inner.high_series_id.as_ref().map(ToString::to_string);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.low_series_id")]
+    low_series_id -> Option<String> = s.inner.low_series_id.as_ref().map(ToString::to_string);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.close_series_id")]
+    close_series_id -> Option<String> = s.inner.close_series_id.as_ref().map(ToString::to_string);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.domestic_discount_curve_id")]
-    #[getter]
-    fn domestic_discount_curve_id(&self) -> String {
-        self.inner.domestic_discount_curve_id.to_string()
-    }
+    domestic_discount_curve_id -> String = s.inner.domestic_discount_curve_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.foreign_discount_curve_id")]
-    #[getter]
-    fn foreign_discount_curve_id(&self) -> String {
-        self.inner.foreign_discount_curve_id.to_string()
-    }
+    foreign_discount_curve_id -> String = s.inner.foreign_discount_curve_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.vol_surface_id")]
-    #[getter]
-    fn vol_surface_id(&self) -> String {
-        self.inner.vol_surface_id.to_string()
-    }
+    vol_surface_id -> String = s.inner.vol_surface_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.day_count")]
-    #[getter]
-    fn day_count(&self) -> crate::bindings::core::dates::daycount::PyDayCount {
-        crate::bindings::core::dates::daycount::PyDayCount::from_inner(self.inner.day_count)
-    }
-}
+    day_count -> crate::bindings::core::dates::daycount::PyDayCount =
+        crate::bindings::core::dates::daycount::PyDayCount::from_inner(s.inner.day_count);
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwapBuilder")]
 #[pyclass(
@@ -481,9 +431,12 @@ impl PyFxVarianceSwapBuilder {
     }
 }
 
-/// Register the bond future and its builder.
+/// Register the FX variance swap and its builder.
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyFxVarianceSwap>()?;
     module.add_class::<PyFxVarianceSwapBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["FxVarianceSwap", "FxVarianceSwapBuilder"];

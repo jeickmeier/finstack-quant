@@ -50,6 +50,7 @@
           "description": "Attributes for tagging and selection"
         },
         "constituents": {
+          "default": [],
           "description": "Optional list of constituents when using `IndexPricing::Constituents`",
           "items": {
             "$ref": "#/$defs/CdsIndexConstituent"
@@ -179,8 +180,7 @@
         "convention",
         "premium_leg",
         "protection_leg",
-        "pricing",
-        "constituents"
+        "pricing"
       ],
       "type": "object"
     },

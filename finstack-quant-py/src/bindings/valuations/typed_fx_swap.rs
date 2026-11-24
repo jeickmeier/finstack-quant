@@ -60,18 +60,6 @@ impl PyFxSwap {
         instrument_expiry(py, &self.inner)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_swap", "FxSwap.base_currency")]
-    #[getter]
-    fn base_currency(&self) -> String {
-        self.inner.base_currency.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_swap", "FxSwap.quote_currency")]
-    #[getter]
-    fn quote_currency(&self) -> String {
-        self.inner.quote_currency.to_string()
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_swap", "FxSwap.near_date")]
     #[getter]
     fn near_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -83,55 +71,44 @@ impl PyFxSwap {
     fn far_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::date_utils::date_to_py(py, self.inner.far_date)
     }
+}
+
+crate::bindings::macros::py_getters!(PyFxSwap |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_swap", "FxSwap.base_currency")]
+    base_currency -> String = s.inner.base_currency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_swap", "FxSwap.quote_currency")]
+    quote_currency -> String = s.inner.quote_currency.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_swap", "FxSwap.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_swap", "FxSwap.domestic_discount_curve_id")]
-    #[getter]
-    fn domestic_discount_curve_id(&self) -> String {
-        self.inner.domestic_discount_curve_id.to_string()
-    }
+    domestic_discount_curve_id -> String = s.inner.domestic_discount_curve_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_swap", "FxSwap.foreign_discount_curve_id")]
-    #[getter]
-    fn foreign_discount_curve_id(&self) -> String {
-        self.inner.foreign_discount_curve_id.to_string()
-    }
+    foreign_discount_curve_id -> String = s.inner.foreign_discount_curve_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_swap", "FxSwap.near_rate")]
-    #[getter]
-    fn near_rate(&self) -> Option<f64> {
-        self.inner.near_rate
-    }
+    near_rate -> Option<f64> = s.inner.near_rate;
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_swap", "FxSwap.far_rate")]
-    #[getter]
-    fn far_rate(&self) -> Option<f64> {
-        self.inner.far_rate
-    }
+    far_rate -> Option<f64> = s.inner.far_rate;
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_swap", "FxSwap.base_calendar_id")]
-    #[getter]
-    fn base_calendar_id(&self) -> Option<String> {
-        self.inner
-            .base_calendar_id
-            .as_ref()
-            .map(ToString::to_string)
-    }
+    base_calendar_id -> Option<String> = s
+        .inner
+        .base_calendar_id
+        .as_ref()
+        .map(ToString::to_string);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_swap", "FxSwap.quote_calendar_id")]
-    #[getter]
-    fn quote_calendar_id(&self) -> Option<String> {
-        self.inner
-            .quote_calendar_id
-            .as_ref()
-            .map(ToString::to_string)
-    }
-}
+    quote_calendar_id -> Option<String> = s
+        .inner
+        .quote_calendar_id
+        .as_ref()
+        .map(ToString::to_string);
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_swap", "FxSwapBuilder")]
 #[pyclass(
@@ -258,9 +235,12 @@ impl PyFxSwapBuilder {
     }
 }
 
-/// Register the bond future and its builder.
+/// Register the FX swap and its builder.
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyFxSwap>()?;
     module.add_class::<PyFxSwapBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["FxSwap", "FxSwapBuilder"];

@@ -4400,6 +4400,7 @@
           "description": "Attributes for tagging and selection"
         },
         "constituents": {
+          "default": [],
           "description": "Optional list of constituents when using `IndexPricing::Constituents`",
           "items": {
             "$ref": "#/$defs/CdsIndexConstituent"
@@ -4529,8 +4530,7 @@
         "convention",
         "premium_leg",
         "protection_leg",
-        "pricing",
-        "constituents"
+        "pricing"
       ],
       "type": "object"
     },
@@ -4830,6 +4830,7 @@
           "description": "Notional amount of the tranche"
         },
         "realized_loss": {
+          "default": 0.0,
           "description": "Realized (settled) loss on the reference pool as a decimal fraction of\nthe original portfolio notional, in `[0, 1]`.",
           "format": "double",
           "type": "number"
@@ -4899,7 +4900,6 @@
         "discount_curve_id",
         "credit_index_id",
         "side",
-        "realized_loss",
         "date_regime",
         "attributes"
       ],

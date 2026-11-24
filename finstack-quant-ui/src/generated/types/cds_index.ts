@@ -528,7 +528,7 @@ export interface D_765A4643A287F5Eb4B9D {
   /**
    * Optional list of constituents when using `IndexPricing::Constituents`
    */
-  constituents: D_80E139D6F4D92C281A38[];
+  constituents?: D_80E139D6F4D92C281A38[];
   /**
    * Regional ISDA convention
    */
