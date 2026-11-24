@@ -135,8 +135,7 @@ impl NodeClaim {
 ///
 /// When every node of the level carries a put floor, or every node carries a
 /// frictionless call cap, the decision is taken with
-/// [`smoothed_max`](crate::trees::kink_smoothing::smoothed_max) or
-/// [`smoothed_min`](crate::trees::kink_smoothing::smoothed_min), which correct
+/// [`smoothed_max`] or [`smoothed_min`], which correct
 /// the exercise kink between adjacent nodes. A call with friction is a jump in
 /// value at its threshold rather than a kink, and a level whose nodes do not
 /// share the right has no boundary to locate; both keep each node's own
