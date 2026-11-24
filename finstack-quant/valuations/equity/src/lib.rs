@@ -118,8 +118,6 @@ pub(crate) mod piecewise_gbm;
 pub mod private_markets_fund;
 /// Real estate asset valuation (unlevered DCF and direct capitalization).
 pub mod real_estate;
-#[doc(hidden)]
-pub mod rf_component_dv01;
 /// Equity spot module - Equity spot positions.
 pub mod spot;
 /// Spot-pinned finite-difference Greeks for products struck at inception spot.
@@ -128,8 +126,7 @@ pub(crate) mod spot_pinned;
 pub(crate) mod underlying;
 /// Variance swap module - Variance and volatility swaps.
 pub mod variance_swap;
-#[doc(hidden)]
-pub mod vega;
+pub(crate) mod vega;
 /// Volatility index future module.
 pub mod vol_index_future;
 /// Exchange-listed options on volatility-index futures.

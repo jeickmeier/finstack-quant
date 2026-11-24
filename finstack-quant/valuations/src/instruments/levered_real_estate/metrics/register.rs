@@ -3,6 +3,9 @@
 use super::super::{LeveredRealEstateEquity, levered_pricer};
 use crate::instruments::Instrument;
 use crate::metrics::sensitivities::bump_config;
+use crate::metrics::sensitivities::rf_component_dv01::{
+    RfComponentDv01Calculator, RfComponentPriced,
+};
 use crate::metrics::{MetricCalculator, MetricContext, MetricRegistry, MetricRegistryError};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -10,9 +13,6 @@ use finstack_quant_valuations_equity::real_estate::metrics::{
     bumped_cap_rate, ensure_cap_rate01_applicable,
 };
 use finstack_quant_valuations_equity::real_estate::pricer as asset_pricer;
-use finstack_quant_valuations_equity::rf_component_dv01::{
-    RfComponentDv01Calculator, RfComponentPriced,
-};
 
 impl RfComponentPriced for LeveredRealEstateEquity {
     /// Asset PV at the bumped property discount rate less the financing PV,

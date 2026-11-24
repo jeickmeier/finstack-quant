@@ -5,13 +5,11 @@
 //! instrument input directly and is therefore registered under `wacc01` or
 //! `discount_rate01`, never under curve `dv01`.
 
+use crate::instruments::Instrument;
+use crate::metrics::sensitivities::bump_config;
+use crate::metrics::{MetricCalculator, MetricContext, sensitivity_central_diff};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
-use finstack_quant_valuations_core::metrics::{
-    MetricCalculator, MetricContext, sensitivity_central_diff,
-};
 use std::marker::PhantomData;
 
 /// Instruments whose PV is discounted at an instrument-owned appraisal rate.

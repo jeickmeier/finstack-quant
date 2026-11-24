@@ -5,10 +5,12 @@
 //! with the unified DV01 framework used across valuations.
 
 use crate::dcf_equity::{DiscountedCashFlow, pricer};
-use crate::rf_component_dv01::{RfComponentDv01Calculator, RfComponentPriced};
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_valuations_core::metrics::sensitivities::rf_component_dv01::{
+    RfComponentDv01Calculator, RfComponentPriced,
+};
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricRegistry};
 
 impl RfComponentPriced for DiscountedCashFlow {

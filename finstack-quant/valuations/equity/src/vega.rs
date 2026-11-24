@@ -4,70 +4,11 @@
 
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
+use finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega;
 use finstack_quant_valuations_core::metrics::{
     MetricCalculator, MetricContext, MetricId, VOL_POINTS_PER_ABSOLUTE_VOL,
-    apply_parallel_surface_bumps_in_place, bumped_volatility_override_dyn,
-    clone_with_crn_seed_if_supported, min_grid_vol, revert_scratch_bumps, volatility_override,
+    clone_with_crn_seed_if_supported, min_grid_vol, volatility_override,
 };
-
-/// Validated rectangular matrix emitted by [`KeyRateVega`] before flattening into `computed`.
-struct Structured2D {
-    row_keys: Vec<(String, String)>,
-    cols: Vec<String>,
-    values: Vec<Vec<f64>>,
-}
-
-impl Structured2D {
-    fn shape_error(&self) -> Option<String> {
-        let num_rows = self.row_keys.len();
-        let num_cols = self.cols.len();
-        if self.values.len() != num_rows {
-            return Some(format!(
-                "Matrix2D row count mismatch: expected {num_rows}, got {}",
-                self.values.len()
-            ));
-        }
-        for (idx, row) in self.values.iter().enumerate() {
-            if row.len() != num_cols {
-                return Some(format!(
-                    "Matrix2D column count mismatch at row {idx}: expected {num_cols}, got {}",
-                    row.len()
-                ));
-            }
-        }
-        None
-    }
-}
-
-fn store_vega_matrix(
-    context: &mut MetricContext,
-    row_keys: Vec<(String, String)>,
-    cols: Vec<String>,
-    values: Vec<Vec<f64>>,
-) -> finstack_quant_core::Result<()> {
-    let matrix = Structured2D {
-        row_keys,
-        cols,
-        values,
-    };
-    if let Some(reason) = matrix.shape_error() {
-        return Err(finstack_quant_core::Error::Validation(reason));
-    }
-    for (r_idx, (surface_id, expiry_label)) in matrix.row_keys.iter().enumerate() {
-        for (c_idx, col_label) in matrix.cols.iter().enumerate() {
-            let key = MetricId::composite(
-                &MetricId::BucketedVega,
-                &[
-                    surface_id.as_str(),
-                    expiry_label.as_str(),
-                    col_label.as_str(),
-                ],
-            );
-            context.computed.insert(key, matrix.values[r_idx][c_idx]);
-        }
-    }
-    Ok(())
-}
 
 /// Key-rate vega calculator: bumps individual `(expiry, strike)` points.
 ///
@@ -88,27 +29,37 @@ impl KeyRateVega {
     ///
     /// * `expiries` - Strictly increasing actual source expiries in years; empty selects every source expiry.
     /// * `strikes` - Strictly increasing actual source strikes; empty selects every source strike.
-    pub fn new(expiries: Vec<f64>, strikes: Vec<f64>) -> Self {
+    #[cfg(test)]
+    pub(crate) fn new(expiries: Vec<f64>, strikes: Vec<f64>) -> Self {
         Self { expiries, strikes }
     }
 }
 
 impl MetricCalculator for KeyRateVega {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let instrument = context.instrument.as_ref();
         let defaults = bump_config::resolve(context)?;
 
-        let dependencies = instrument.market_dependencies()?;
-        let vol_surface_ids = if volatility_override(instrument).is_some() {
-            Vec::new()
-        } else {
-            dependencies.grid_vol_surface_ids(&context.curves)?
+        let vol_surface_ids = {
+            let instrument = context.instrument.as_ref();
+            let dependencies = instrument.market_dependencies()?;
+            let ids = if volatility_override(instrument).is_some() {
+                Vec::new()
+            } else {
+                dependencies.grid_vol_surface_ids(&context.curves)?
+            };
+            if ids.is_empty() && volatility_override(instrument).is_none() {
+                return Err(finstack_quant_core::Error::Validation(
+                    "vega requires a vol surface dependency or a volatility override".to_string(),
+                ));
+            }
+            ids
         };
-        if vol_surface_ids.is_empty() && volatility_override(instrument).is_none() {
-            return Err(finstack_quant_core::Error::Validation(
-                "vega requires a vol surface dependency or a volatility override".to_string(),
-            ));
-        }
+
+        let target_total = if let Some(existing) = context.computed.get(&MetricId::Vega) {
+            *existing
+        } else {
+            GenericFdVega.calculate(context)?
+        };
 
         let curves = std::sync::Arc::clone(&context.curves);
         let base_ctx = curves.as_ref();
@@ -123,77 +74,9 @@ impl MetricCalculator for KeyRateVega {
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
         let as_of = context.as_of;
-
         let bump_pct = defaults.vol_bump_decimal;
-        let seeded_instrument = clone_with_crn_seed_if_supported(instrument);
+        let seeded_instrument = clone_with_crn_seed_if_supported(context.instrument.as_ref());
         let instrument = seeded_instrument.as_ref();
-
-        // Use already-computed Vega when available to keep totals consistent
-        let target_total = if let Some(existing) = context.computed.get(&MetricId::Vega) {
-            *existing
-        } else if let Some(volatility) = volatility_override(instrument) {
-            let up =
-                bumped_volatility_override_dyn(instrument, bump_pct, false)?.ok_or_else(|| {
-                    finstack_quant_core::Error::Internal(
-                        "active volatility override disappeared".into(),
-                    )
-                })?;
-            let pv_up = context.reprice_instrument_raw(up.as_ref(), base_ctx, as_of)?;
-            if volatility <= bump_pct {
-                (pv_up - context.reprice_instrument_raw(instrument, base_ctx, as_of)?)
-                    / (bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL)
-            } else {
-                let down = bumped_volatility_override_dyn(instrument, -bump_pct, false)?
-                    .ok_or_else(|| {
-                        finstack_quant_core::Error::Internal(
-                            "active volatility override disappeared".into(),
-                        )
-                    })?;
-                (pv_up - context.reprice_instrument_raw(down.as_ref(), base_ctx, as_of)?)
-                    / (2.0 * bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL)
-            }
-        } else {
-            let mut min_vol: Option<f64> = None;
-            for (_, surface) in &vol_surfaces {
-                if let Some(vol) = min_grid_vol(surface)? {
-                    min_vol = Some(min_vol.map_or(vol, |m| m.min(vol)));
-                }
-            }
-            context.with_market_scratch(|ctx, scratch| {
-                // Central difference O(h²) — consistent with bucketed approach.
-                let tokens_up =
-                    apply_parallel_surface_bumps_in_place(scratch, &vol_surface_ids, bump_pct)?;
-                let pv_up = ctx.reprice_instrument_raw(instrument, scratch, as_of);
-                revert_scratch_bumps(scratch, tokens_up)?;
-                let pv_up = pv_up?;
-
-                // An additive down-bump `σ - h` is rejected when `σ < h` and
-                // hits the degenerate `σ = 0` boundary when `σ == h`. Detect
-                // low grid vol via the surface minimum and fall back to a
-                // one-sided forward difference near zero vol.
-                if min_vol.is_some_and(|m| m <= bump_pct) {
-                    tracing::warn!(
-                        vol_surface_ids = ?vol_surface_ids,
-                        min_vol = min_vol,
-                        bump = bump_pct,
-                        "key-rate vega parallel down-bump would reach or breach σ = 0; \
-                         using one-sided forward difference"
-                    );
-                    let pv_base = ctx.reprice_instrument_raw(instrument, base_ctx, as_of)?;
-                    Ok((pv_up - pv_base) / (bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL))
-                } else {
-                    let tokens_down = apply_parallel_surface_bumps_in_place(
-                        scratch,
-                        &vol_surface_ids,
-                        -bump_pct,
-                    )?;
-                    let pv_down = ctx.reprice_instrument_raw(instrument, scratch, as_of);
-                    revert_scratch_bumps(scratch, tokens_down)?;
-                    let pv_down = pv_down?;
-                    Ok((pv_up - pv_down) / (2.0 * bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL))
-                }
-            })?
-        };
 
         let grids = vol_surfaces
             .iter()
@@ -280,8 +163,18 @@ impl MetricCalculator for KeyRateVega {
         }
 
         let col_labels: Vec<String> = columns.iter().map(ToString::to_string).collect();
-        if !row_keys.is_empty() {
-            store_vega_matrix(context, row_keys, col_labels, raw_matrix)?;
+        for ((surface_id, expiry_label), row) in row_keys.iter().zip(raw_matrix.iter()) {
+            for (col_label, &value) in col_labels.iter().zip(row.iter()) {
+                let key = MetricId::composite(
+                    &MetricId::BucketedVega,
+                    &[
+                        surface_id.as_str(),
+                        expiry_label.as_str(),
+                        col_label.as_str(),
+                    ],
+                );
+                context.computed.insert(key, value);
+            }
         }
 
         Ok(raw_total)
@@ -326,6 +219,7 @@ mod tests {
     use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::CurveId;
     use finstack_quant_valuations_core::instruments::Instrument;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     use finstack_quant_valuations_core::instruments::{MarketDependencies, VolatilityDependency};
     use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
     use finstack_quant_valuations_core::pricer::InstrumentType;
@@ -335,6 +229,7 @@ mod tests {
     #[derive(Clone)]
     struct MultiSurfaceVegaInstrument {
         attributes: Attributes,
+        pricing_overrides: InstrumentPricingOverrides,
         surface_terms: Vec<(CurveId, f64)>,
     }
 
@@ -400,6 +295,16 @@ mod tests {
             &mut self.attributes
         }
 
+        fn get_instrument_pricing_overrides(&self) -> Option<&InstrumentPricingOverrides> {
+            Some(&self.pricing_overrides)
+        }
+
+        fn get_instrument_pricing_overrides_mut(
+            &mut self,
+        ) -> Option<&mut InstrumentPricingOverrides> {
+            Some(&mut self.pricing_overrides)
+        }
+
         fn base_value(
             &self,
             market: &MarketContext,
@@ -433,6 +338,7 @@ mod tests {
     fn production_risk_default_vega_uses_unique_nodes() {
         let instrument = MultiSurfaceVegaInstrument {
             attributes: Attributes::new(),
+            pricing_overrides: InstrumentPricingOverrides::default(),
             surface_terms: vec![(CurveId::new("VOL"), 1_000.0)],
         };
         let market = MarketContext::new().insert_surface(flat_surface("VOL", 0.2));
@@ -463,6 +369,7 @@ mod tests {
     fn production_risk_custom_vega_rejects_duplicate_source_nodes() {
         let instrument = MultiSurfaceVegaInstrument {
             attributes: Attributes::new(),
+            pricing_overrides: InstrumentPricingOverrides::default(),
             surface_terms: vec![(CurveId::new("VOL"), 1_000.0)],
         };
         let market = MarketContext::new().insert_surface(flat_surface("VOL", 0.2));
@@ -488,6 +395,7 @@ mod tests {
         let second_coefficient = 2_500.0;
         let instrument = MultiSurfaceVegaInstrument {
             attributes: Attributes::new(),
+            pricing_overrides: InstrumentPricingOverrides::default(),
             surface_terms: vec![
                 (CurveId::new("VOL-A"), first_coefficient),
                 (CurveId::new("VOL-B"), second_coefficient),
