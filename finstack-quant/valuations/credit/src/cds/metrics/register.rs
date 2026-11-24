@@ -1,7 +1,9 @@
 //! Metric registration and calculators.
 
 use crate::cds::CreditDefaultSwap;
-use crate::cds::pricing::CdsPricer;
+use crate::cds::pricing::{
+    par_spread, pv_premium_leg, pv_protection_leg, risky_annuity, risky_pv01,
+};
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
@@ -155,8 +157,7 @@ impl MetricCalculator for ParSpreadCalculator {
         let surv = context
             .curves
             .get_hazard(&cds.protection_leg.credit_curve_id)?;
-        let pricer = CdsPricer::new();
-        pricer.par_spread(cds, disc.as_ref(), surv.as_ref(), context.as_of)
+        par_spread(cds, disc.as_ref(), surv.as_ref(), context.as_of)
     }
 }
 
@@ -175,8 +176,7 @@ impl MetricCalculator for PremiumLegPvCalculator {
         let surv = context
             .curves
             .get_hazard(&cds.protection_leg.credit_curve_id)?;
-        let pricer = CdsPricer::new();
-        let pv = pricer.pv_premium_leg(cds, disc.as_ref(), surv.as_ref(), context.as_of)?;
+        let pv = pv_premium_leg(cds, disc.as_ref(), surv.as_ref(), context.as_of)?;
         Ok(pv.amount())
     }
 }
@@ -196,8 +196,7 @@ impl MetricCalculator for ProtectionLegPvCalculator {
         let surv = context
             .curves
             .get_hazard(&cds.protection_leg.credit_curve_id)?;
-        let pricer = CdsPricer::new();
-        let pv = pricer.pv_protection_leg(cds, disc.as_ref(), surv.as_ref(), context.as_of)?;
+        let pv = pv_protection_leg(cds, disc.as_ref(), surv.as_ref(), context.as_of)?;
         Ok(pv.amount())
     }
 }
@@ -219,7 +218,7 @@ impl MetricCalculator for RiskyAnnuityCalculator {
         let surv = context
             .curves
             .get_hazard(&cds.protection_leg.credit_curve_id)?;
-        CdsPricer::new().risky_annuity(cds, disc.as_ref(), surv.as_ref(), context.as_of)
+        risky_annuity(cds, disc.as_ref(), surv.as_ref(), context.as_of)
     }
 }
 
@@ -240,6 +239,6 @@ impl MetricCalculator for RiskyPv01Calculator {
         let surv = context
             .curves
             .get_hazard(&cds.protection_leg.credit_curve_id)?;
-        CdsPricer::new().risky_pv01(cds, disc.as_ref(), surv.as_ref(), context.as_of)
+        risky_pv01(cds, disc.as_ref(), surv.as_ref(), context.as_of)
     }
 }

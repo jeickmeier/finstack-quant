@@ -191,19 +191,6 @@ impl CreditParams {
         Self::new(reference_entity, 0.40, credit_curve_id)
     }
 
-    /// Sovereign credit with 30% recovery.
-    ///
-    /// # Arguments
-    ///
-    /// * `reference_entity` - Sovereign issuer name.
-    /// * `credit_curve_id` - Identifier of the hazard/survival curve in market data.
-    pub fn sovereign_standard(
-        reference_entity: impl Into<String>,
-        credit_curve_id: impl Into<CurveId>,
-    ) -> Self {
-        Self::new(reference_entity, 0.30, credit_curve_id)
-    }
-
     /// Validate that the recovery rate is within valid bounds `[0.0, 1.0)`.
     ///
     /// # Errors
@@ -221,9 +208,7 @@ mod tests {
     #[test]
     fn credit_typed_constructors_preserve_typed_inputs() {
         let corp = CreditParams::corporate_standard("CORP", "CORP-CDS");
-        let sov = CreditParams::sovereign_standard("UST", "UST-CDS");
         assert!((corp.recovery_rate - 0.40).abs() < 1e-12);
-        assert!((sov.recovery_rate - 0.30).abs() < 1e-12);
     }
 
     #[test]
@@ -261,11 +246,7 @@ mod tests {
                 .validate()
                 .is_ok()
         );
-        assert!(
-            CreditParams::sovereign_standard("UST", "UST-CDS")
-                .validate()
-                .is_ok()
-        );
+
         let bad = CreditParams {
             reference_entity: "X".to_string(),
             recovery_rate: 1.2,

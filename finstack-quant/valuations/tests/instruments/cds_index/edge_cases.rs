@@ -31,7 +31,25 @@ fn test_zero_notional() {
     let end = date!(2030 - 01 - 01);
     let as_of = start;
 
-    let idx = standard_single_curve_index("CDX-ZERO", start, end, 0.0);
+    let build_err = CdsIndex::from_preset(
+        &standard_cdx_params(),
+        finstack_quant_valuations::instruments::credit_derivatives::cds::CdsTradeParams {
+            id: finstack_quant_core::types::InstrumentId::new("CDX-ZERO"),
+            notional: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+            side: PayReceive::Pay,
+            include_valuation_date_cashflows: false,
+            start,
+            end,
+            recovery_rate: TEST_RECOVERY,
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            credit_curve_id: finstack_quant_core::types::CurveId::new("HZ-INDEX"),
+        },
+    )
+    .expect_err("zero notional must fail construction");
+    assert!(build_err.to_string().contains("non-zero"));
+
+    let mut idx = standard_single_curve_index("CDX-ZERO", start, end, TEST_NOTIONAL);
+    idx.notional = Money::new(0.0, Currency::USD).expect("valid money fixture");
     let ctx = standard_market_context(as_of);
 
     let err = idx.value(&ctx, as_of).expect_err("zero notional must fail");
@@ -256,12 +274,12 @@ fn test_recovery_rate_zero() {
 
 #[test]
 fn test_recovery_rate_one() {
-    // Edge Case: 100% recovery rate (zero LGD)
+    // Edge Case: 100% recovery rate (zero LGD) is outside the valid [0.0, 1.0) domain.
     let start = date!(2025 - 01 - 01);
     let end = date!(2030 - 01 - 01);
     let as_of = start;
 
-    let idx = CdsIndex::from_preset(
+    let build_err = CdsIndex::from_preset(
         &standard_cdx_params(),
         finstack_quant_valuations::instruments::credit_derivatives::cds::CdsTradeParams {
             id: finstack_quant_core::types::InstrumentId::new("CDX-FULL-REC"),
@@ -275,23 +293,28 @@ fn test_recovery_rate_one() {
             credit_curve_id: finstack_quant_core::types::CurveId::new("HZ-INDEX"),
         },
     )
-    .expect("valid test parameters");
+    .expect_err("recovery rate 1.0 must fail construction");
+    assert!(
+        build_err.to_string().contains("Recovery rate")
+            || build_err.to_string().contains("[0.0, 1.0)"),
+        "unexpected error: {build_err}"
+    );
 
-    // The hazard curve's bootstrap recovery must agree with the index trade
-    // recovery (ISDA "same R in both legs"); build HZ-INDEX at 1.0 to match.
+    let mut idx = standard_single_curve_index("CDX-FULL-REC", start, end, TEST_NOTIONAL);
+    idx.protection_leg.recovery_rate = 1.0;
     let ctx = MarketContext::new()
         .try_insert(flat_discount_curve("USD-OIS", as_of, 0.03))
         .expect("insert market curve")
         .try_insert(flat_hazard_curve(
             "HZ-INDEX",
             as_of,
-            1.0,
+            0.4,
             STANDARD_HAZARD_RATE,
         ))
         .expect("insert market curve");
     let result = idx.value(&ctx, as_of);
 
-    assert!(result.is_ok(), "Full recovery should be valid");
+    assert!(result.is_err(), "Full recovery should be rejected");
 }
 
 #[test]

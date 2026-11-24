@@ -36,8 +36,8 @@ Import path: `finstack_quant_valuations_credit::<leaf>::<Type>` (or
 through the umbrella); the crate root exports only the `CREDIT` family static.
 `CreditDefaultSwap`, `CdsIndex`, `CdsTranche` and `CdsOption` are also flat at
 `finstack_quant_valuations::instruments`. The quadrature
-helpers in `cds_option::{bloomberg_quadrature, pricer}` and the CDS pricing
-engine in `cds::pricing` are `#[doc(hidden)] pub`: the umbrella's Bloomberg
+helpers in `cds_option::{bloomberg_quadrature, pricer}` are
+`#[doc(hidden)] pub`: the umbrella's Bloomberg
 CDSO golden test reaches them because its market bootstrap needs
 `finstack-quant-calibration`, which this crate cannot dev-depend on.
 

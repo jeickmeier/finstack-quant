@@ -34,7 +34,6 @@ impl Marginable for CdsIndex {
             CreditSimmTerms {
                 qualifier: &self.index_name,
                 maturity: self.premium_leg.end,
-                recovery_rate: self.protection_leg.recovery_rate,
                 notional: Money::new(
                     self.notional.amount() * self.index_factor,
                     self.notional.currency(),

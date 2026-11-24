@@ -79,6 +79,14 @@ mod metrics;
 mod tests;
 
 pub(crate) use conventions::date_from_hazard_time;
-#[doc(hidden)]
-pub use engine::CdsPricer;
 pub use engine::PreparedCds;
+#[cfg(test)]
+pub(crate) use engine::pv_premium_leg_raw;
+pub(crate) use engine::{pv_premium_leg, pv_protection_leg, pv_protection_leg_raw};
+#[cfg(test)]
+pub(crate) use metrics::premium_leg_annuity;
+pub(crate) use metrics::{
+    clean_quote_accrual_fraction, coupon_periods, default_accrued_fraction, generate_isda_schedule,
+    npv_full, par_spread, par_spread_denominator, premium_cashflow_accruals, risky_annuity,
+    risky_pv01,
+};

@@ -79,7 +79,7 @@ impl CdsIndexConstituent {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct CdsIndex {
     /// Whether scheduled premium and actual upfront payable on the valuation date
     /// are still due. A booked trade must explicitly elect this boundary.
@@ -107,6 +107,8 @@ pub struct CdsIndex {
     /// Pricing aggregation mode
     pub pricing: IndexPricing,
     /// Optional list of constituents when using `IndexPricing::Constituents`
+    #[serde(default)]
+    #[builder(default)]
     pub constituents: Vec<CdsIndexConstituent>,
     /// Number of reference entities in the index pool.
     ///
@@ -179,23 +181,9 @@ pub struct CdsIndex {
     pub attributes: Attributes,
 }
 
+finstack_quant_valuations_core::validate_on_deserialize!(CdsIndex);
+
 impl CdsIndex {
-    fn premium_with_standard_defaults(&self) -> finstack_quant_core::Result<PremiumLegSpec> {
-        let mut premium = self.premium_leg.clone();
-        if premium.calendar_id.is_none() {
-            premium.calendar_id = Some(self.convention.get_spec()?.calendar_id.as_str().into());
-        }
-        Ok(premium)
-    }
-
-    fn protection_with_standard_defaults(&self) -> finstack_quant_core::Result<ProtectionLegSpec> {
-        let mut protection = self.protection_leg.clone();
-        if protection.settlement_delay == 0 {
-            protection.settlement_delay = self.convention.get_spec()?.settlement_days;
-        }
-        Ok(protection)
-    }
-
     /// Create a canonical example CDS Index for testing and documentation.
     ///
     /// Returns a CDX.NA.IG series 42 index with standard conventions.
@@ -320,7 +308,7 @@ impl CdsIndex {
 
         let coupon_bp = finstack_quant_core::decimal::f64_to_decimal(preset.coupon_bp)?;
 
-        Ok(Self {
+        let index = Self {
             id,
             index_name: preset.index_name.clone(),
             series: preset.series,
@@ -357,7 +345,9 @@ impl CdsIndex {
             valuation_convention: CdsValuationConvention::default(),
             margin_spec: None,
             attributes: Attributes::new(),
-        })
+        };
+        index.validate()?;
+        Ok(index)
     }
 
     /// Set the number of reference entities in the index pool.
@@ -384,6 +374,12 @@ impl CdsIndex {
 
     /// Validate trade-state invariants shared by all pricing modes.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        finstack_quant_core::validation::validate_date_range_strict(
+            self.premium_leg.start,
+            self.premium_leg.end,
+            "CDS Index premium",
+        )?;
+        finstack_quant_core::validation::validate_recovery_rate(self.protection_leg.recovery_rate)?;
         if !self.index_factor.is_finite() || !(0.0..=1.0).contains(&self.index_factor) {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "CDS Index '{}' has invalid index_factor {} (must be finite and within [0, 1])",
@@ -396,6 +392,29 @@ impl CdsIndex {
                 self.id,
                 self.notional.amount()
             )));
+        }
+        if self.pricing == IndexPricing::Constituents {
+            if self.constituents.is_empty() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CDS Index '{}' has pricing=Constituents but no constituents supplied",
+                    self.id
+                )));
+            }
+            for (i, constituent) in self.constituents.iter().enumerate() {
+                if !constituent.weight.is_finite() || constituent.weight <= 0.0 {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "CDS Index '{}' constituent #{} ('{}') has invalid weight {} \
+                         (must be finite and > 0)",
+                        self.id,
+                        i + 1,
+                        constituent.credit.credit_curve_id,
+                        constituent.weight
+                    )));
+                }
+                finstack_quant_core::validation::validate_recovery_rate(
+                    constituent.credit.recovery_rate,
+                )?;
+            }
         }
         if let Some(margin_spec) = &self.margin_spec {
             margin_spec.validate_for_credit()?;
@@ -429,8 +448,8 @@ impl CdsIndex {
             )?,
             side: self.side,
             convention: self.convention,
-            premium_leg: self.premium_with_standard_defaults()?,
-            protection_leg: self.protection_with_standard_defaults()?,
+            premium_leg: self.premium_leg.clone(),
+            protection_leg: self.protection_leg.clone(),
             instrument_pricing_overrides: self.instrument_pricing_overrides.clone(),
             metric_pricing_overrides: self.metric_pricing_overrides.clone(),
             scenario_pricing_overrides: self.scenario_pricing_overrides.clone(),
@@ -441,6 +460,27 @@ impl CdsIndex {
             margin_spec: self.margin_spec.clone(),
             attributes: self.attributes.clone(),
         })
+    }
+
+    /// Distinct credit curve identifiers consumed under the current pricing mode.
+    pub(crate) fn credit_curve_ids(&self) -> Vec<CurveId> {
+        match self.pricing {
+            IndexPricing::SingleCurve => vec![self.protection_leg.credit_curve_id.clone()],
+            IndexPricing::Constituents => {
+                let mut curve_ids = Vec::new();
+                for constituent in self
+                    .constituents
+                    .iter()
+                    .filter(|constituent| !constituent.defaulted)
+                {
+                    let curve_id = &constituent.credit.credit_curve_id;
+                    if !curve_ids.contains(curve_id) {
+                        curve_ids.push(curve_id.clone());
+                    }
+                }
+                curve_ids
+            }
+        }
     }
 
     /// Configure explicit constituents with custom weights.
@@ -479,13 +519,8 @@ impl finstack_quant_valuations_core::instruments::Instrument for CdsIndex {
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
         let mut deps = MarketDependencies::new();
         deps.add_discount_curve(self.premium_leg.discount_curve_id.clone());
-        deps.add_credit_curve(self.protection_leg.credit_curve_id.clone());
-        if self.pricing == IndexPricing::Constituents {
-            for constituent in &self.constituents {
-                if !constituent.defaulted {
-                    deps.add_credit_curve(constituent.credit.credit_curve_id.clone());
-                }
-            }
+        for credit_id in self.credit_curve_ids() {
+            deps.add_credit_curve(credit_id);
         }
         Ok(deps)
     }

@@ -108,6 +108,12 @@ fn resolve_constituent_count(num_constituents: Option<u32>, index_name: &str) ->
 impl MetricCalculator for JumpToDefaultCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let index: &CdsIndex = context.instrument_as()?;
+        if context.as_of < index.premium_leg.start
+            || context.as_of >= index.premium_leg.end
+            || index.index_factor <= 0.0
+        {
+            return Ok(0.0);
+        }
 
         if index.pricing == IndexPricing::Constituents {
             // Average per-name JTD using surviving constituents only.
@@ -209,5 +215,47 @@ mod tests {
     #[test]
     fn errors_on_zero_explicit_count() {
         assert!(resolve_constituent_count(Some(0), "CDX.NA.IG").is_err());
+    }
+
+    #[test]
+    fn inactive_or_zero_factor_indices_report_zero_jtd() {
+        use finstack_quant_core::currency::Currency;
+        use finstack_quant_core::market_data::context::MarketContext;
+        use finstack_quant_core::money::Money;
+        use std::sync::Arc;
+
+        let market = Arc::new(MarketContext::new());
+        let base = CdsIndex::example().expect("example");
+        let check = |idx: CdsIndex, as_of| {
+            let mut ctx = MetricContext::new(
+                Arc::new(idx),
+                Arc::clone(&market),
+                as_of,
+                Money::from((0_i64, Currency::USD)),
+                MetricContext::default_config(),
+            );
+            JumpToDefaultCalculator
+                .calculate(&mut ctx)
+                .expect("JTD calculation")
+        };
+
+        // Forward-starting and matured single-curve index -> 0.0.
+        let pre_start = base.premium_leg.start - time::Duration::days(1);
+        assert_eq!(check(base.clone(), pre_start), 0.0);
+        assert_eq!(check(base.clone(), base.premium_leg.end), 0.0);
+
+        // Zero surviving factor (single-curve and constituents) -> 0.0.
+        let mut zero_single = base.clone();
+        zero_single.index_factor = 0.0;
+        assert_eq!(check(zero_single, base.premium_leg.start), 0.0);
+
+        let mut zero_constituents = base.clone();
+        zero_constituents.pricing = IndexPricing::Constituents;
+        zero_constituents.constituents = vec![crate::cds_index::CdsIndexConstituent::active(
+            crate::CreditParams::corporate_standard("CORP", "CORP-HAZARD"),
+            1.0,
+        )];
+        zero_constituents.index_factor = 0.0;
+        assert_eq!(check(zero_constituents, base.premium_leg.start), 0.0);
     }
 }

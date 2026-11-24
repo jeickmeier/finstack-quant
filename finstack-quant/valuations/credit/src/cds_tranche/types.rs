@@ -27,7 +27,7 @@ use finstack_quant_valuations_core::impl_instrument_base;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct CdsTranche {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -75,6 +75,8 @@ pub struct CdsTranche {
     pub start_date: Option<Date>,
     /// Realized (settled) loss on the reference pool as a decimal fraction of
     /// the original portfolio notional, in `[0, 1]`.
+    #[serde(default)]
+    #[builder(default)]
     pub realized_loss: f64,
     /// Contractual date regime of the coupon schedule (record
     /// CALIBRATION-FRAMEWORK-007, O7): `standard` CDS roll dates (20th of Mar,
@@ -120,6 +122,8 @@ pub struct CdsTranche {
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(CdsTranche);
 
 impl CdsTranche {
     pub(crate) fn contractual_start_date(&self, as_of: Date) -> Option<Date> {
@@ -443,5 +447,13 @@ mod tests {
 
         assert_eq!(dependencies.credit_index_ids, vec![tranche.credit_index_id]);
         assert!(dependencies.curves.credit_curves.is_empty());
+    }
+
+    #[test]
+    fn serde_rejects_invalid_tranche_invariants() {
+        let mut val =
+            serde_json::to_value(CdsTranche::example().expect("example")).expect("serialize");
+        val["attach_pct"] = serde_json::json!(10.0);
+        assert!(serde_json::from_value::<CdsTranche>(val).is_err());
     }
 }

@@ -12,8 +12,8 @@ use super::common::*;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_models::types::OptionType;
-use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
+use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations_test_support::assertions::assert_positive;
 use time::macros::date;
@@ -201,9 +201,12 @@ fn price_strike_vega_is_positive() {
     let market = standard_market(as_of);
 
     for option_type in [OptionType::Call, OptionType::Put] {
-        let vega = hy_option(option_type, NEAR_ATM_PRICE_PCT, as_of)
-            .vega(&market, as_of)
-            .expect("price-strike vega");
+        let vega = *hy_option(option_type, NEAR_ATM_PRICE_PCT, as_of)
+            .price_with_metrics(&market, as_of, &[MetricId::Vega], PricingOptions::default())
+            .expect("price-strike vega")
+            .measures
+            .get("vega")
+            .expect("vega measure");
         assert_positive(vega, "near-ATM vega");
     }
 }

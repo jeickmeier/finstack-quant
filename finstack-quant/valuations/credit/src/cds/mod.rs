@@ -137,10 +137,10 @@
 
 pub(crate) mod marginable;
 pub(crate) mod metrics;
-#[doc(hidden)]
-pub mod pricing;
+pub(crate) mod pricing;
 mod types;
 
+pub use pricing::PreparedCds;
 pub use types::CdsTradeParams;
 pub use types::CreditDefaultSwap;
 pub use types::CreditDefaultSwapBuilder;

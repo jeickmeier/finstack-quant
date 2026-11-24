@@ -53,12 +53,13 @@ impl crate::cs01::CdsCs01Conventions for crate::cds_option::CdsOption {
         _hazard_id: &finstack_quant_core::types::CurveId,
     ) -> finstack_quant_core::Result<Option<f64>> {
         let as_of = context.as_of;
+        pricer::ensure_valuation_not_after_expiry(self, as_of)?;
         if as_of >= self.expiry {
             tracing::debug!(
                 instrument_id = %self.id,
                 as_of = %as_of,
                 expiry = %self.expiry,
-                "CDS Option CS01: Instrument already expired, returning 0.0"
+                "CDS Option CS01: Cash-settled option at expiry, returning 0.0"
             );
             return Ok(Some(0.0));
         }
@@ -155,8 +156,8 @@ impl MetricCalculator for UnderlyingSpreadDv01Calculator {
                 source_market: std::sync::Arc::clone(&context.curves),
                 target_market: std::sync::Arc::clone(&context.curves),
                 discount_curve_id: option.discount_curve_id.clone(),
-                doc_clause: None,
-                cds_valuation_convention: None,
+                doc_clause: Some(crate::cds::metrics::market_doc_clause(&cds)),
+                cds_valuation_convention: Some(cds.valuation_convention),
                 deal_quote_override: None,
                 action: HazardRecalibrationAction::SpreadBump(QuoteBump::ParallelBp(1.0)),
             },
@@ -179,7 +180,7 @@ pub(crate) struct ThetaCalculator;
 impl MetricCalculator for ThetaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let option: &CdsOption = context.instrument_as()?;
-        option.theta(&context.curves, context.as_of)
+        crate::cds_option::pricer::theta(option, &context.curves, context.as_of)
     }
 }
 
@@ -207,6 +208,10 @@ pub(crate) fn vega(
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
 ) -> Result<f64> {
+    pricer::ensure_valuation_not_after_expiry(option, as_of)?;
+    if option.expiry <= as_of {
+        return Ok(0.0);
+    }
     let base_sigma = resolve_sigma(option, curves, as_of)?;
     let bumped_sigma = base_sigma + VEGA_VOL_BUMP;
     if bumped_sigma > super::super::types::MAX_IMPLIED_VOL {

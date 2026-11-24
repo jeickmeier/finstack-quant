@@ -1,7 +1,8 @@
 //! Market validation tests for option moneyness behavior (ITM/ATM/OTM).
 
 use super::common::*;
-use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
+use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations_test_support::assertions::{
     assert_finite, assert_non_negative, assert_positive,
 };
@@ -73,7 +74,17 @@ fn test_atm_call_delta_positive() {
         .strike(200.0) // Near forward
         .build(as_of);
 
-    let delta = option.delta(&market, as_of).unwrap();
+    let delta = *option
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Delta],
+            PricingOptions::default(),
+        )
+        .unwrap()
+        .measures
+        .get("delta")
+        .unwrap();
 
     // Delta should be positive for ATM call
     assert_positive(delta, "ATM call delta");
@@ -91,8 +102,28 @@ fn test_itm_call_delta_higher() {
 
     let atm_option = CdsOptionBuilder::new().call().strike(200.0).build(as_of);
 
-    let itm_delta = itm_option.delta(&market, as_of).unwrap();
-    let atm_delta = atm_option.delta(&market, as_of).unwrap();
+    let itm_delta = *itm_option
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Delta],
+            PricingOptions::default(),
+        )
+        .unwrap()
+        .measures
+        .get("delta")
+        .unwrap();
+    let atm_delta = *atm_option
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Delta],
+            PricingOptions::default(),
+        )
+        .unwrap()
+        .measures
+        .get("delta")
+        .unwrap();
 
     assert!(
         itm_delta > atm_delta,
@@ -112,8 +143,28 @@ fn test_otm_call_delta_lower() {
 
     let atm_option = CdsOptionBuilder::new().call().strike(200.0).build(as_of);
 
-    let otm_delta = otm_option.delta(&market, as_of).unwrap();
-    let atm_delta = atm_option.delta(&market, as_of).unwrap();
+    let otm_delta = *otm_option
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Delta],
+            PricingOptions::default(),
+        )
+        .unwrap()
+        .measures
+        .get("delta")
+        .unwrap();
+    let atm_delta = *atm_option
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Delta],
+            PricingOptions::default(),
+        )
+        .unwrap()
+        .measures
+        .get("delta")
+        .unwrap();
 
     assert!(
         otm_delta < atm_delta,
@@ -232,10 +283,18 @@ fn test_gamma_positive_all_strikes() {
     let market = standard_market(as_of);
 
     for strike in [100.0, 150.0, 200.0, 250.0, 400.0] {
-        let gamma = CdsOptionBuilder::new()
+        let gamma = *CdsOptionBuilder::new()
             .strike(strike)
             .build(as_of)
-            .gamma(&market, as_of)
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[MetricId::Gamma],
+                PricingOptions::default(),
+            )
+            .unwrap()
+            .measures
+            .get("gamma")
             .unwrap();
 
         assert_non_negative(gamma, &format!("Gamma for strike {}", strike));
@@ -250,10 +309,13 @@ fn test_vega_positive_all_strikes() {
     let market = standard_market(as_of);
 
     for strike in [100.0, 150.0, 200.0, 250.0, 400.0] {
-        let vega = CdsOptionBuilder::new()
+        let vega = *CdsOptionBuilder::new()
             .strike(strike)
             .build(as_of)
-            .vega(&market, as_of)
+            .price_with_metrics(&market, as_of, &[MetricId::Vega], PricingOptions::default())
+            .unwrap()
+            .measures
+            .get("vega")
             .unwrap();
 
         assert_positive(vega, &format!("Vega for strike {}", strike));

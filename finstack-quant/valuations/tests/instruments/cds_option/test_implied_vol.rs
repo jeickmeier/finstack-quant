@@ -194,7 +194,11 @@ fn test_max_implied_vol_hard_error() {
     let err = over_max.validate_invariants().unwrap_err();
     assert!(err.to_string().contains("exceeds maximum"));
 
-    let invalid_option = CdsOptionBuilder::new().implied_vol(5.5).build(as_of);
+    let mut invalid_option = CdsOptionBuilder::new().build(as_of);
+    invalid_option
+        .instrument_pricing_overrides
+        .market_quotes
+        .implied_volatility = Some(5.5);
     let pricing_err = invalid_option.value(&market, as_of).unwrap_err();
     assert!(pricing_err.to_string().contains("exceeds maximum"));
 }

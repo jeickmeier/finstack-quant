@@ -1,7 +1,7 @@
 //! Bloomberg CDSO quadrature implementation.
 
 use crate::cds::CreditDefaultSwap;
-use crate::cds::pricing::CdsPricer;
+use crate::cds::pricing::{premium_cashflow_accruals, pv_protection_leg};
 use crate::cds_option::CdsOption;
 use crate::constants::bloomberg_cdso;
 use finstack_quant_core::Result;
@@ -29,7 +29,7 @@ const DISTRESSED_FORWARD_SPREAD_LIMIT: f64 = 0.10;
 const PAYOFF_QUADRATURE_MAX_EVALS: usize = 1_000_000;
 
 /// Price a CDS option under the Bloomberg CDSO numerical-quadrature model.
-pub fn npv(
+pub(crate) fn npv(
     option: &CdsOption,
     cds: &CreditDefaultSwap,
     market: &MarketContext,
@@ -54,7 +54,7 @@ pub fn npv(
 
 /// Bloomberg CDSO theta: shorten the exercise time by 1/365.25 while
 /// retaining the same calibrated forward price and lognormal mean.
-pub fn theta(
+pub(crate) fn theta(
     option: &CdsOption,
     cds: &CreditDefaultSwap,
     market: &MarketContext,
@@ -76,7 +76,7 @@ pub fn theta(
 
 /// Bloomberg CDSO ATM Forward (in basis points) — the bootstrapped forward
 /// par spread of the no-knockout forward CDS at expiry.
-pub fn forward_par_at_expiry_bp(
+pub(crate) fn forward_par_at_expiry_bp(
     option: &CdsOption,
     cds: &CreditDefaultSwap,
     market: &MarketContext,
@@ -106,7 +106,7 @@ pub fn forward_par_at_expiry_bp(
 /// [`CdsOptionStrike::clean_price_fraction`]:
 ///     super::super::strike::CdsOptionStrike::clean_price_fraction
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum QuadratureStrike {
+pub(crate) enum QuadratureStrike {
     /// Forward-spread strike `K` (decimal rate).
     Spread {
         /// Strike spread as a decimal rate.
@@ -164,7 +164,7 @@ pub struct ForwardCdsContext {
     /// Index contractual coupon `c` (decimal).
     pub coupon: f64,
     /// Typed, precomputed strike data for the deterministic strike term.
-    pub strike: QuadratureStrike,
+    pub(crate) strike: QuadratureStrike,
     /// `ξ = +1` for payer (Call), `−1` for receiver (Put).
     pub option_type: OptionType,
     /// Index-factor scale (1.0 for non-index or original-version index
@@ -193,7 +193,6 @@ impl ForwardCdsContext {
         as_of: Date,
         sigma: f64,
     ) -> Result<Self> {
-        let cds_pricer = CdsPricer::new();
         // LGD must be strictly positive and finite; recovery is already
         // validated to `(0, 1)` at construction time, but guard against NaN /
         // future construction-path regressions with an explicit error rather
@@ -248,7 +247,7 @@ impl ForwardCdsContext {
         // A forward premium-leg PV that includes AoD would systematically
         // overstate the annuity by the AoD contribution, which on cdx_ig_46
         // shifts ATM Fwd by ~0.1 bp.
-        let cashflows = cds_pricer.premium_cashflow_accruals(cds, as_of)?;
+        let cashflows = premium_cashflow_accruals(cds)?;
         let mut times_from_expiry = Vec::with_capacity(cashflows.len());
         let mut accrual_factors = Vec::with_capacity(cashflows.len());
         let mut fwd_discount_factors = Vec::with_capacity(cashflows.len());
@@ -328,9 +327,7 @@ impl ForwardCdsContext {
         let mut forward_cds =
             super::super::pricer::cds_with_bloomberg_protection_end_extension(cds);
         forward_cds.protection_effective_date = Some(cds.protection_start().max(option.expiry));
-        let forward_protection_pv = cds_pricer
-            .pv_protection_leg(&forward_cds, disc, surv, as_of)?
-            .amount();
+        let forward_protection_pv = pv_protection_leg(&forward_cds, disc, surv, as_of)?.amount();
         let mut forward_par_spread =
             forward_protection_pv / (risky_annuity_at_value_dt * cds.notional.amount());
 

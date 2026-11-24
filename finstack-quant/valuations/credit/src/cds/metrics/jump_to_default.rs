@@ -43,7 +43,7 @@
 //! the current mark in all these states; it is not a pending-coupon cashflow model.
 
 use crate::cds::CreditDefaultSwap;
-use crate::cds::pricing::CdsPricer;
+use crate::cds::pricing::default_accrued_fraction;
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
@@ -131,7 +131,7 @@ fn calculate_accrued_premium(
     cds: &CreditDefaultSwap,
     as_of: finstack_quant_core::dates::Date,
 ) -> Result<f64> {
-    let accrual_fraction = CdsPricer::new().default_accrued_fraction(cds, as_of)?;
+    let accrual_fraction = default_accrued_fraction(cds, as_of)?;
     let spread = cds.premium_leg.coupon_bp.to_f64().ok_or_else(|| {
         finstack_quant_core::Error::Validation(
             "premium.coupon_bp cannot be represented as f64".to_string(),

@@ -418,7 +418,11 @@ impl CdsTranchePricer {
     ) -> Result<f64> {
         tranche.validate()?;
         let index_data_arc = market.get_credit_index(&tranche.credit_index_id)?;
-        self.calculate_expected_tranche_loss(tranche, index_data_arc.as_ref(), tranche.maturity)
+        let points = self
+            .prepare_el_wd_curve(tranche, index_data_arc.as_ref(), &[tranche.maturity])?
+            .evaluate(self, index_data_arc.base_correlation_curve())?;
+        let prior_loss = self.calculate_prior_tranche_loss(tranche);
+        Ok((points[0].el_fraction - prior_loss).max(0.0) * tranche.notional.amount())
     }
 
     /// Calculate correlation delta (Correlation01) using a central difference.
@@ -447,29 +451,21 @@ impl CdsTranchePricer {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
-        tranche.validate()?;
+        let prepared = self.prepare(tranche, market, as_of)?;
         let bump_abs = finstack_quant_valuations_core::metrics::CORRELATION_BUMP;
         let original_index_arc = market.get_credit_index(&tranche.credit_index_id)?;
-
         let curve = original_index_arc.base_correlation_curve();
-        let ctx_up = market
-            .clone()
-            .try_insert(curve.apply_bucket_bump(None, bump_abs)?)?;
-        let ctx_down = market
-            .clone()
-            .try_insert(curve.apply_bucket_bump(None, -bump_abs)?)?;
 
-        let pv_up = self
-            .price_validated_tranche(tranche, &ctx_up, as_of)?
+        let pv_up = prepared
+            .price(&curve.apply_bucket_bump(None, bump_abs)?)?
             .amount();
-        let pv_down = self
-            .price_validated_tranche(tranche, &ctx_down, as_of)?
+        let pv_down = prepared
+            .price(&curve.apply_bucket_bump(None, -bump_abs)?)?
             .amount();
 
         // Central difference per unit ρ, rescaled to the per-1% (0.01 absolute
         // correlation) reporting convention shared with Recovery01.
-        Ok((pv_up - pv_down) / (2.0 * bump_abs)
-            * finstack_quant_valuations_core::metrics::CORRELATION_BUMP)
+        Ok((pv_up - pv_down) / (2.0 * bump_abs) * bump_abs)
     }
 
     /// Calculate jump-to-default (immediate loss from specific entity default).

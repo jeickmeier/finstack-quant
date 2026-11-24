@@ -1,7 +1,5 @@
 use super::engine::*;
-use crate::CreditParams;
 use crate::cds_option::CdsOption;
-use crate::cds_option::parameters::CdsOptionParams;
 use crate::cds_option::pricer::synthetic_underlying_cds;
 use crate::constants::bloomberg_cdso;
 use finstack_quant_core::currency::Currency;
@@ -12,7 +10,9 @@ use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::math::special_functions::norm_pdf;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::types::OptionType;
+use finstack_quant_valuations_core::instruments::SettlementType;
 use rust_decimal::Decimal;
 use time::macros::date;
 
@@ -65,17 +65,22 @@ fn option_with_coupon(
     coupon_bp: f64,
     vol: f64,
 ) -> CdsOption {
-    let params = CdsOptionParams::new(
-        crate::cds_option::strike::CdsOptionStrike::Spread(bp_to_decimal(strike_bp)),
-        as_of.add_months(12).expect("valid date shift"),
-        as_of.add_months(60).expect("valid date shift"),
-        Money::from((10_000_000_i64, Currency::USD)),
-        option_type,
-    )
-    .expect("valid option params")
-    .with_coupon_bp(Decimal::try_from(coupon_bp).expect("valid coupon bp"));
-    let credit = CreditParams::corporate_standard("SN", "HZ-SN");
-    let mut option = CdsOption::new("CDSO-UNIT", &params, &credit, "USD-OIS", "CDSO-VOL")
+    let mut option = CdsOption::builder()
+        .id(InstrumentId::new("CDSO-UNIT"))
+        .strike(crate::cds_option::strike::CdsOptionStrike::Spread(
+            bp_to_decimal(strike_bp),
+        ))
+        .option_type(option_type)
+        .expiry(as_of.add_months(12).expect("valid date shift"))
+        .underlying_maturity(as_of.add_months(60).expect("valid date shift"))
+        .notional(Money::from((10_000_000_i64, Currency::USD)))
+        .settlement(SettlementType::Cash)
+        .recovery_rate(0.40)
+        .discount_curve_id(CurveId::new("USD-OIS"))
+        .credit_curve_id(CurveId::new("HZ-SN"))
+        .vol_surface_id(CurveId::new("CDSO-VOL"))
+        .coupon_bp(Decimal::try_from(coupon_bp).expect("valid coupon bp"))
+        .build()
         .expect("valid cds option");
     option
         .instrument_pricing_overrides
@@ -593,25 +598,28 @@ fn price_strike_option(
     current_factor: f64,
     realized_loss: Option<f64>,
 ) -> CdsOption {
-    use finstack_quant_valuations_core::instruments::Instrument;
+    use finstack_quant_core::types::{CurveId, InstrumentId};
+    use finstack_quant_valuations_core::instruments::{Instrument, SettlementType};
 
-    let params = CdsOptionParams::new(
-        crate::cds_option::strike::CdsOptionStrike::CleanPricePct(
+    let mut option = CdsOption::builder()
+        .id(InstrumentId::new("CDSO-HY-UNIT"))
+        .strike(crate::cds_option::strike::CdsOptionStrike::CleanPricePct(
             Decimal::try_from(strike_price_pct).expect("valid clean-price strike"),
-        ),
-        as_of.add_months(12).expect("valid date shift"),
-        as_of.add_months(60).expect("valid date shift"),
-        Money::from((10_000_000_i64, Currency::USD)),
-        option_type,
-    )
-    .expect("valid option params")
-    .as_index(current_factor)
-    .expect("valid index factor")
-    .with_strike_index_factor(strike_factor)
-    .expect("valid strike index factor")
-    .with_coupon_bp(Decimal::try_from(coupon_bp).expect("valid coupon bp"));
-    let credit = CreditParams::corporate_standard("HY", "HZ-SN");
-    let mut option = CdsOption::new("CDSO-HY-UNIT", &params, &credit, "USD-OIS", "CDSO-VOL")
+        ))
+        .option_type(option_type)
+        .expiry(as_of.add_months(12).expect("valid date shift"))
+        .underlying_maturity(as_of.add_months(60).expect("valid date shift"))
+        .notional(Money::from((10_000_000_i64, Currency::USD)))
+        .settlement(SettlementType::Cash)
+        .recovery_rate(0.40)
+        .discount_curve_id(CurveId::new("USD-OIS"))
+        .credit_curve_id(CurveId::new("HZ-SN"))
+        .vol_surface_id(CurveId::new("CDSO-VOL"))
+        .underlying_is_index(true)
+        .index_factor(current_factor)
+        .strike_index_factor(strike_factor)
+        .coupon_bp(Decimal::try_from(coupon_bp).expect("valid coupon bp"))
+        .build()
         .expect("valid cds option");
     option.realized_loss = realized_loss.unwrap_or(0.0);
     option

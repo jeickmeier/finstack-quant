@@ -2,11 +2,10 @@
 //!
 //! Same rate-bump-and-replay step as single-name CDS DV01
 //! ([`rate_bumped_market_with_hazard_replay`]), applied to every credit curve
-//! the tranche's credit index feeds into pricing. Rebuilt curves are swapped
-//! into the credit index as well as the market, since the tranche pricer reads
-//! hazards through the index.
+//! the tranche's credit index feeds into pricing (`try_insert_mut` auto-rebinds
+//! dependent credit indices).
 
-use super::cs01::{active_hazards, replace_hazard};
+use super::cs01::active_hazards;
 use crate::cds::metrics::dv01::{
     DiscountShock, HazardReplay, calculate_credit_dv01, rate_bumped_market_with_hazard_replay,
 };
@@ -33,20 +32,12 @@ impl MetricCalculator for CdsTrancheDv01Calculator {
                 cds_valuation_convention: None,
                 deal_quote_override: None,
             });
-            let (mut bumped_market, rebuilt) = rate_bumped_market_with_hazard_replay(
+            let bumped_market = rate_bumped_market_with_hazard_replay(
                 context,
                 &tranche.discount_curve_id,
                 shock,
                 replays,
             )?;
-            if !rebuilt.is_empty() {
-                let mut bumped_index = index.as_ref().clone();
-                for hazard in rebuilt {
-                    bumped_index = replace_hazard(&bumped_index, hazard)?;
-                }
-                bumped_market = bumped_market
-                    .insert_credit_index(tranche.credit_index_id.as_str(), bumped_index)?;
-            }
             context.reprice_raw(&bumped_market, context.as_of)
         };
 

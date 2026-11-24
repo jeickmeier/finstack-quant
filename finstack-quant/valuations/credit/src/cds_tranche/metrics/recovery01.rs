@@ -46,132 +46,94 @@ use std::sync::Arc;
 /// Recovery01 calculator for CDS Tranche.
 pub(crate) struct Recovery01Calculator;
 
-/// Build a market with the index recovery bumped and the index hazard curve
-/// **frozen** (reused unchanged).
-fn frozen_market_at_bumped_recovery(
-    base_market: &MarketContext,
-    tranche: &CdsTranche,
-    original_index: &CreditIndexData,
-    new_recovery: f64,
-) -> Result<MarketContext> {
-    // `to_builder` preserves all per-issuer overrides (curves, recovery rates,
-    // weights), so heterogeneous bespoke tranches are not silently downgraded
-    // to the homogeneous binomial path during bumping.
-    let bumped_index = original_index
-        .to_builder()
-        .recovery_rate(new_recovery)
-        .build()?;
-    base_market
-        .clone()
-        .insert_credit_index(&tranche.credit_index_id, bumped_index)
-}
-
-/// Build a market with both the index recovery bumped and the index hazard
-/// curve re-bootstrapped from par spreads at the new recovery.
-fn recalibrated_market_at_bumped_recovery(
+/// Build a market with the index recovery bumped and, when `recalibrate` is set,
+/// the index hazard curve re-bootstrapped at that recovery.
+fn market_with_recovery(
     context: &MetricContext,
     base_market: &MarketContext,
     tranche: &CdsTranche,
     original_index: &CreditIndexData,
     new_recovery: f64,
+    recalibrate: bool,
 ) -> Result<MarketContext> {
-    let recalibrated = context
-        .rebuild_hazard_curve(
-            HazardRecalibrationRequest {
-                hazard: Arc::clone(original_index.index_credit_curve()),
-                source_market: Arc::new(base_market.clone()),
-                target_market: Arc::new(base_market.clone()),
-                discount_curve_id: tranche.discount_curve_id.clone(),
-                doc_clause: None,
-                cds_valuation_convention: None,
-                deal_quote_override: None,
-                action: HazardRecalibrationAction::RecoveryRateReplay {
-                    recovery_rate: new_recovery,
+    let mut market = base_market.clone();
+    let mut builder = original_index.to_builder().recovery_rate(new_recovery);
+    if recalibrate {
+        let recalibrated = context
+            .rebuild_hazard_curve(
+                HazardRecalibrationRequest {
+                    hazard: Arc::clone(original_index.index_credit_curve()),
+                    source_market: Arc::new(base_market.clone()),
+                    target_market: Arc::new(base_market.clone()),
+                    discount_curve_id: tranche.discount_curve_id.clone(),
+                    doc_clause: None,
+                    cds_valuation_convention: None,
+                    deal_quote_override: None,
+                    action: HazardRecalibrationAction::RecoveryRateReplay {
+                        recovery_rate: new_recovery,
+                    },
                 },
-            },
-            "recovery01",
-        )
-        .map_err(|error| finstack_quant_core::Error::Calibration {
-            message: format!(
-                "CDS tranche '{}' Recovery01 failed to re-bootstrap index hazard curve '{}' \
-             at recovery {new_recovery}: {error}",
-                tranche.id,
-                original_index.index_credit_curve().id()
-            ),
-            category: "recovery01_rebootstrap".to_string(),
-        })?;
-    let bumped_index = original_index
-        .to_builder()
-        .recovery_rate(new_recovery)
-        .index_credit_curve(Arc::clone(&recalibrated))
-        .build()?;
-    base_market
-        .clone()
-        .try_insert(recalibrated)?
-        .insert_credit_index(&tranche.credit_index_id, bumped_index)
+                "recovery01",
+            )
+            .map_err(|error| finstack_quant_core::Error::Calibration {
+                message: format!(
+                    "CDS tranche '{}' Recovery01 failed to re-bootstrap index hazard curve '{}' \
+                 at recovery {new_recovery}: {error}",
+                    tranche.id,
+                    original_index.index_credit_curve().id()
+                ),
+                category: "recovery01_rebootstrap".to_string(),
+            })?;
+        builder = builder.index_credit_curve(Arc::clone(&recalibrated));
+        market.try_insert_mut(recalibrated)?;
+    }
+    let bumped_index = builder.build()?;
+    market.insert_credit_index(&tranche.credit_index_id, bumped_index)
+}
+
+fn recovery01_fd(context: &MetricContext, tranche: &CdsTranche) -> Result<f64> {
+    let as_of = context.as_of;
+    let market = context.curves.as_ref();
+    let original_index = market.get_credit_index(&tranche.credit_index_id)?;
+    let base_recovery = original_index.recovery_rate();
+
+    let bumped_recovery_up = bumped_recovery(base_recovery, RECOVERY_BUMP);
+    let bumped_recovery_down = bumped_recovery(base_recovery, -RECOVERY_BUMP);
+    let span = bumped_recovery_up - bumped_recovery_down;
+    if span <= 0.0 {
+        return Ok(0.0);
+    }
+
+    let recalibrate = original_index
+        .index_credit_curve()
+        .hazard_calibration()
+        .is_some();
+    let curves_up = market_with_recovery(
+        context,
+        market,
+        tranche,
+        original_index.as_ref(),
+        bumped_recovery_up,
+        recalibrate,
+    )?;
+    let curves_down = market_with_recovery(
+        context,
+        market,
+        tranche,
+        original_index.as_ref(),
+        bumped_recovery_down,
+        recalibrate,
+    )?;
+
+    let pv_up = tranche.value(&curves_up, as_of)?.amount();
+    let pv_down = tranche.value(&curves_down, as_of)?.amount();
+    Ok((pv_up - pv_down) / span * RECOVERY_BUMP)
 }
 
 impl MetricCalculator for Recovery01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let tranche: &CdsTranche = context.instrument_as()?;
-        let as_of = context.as_of;
-        let market = context.curves.as_ref();
-
-        let original_index = market.get_credit_index(&tranche.credit_index_id)?;
-        let base_recovery = original_index.recovery_rate();
-
-        let bumped_recovery_up = bumped_recovery(base_recovery, RECOVERY_BUMP);
-        let up_delta = bumped_recovery_up - base_recovery;
-        let bumped_recovery_down = bumped_recovery(base_recovery, -RECOVERY_BUMP);
-        let down_delta = base_recovery - bumped_recovery_down;
-
-        let has_par_quotes = original_index
-            .index_credit_curve()
-            .hazard_calibration()
-            .is_some();
-
-        let (curves_up, curves_down) = if has_par_quotes {
-            (
-                recalibrated_market_at_bumped_recovery(
-                    context,
-                    market,
-                    tranche,
-                    original_index.as_ref(),
-                    bumped_recovery_up,
-                )?,
-                recalibrated_market_at_bumped_recovery(
-                    context,
-                    market,
-                    tranche,
-                    original_index.as_ref(),
-                    bumped_recovery_down,
-                )?,
-            )
-        } else {
-            (
-                frozen_market_at_bumped_recovery(
-                    market,
-                    tranche,
-                    original_index.as_ref(),
-                    bumped_recovery_up,
-                )?,
-                frozen_market_at_bumped_recovery(
-                    market,
-                    tranche,
-                    original_index.as_ref(),
-                    bumped_recovery_down,
-                )?,
-            )
-        };
-
-        let pv_up = tranche.value(&curves_up, as_of)?.amount();
-        let pv_down = tranche.value(&curves_down, as_of)?.amount();
-
-        let span = up_delta + down_delta;
-        if span <= 0.0 {
-            return Ok(0.0);
-        }
-        Ok((pv_up - pv_down) / span * RECOVERY_BUMP)
+        recovery01_fd(context, tranche)
     }
 }
 

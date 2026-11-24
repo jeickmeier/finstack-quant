@@ -2,10 +2,8 @@
 //!
 //! Pricing primitives — NPV, par spread, theta, implied volatility — that
 //! flow through the [`bloomberg_quadrature`](super::bloomberg_quadrature)
-//! numerical-quadrature engine. Greek metrics (delta, gamma, vega) live
-//! alongside their `MetricCalculator` definitions in the metrics module;
-//! the `CdsOption::{delta, gamma, vega}` methods validate the option and
-//! then call those canonical implementations.
+//! numerical-quadrature engine. Greek metrics (delta, gamma, vega, theta) are
+//! exposed through registered metric calculators.
 //!
 //! # References
 //!
@@ -74,7 +72,7 @@ pub(crate) fn theta(
     bloomberg_quadrature::theta(option, &cds, curves, sigma, as_of)
 }
 
-fn ensure_valuation_not_after_expiry(
+pub(super) fn ensure_valuation_not_after_expiry(
     option: &CdsOption,
     as_of: finstack_quant_core::dates::Date,
 ) -> Result<()> {
@@ -118,6 +116,7 @@ pub(crate) fn implied_vol(
             "implied vol target price must be finite and non-negative, got {target_price}"
         )));
     }
+    ensure_valuation_not_after_expiry(option, as_of)?;
     if option.expiry <= as_of {
         return Ok(0.0);
     }
@@ -307,14 +306,14 @@ mod lifecycle_tests {
 #[cfg(test)]
 mod settlement_and_sigma_tests {
     use super::*;
-    use crate::CreditParams;
-    use crate::cds_option::{CdsOptionParams, CdsOptionStrike};
+    use crate::cds_option::CdsOptionStrike;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DateExt};
     use finstack_quant_core::market_data::surfaces::{
         VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
     };
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+    use finstack_quant_core::types::{CurveId, InstrumentId};
     use finstack_quant_models::types::OptionType;
     use finstack_quant_valuations_core::instruments::SettlementType;
     use rust_decimal::Decimal;
@@ -356,17 +355,19 @@ mod settlement_and_sigma_tests {
     }
 
     fn spread_option(as_of: Date, settlement: SettlementType, vol: Option<f64>) -> CdsOption {
-        let params = CdsOptionParams::new(
-            CdsOptionStrike::Spread(Decimal::new(1, 2)),
-            as_of.add_months(12).expect("valid date shift"),
-            as_of.add_months(60).expect("valid date shift"),
-            Money::from((10_000_000_i64, Currency::USD)),
-            OptionType::Call,
-        )
-        .expect("valid params")
-        .with_settlement(settlement);
-        let credit = CreditParams::corporate_standard("SN", "HZ-SN");
-        let mut option = CdsOption::new("CDSO-SETTLE", &params, &credit, "USD-OIS", "CDSO-VOL")
+        let mut option = CdsOption::builder()
+            .id(InstrumentId::new("CDSO-SETTLE"))
+            .strike(CdsOptionStrike::Spread(Decimal::new(1, 2)))
+            .option_type(OptionType::Call)
+            .expiry(as_of.add_months(12).expect("valid date shift"))
+            .underlying_maturity(as_of.add_months(60).expect("valid date shift"))
+            .notional(Money::from((10_000_000_i64, Currency::USD)))
+            .settlement(settlement)
+            .recovery_rate(0.40)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .credit_curve_id(CurveId::new("HZ-SN"))
+            .vol_surface_id(CurveId::new("CDSO-VOL"))
+            .build()
             .expect("valid option");
         option
             .instrument_pricing_overrides
@@ -376,21 +377,23 @@ mod settlement_and_sigma_tests {
     }
 
     fn price_strike_option(as_of: Date) -> CdsOption {
-        let params = CdsOptionParams::new(
-            CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)),
-            as_of.add_months(12).expect("valid date shift"),
-            as_of.add_months(60).expect("valid date shift"),
-            Money::from((10_000_000_i64, Currency::USD)),
-            OptionType::Call,
-        )
-        .expect("valid params")
-        .as_index(1.0)
-        .expect("valid factor")
-        .with_strike_index_factor(1.0)
-        .expect("valid strike factor")
-        .with_coupon_bp(Decimal::new(500, 0));
-        let credit = CreditParams::corporate_standard("HY", "HZ-SN");
-        CdsOption::new("CDSO-HY-SIGMA", &params, &credit, "USD-OIS", "CDSO-VOL")
+        CdsOption::builder()
+            .id(InstrumentId::new("CDSO-HY-SIGMA"))
+            .strike(CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)))
+            .option_type(OptionType::Call)
+            .expiry(as_of.add_months(12).expect("valid date shift"))
+            .underlying_maturity(as_of.add_months(60).expect("valid date shift"))
+            .notional(Money::from((10_000_000_i64, Currency::USD)))
+            .settlement(SettlementType::Cash)
+            .recovery_rate(0.40)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .credit_curve_id(CurveId::new("HZ-SN"))
+            .vol_surface_id(CurveId::new("CDSO-VOL"))
+            .underlying_is_index(true)
+            .index_factor(1.0)
+            .strike_index_factor(1.0)
+            .coupon_bp(Decimal::new(500, 0))
+            .build()
             .expect("valid option")
     }
 
@@ -548,5 +551,44 @@ mod settlement_and_sigma_tests {
         let sigma =
             resolve_sigma(&option, &market(as_of), as_of).expect("override needs no surface");
         assert_eq!(sigma, 0.31);
+    }
+
+    #[test]
+    fn post_expiry_metrics_fail_closed_and_cash_at_expiry_is_zero() {
+        use crate::cds_option::metrics::{
+            delta::delta_with_provider, gamma::gamma_with_provider, register::vega,
+        };
+
+        let as_of = date!(2025 - 01 - 01);
+        let mkt = market(as_of);
+        let cash = spread_option(as_of, SettlementType::Cash, Some(0.35));
+        let physical = spread_option(as_of, SettlementType::Physical, Some(0.35));
+        let after = cash.expiry + time::Duration::days(1);
+
+        // Cash-settled at expiry: Greeks and implied_vol return 0.0 cleanly.
+        assert_eq!(
+            vega(&cash, &mkt, cash.expiry).expect("cash vega at expiry"),
+            0.0
+        );
+        assert_eq!(
+            implied_vol(&cash, &mkt, cash.expiry, 0.0, None).expect("cash iv at expiry"),
+            0.0
+        );
+        assert_eq!(
+            delta_with_provider(&cash, &mkt, cash.expiry, None).expect("cash delta at expiry"),
+            0.0
+        );
+        assert_eq!(
+            gamma_with_provider(&cash, &mkt, cash.expiry, None).expect("cash gamma at expiry"),
+            0.0
+        );
+
+        // Post-expiry fails closed across all paths; physical at expiry also fails closed.
+        assert!(vega(&cash, &mkt, after).is_err());
+        assert!(implied_vol(&cash, &mkt, after, 0.01, None).is_err());
+        assert!(delta_with_provider(&cash, &mkt, after, None).is_err());
+        assert!(gamma_with_provider(&cash, &mkt, after, None).is_err());
+        assert!(vega(&physical, &mkt, physical.expiry).is_err());
+        assert!(implied_vol(&physical, &mkt, physical.expiry, 0.01, None).is_err());
     }
 }

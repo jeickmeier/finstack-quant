@@ -37,9 +37,7 @@ use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::instruments::SettlementType;
 use finstack_quant_valuations::instruments::credit_derivatives::CreditParams;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
-    CdsOption, CdsOptionParams,
-};
+use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
 use finstack_quant_valuations::instruments::credit_derivatives::{
@@ -977,24 +975,24 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
     // 11. CDS Options
     for i in 0..positions_per_derivative.min(2) {
         let cds_option_id = format!("CDSOPTION_{}", i);
-        let option_params = CdsOptionParams::call(
-            finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionStrike::Spread(
-                rust_decimal::Decimal::new(1, 2),
-            ),
-            base + time::Duration::days(365),
-            maturity_5y(),
-            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-        )
-        .expect("valid CDS option params");
-        let credit_params = CreditParams::new("CORP", 0.40, "CORP-HAZARD");
-        let cds_option = CdsOption::new(
-            cds_option_id.clone(),
-            &option_params,
-            &credit_params,
-            "USD-OIS",
-            "CDS-SPREAD-VOL",
-        )
-        .expect("valid CDS option");
+        let cds_option = CdsOption::builder()
+            .id(cds_option_id.as_str().into())
+            .strike(
+                finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionStrike::Spread(
+                    rust_decimal::Decimal::new(1, 2),
+                ),
+            )
+            .option_type(OptionType::Call)
+            .expiry(base + time::Duration::days(365))
+            .underlying_maturity(maturity_5y())
+            .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+            .settlement(SettlementType::Cash)
+            .recovery_rate(0.40)
+            .discount_curve_id("USD-OIS".into())
+            .credit_curve_id("CORP-HAZARD".into())
+            .vol_surface_id("CDS-SPREAD-VOL".into())
+            .build()
+            .expect("valid CDS option");
         let entity_id = format!("FUND_{}", (i % 5) + 1);
         builder = builder.position(
             Position::new(

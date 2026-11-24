@@ -11,7 +11,6 @@ use crate::cds::metrics::{deal_quote_override, market_doc_clause};
 use crate::cds_index::{CdsIndex, IndexPricing};
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
-use std::collections::BTreeSet;
 use std::sync::Arc;
 
 pub(crate) struct CdsIndexDv01Calculator(pub(crate) bool);
@@ -23,25 +22,14 @@ impl MetricCalculator for CdsIndexDv01Calculator {
         let doc_clause = Some(market_doc_clause(&synthetic));
         let cds_valuation_convention = Some(synthetic.valuation_convention);
 
-        let (curve_ids, quote_override) = match idx.pricing {
-            IndexPricing::SingleCurve => (
-                vec![idx.protection_leg.credit_curve_id.clone()],
-                deal_quote_override(&synthetic),
-            ),
+        let quote_override = match idx.pricing {
+            IndexPricing::SingleCurve => deal_quote_override(&synthetic),
             // The deal quote is an index-level spread; it does not describe
             // any single constituent curve, so constituents replay unchanged.
-            IndexPricing::Constituents => (
-                idx.constituents
-                    .iter()
-                    .filter(|con| !con.defaulted)
-                    .map(|con| con.credit.credit_curve_id.clone())
-                    .collect(),
-                None,
-            ),
+            IndexPricing::Constituents => None,
         };
-        let hazards = curve_ids
-            .into_iter()
-            .collect::<BTreeSet<_>>()
+        let hazards = idx
+            .credit_curve_ids()
             .iter()
             .map(|curve_id| context.curves.get_hazard(curve_id.as_str()))
             .collect::<Result<Vec<_>>>()?;
@@ -53,7 +41,7 @@ impl MetricCalculator for CdsIndexDv01Calculator {
                 cds_valuation_convention,
                 deal_quote_override: quote_override,
             });
-            let (bumped_market, _) = rate_bumped_market_with_hazard_replay(
+            let bumped_market = rate_bumped_market_with_hazard_replay(
                 context,
                 &idx.premium_leg.discount_curve_id,
                 shock,

@@ -13,9 +13,8 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCur
 use finstack_quant_core::money::Money;
 use finstack_quant_models::types::OptionType;
 pub use finstack_quant_test_utils::assert::relative_eq;
-use finstack_quant_valuations::instruments::credit_derivatives::CreditParams;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
-    CdsOption, CdsOptionParams, CdsOptionStrike, ProtectionStartConvention,
+    CdsOption, CdsOptionStrike, ProtectionStartConvention,
 };
 use finstack_quant_valuations::instruments::credit_derivatives::constants::isda::STANDARD_RECOVERY_SENIOR;
 use rust_decimal::Decimal;
@@ -271,40 +270,32 @@ impl CdsOptionBuilder {
             ),
             None => CdsOptionStrike::Spread(bp_to_decimal(self.strike_bp)),
         };
-        let mut option_params = CdsOptionParams::new(
-            strike,
-            expiry,
-            underlying_maturity,
-            self.notional,
-            self.option_type,
-        )
-        .expect("valid option params");
-        option_params.protection_start_convention = self.protection_start_convention;
-
-        if self.is_index {
-            option_params = option_params
-                .as_index(self.index_factor.unwrap_or(1.0))
-                .expect("valid index factor");
-        }
+        let index_factor = self.index_factor.unwrap_or(1.0);
+        let mut builder = CdsOption::builder()
+            .id(self.id.into())
+            .strike(strike)
+            .option_type(self.option_type)
+            .expiry(expiry)
+            .underlying_maturity(underlying_maturity)
+            .notional(self.notional)
+            .settlement(finstack_quant_valuations::instruments::SettlementType::Cash)
+            .protection_start_convention(self.protection_start_convention)
+            .knockout(self.knockout.unwrap_or(!self.is_index))
+            .recovery_rate(STANDARD_RECOVERY_SENIOR)
+            .discount_curve_id("USD-OIS".into())
+            .credit_curve_id("HZ-SN".into())
+            .vol_surface_id("CDS-OPT-VOL".into())
+            .underlying_is_index(self.is_index)
+            .index_factor(index_factor)
+            .realized_loss(self.realized_loss.unwrap_or(0.0));
         if let Some(f0) = self.strike_index_factor {
-            option_params = option_params
-                .with_strike_index_factor(f0)
-                .expect("valid strike index factor");
+            builder = builder.strike_index_factor(f0);
         }
         if let Some(bp) = self.coupon_bp {
-            option_params = option_params
-                .with_coupon_bp(rust_decimal::Decimal::try_from(bp).expect("valid coupon bp"));
+            builder =
+                builder.coupon_bp(rust_decimal::Decimal::try_from(bp).expect("valid coupon bp"));
         }
-
-        let credit_params = CreditParams::corporate_standard("SN", "HZ-SN");
-        let mut option = CdsOption::new(
-            self.id,
-            &option_params,
-            &credit_params,
-            "USD-OIS",
-            "CDS-OPT-VOL",
-        )
-        .expect("valid CDS option");
+        let mut option = builder.build().expect("valid CDS option");
 
         if let Some(vol) = self.implied_vol {
             option
@@ -312,8 +303,9 @@ impl CdsOptionBuilder {
                 .market_quotes
                 .implied_volatility = Some(vol);
         }
-        option.knockout = self.knockout.unwrap_or(!self.is_index);
-        option.realized_loss = self.realized_loss.unwrap_or(0.0);
+
+        finstack_quant_valuations::instruments::Instrument::validate_for_pricing(&option)
+            .expect("valid CDS option");
 
         option
     }

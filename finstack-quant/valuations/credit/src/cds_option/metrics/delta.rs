@@ -9,20 +9,17 @@
 //!   bump with hazard-curve rebootstrap, sticky native strike, and sticky
 //!   surface volatility.
 //!
-//! This module is the single source of truth for both values;
-//! [`CdsOption::delta`] is a thin pass-through to [`delta`].
+//! This module is the single source of truth for both delta conventions.
 
 use crate::cds_option::bloomberg_quadrature::{self, ForwardCdsContext};
 use crate::cds_option::pricer::{resolve_sigma, synthetic_underlying_cds};
-use crate::cds_option::{CdsOption, CdsOptionStrikeKind};
+use crate::cds_option::{CdsOption, CdsOptionStrike};
 use finstack_quant_core::Result;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
-use finstack_quant_valuations_core::recalibration::{
-    HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump, RecalibrationProvider,
-};
+use finstack_quant_valuations_core::recalibration::RecalibrationProvider;
 
 /// Symmetric par-spread bump (in bp) for the price-strike hedge-ratio
 /// delta, matching the Bloomberg CDSW ±1 bp spread DV01 convention.
@@ -34,7 +31,7 @@ pub(crate) struct DeltaCalculator;
 impl MetricCalculator for DeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let option: &CdsOption = context.instrument_as()?;
-        let provider = if option.strike.kind() == CdsOptionStrikeKind::CleanPricePct {
+        let provider = if matches!(option.strike, CdsOptionStrike::CleanPricePct(_)) {
             Some(context.recalibration_provider("cds_option_delta")?)
         } else {
             None
@@ -43,7 +40,7 @@ impl MetricCalculator for DeltaCalculator {
     }
 }
 
-/// CDS option Δ, branched by strike kind (see the module docs).
+/// CDS option Δ, branched by strike convention (see the module docs).
 ///
 /// Returned as a unit-less ratio (multiply by 100 for the displayed
 /// percentage). Payers Δ ≥ 0, receivers Δ ≤ 0 under both conventions.
@@ -53,13 +50,14 @@ pub(crate) fn delta_with_provider(
     as_of: finstack_quant_core::dates::Date,
     provider: Option<&dyn RecalibrationProvider>,
 ) -> Result<f64> {
+    crate::cds_option::pricer::ensure_valuation_not_after_expiry(option, as_of)?;
     let t = option.time_to_expiry(as_of)?;
     if t <= 0.0 {
         return Ok(0.0);
     }
-    match option.strike.kind() {
-        CdsOptionStrikeKind::Spread => spread_black_delta(option, curves, as_of, t),
-        CdsOptionStrikeKind::CleanPricePct => {
+    match option.strike {
+        CdsOptionStrike::Spread(_) => spread_black_delta(option, curves, as_of, t),
+        CdsOptionStrike::CleanPricePct(_) => {
             let provider = provider.ok_or_else(|| {
                 finstack_quant_valuations_core::recalibration::provider_missing("cds_option_delta")
             })?;
@@ -113,21 +111,22 @@ pub(super) fn price_strike_delta(
         "CDS option price-strike delta",
     )?;
 
-    let bumped_market = |bump_bp: f64| -> Result<MarketContext> {
-        let bumped = provider.rebuild_hazard_curve(&HazardRecalibrationRequest {
-            hazard: std::sync::Arc::clone(&hazard),
-            source_market: std::sync::Arc::new(curves.clone()),
-            target_market: std::sync::Arc::new(curves.clone()),
-            discount_curve_id: option.discount_curve_id.clone(),
-            doc_clause: None,
-            cds_valuation_convention: None,
-            deal_quote_override: None,
-            action: HazardRecalibrationAction::SpreadBump(QuoteBump::ParallelBp(bump_bp)),
-        })?;
-        curves.clone().try_insert(bumped.as_ref().clone())
-    };
-    let up_market = bumped_market(PRICE_DELTA_SPREAD_BUMP_BP)?;
-    let down_market = bumped_market(-PRICE_DELTA_SPREAD_BUMP_BP)?;
+    let up_market = spread_bumped_market(
+        option,
+        curves,
+        &cds,
+        &hazard,
+        provider,
+        PRICE_DELTA_SPREAD_BUMP_BP,
+    )?;
+    let down_market = spread_bumped_market(
+        option,
+        curves,
+        &cds,
+        &hazard,
+        provider,
+        -PRICE_DELTA_SPREAD_BUMP_BP,
+    )?;
 
     let option_up = bloomberg_quadrature::npv(option, &cds, &up_market, sigma, as_of)?.amount();
     let option_down = bloomberg_quadrature::npv(option, &cds, &down_market, sigma, as_of)?.amount();
@@ -167,4 +166,33 @@ pub(super) fn black_delta_ratio(
             finstack_quant_models::closed_form::black_delta_put(forward, strike, sigma, t)
         }
     }
+}
+
+/// Rebuild the CDS option hazard curve on a parallel par-spread bump,
+/// enforcing the synthetic underlying CDS's documentation clause and
+/// valuation convention.
+pub(super) fn spread_bumped_market(
+    option: &CdsOption,
+    curves: &MarketContext,
+    cds: &crate::cds::CreditDefaultSwap,
+    hazard: &std::sync::Arc<finstack_quant_core::market_data::term_structures::HazardCurve>,
+    provider: &dyn RecalibrationProvider,
+    bump_bp: f64,
+) -> Result<MarketContext> {
+    use finstack_quant_valuations_core::recalibration::{
+        HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump,
+    };
+
+    let shared_market = std::sync::Arc::new(curves.clone());
+    let bumped = provider.rebuild_hazard_curve(&HazardRecalibrationRequest {
+        hazard: std::sync::Arc::clone(hazard),
+        source_market: std::sync::Arc::clone(&shared_market),
+        target_market: shared_market,
+        discount_curve_id: option.discount_curve_id.clone(),
+        doc_clause: Some(crate::cds::metrics::market_doc_clause(cds)),
+        cds_valuation_convention: Some(cds.valuation_convention),
+        deal_quote_override: None,
+        action: HazardRecalibrationAction::SpreadBump(QuoteBump::ParallelBp(bump_bp)),
+    })?;
+    curves.clone().try_insert(bumped.as_ref().clone())
 }

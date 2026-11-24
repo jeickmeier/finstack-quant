@@ -64,7 +64,10 @@ use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use time::macros::date;
 
-use crate::cds::pricing::CdsPricer;
+use crate::cds::pricing::{
+    clean_quote_accrual_fraction, generate_isda_schedule, npv_full, par_spread,
+    premium_cashflow_accruals,
+};
 use finstack_quant_valuations_core::impl_instrument_base;
 
 use crate::{PremiumLegSpec, ProtectionLegSpec};
@@ -129,7 +132,7 @@ fn resolve_doc_clause(clause: CdsDocClause) -> CdsDocClause {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 // Note: JsonSchema derive requires finstack-quant-core types to implement JsonSchema
 // #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CreditDefaultSwap {
@@ -237,6 +240,8 @@ pub struct CreditDefaultSwap {
     pub attributes: Attributes,
 }
 
+finstack_quant_valuations_core::validate_on_deserialize!(CreditDefaultSwap);
+
 /// Trade terms of a standard-convention CDS or CDS index trade.
 ///
 /// The convention-driven schedule terms (day count, frequency, stub,
@@ -330,7 +335,7 @@ impl CreditDefaultSwap {
         finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
         let discount = market.get_discount(self.premium_leg.discount_curve_id.as_str())?;
         let hazard = market.get_hazard(self.protection_leg.credit_curve_id.as_str())?;
-        CdsPricer::new().par_spread(self, discount.as_ref(), hazard.as_ref(), as_of)
+        par_spread(self, discount.as_ref(), hazard.as_ref(), as_of)
     }
 
     /// Accrued premium fraction for a clean quote on this CDS.
@@ -345,7 +350,7 @@ impl CreditDefaultSwap {
     ///
     /// Returns an error if the coupon schedule or day count cannot be resolved.
     pub fn clean_quote_accrual(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
-        CdsPricer::new().clean_quote_accrual_fraction(self, as_of)
+        clean_quote_accrual_fraction(self, as_of)
     }
 
     /// Create a canonical example CDS for testing and documentation.
@@ -639,8 +644,7 @@ impl CreditDefaultSwap {
                 "premium.coupon_bp cannot be represented as f64".to_string(),
             )
         })? / 10_000.0;
-        let pricer = CdsPricer::new();
-        let payment_accruals = pricer.premium_cashflow_accruals(self, self.premium_leg.start)?;
+        let payment_accruals = premium_cashflow_accruals(self)?;
         let flows = payment_accruals
             .into_iter()
             .map(|(end, accrual)| {
@@ -682,8 +686,7 @@ impl CreditDefaultSwap {
     ///   maturity date.
     pub fn isda_coupon_schedule(&self) -> finstack_quant_core::Result<Vec<Date>> {
         self.validate()?;
-        let pricer = CdsPricer::new();
-        pricer.generate_isda_schedule(self)
+        generate_isda_schedule(self)
     }
 
     fn npv_raw_internal(
@@ -695,7 +698,7 @@ impl CreditDefaultSwap {
         // lifecycle (`Instrument::value*` or the pricer registry).
         let disc = market.get_discount(&self.premium_leg.discount_curve_id)?;
         let surv = market.get_hazard(&self.protection_leg.credit_curve_id)?;
-        CdsPricer::new().npv_full(self, disc.as_ref(), surv.as_ref(), as_of)
+        npv_full(self, disc.as_ref(), surv.as_ref(), as_of)
     }
 
     // (no public/raw-NPV helper; use `Instrument::value_raw()` instead)

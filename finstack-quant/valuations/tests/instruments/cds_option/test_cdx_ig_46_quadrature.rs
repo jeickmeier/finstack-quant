@@ -254,12 +254,20 @@ fn cdx_ig_46_convention_matrix() {
     // Published forward definitions on the flat curve.
     let ctx = context_for(&option, &market, as_of, sigma);
     let cds = synthetic_underlying_cds(&option, as_of).expect("synthetic cds");
-    let spot_annuity =
-        finstack_quant_valuations::instruments::credit_derivatives::cds::pricing::CdsPricer::new()
-            .risky_pv01(&cds, discount.as_ref(), hazard.as_ref(), as_of)
-            .expect("spot annuity")
-            / cds.notional.amount()
-            * 1e4;
+    let spot_annuity = finstack_quant_valuations_core::instruments::Instrument::price_with_metrics(
+        &cds,
+        &market,
+        as_of,
+        &[finstack_quant_valuations_core::metrics::MetricId::RiskyPv01],
+        finstack_quant_valuations_core::instruments::PricingOptions::default(),
+    )
+    .expect("spot annuity")
+    .measures
+    .get("risky_pv01")
+    .copied()
+    .expect("risky_pv01 metric")
+        / cds.notional.amount()
+        * 1e4;
     let forward_annuity = ctx.bootstrapped_l_at_expiry * df_expiry;
     println!(
         "spot clean annuity {spot_annuity:.6}, forward annuity (today) {forward_annuity:.6}, \

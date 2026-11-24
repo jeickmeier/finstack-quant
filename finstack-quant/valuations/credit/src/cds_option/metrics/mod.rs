@@ -15,6 +15,6 @@ pub(crate) mod delta;
 mod dv01;
 pub(crate) mod gamma;
 mod recovery01;
-mod register;
+pub(crate) mod register;
 
-pub(crate) use register::{register_cds_option_metrics, vega};
+pub(crate) use register::register_cds_option_metrics;

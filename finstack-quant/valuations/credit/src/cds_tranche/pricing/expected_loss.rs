@@ -4,9 +4,9 @@
 #[cfg(test)]
 use super::pool::HomogeneousPool;
 use super::pool::PreparedPool;
-use super::pricer::{
-    CdsTranchePricer, ElWdPoint, INTEGRATION_TOLERANCE, PROBABILITY_CLIP, PoolExposure,
-};
+#[cfg(test)]
+use super::pricer::PoolExposure;
+use super::pricer::{CdsTranchePricer, ElWdPoint, INTEGRATION_TOLERANCE, PROBABILITY_CLIP};
 use crate::cds_tranche::CdsTranche;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::{BaseCorrelationCurve, CreditIndexData};
@@ -36,88 +36,6 @@ struct ElInvariants {
 }
 
 impl CdsTranchePricer {
-    /// Calculate expected tranche loss using the base correlation approach.
-    ///
-    /// Decomposes the tranche [A, D] as the difference between two equity
-    /// tranches: EL(0, D) - EL(0, A), using correlations interpolated from
-    /// the base correlation curve with enhanced numerical stability.
-    pub(super) fn calculate_expected_tranche_loss(
-        &self,
-        tranche: &CdsTranche,
-        index_data: &CreditIndexData,
-        maturity: Date,
-    ) -> Result<f64> {
-        let eff = self.calculate_effective_structure(tranche, index_data.recovery_rate());
-        let (eff_attach, eff_detach, pool_factor) =
-            (eff.eff_attach, eff.eff_detach, eff.pool_factor);
-
-        // If effective width is zero, no loss
-        if eff_detach <= eff_attach {
-            return Ok(0.0);
-        }
-
-        // Get correlations for ORIGINAL attachment and detachment points
-        // Base correlation is sticky to the original structure
-        let corr_attach = index_data
-            .base_correlation_curve()
-            .get_correlation(tranche.attach_pct)?;
-        let corr_detach = index_data
-            .base_correlation_curve()
-            .get_correlation(tranche.detach_pct)?;
-
-        // Apply enhanced correlation boundary handling for numerical stability
-        let corr_attach = self.smooth_correlation_boundary(corr_attach);
-        let corr_detach = self.smooth_correlation_boundary(corr_detach);
-
-        // Calculate expected losses for equity tranches [0, A_eff] and [0, D_eff]
-        // Note: These inputs to calculate_equity_tranche_capped are now in "Effective %" terms
-        // but correlations are from "Original %" terms.
-        let el_to_attach = self.calculate_equity_tranche_capped(
-            eff_attach * 100.0,
-            corr_attach,
-            index_data,
-            maturity,
-            PoolExposure::Loss,
-        )?;
-
-        let el_to_detach = self.calculate_equity_tranche_capped(
-            eff_detach * 100.0,
-            corr_detach,
-            index_data,
-            maturity,
-            PoolExposure::Loss,
-        )?;
-
-        // The [A_eff, D_eff] tranche loss as a fraction of CURRENT portfolio.
-        // EL(0,D) − EL(0,A) is the tranchelet EL; it must be non-negative
-        // because a wider equity tranche cannot lose less than a narrower
-        // one. A negative value signals genuine base-correlation arbitrage
-        // (ρ(D) and ρ(A) inconsistent) — surfaced explicitly rather than
-        // silently clamped to zero protection.
-        let current_portfolio_loss_fraction = self.resolve_tranchelet_difference(
-            el_to_detach,
-            el_to_attach,
-            tranche.attach_pct,
-            tranche.detach_pct,
-            maturity,
-        )?;
-
-        // Convert to currency amount:
-        // Loss = CurrentPortFrac * CurrentPortNotional
-        // CurrentPortNotional = OrigPortNotional * (1 - L)
-        // OrigPortNotional = TrancheNotional / (D_orig - A_orig)
-
-        let orig_width = (tranche.detach_pct - tranche.attach_pct) / 100.0;
-        if orig_width <= 1e-9 {
-            return Ok(0.0);
-        }
-
-        let orig_port_notional = tranche.notional.amount() / orig_width;
-        let loss_amount = current_portfolio_loss_fraction * orig_port_notional * pool_factor;
-
-        Ok(loss_amount)
-    }
-
     /// Compute the date-independent invariants needed for EL fraction evaluation.
     fn el_invariants(
         &self,
@@ -340,6 +258,7 @@ impl CdsTranchePricer {
     /// * `index_data` - Credit index market data
     /// * `maturity` - Maturity date for the loss calculation
     /// * `exposure` - Per-name exposure: loss given default or recovery
+    #[cfg(test)]
     pub(super) fn calculate_equity_tranche_capped(
         &self,
         cap_pct: f64,

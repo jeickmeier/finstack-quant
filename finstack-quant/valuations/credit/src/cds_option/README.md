@@ -18,15 +18,11 @@ Import path:
 
 | Item | Purpose |
 |------|---------|
-| `CdsOption` | The instrument. `CdsOption::new(id, &option_params, &credit_params, discount_curve_id, vol_surface_id)`; `CdsOption::example()`. |
-| `CdsOptionParams` | Deal-level fields; `CdsOptionParams::call(..)` (payer) / `::put(..)` (receiver). |
+| `CdsOption` | The instrument. Construct via `CdsOption::builder()` or `CdsOption::example()`. |
 | `CdsOptionStrike` | `Spread(Decimal)` or `CleanPricePct(Decimal)`. |
-| `CdsOptionStrikeKind` | Discriminant for branching pricing and metric paths. |
 | `ProtectionStartConvention` | `Spot` (default) or `Forward`. |
 
-Useful methods on `CdsOption`: the direct Greek entry points `delta`, `gamma`, `vega`, `theta` and
-`implied_vol(curves, as_of, target_price, initial_guess)`. Each is the same
-computation the corresponding metric calculator registers.
+Useful methods on `CdsOption`: `implied_vol(curves, as_of, target_price, initial_guess)`, and Greek metrics (`delta`, `gamma`, `vega`, `theta`) via `Instrument::price_with_metrics` or `MetricId`.
 
 ## Module layout
 
@@ -34,8 +30,7 @@ computation the corresponding metric calculator registers.
 cds_option/
 ├── mod.rs                    # public re-exports and model overview
 ├── types.rs                  # CdsOption, ProtectionStartConvention, validation, example
-├── parameters.rs             # CdsOptionParams (call/put constructors)
-├── strike.rs                 # CdsOptionStrike, CdsOptionStrikeKind
+├── strike.rs                 # CdsOptionStrike
 ├── bloomberg_quadrature.rs   # crate-private DOCS 2055833 quadrature kernel
 ├── pricer.rs                 # crate-private pricing primitives
 └── metrics/                  # delta, gamma, vega, theta, dv01, spread_dv01, par_spread,
@@ -156,32 +151,31 @@ let pv = option.value(&market, as_of)?;
 Building one explicitly:
 
 ```rust
+use finstack_quant_valuations::instruments::SettlementType;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
-    CdsOption, CdsOptionParams, CdsOptionStrike,
+    CdsOption, CdsOptionStrike,
 };
-use finstack_quant_valuations::instruments::credit_derivatives::CreditParams;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_models::types::OptionType;
 use rust_decimal::Decimal;
 use time::macros::date;
 
 // Payer (call on spread) struck at 100 bp.
-let params = CdsOptionParams::call(
-    CdsOptionStrike::Spread(Decimal::new(1, 2)),
-    date!(2025 - 06 - 20),   // expiry
-    date!(2030 - 06 - 20),   // underlying CDS maturity
-    Money::new(10_000_000.0, Currency::USD)?,
-)?;
-
-let credit = CreditParams::corporate_standard("CORP", "CORP-HAZARD");
-
-let option = CdsOption::new(
-    "CDSOPT-CALL-CORP-5Y",
-    &params,
-    &credit,
-    "USD-OIS",
-    "CDSOPT-VOL",
-)?;
+let option = CdsOption::builder()
+    .id(InstrumentId::new("CDSOPT-CALL-CORP-5Y"))
+    .strike(CdsOptionStrike::Spread(Decimal::new(1, 2)))
+    .option_type(OptionType::Call)
+    .expiry(date!(2025 - 06 - 20))
+    .underlying_maturity(date!(2030 - 06 - 20))
+    .notional(Money::new(10_000_000.0, Currency::USD)?)
+    .settlement(SettlementType::Cash)
+    .recovery_rate(0.40)
+    .discount_curve_id(CurveId::new("USD-OIS"))
+    .credit_curve_id(CurveId::new("CORP-HAZARD"))
+    .vol_surface_id(CurveId::new("CDSOPT-VOL"))
+    .build()?;
 ```
 
 ## Metrics

@@ -23,7 +23,7 @@ use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey,
 use finstack_quant_valuations_core::market::conventions::{
     CdsConvention, CdsConventionSpec, ConventionRegistry,
 };
-use finstack_quant_valuations_credit::cds::{CreditDefaultSwap, pricing::PreparedCds};
+use finstack_quant_valuations_credit::cds::{CreditDefaultSwap, PreparedCds};
 use std::str::FromStr;
 use std::sync::Arc;
 

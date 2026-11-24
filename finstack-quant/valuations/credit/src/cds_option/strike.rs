@@ -80,34 +80,7 @@ pub enum CdsOptionStrike {
     ),
 }
 
-/// Discriminant of a [`CdsOptionStrike`], for branching metric and pricing
-/// paths without repeated pattern matches on the payload.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CdsOptionStrikeKind {
-    /// Forward-spread strike.
-    Spread,
-    /// Clean-price strike.
-    CleanPricePct,
-}
-
-impl std::fmt::Display for CdsOptionStrikeKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Spread => write!(f, "spread"),
-            Self::CleanPricePct => write!(f, "clean_price_pct"),
-        }
-    }
-}
-
 impl CdsOptionStrike {
-    /// Strike kind discriminant.
-    pub fn kind(&self) -> CdsOptionStrikeKind {
-        match self {
-            Self::Spread(_) => CdsOptionStrikeKind::Spread,
-            Self::CleanPricePct(_) => CdsOptionStrikeKind::CleanPricePct,
-        }
-    }
-
     /// The strike spread as a decimal rate, when this is a spread strike.
     pub fn spread_decimal(&self) -> Option<Decimal> {
         match self {
@@ -203,13 +176,11 @@ mod tests {
     }
 
     #[test]
-    fn kind_and_accessors_are_consistent() {
+    fn accessors_are_consistent() {
         let spread = CdsOptionStrike::Spread(Decimal::new(1, 2));
-        assert_eq!(spread.kind(), CdsOptionStrikeKind::Spread);
         assert_eq!(spread.spread_decimal(), Some(Decimal::new(1, 2)));
 
         let price = CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1));
-        assert_eq!(price.kind(), CdsOptionStrikeKind::CleanPricePct);
         assert_eq!(price.spread_decimal(), None);
     }
 }

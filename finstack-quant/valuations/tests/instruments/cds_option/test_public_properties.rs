@@ -2,7 +2,8 @@
 //! diagnostics from the Bloomberg quadrature module.
 
 use super::common::*;
-use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
+use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations_test_support::assertions::assert_finite;
 use time::macros::date;
 
@@ -36,7 +37,17 @@ fn test_put_delta_sign_negative() {
 
     for strike in [75.0, 100.0, 150.0, 250.0] {
         let put = CdsOptionBuilder::new().put().strike(strike).build(as_of);
-        let delta = put.delta(&market, as_of).expect("put delta");
+        let delta = *put
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[MetricId::Delta],
+                PricingOptions::default(),
+            )
+            .expect("put delta")
+            .measures
+            .get("delta")
+            .expect("delta measure");
         assert!(
             delta < 0.0,
             "receiver/put CDS option delta should be negative at strike {strike}: delta={delta}",

@@ -7,7 +7,7 @@ use finstack_quant_core::{Error, Result, dates::Date, money::Money};
 /// Groups parameters specific to CDS tranches.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct CdsTrancheParams {
     /// Index name (e.g., "CDX.NA.IG", "iTraxx Europe")
     pub index_name: String,
@@ -31,6 +31,25 @@ pub struct CdsTrancheParams {
     /// (`0.0` when omitted from the wire form).
     #[serde(default)]
     pub realized_loss: f64,
+}
+
+impl serde::Serialize for CdsTrancheParams {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        Self::serialize(self, serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for CdsTrancheParams {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        let params = Self::deserialize(deserializer)?;
+        params.validate().map_err(serde::de::Error::custom)?;
+        Ok(params)
+    }
 }
 
 impl CdsTrancheParams {
@@ -76,11 +95,34 @@ impl CdsTrancheParams {
     ///
     /// # Errors
     ///
-    /// Returns a validation error when `realized_loss` is outside `[0.0, 1.0]`.
+    /// Returns a validation error when attachment/detachment bounds, coupon,
+    /// notional, or `realized_loss` violate tranche invariants.
     pub fn validate(&self) -> Result<()> {
-        if !(0.0..=1.0).contains(&self.realized_loss) {
+        if !self.attach_pct.is_finite()
+            || !self.detach_pct.is_finite()
+            || self.attach_pct < 0.0
+            || self.attach_pct >= self.detach_pct
+            || self.detach_pct > 100.0
+        {
             return Err(Error::Validation(format!(
-                "realized_loss must be in [0.0, 1.0], got {}",
+                "attach_pct ({}) and detach_pct ({}) must be finite with 0 <= attach_pct < detach_pct <= 100",
+                self.attach_pct, self.detach_pct
+            )));
+        }
+        if !self.coupon_bp.is_finite() {
+            return Err(Error::Validation(format!(
+                "coupon_bp must be finite, got {}",
+                self.coupon_bp
+            )));
+        }
+        finstack_quant_core::validation::validate_money_gt(
+            self.notional,
+            0.0,
+            "CDS tranche notional",
+        )?;
+        if !self.realized_loss.is_finite() || !(0.0..=1.0).contains(&self.realized_loss) {
+            return Err(Error::Validation(format!(
+                "realized_loss must be finite and in [0.0, 1.0], got {}",
                 self.realized_loss
             )));
         }

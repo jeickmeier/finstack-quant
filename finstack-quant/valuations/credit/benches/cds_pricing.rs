@@ -16,8 +16,7 @@ use finstack_quant_valuations_core::instruments::{Instrument, PayReceive, Pricin
 use finstack_quant_valuations_core::market::conventions::CdsConvention;
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_core::results::ValuationResult;
-use finstack_quant_valuations_credit::cds::CreditDefaultSwap;
-use finstack_quant_valuations_credit::cds::pricing::PreparedCds;
+use finstack_quant_valuations_credit::cds::{CreditDefaultSwap, PreparedCds};
 use finstack_quant_valuations_credit::constants::isda::STANDARD_RECOVERY_SENIOR;
 use finstack_quant_valuations_credit::{CdsDateRegime, PremiumLegSpec, ProtectionLegSpec};
 use rust_decimal::Decimal;

@@ -57,6 +57,7 @@ mod engine;
 mod tests;
 
 pub use engine::{
-    ForwardCdsContext, QuadratureStrike, calibrate_lognormal_mean, forward_par_at_expiry_bp,
-    normal_integral, npv, price_with_calibrated_mean, quadrature_payoff, theta, z_limit,
+    ForwardCdsContext, calibrate_lognormal_mean, normal_integral, price_with_calibrated_mean,
+    quadrature_payoff, z_limit,
 };
+pub(crate) use engine::{forward_par_at_expiry_bp, npv, theta};

@@ -1865,11 +1865,8 @@ fn realistic_base_correlation_skew_prices_every_tranche() {
 
         // The maturity loss is strictly positive: the curve is arbitrage-free
         // where it is quoted, so protection has value.
-        let index = market_ctx
-            .get_credit_index("CDX.NA.IG.42")
-            .expect("credit index");
         let terminal_loss = pricer
-            .calculate_expected_tranche_loss(&tranche, &index, maturity)
+            .calculate_expected_loss(&tranche, &market_ctx)
             .expect("maturity loss");
         assert!(
             terminal_loss > 0.0,

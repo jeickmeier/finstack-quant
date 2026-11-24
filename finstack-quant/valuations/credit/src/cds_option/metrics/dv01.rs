@@ -15,14 +15,17 @@ impl MetricCalculator for CdsOptionDv01Calculator {
         let option = context.instrument_as::<CdsOption>()?;
         let discount_id = option.discount_curve_id.clone();
         let hazard = context.curves.get_hazard(&option.credit_curve_id)?;
+        let cds = crate::cds_option::pricer::synthetic_underlying_cds(option, context.as_of)?;
+        let doc_clause = Some(crate::cds::metrics::market_doc_clause(&cds));
+        let cds_valuation_convention = Some(cds.valuation_convention);
         let reprice = |context: &MetricContext, shock: DiscountShock| -> Result<f64> {
             let replay = HazardReplay {
                 hazard: Arc::clone(&hazard),
-                doc_clause: None,
-                cds_valuation_convention: None,
+                doc_clause,
+                cds_valuation_convention,
                 deal_quote_override: None,
             };
-            let (market, _) =
+            let market =
                 rate_bumped_market_with_hazard_replay(context, &discount_id, shock, [replay])?;
             context.reprice_raw(&market, context.as_of)
         };

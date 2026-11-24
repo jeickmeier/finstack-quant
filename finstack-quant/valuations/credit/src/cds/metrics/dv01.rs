@@ -145,17 +145,15 @@ pub(crate) struct HazardReplay {
 /// (see [`discount_bumped_market`]) and every calibrated hazard curve in
 /// `replays` re-bootstrapped from its unchanged par spreads against that
 /// bumped discount curve. Hazards without a calibration recipe stay as they
-/// are. Returns the rebuilt curves too, so callers that also hold the hazards
-/// elsewhere (a credit index) can swap them in.
+/// are.
 pub(crate) fn rate_bumped_market_with_hazard_replay(
     context: &MetricContext,
     discount_id: &CurveId,
     shock: DiscountShock,
     replays: impl IntoIterator<Item = HazardReplay>,
-) -> Result<(MarketContext, Vec<Arc<HazardCurve>>)> {
+) -> Result<MarketContext> {
     let mut bumped_market = discount_bumped_market(context, discount_id, shock)?;
     let target_market = Arc::new(bumped_market.clone());
-    let mut rebuilt = Vec::new();
     for replay in replays {
         if replay.hazard.hazard_calibration().is_none() {
             continue;
@@ -173,10 +171,9 @@ pub(crate) fn rate_bumped_market_with_hazard_replay(
             },
             "dv01",
         )?;
-        bumped_market.try_insert_mut(Arc::clone(&recalibrated))?;
-        rebuilt.push(recalibrated);
+        bumped_market.try_insert_mut(recalibrated)?;
     }
-    Ok((bumped_market, rebuilt))
+    Ok(bumped_market)
 }
 
 /// CDS DV01 calculator with par-spread hazard re-bootstrap when possible.
@@ -196,7 +193,7 @@ impl MetricCalculator for CdsDv01Calculator {
                 cds_valuation_convention: Some(cds.valuation_convention),
                 deal_quote_override: deal_quote_override(&cds),
             };
-            let (bumped_market, _) = rate_bumped_market_with_hazard_replay(
+            let bumped_market = rate_bumped_market_with_hazard_replay(
                 context,
                 &cds.premium_leg.discount_curve_id,
                 shock,

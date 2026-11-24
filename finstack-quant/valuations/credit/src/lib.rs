@@ -38,7 +38,7 @@
 //! - **Recovery rates**: Standard 40% for senior, 20% for subordinated
 //! - **Accrual-on-default**: analytical piecewise-constant integration over
 //!   hazard/discount knots (ISDA Standard Model; see
-//!   `cds::pricing::engine`)
+//!   [`cds::PreparedCds`](crate::cds::PreparedCds))
 //!
 //! # ISDA Conventions
 //!

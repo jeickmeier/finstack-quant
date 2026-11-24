@@ -17,11 +17,12 @@ use finstack_quant_core::market_data::surfaces::{
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve, Seniority};
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::types::OptionType;
-use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_credit::CreditParams;
+use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions, SettlementType};
+use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_credit::cds_option::{
-    CdsOption, CdsOptionParams, CdsOptionStrike, ProtectionStartConvention,
+    CdsOption, CdsOptionStrike, ProtectionStartConvention,
 };
 use rust_decimal::Decimal;
 use std::hint::black_box;
@@ -43,34 +44,24 @@ fn create_cds_option(
     let expiry = base + time::Duration::days((expiry_months * 30) as i64);
     let underlying_maturity = base + time::Duration::days((cds_tenor_years * 365) as i64);
 
-    let option_params = CdsOptionParams {
-        strike: CdsOptionStrike::Spread(Decimal::new(1, 2)), // 0.01 = 100bp
-        option_type,
-        expiry,
-        underlying_maturity,
-        notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-        settlement: finstack_quant_valuations_core::instruments::SettlementType::Cash,
-        underlying_is_index: false,
-        index_factor: 1.0,
-        strike_index_factor: None,
-        coupon_bp: None,
-        protection_start_convention: ProtectionStartConvention::Forward,
-    };
-
-    let credit_params = CreditParams {
-        reference_entity: "ACME".to_string(),
-        recovery_rate: 0.40,
-        credit_curve_id: "ACME-HAZARD".into(),
-    };
-
-    CdsOption::new(
-        format!("CDS_OPT_{}M_{}Y", expiry_months, cds_tenor_years),
-        &option_params,
-        &credit_params,
-        "USD-OIS",
-        "CDS-VOL",
-    )
-    .expect("valid CDS option setup")
+    CdsOption::builder()
+        .id(InstrumentId::new(format!(
+            "CDS_OPT_{}M_{}Y",
+            expiry_months, cds_tenor_years
+        )))
+        .strike(CdsOptionStrike::Spread(Decimal::new(1, 2))) // 0.01 = 100bp
+        .option_type(option_type)
+        .expiry(expiry)
+        .underlying_maturity(underlying_maturity)
+        .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .settlement(SettlementType::Cash)
+        .protection_start_convention(ProtectionStartConvention::Forward)
+        .recovery_rate(0.40)
+        .discount_curve_id(CurveId::new("USD-OIS"))
+        .credit_curve_id(CurveId::new("ACME-HAZARD"))
+        .vol_surface_id(CurveId::new("CDS-VOL"))
+        .build()
+        .expect("valid CDS option setup")
 }
 
 fn create_index_cds_option() -> CdsOption {
@@ -211,9 +202,17 @@ fn bench_cds_option_greeks(c: &mut Criterion) {
         support::bench(
             b,
             || {
-                option
-                    .delta(black_box(&market), black_box(as_of))
+                *option
+                    .price_with_metrics(
+                        black_box(&market),
+                        black_box(as_of),
+                        &[MetricId::Delta],
+                        PricingOptions::default(),
+                    )
                     .expect("CDS option delta")
+                    .measures
+                    .get("delta")
+                    .expect("delta measure")
             },
             |value| assert!(value.is_finite()),
         );
@@ -225,9 +224,17 @@ fn bench_cds_option_greeks(c: &mut Criterion) {
         support::bench(
             b,
             || {
-                option
-                    .gamma(black_box(&market), black_box(as_of))
+                *option
+                    .price_with_metrics(
+                        black_box(&market),
+                        black_box(as_of),
+                        &[MetricId::Gamma],
+                        PricingOptions::default(),
+                    )
                     .expect("CDS option gamma")
+                    .measures
+                    .get("gamma")
+                    .expect("gamma measure")
             },
             |value| assert!(value.is_finite()),
         );
@@ -239,9 +246,17 @@ fn bench_cds_option_greeks(c: &mut Criterion) {
         support::bench(
             b,
             || {
-                option
-                    .vega(black_box(&market), black_box(as_of))
+                *option
+                    .price_with_metrics(
+                        black_box(&market),
+                        black_box(as_of),
+                        &[MetricId::Vega],
+                        PricingOptions::default(),
+                    )
                     .expect("CDS option vega")
+                    .measures
+                    .get("vega")
+                    .expect("vega measure")
             },
             |value| assert!(value.is_finite()),
         );
@@ -253,9 +268,17 @@ fn bench_cds_option_greeks(c: &mut Criterion) {
         support::bench(
             b,
             || {
-                option
-                    .theta(black_box(&market), black_box(as_of))
+                *option
+                    .price_with_metrics(
+                        black_box(&market),
+                        black_box(as_of),
+                        &[MetricId::Theta],
+                        PricingOptions::default(),
+                    )
                     .expect("CDS option theta")
+                    .measures
+                    .get("theta")
+                    .expect("theta measure")
             },
             |value| assert!(value.is_finite()),
         );
@@ -274,19 +297,24 @@ fn bench_cds_option_all_greeks(c: &mut Criterion) {
         support::bench(
             b,
             || {
+                let res = option
+                    .price_with_metrics(
+                        black_box(&market),
+                        black_box(as_of),
+                        &[
+                            MetricId::Delta,
+                            MetricId::Gamma,
+                            MetricId::Vega,
+                            MetricId::Theta,
+                        ],
+                        PricingOptions::default(),
+                    )
+                    .expect("CDS option all greeks");
                 [
-                    option
-                        .delta(black_box(&market), black_box(as_of))
-                        .expect("CDS option delta"),
-                    option
-                        .gamma(black_box(&market), black_box(as_of))
-                        .expect("CDS option gamma"),
-                    option
-                        .vega(black_box(&market), black_box(as_of))
-                        .expect("CDS option vega"),
-                    option
-                        .theta(black_box(&market), black_box(as_of))
-                        .expect("CDS option theta"),
+                    *res.measures.get("delta").expect("delta"),
+                    *res.measures.get("gamma").expect("gamma"),
+                    *res.measures.get("vega").expect("vega"),
+                    *res.measures.get("theta").expect("theta"),
                 ]
             },
             |values| assert!(values.iter().all(|value| value.is_finite())),

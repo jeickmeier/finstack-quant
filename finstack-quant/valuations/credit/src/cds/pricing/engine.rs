@@ -1,4 +1,4 @@
-//! `CdsPricer`: premium and protection legs, protection-leg integration over the
+//! CDS pricing kernel: premium and protection legs, protection-leg integration over the
 //! ISDA Standard Model knot grid, NPV and the prepared CDS workspace.
 
 use super::conventions::{
@@ -16,16 +16,6 @@ use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error, Result};
 use rust_decimal::prelude::ToPrimitive;
-
-/// CDS pricing engine.
-///
-/// Stateless: every valuation choice (par-spread denominator, step-in,
-/// accrual day count) comes from the instrument's
-/// [`CdsValuationConvention`](finstack_quant_valuations_core::market::conventions::CdsValuationConvention).
-/// Accrual-on-default is always included in the premium leg.
-#[derive(Debug, Default, Clone, Copy)]
-#[doc(hidden)]
-pub struct CdsPricer;
 
 #[derive(Clone, Copy)]
 pub(super) struct AodInputs<'a> {
@@ -57,365 +47,280 @@ pub(crate) struct CouponPeriod {
     pub(super) is_final: bool,
 }
 
-impl CdsPricer {
-    fn add_premium_period(
-        &self,
-        total: &mut f64,
-        inputs: AodInputs<'_>,
-        accrual: f64,
-        df: f64,
-    ) -> Result<()> {
-        let sp = if inputs.end_date <= inputs.as_of {
-            1.0
-        } else {
-            sp_cond_to(inputs.surv, inputs.as_of, inputs.end_date)?
-        };
-        let scheduled_coupon = inputs.cds.notional.amount() * inputs.spread * accrual;
-        *total += scheduled_coupon * sp * df;
-        *total += inputs.spread.signum()
-            * inputs.cds.notional.amount()
-            * self.accrual_on_default_isda_standard_model_cond(AodInputs {
-                spread: inputs.spread.abs(),
-                ..inputs
-            })?;
-        Ok(())
-    }
+#[inline]
+pub(super) fn spread_decimal(cds: &CreditDefaultSwap) -> Result<f64> {
+    let bp = cds.premium_leg.coupon_bp.to_f64().ok_or_else(|| {
+        Error::Validation("premium.coupon_bp cannot be represented as f64".into())
+    })?;
+    Ok(bp / BASIS_POINTS_PER_UNIT)
+}
 
-    /// Create the (stateless) CDS pricer.
-    #[must_use]
-    #[doc(hidden)]
-    pub fn new() -> Self {
-        Self
-    }
+#[inline]
+pub(super) fn calendar_for(
+    cds: &CreditDefaultSwap,
+) -> Result<Option<&'static dyn HolidayCalendar>> {
+    cds.premium_leg
+        .calendar_id
+        .as_deref()
+        .map(finstack_quant_core::dates::calendar_by_id_strict)
+        .transpose()
+}
 
-    /// Calculate PV of protection leg using ISDA Standard Model integration.
-    ///
-    /// The protection leg represents the contingent payment made by the
-    /// protection seller upon a credit event. Its present value is:
-    ///
-    /// ```text
-    /// PV_prot = (1 - R) × ∫ DF(t + delay) × (-dS(t)) dt
-    /// ```
-    ///
-    /// where R is the recovery rate, DF is the discount factor, S is the
-    /// survival probability, and delay is the settlement delay in years.
-    /// Calculate PV of protection leg (Money)
-    pub(crate) fn pv_protection_leg(
-        &self,
-        cds: &CreditDefaultSwap,
-        disc: &DiscountCurve,
-        surv: &HazardCurve,
-        as_of: Date,
-    ) -> Result<Money> {
-        let pv = self.pv_protection_leg_raw(cds, disc, surv, as_of)?;
-        Money::from_model_value(pv, cds.notional.currency())
-    }
+#[inline]
+pub(super) fn act360_inclusive_year_fraction(start: Date, end: Date) -> f64 {
+    let days = (end - start).whole_days() + 1;
+    (days.max(0) as f64) / 360.0
+}
 
-    /// Calculate PV of protection leg (raw f64)
-    ///
-    /// Uses proper time-axis conventions:
-    /// - Times are computed using the hazard curve's day-count convention
-    /// - Survival probabilities are conditional on no default before `as_of`
-    /// - Discounting uses the discount curve (times mapped from hazard curve axis)
-    ///
-    /// # Panics
-    ///
-    /// This method assumes the CDS has been validated at construction time.
-    /// Recovery rate is expected to be in [0, 1]. Invalid recovery rates will
-    /// produce incorrect results without error.
-    pub(crate) fn pv_protection_leg_raw(
-        &self,
-        cds: &CreditDefaultSwap,
-        disc: &DiscountCurve,
-        surv: &HazardCurve,
-        as_of: Date,
-    ) -> Result<f64> {
-        self.pv_protection_leg_prepared(cds, disc, surv, as_of, None)
-    }
-
-    fn pv_protection_leg_prepared(
-        &self,
-        cds: &CreditDefaultSwap,
-        disc: &DiscountCurve,
-        surv: &HazardCurve,
-        as_of: Date,
-        grid_cache: Option<&IsdaWindowCache>,
-    ) -> Result<f64> {
-        // Note: Recovery rate validation is performed at CDS construction time.
-        // All public constructors (builder, new_isda) call validate().
-        //
-        // Additionally enforce that the trade-spec recovery agrees with the
-        // recovery used to bootstrap the hazard curve. The ISDA Standard Model
-        // requires the same R in both legs; mismatched recoveries silently
-        // mis-scale the protection leg (1 − R) factor.
-        validate_recovery_consistency(cds.protection_leg.recovery_rate, surv)?;
-
-        // Protection leg covers the period from protection start to premium end.
-        // For forward-starting CDS, protection begins at protection_effective_date
-        // (which may be later than the premium leg start).
-        // We only value protection from as_of onwards (can't protect against past defaults).
-        //
-        // **Audit P3c**: standard CDS (single-name, CDX, iTraxx) terminate
-        // protection and premium on the same date, which is why we read
-        // `cds.premium_leg.end` here. `ProtectionLegSpec`
-        // (see `instruments::credit_derivatives::ProtectionLegSpec`) carries no
-        // `end_date` field today. Bespoke contracts that need a separate
-        // protection termination (contingent CDS, amortising structures
-        // with shrinking notional schedules) would have to extend
-        // `ProtectionLegSpec` with an explicit `end_date: Option<Date>`
-        // and prefer it here when present.
-        // Protection step-in: ISDA-standard conventions step protection in at
-        // T+1 calendar (a default on the valuation date itself is not
-        // covered); Bloomberg CDSW/CDSO conventions integrate from the
-        // valuation date ("protection starts immediately"). See
-        // `CdsValuationConvention::protection_step_in_days`.
-        let step_in =
-            as_of + time::Duration::days(cds.valuation_convention.protection_step_in_days());
-        let protection_start = step_in.max(cds.protection_start());
-        let protection_end = cds.premium_leg.end;
-
-        // Protection can expire before the last rolled premium payment.
-        // An exhausted protection interval contributes zero, leaving the
-        // pending premium receivable available to the rest of the pricer.
-        if protection_end <= as_of {
-            return Ok(0.0);
-        }
-
-        // Step-in at/after the protection end (e.g. valuing a 1-day CDS where
-        // T+1 step-in lands on maturity): empty protection interval, zero
-        // protection value.
-        if protection_start >= protection_end {
-            return Ok(0.0);
-        }
-
-        // Use hazard curve's day-count for time axis (survival is the dominant factor)
-        let t_asof = haz_t(surv, as_of)?;
-        let t_start = haz_t(surv, protection_start)?;
-        let t_end = haz_t(surv, protection_end)?;
-
-        let recovery = cds.protection_leg.recovery_rate;
-        let calendar = cds
-            .premium_leg
-            .calendar_id
-            .as_deref()
-            .map(finstack_quant_core::dates::calendar_by_id_strict)
-            .transpose()?;
-
-        // Compute survival at as_of for conditioning
-        let sp_asof = surv.sp(t_asof)?;
-
-        let grid = IsdaGrid {
-            t_start,
-            t_end,
-            settlement_delay: cds.protection_leg.settlement_delay,
-            calendar,
-            sp_asof,
-            as_of,
-            disc,
-            surv,
-            grid_cache,
-        };
-        let protection_pv = protection_leg_isda_standard_model_cond(&grid, recovery)?;
-
-        Ok(protection_pv * cds.notional.amount())
-    }
-
-    /// Calculate PV of premium leg with optional accrual-on-default
-    /// Calculate PV of premium leg (Money)
-    pub(crate) fn pv_premium_leg(
-        &self,
-        cds: &CreditDefaultSwap,
-        disc: &DiscountCurve,
-        surv: &HazardCurve,
-        as_of: Date,
-    ) -> Result<Money> {
-        let pv = self.pv_premium_leg_raw(cds, disc, surv, as_of)?;
-        Money::from_model_value(pv, cds.notional.currency())
-    }
-
-    /// Calculate PV of premium leg (raw f64)
-    ///
-    /// Uses proper time-axis conventions:
-    /// - Discounting: relative DF from `as_of` using discount curve's day-count
-    /// - Survival: conditional survival given no default before `as_of` using hazard curve's day-count
-    /// - Accrual: instrument's premium leg day-count convention (Act/360 for NA, etc.)
-    /// - Accrual-on-default: analytical piecewise-constant integration over hazard/disc knots
-    pub(crate) fn pv_premium_leg_raw(
-        &self,
-        cds: &CreditDefaultSwap,
-        disc: &DiscountCurve,
-        surv: &HazardCurve,
-        as_of: Date,
-    ) -> Result<f64> {
-        let calendar = cds
-            .premium_leg
-            .calendar_id
-            .as_deref()
-            .map(finstack_quant_core::dates::calendar_by_id_strict)
-            .transpose()?;
-        let periods = self.coupon_periods(cds, as_of)?;
-        let spread = cds.premium_leg.coupon_bp.to_f64().ok_or_else(|| {
-            Error::Validation("premium.coupon_bp cannot be represented as f64".into())
-        })? / BASIS_POINTS_PER_UNIT;
-
-        let mut premium_pv = 0.0;
-        for period in periods {
-            let start_date = period.accrual_start;
-            let end_date = period.accrual_end;
-            let payment_date = period.payment_date;
-
-            if !crate::cds::cash_is_eligible(
-                payment_date,
-                as_of,
-                cds.include_valuation_date_cashflows,
-            ) {
-                continue;
-            }
-
-            // Discounting uses discount curve's day-count and relative DF from as_of
-            let df = disc.df_between_dates(as_of, payment_date)?;
-
-            let accrual = self.coupon_accrual(cds, &period)?;
-            self.add_premium_period(
-                &mut premium_pv,
-                AodInputs {
-                    cds,
-                    spread,
-                    accrual_start_date: start_date,
-                    start_date: start_date.max(as_of),
-                    end_date,
-                    settlement_delay: cds.protection_leg.settlement_delay,
-                    calendar,
-                    as_of,
-                    disc,
-                    surv,
-                    grid_cache: None,
-                },
-                accrual,
-                df,
-            )?;
-        }
-
-        Ok(premium_pv)
-    }
-
-    // ─── Accrual-on-default integration ───────────────────────────────────
-
-    /// ISDA Standard Model AoD: analytical integration over piecewise-constant
-    /// hazard and interest rate intervals (knot-aligned), using conditional
-    /// survival and relative discount factors from `as_of`.
-    pub(super) fn accrual_on_default_isda_standard_model_cond(
-        &self,
-        inp: AodInputs<'_>,
-    ) -> Result<f64> {
-        if inp.end_date <= inp.start_date {
-            return Ok(0.0);
-        }
-        // `accrual_start_date` may pre-date the hazard curve base for the
-        // in-progress coupon period of an ISDA-dirty CDS valued mid-period.
-        // Compute a signed year fraction so the accrual origin extends back
-        // across the base date instead of clamping to zero.
-        let t_accrual_start = if inp.accrual_start_date < inp.surv.base_date() {
-            -inp.surv.day_count().year_fraction(
-                inp.accrual_start_date,
-                inp.surv.base_date(),
-                finstack_quant_core::dates::DayCountContext::default(),
-            )?
-        } else {
-            haz_t(inp.surv, inp.accrual_start_date)?
-        };
-        let t_start = haz_t(inp.surv, inp.start_date)?;
-        let t_end = haz_t(inp.surv, inp.end_date)?;
-        let t_asof = haz_t(inp.surv, inp.as_of)?;
-        let sp_asof = inp.surv.sp(t_asof)?;
-        if sp_asof <= credit::SURVIVAL_PROBABILITY_FLOOR {
-            return Ok(0.0);
-        }
-
-        // QuantLib parity: with `Actual360(true)` the within-period
-        // accrual fraction is inclusive of the upper boundary. Mirror that
-        // behaviour for the AoD integral under the QuantLib parity convention
-        // so the linear `tau` interpolation matches QuantLib's
-        // `IsdaCdsEngine`.
-        let tau_remaining = if inp.cds.valuation_convention.act360_includes_last_day()
-            && inp.cds.premium_leg.day_count == finstack_quant_core::dates::DayCount::Act360
-            && inp.end_date > inp.accrual_start_date
+pub(super) fn upfront_pv(
+    cds: &CreditDefaultSwap,
+    disc: &DiscountCurve,
+    as_of: Date,
+) -> Result<f64> {
+    match cds.upfront {
+        Some((dt, amount))
+            if crate::cds::cash_is_eligible(dt, as_of, cds.include_valuation_date_cashflows) =>
         {
-            let days = (inp.end_date - inp.accrual_start_date).whole_days() + 1;
-            (days.max(0) as f64) / 360.0
-        } else {
-            inp.cds.premium_leg.day_count.year_fraction(
-                inp.accrual_start_date,
-                inp.end_date,
-                DayCountContext::default(),
-            )?
-        };
-        let accrual_period_length_haz = t_end - t_accrual_start;
-        if accrual_period_length_haz <= 0.0 || tau_remaining <= 0.0 {
-            return Ok(0.0);
+            Ok(amount.amount() * disc.df_between_dates(as_of, dt)?)
         }
-        // Linear scale from hazard-time position to instrument-day-count accrual.
-        let tau_per_haz = tau_remaining / accrual_period_length_haz;
-
-        // Accrued fraction at interval start, expressed in instrument-DC units.
-        //
-        // QuantLib's `Actual360(true)` shifts discrete coupon accrual by
-        // one inclusive day. In the continuous default-accrual integral,
-        // that convention contributes half a day at the interval boundary.
-        // `IsdaCdsEngine` can also add its explicit `HalfDayBias`; when
-        // both QuantLib knobs are enabled the starting accrual is shifted
-        // by one full day.
-        let mut bias_days = 0.0;
-        if inp.cds.premium_leg.day_count == finstack_quant_core::dates::DayCount::Act360 {
-            if inp.cds.valuation_convention.act360_includes_last_day() {
-                bias_days += 0.5;
-            }
-            if inp.cds.valuation_convention.aod_half_day_bias() {
-                bias_days += 0.5;
-            }
-        }
-        let accrual_bias = bias_days / 360.0;
-
-        let grid = IsdaGrid {
-            t_start,
-            t_end,
-            settlement_delay: inp.settlement_delay,
-            calendar: inp.calendar,
-            sp_asof,
-            as_of: inp.as_of,
-            disc: inp.disc,
-            surv: inp.surv,
-            grid_cache: inp.grid_cache,
-        };
-        let mut accrual_pv = 0.0;
-        grid.for_each_window(|w| {
-            let tau_at_t1 = (w.t1 - t_accrual_start) * tau_per_haz + accrual_bias;
-
-            // Analytical integration for
-            //   ∫ spread * (τ_at_t1 + (t - t1) * tau_per_haz) * λ * S(t1) * D(t1)
-            //     * exp(-(λ + r)(t - t1)) dt
-            // Let k = λ + r. Then
-            //   I0 = (1 - e^{-kΔ})/k
-            //   I1 = (1 - e^{-kΔ}(1 + kΔ))/k²
-            let k = w.hazard_rate + w.interest_rate;
-            let contribution = if k.abs() > ZERO_TOLERANCE {
-                let exp_term = (-k * w.dt).exp();
-                let i0 = (1.0 - exp_term) / k;
-                let i1 = (1.0 - exp_term * (1.0 + k * w.dt)) / (k * k);
-                inp.spread * w.df1 * w.sp1 * w.hazard_rate * (tau_at_t1 * i0 + tau_per_haz * i1)
-            } else {
-                // Small-k fallback: midpoint approximation keeps AoD well-behaved
-                // for near-zero hazard or near-zero (r+λ).
-                let t_mid = (w.t1 + w.t2) * 0.5;
-                let position =
-                    ((t_mid - t_accrual_start) / accrual_period_length_haz).clamp(0.0, 1.0);
-                let accrued_tau = tau_remaining * position + accrual_bias;
-                inp.spread * accrued_tau * (w.sp1 - w.sp2) * w.df1
-            };
-            accrual_pv += contribution;
-        })?;
-        Ok(accrual_pv)
+        _ => Ok(0.0),
     }
+}
+
+pub(super) fn clean_accrued_amount(
+    cds: &CreditDefaultSwap,
+    spread: f64,
+    as_of: Date,
+) -> Result<f64> {
+    if cds.uses_clean_price() {
+        let accrual_fraction = super::metrics::clean_quote_accrual_fraction(cds, as_of)?;
+        Ok(cds.notional.amount() * spread * accrual_fraction)
+    } else {
+        Ok(0.0)
+    }
+}
+
+pub(super) fn add_premium_period(
+    total: &mut f64,
+    inputs: AodInputs<'_>,
+    accrual: f64,
+    df: f64,
+    include_aod: bool,
+) -> Result<()> {
+    let sp = sp_cond_to(inputs.surv, inputs.as_of, inputs.end_date)?;
+    *total += inputs.spread * accrual * sp * df;
+    if include_aod {
+        *total += accrual_on_default_isda_standard_model_cond(inputs)?;
+    }
+    Ok(())
+}
+
+/// Calculate PV of protection leg using ISDA Standard Model integration (Money).
+///
+/// The protection leg represents the contingent payment made by the
+/// protection seller upon a credit event. Its present value is:
+///
+/// ```text
+/// PV_prot = (1 - R) × ∫ DF(t + delay) × (-dS(t)) dt
+/// ```
+///
+/// where R is the recovery rate, DF is the discount factor, S is the
+/// survival probability, and delay is the settlement delay in years.
+pub(crate) fn pv_protection_leg(
+    cds: &CreditDefaultSwap,
+    disc: &DiscountCurve,
+    surv: &HazardCurve,
+    as_of: Date,
+) -> Result<Money> {
+    let pv = pv_protection_leg_raw(cds, disc, surv, as_of)?;
+    Money::from_model_value(pv, cds.notional.currency())
+}
+
+/// Calculate PV of protection leg (raw f64)
+///
+/// Uses proper time-axis conventions:
+/// - Times are computed using the hazard curve's day-count convention
+/// - Survival probabilities are conditional on no default before `as_of`
+/// - Discounting uses the discount curve (times mapped from hazard curve axis)
+pub(crate) fn pv_protection_leg_raw(
+    cds: &CreditDefaultSwap,
+    disc: &DiscountCurve,
+    surv: &HazardCurve,
+    as_of: Date,
+) -> Result<f64> {
+    pv_protection_leg_prepared(cds, disc, surv, as_of, calendar_for(cds)?, None)
+}
+
+fn pv_protection_leg_prepared(
+    cds: &CreditDefaultSwap,
+    disc: &DiscountCurve,
+    surv: &HazardCurve,
+    as_of: Date,
+    calendar: Option<&dyn HolidayCalendar>,
+    grid_cache: Option<&IsdaWindowCache>,
+) -> Result<f64> {
+    // Enforce that the trade-spec recovery agrees with the recovery used to
+    // bootstrap the hazard curve. The ISDA Standard Model requires the same R
+    // in both legs; mismatched recoveries silently mis-scale (1 − R).
+    validate_recovery_consistency(cds.protection_leg.recovery_rate, surv)?;
+
+    // Protection step-in: ISDA-standard conventions step protection in at T+1
+    // calendar; Bloomberg CDSW/CDSO integrate immediately from as_of.
+    let step_in = as_of + time::Duration::days(cds.valuation_convention.protection_step_in_days());
+    let protection_start = step_in.max(cds.protection_start());
+    let protection_end = cds.premium_leg.end;
+
+    if protection_end <= as_of || protection_start >= protection_end {
+        return Ok(0.0);
+    }
+
+    let t_asof = haz_t(surv, as_of)?;
+    let t_start = haz_t(surv, protection_start)?;
+    let t_end = haz_t(surv, protection_end)?;
+    let recovery = cds.protection_leg.recovery_rate;
+    let sp_asof = surv.sp(t_asof)?;
+
+    let grid = IsdaGrid {
+        t_start,
+        t_end,
+        settlement_delay: cds.protection_leg.settlement_delay,
+        calendar,
+        sp_asof,
+        as_of,
+        disc,
+        surv,
+        grid_cache,
+    };
+    let protection_pv = protection_leg_isda_standard_model_cond(&grid, recovery)?;
+
+    Ok(protection_pv * cds.notional.amount())
+}
+
+/// Calculate PV of premium leg with accrual-on-default (Money).
+pub(crate) fn pv_premium_leg(
+    cds: &CreditDefaultSwap,
+    disc: &DiscountCurve,
+    surv: &HazardCurve,
+    as_of: Date,
+) -> Result<Money> {
+    let pv = pv_premium_leg_raw(cds, disc, surv, as_of)?;
+    Money::from_model_value(pv, cds.notional.currency())
+}
+
+/// Calculate PV of premium leg with accrual-on-default (raw f64).
+///
+/// Uses proper time-axis conventions:
+/// - Discounting: relative DF from `as_of` using discount curve's day-count
+/// - Survival: conditional survival given no default before `as_of` using hazard curve's day-count
+/// - Accrual: instrument's premium leg day-count convention (Act/360 for NA, etc.)
+/// - Accrual-on-default: analytical piecewise-constant integration over hazard/disc knots
+pub(crate) fn pv_premium_leg_raw(
+    cds: &CreditDefaultSwap,
+    disc: &DiscountCurve,
+    surv: &HazardCurve,
+    as_of: Date,
+) -> Result<f64> {
+    let spread = spread_decimal(cds)?;
+    Ok(cds.notional.amount()
+        * super::metrics::premium_leg_annuity(cds, disc, surv, as_of, spread, true)?)
+}
+
+// ─── Accrual-on-default integration ───────────────────────────────────
+
+/// ISDA Standard Model AoD: analytical integration over piecewise-constant
+/// hazard and interest rate intervals (knot-aligned), using conditional
+/// survival and relative discount factors from `as_of`.
+pub(super) fn accrual_on_default_isda_standard_model_cond(inp: AodInputs<'_>) -> Result<f64> {
+    if inp.end_date <= inp.start_date {
+        return Ok(0.0);
+    }
+    // `accrual_start_date` may pre-date the hazard curve base for the
+    // in-progress coupon period of an ISDA-dirty CDS valued mid-period.
+    // Compute a signed year fraction so the accrual origin extends back
+    // across the base date instead of clamping to zero.
+    let t_accrual_start = if inp.accrual_start_date < inp.surv.base_date() {
+        -inp.surv.day_count().year_fraction(
+            inp.accrual_start_date,
+            inp.surv.base_date(),
+            finstack_quant_core::dates::DayCountContext::default(),
+        )?
+    } else {
+        haz_t(inp.surv, inp.accrual_start_date)?
+    };
+    let t_start = haz_t(inp.surv, inp.start_date)?;
+    let t_end = haz_t(inp.surv, inp.end_date)?;
+    let t_asof = haz_t(inp.surv, inp.as_of)?;
+    let sp_asof = inp.surv.sp(t_asof)?;
+    if sp_asof <= credit::SURVIVAL_PROBABILITY_FLOOR {
+        return Ok(0.0);
+    }
+
+    // QuantLib parity: with `Actual360(true)` the within-period
+    // accrual fraction is inclusive of the upper boundary.
+    let tau_remaining = if inp.cds.valuation_convention.act360_includes_last_day()
+        && inp.cds.premium_leg.day_count == finstack_quant_core::dates::DayCount::Act360
+        && inp.end_date > inp.accrual_start_date
+    {
+        act360_inclusive_year_fraction(inp.accrual_start_date, inp.end_date)
+    } else {
+        inp.cds.premium_leg.day_count.year_fraction(
+            inp.accrual_start_date,
+            inp.end_date,
+            DayCountContext::default(),
+        )?
+    };
+    let accrual_period_length_haz = t_end - t_accrual_start;
+    if accrual_period_length_haz <= 0.0 || tau_remaining <= 0.0 {
+        return Ok(0.0);
+    }
+    // Linear scale from hazard-time position to instrument-day-count accrual.
+    let tau_per_haz = tau_remaining / accrual_period_length_haz;
+
+    // Accrued fraction at interval start, expressed in instrument-DC units.
+    let mut bias_days = 0.0;
+    if inp.cds.premium_leg.day_count == finstack_quant_core::dates::DayCount::Act360 {
+        if inp.cds.valuation_convention.act360_includes_last_day() {
+            bias_days += 0.5;
+        }
+        if inp.cds.valuation_convention.aod_half_day_bias() {
+            bias_days += 0.5;
+        }
+    }
+    let accrual_bias = bias_days / 360.0;
+
+    let grid = IsdaGrid {
+        t_start,
+        t_end,
+        settlement_delay: inp.settlement_delay,
+        calendar: inp.calendar,
+        sp_asof,
+        as_of: inp.as_of,
+        disc: inp.disc,
+        surv: inp.surv,
+        grid_cache: inp.grid_cache,
+    };
+    let mut accrual_pv = 0.0;
+    grid.for_each_window(|w| {
+        let tau_at_t1 = (w.t1 - t_accrual_start) * tau_per_haz + accrual_bias;
+
+        // Analytical integration for
+        //   ∫ spread * (τ_at_t1 + (t - t1) * tau_per_haz) * λ * S(t1) * D(t1)
+        //     * exp(-(λ + r)(t - t1)) dt
+        let k = w.hazard_rate + w.interest_rate;
+        let contribution = if k.abs() > ZERO_TOLERANCE {
+            let exp_term = (-k * w.dt).exp();
+            let i0 = (1.0 - exp_term) / k;
+            let i1 = (1.0 - exp_term * (1.0 + k * w.dt)) / (k * k);
+            inp.spread * w.df1 * w.sp1 * w.hazard_rate * (tau_at_t1 * i0 + tau_per_haz * i1)
+        } else {
+            let t_mid = (w.t1 + w.t2) * 0.5;
+            let position = ((t_mid - t_accrual_start) / accrual_period_length_haz).clamp(0.0, 1.0);
+            let accrued_tau = tau_remaining * position + accrual_bias;
+            inp.spread * accrued_tau * (w.sp1 - w.sp2) * w.df1
+        };
+        accrual_pv += contribution;
+    })?;
+    Ok(accrual_pv)
 }
 
 /// Immutable CDS contract and discount snapshot for repeated hazard-curve pricing.
@@ -426,9 +331,9 @@ impl CdsPricer {
 /// for the last hazard knot topology; changing bases, day count or knot times
 /// replaces that cache. Storage is bounded by this contract’s integration windows.
 pub struct PreparedCds {
-    pricer: CdsPricer,
     cds: CreditDefaultSwap,
     disc: std::sync::Arc<DiscountCurve>,
+    calendar: Option<&'static dyn HolidayCalendar>,
     as_of: Date,
     periods: Vec<(CouponPeriod, f64, f64)>,
     spread: f64,
@@ -460,12 +365,10 @@ impl PreparedCds {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: Date,
     ) -> Result<Self> {
-        use rust_decimal::prelude::ToPrimitive;
-
         cds.validate()?;
-        let pricer = CdsPricer::new();
         let disc = market.get_discount(&cds.premium_leg.discount_curve_id)?;
-        let periods_raw = pricer.coupon_periods(cds, as_of)?;
+        let calendar = calendar_for(cds)?;
+        let periods_raw = super::metrics::coupon_periods(cds)?;
         let mut periods = Vec::with_capacity(periods_raw.len());
         for period in periods_raw {
             if !crate::cds::cash_is_eligible(
@@ -475,35 +378,17 @@ impl PreparedCds {
             ) {
                 continue;
             }
-            let accrual = pricer.coupon_accrual(cds, &period)?;
+            let accrual = super::metrics::coupon_accrual(cds, &period)?;
             let df = disc.as_ref().df_between_dates(as_of, period.payment_date)?;
             periods.push((period, accrual, df));
         }
-        let spread = cds.premium_leg.coupon_bp.to_f64().ok_or_else(|| {
-            Error::Validation("premium.coupon_bp cannot be represented as f64".into())
-        })? / BASIS_POINTS_PER_UNIT;
-        let upfront_pv = match cds.upfront {
-            Some((dt, amount))
-                if crate::cds::cash_is_eligible(
-                    dt,
-                    as_of,
-                    cds.include_valuation_date_cashflows,
-                ) =>
-            {
-                amount.amount() * disc.as_ref().df_between_dates(as_of, dt)?
-            }
-            _ => 0.0,
-        };
-        let clean_accrued = if cds.uses_clean_price() {
-            let accrual_fraction = pricer.clean_quote_accrual_fraction(cds, as_of)?;
-            cds.notional.amount() * spread * accrual_fraction
-        } else {
-            0.0
-        };
+        let spread = spread_decimal(cds)?;
+        let upfront_pv = upfront_pv(cds, disc.as_ref(), as_of)?;
+        let clean_accrued = clean_accrued_amount(cds, spread, as_of)?;
         Ok(Self {
-            pricer,
             cds: cds.clone(),
             disc,
+            calendar,
             as_of,
             periods,
             spread,
@@ -531,23 +416,17 @@ impl PreparedCds {
     /// Returns recovery-validation, survival, discounting or integration/date
     /// errors from the shared CDS pricing kernel.
     pub fn price(&self, surv: &HazardCurve) -> Result<f64> {
-        let protection_pv = self.pricer.pv_protection_leg_prepared(
+        let protection_pv = pv_protection_leg_prepared(
             &self.cds,
             self.disc.as_ref(),
             surv,
             self.as_of,
+            self.calendar,
             Some(&self.grids),
         )?;
-        let calendar = self
-            .cds
-            .premium_leg
-            .calendar_id
-            .as_deref()
-            .map(finstack_quant_core::dates::calendar_by_id_strict)
-            .transpose()?;
         let mut premium_pv = 0.0;
         for &(period, accrual, df) in &self.periods {
-            self.pricer.add_premium_period(
+            add_premium_period(
                 &mut premium_pv,
                 AodInputs {
                     cds: &self.cds,
@@ -556,7 +435,7 @@ impl PreparedCds {
                     start_date: period.accrual_start.max(self.as_of),
                     end_date: period.accrual_end,
                     settlement_delay: self.cds.protection_leg.settlement_delay,
-                    calendar,
+                    calendar: self.calendar,
                     as_of: self.as_of,
                     disc: self.disc.as_ref(),
                     surv,
@@ -564,8 +443,10 @@ impl PreparedCds {
                 },
                 accrual,
                 df,
+                true,
             )?;
         }
+        premium_pv *= self.cds.notional.amount();
 
         Ok(signed_npv(
             &self.cds,
@@ -756,7 +637,8 @@ fn protection_leg_isda_standard_model_cond(grid: &IsdaGrid<'_>, recovery: f64) -
 
 #[cfg(test)]
 mod prepared_cds_tests {
-    use super::{CdsPricer, PreparedCds};
+    use super::super::metrics::{npv_full, premium_leg_annuity};
+    use super::PreparedCds;
     use crate::cds::CreditDefaultSwap;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
@@ -865,11 +747,8 @@ mod prepared_cds_tests {
             "valuation date should fall inside a live coupon accrual period"
         );
         let discount = market.get_discount(&cds.premium_leg.discount_curve_id)?;
-        let pricer = CdsPricer::new();
-        let with_aod =
-            pricer.premium_leg_annuity(&cds, discount.as_ref(), &hazard, as_of, 1.0, true)?;
-        let without_aod =
-            pricer.premium_leg_annuity(&cds, discount.as_ref(), &hazard, as_of, 1.0, false)?;
+        let with_aod = premium_leg_annuity(&cds, discount.as_ref(), &hazard, as_of, 1.0, true)?;
+        let without_aod = premium_leg_annuity(&cds, discount.as_ref(), &hazard, as_of, 1.0, false)?;
         assert!(
             (with_aod - without_aod).abs() > 1.0e-8,
             "fixture should produce a non-zero accrual-on-default contribution"
@@ -895,7 +774,6 @@ mod prepared_cds_tests {
     -> finstack_quant_core::Result<()> {
         let (market, hazard) = create_test_market()?;
         let discount = market.get_discount("USD-OIS")?;
-        let pricer = CdsPricer::new();
         for convention in [
             CdsValuationConvention::IsdaDirty,
             CdsValuationConvention::BloombergCdswClean,
@@ -914,7 +792,7 @@ mod prepared_cds_tests {
                 ));
                 let prepared = PreparedCds::new(&cds, &market, as_of)?;
                 for curve in [&hazard, &hazard.with_parallel_hazard_rate_bump_bp(1.0)?] {
-                    let expected = pricer.npv_full(&cds, discount.as_ref(), curve, as_of)?;
+                    let expected = npv_full(&cds, discount.as_ref(), curve, as_of)?;
                     assert_eq!(
                         prepared.price(curve)?.to_bits(),
                         expected.to_bits(),
@@ -974,11 +852,10 @@ mod prepared_cds_tests {
         let as_of = date!(2025 - 02 - 15);
         let discount = market.get_discount("USD-OIS")?;
         let prepared = PreparedCds::new(&cds, &market, as_of)?;
-        let ordinary = CdsPricer::new();
         let verify = |curve: &HazardCurve| -> finstack_quant_core::Result<()> {
             assert_eq!(
                 prepared.price(curve)?.to_bits(),
-                ordinary.npv_full(&cds, &discount, curve, as_of)?.to_bits()
+                npv_full(&cds, &discount, curve, as_of)?.to_bits()
             );
             Ok(())
         };
@@ -1134,7 +1011,7 @@ mod prepared_cds_tests {
                 cds.protection_leg.settlement_delay = delay;
                 let prepared = PreparedCds::new(&cds, &market, as_of)?;
                 for curve in [&hazard, &hazard.with_parallel_hazard_rate_bump_bp(1.0)?] {
-                    let expected = CdsPricer::new().npv_full(&cds, &discount, curve, as_of)?;
+                    let expected = npv_full(&cds, &discount, curve, as_of)?;
                     assert_eq!(prepared.price(curve)?.to_bits(), expected.to_bits());
                     assert_eq!(prepared.price(curve)?.to_bits(), expected.to_bits());
                 }
@@ -1146,12 +1023,17 @@ mod prepared_cds_tests {
 
 #[cfg(test)]
 mod cds_review_regression_tests {
-    use super::{CdsPricer, PreparedCds};
+    use super::super::metrics::{
+        clean_quote_accrual_fraction, coupon_accrual, coupon_periods, npv_full,
+        par_spread_denominator, premium_leg_annuity, risky_annuity,
+    };
+    use super::{PreparedCds, pv_premium_leg_raw, pv_protection_leg_raw};
     use crate::cds::CreditDefaultSwap;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+    use finstack_quant_core::math::units::ONE_BASIS_POINT;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{CurveId, InstrumentId};
     use finstack_quant_valuations_core::instruments::PayReceive;
@@ -1225,13 +1107,12 @@ mod cds_review_regression_tests {
             (date!(2025 - 12 - 20), date!(2026 - 06 - 19)),
         ] {
             let cds = contract(start, end, CdsValuationConvention::BloombergCdswClean)?;
-            let pricer = CdsPricer::new();
-            let periods = pricer.coupon_periods(&cds, start)?;
+            let periods = coupon_periods(&cds)?;
             let final_period = periods.last().expect("coupon period");
             assert_eq!(final_period.accrual_end, end);
             assert!(final_period.payment_date >= end);
             let expected = ((end - final_period.accrual_start).whole_days() + 1) as f64 / 360.0;
-            close(pricer.coupon_accrual(&cds, final_period)?, expected);
+            close(coupon_accrual(&cds, final_period)?, expected);
         }
         Ok(())
     }
@@ -1246,7 +1127,6 @@ mod cds_review_regression_tests {
             CdsValuationConvention::BloombergCdswClean,
         ] {
             let cds = contract(start, end, convention)?;
-            let pricer = CdsPricer::new();
             let expected_days =
                 (end - start).whole_days() + i64::from(convention.uses_clean_price());
             let expected_coupon = 10_000_000.0 * 0.01 * expected_days as f64 / 360.0;
@@ -1263,22 +1143,16 @@ mod cds_review_regression_tests {
                     } else {
                         0.0
                     };
+                    close(pv_protection_leg_raw(&cds, &disc, &surv, as_of)?, 0.0);
+                    close(pv_premium_leg_raw(&cds, &disc, &surv, as_of)?, expected);
                     close(
-                        pricer.pv_protection_leg_raw(&cds, &disc, &surv, as_of)?,
-                        0.0,
-                    );
-                    close(
-                        pricer.pv_premium_leg_raw(&cds, &disc, &surv, as_of)?,
-                        expected,
-                    );
-                    close(
-                        pricer.premium_leg_pv_per_bp(&cds, &disc, &surv, as_of)?
+                        premium_leg_annuity(&cds, &disc, &surv, as_of, ONE_BASIS_POINT, true)?
                             * 100.0
                             * 10_000_000.0,
                         expected,
                     );
                     close(
-                        pricer.risky_annuity(&cds, &disc, &surv, as_of)? * 0.01 * 10_000_000.0,
+                        risky_annuity(&cds, &disc, &surv, as_of)? * 0.01 * 10_000_000.0,
                         expected,
                     );
                     let market = MarketContext::new()
@@ -1288,7 +1162,7 @@ mod cds_review_regression_tests {
                         .expect("insert market curve");
                     let cached = PreparedCds::new(&cds, &market, as_of)?.price(&surv)?;
                     close(cached, -expected);
-                    close(cached, pricer.npv_full(&cds, &disc, &surv, as_of)?);
+                    close(cached, npv_full(&cds, &disc, &surv, as_of)?);
                 }
             }
         }
@@ -1314,7 +1188,6 @@ mod cds_review_regression_tests {
             CdsValuationConvention::BloombergCdswCleanFullPremium,
         ] {
             let cds = contract(start, end, convention)?;
-            let pricer = CdsPricer::new();
             let accrual = ((end - start).whole_days() + i64::from(convention.uses_clean_price()))
                 as f64
                 / 360.0;
@@ -1327,25 +1200,21 @@ mod cds_review_regression_tests {
                 };
                 let expected_premium = expected_annuity * 10_000_000.0 * 0.01;
                 close(
-                    pricer.pv_premium_leg_raw(&cds, &disc, &surv, as_of)?,
+                    pv_premium_leg_raw(&cds, &disc, &surv, as_of)?,
                     expected_premium,
                 );
                 close(
-                    pricer.premium_leg_pv_per_bp(&cds, &disc, &surv, as_of)? * 10_000_000.0 * 100.0,
+                    premium_leg_annuity(&cds, &disc, &surv, as_of, ONE_BASIS_POINT, true)?
+                        * 10_000_000.0
+                        * 100.0,
                     expected_premium,
                 );
+                close(risky_annuity(&cds, &disc, &surv, as_of)?, expected_annuity);
                 close(
-                    pricer.risky_annuity(&cds, &disc, &surv, as_of)?,
+                    par_spread_denominator(&cds, &disc, &surv, as_of)?,
                     expected_annuity,
                 );
-                close(
-                    pricer.par_spread_denominator(&cds, &disc, &surv, as_of)?,
-                    expected_annuity,
-                );
-                close(
-                    pricer.npv_full(&cds, &disc, &surv, as_of)?,
-                    -expected_premium,
-                );
+                close(npv_full(&cds, &disc, &surv, as_of)?, -expected_premium);
                 let market = MarketContext::new()
                     .try_insert(disc)
                     .expect("insert market curve")
@@ -1376,7 +1245,6 @@ mod cds_review_regression_tests {
                 CdsValuationConvention::BloombergCdswCleanFullPremium,
             ] {
                 let cds = contract(start, end, convention)?;
-                let pricer = CdsPricer::new();
                 let t = (end - as_of).whole_days() as f64 / 365.0;
                 let elapsed = (as_of - start).whole_days() as f64 / 360.0;
                 let coupon = ((end - start).whole_days() + 1) as f64 / 360.0;
@@ -1388,16 +1256,17 @@ mod cds_review_regression_tests {
                 let default_accrual = lambda * (elapsed * i0 + 365.0 / 360.0 * i1);
                 let expected_premium =
                     10_000_000.0 * 0.01 * (coupon * (-lambda * t).exp() + default_accrual);
-                let premium = pricer.pv_premium_leg_raw(&cds, &disc, &surv, as_of)?;
+                let premium = pv_premium_leg_raw(&cds, &disc, &surv, as_of)?;
                 close(premium, expected_premium);
                 close(
-                    pricer.premium_leg_pv_per_bp(&cds, &disc, &surv, as_of)? * 100.0 * 10_000_000.0,
+                    premium_leg_annuity(&cds, &disc, &surv, as_of, ONE_BASIS_POINT, true)?
+                        * 100.0
+                        * 10_000_000.0,
                     expected_premium,
                 );
-                let accrued =
-                    pricer.clean_quote_accrual_fraction(&cds, as_of)? * 10_000_000.0 * 0.01;
+                let accrued = clean_quote_accrual_fraction(&cds, as_of)? * 10_000_000.0 * 0.01;
                 let expected_protection = 10_000_000.0 * 0.6 * (1.0 - (-lambda * t).exp());
-                let npv = pricer.npv_full(&cds, &disc, &surv, as_of)?;
+                let npv = npv_full(&cds, &disc, &surv, as_of)?;
                 close(npv, expected_protection - expected_premium + accrued);
                 let market = MarketContext::new()
                     .try_insert(disc.clone())
@@ -1406,7 +1275,7 @@ mod cds_review_regression_tests {
                     .expect("insert market curve");
                 close(PreparedCds::new(&cds, &market, as_of)?.price(&surv)?, npv);
                 values.push(npv);
-                denominators.push(pricer.par_spread_denominator(&cds, &disc, &surv, as_of)?);
+                denominators.push(par_spread_denominator(&cds, &disc, &surv, as_of)?);
             }
             close(values[0], values[1]);
             if start < as_of {

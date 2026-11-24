@@ -24,10 +24,9 @@
 //! [canonical]: finstack_quant_valuations_core::metrics::sensitivities::cs01
 //! [`CdsIndex::cs01`]: crate::cds_index::CdsIndex::cs01
 
-use crate::cds_index::{CdsIndex, IndexPricing};
+use crate::cds_index::CdsIndex;
 use finstack_quant_core::Result;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
-use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::metrics::sensitivities::cs01::{
     Cs01Request, compute_key_rate_cs01_series_with_context_raw, cs01_reval,
@@ -43,26 +42,6 @@ impl MetricCalculator for Cs01Calculator {
         let bump_bp = bump_config::resolve(context)?.credit_spread_bump_bp;
         let idx: &CdsIndex = context.instrument_as()?;
         idx.cs01_with_bump(&context.curves, context.as_of, provider.as_ref(), bump_bp)
-    }
-}
-
-fn index_credit_curve_ids(index: &CdsIndex) -> Result<Vec<CurveId>> {
-    match index.pricing {
-        IndexPricing::SingleCurve => Ok(vec![index.protection_leg.credit_curve_id.clone()]),
-        IndexPricing::Constituents => {
-            let mut curve_ids = Vec::new();
-            for constituent in index
-                .constituents
-                .iter()
-                .filter(|constituent| !constituent.defaulted)
-            {
-                let curve_id = &constituent.credit.credit_curve_id;
-                if !curve_ids.contains(curve_id) {
-                    curve_ids.push(curve_id.clone());
-                }
-            }
-            Ok(curve_ids)
-        }
     }
 }
 
@@ -86,7 +65,7 @@ impl MetricCalculator for CdsIndexBucketedCs01Calculator {
         let defaults = bump_config::resolve(context)?;
         let bump_bp = defaults.credit_spread_bump_bp;
 
-        let credit_ids = index_credit_curve_ids(&index)?;
+        let credit_ids = index.credit_curve_ids();
         if credit_ids.is_empty() {
             return Ok(0.0);
         }

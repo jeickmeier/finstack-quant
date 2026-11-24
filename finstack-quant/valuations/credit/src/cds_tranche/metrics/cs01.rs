@@ -36,7 +36,6 @@ impl MetricCalculator for CdsTrancheCs01Calculator {
         let total = parallel_cs01(
             provider.as_ref(),
             &context.curves,
-            tranche.credit_index_id.as_str(),
             &tranche.discount_curve_id,
             &hazards,
             bump,
@@ -51,7 +50,6 @@ impl MetricCalculator for CdsTrancheCs01Calculator {
                     parallel_cs01(
                         provider.as_ref(),
                         &context.curves,
-                        tranche.credit_index_id.as_str(),
                         &tranche.discount_curve_id,
                         std::slice::from_ref(hazard),
                         bump,
@@ -77,7 +75,7 @@ impl MetricCalculator for CdsTrancheBucketedCs01Calculator {
         let index = context.curves.get_credit_index(&tranche.credit_index_id)?;
         let hazards = active_hazards(&index);
         let bump = bump_config::resolve(context)?.credit_spread_bump_bp;
-        let request = Cs01Request::generic(bump, tranche.discount_curve_id.clone());
+        let request = Cs01Request::generic(bump, tranche.discount_curve_id);
         let instrument = Arc::clone(&context.instrument);
         let dispatch = context.clone_pricer_dispatch();
         let as_of = context.as_of;
@@ -90,13 +88,7 @@ impl MetricCalculator for CdsTrancheBucketedCs01Calculator {
                 hazard,
                 series_id,
                 &request,
-                |market| {
-                    let bumped = replace_hazard(&index, market.get_hazard(hazard_id.as_str())?)?;
-                    let market = market
-                        .clone()
-                        .insert_credit_index(tranche.credit_index_id.as_str(), bumped)?;
-                    dispatch.price_raw(instrument.as_ref(), &market, as_of)
-                },
+                |market| dispatch.price_raw(instrument.as_ref(), market, as_of),
             )?;
         }
         Ok(total)
@@ -119,35 +111,9 @@ pub(super) fn active_hazards(index: &CreditIndexData) -> Vec<Arc<HazardCurve>> {
     }
 }
 
-pub(super) fn replace_hazard(
-    index: &CreditIndexData,
-    hazard: Arc<HazardCurve>,
-) -> Result<CreditIndexData> {
-    let mut builder = index.to_builder();
-    if index.index_credit_curve().id() == hazard.id() {
-        builder = builder.index_credit_curve(Arc::clone(&hazard));
-    }
-    if let Some(issuers) = index.issuer_credit_curves() {
-        let updated: finstack_quant_core::FxHashMap<_, _> = issuers
-            .iter()
-            .map(|(issuer, curve)| {
-                let next = if curve.id() == hazard.id() {
-                    Arc::clone(&hazard)
-                } else {
-                    Arc::clone(curve)
-                };
-                (issuer.clone(), next)
-            })
-            .collect();
-        builder = builder.issuer_curves(updated);
-    }
-    builder.build()
-}
-
 fn parallel_cs01(
     provider: &dyn RecalibrationProvider,
     market: &MarketContext,
-    index_id: &str,
     discount_id: &CurveId,
     hazards: &[Arc<HazardCurve>],
     bump_bp: f64,
@@ -158,10 +124,8 @@ fn parallel_cs01(
             "tranche CS01 bump must be finite and positive".to_owned(),
         ));
     }
-    let original = market.get_credit_index(index_id)?;
     let source = Arc::new(market.clone());
     let reprice = |bp| {
-        let mut bumped_index = original.as_ref().clone();
         let mut bumped_market = market.clone();
         for hazard in hazards {
             require_hazard_replay(hazard, "tranche quote-space CS01")?;
@@ -175,10 +139,9 @@ fn parallel_cs01(
                 deal_quote_override: None,
                 action: HazardRecalibrationAction::SpreadBump(QuoteBump::ParallelBp(bp)),
             })?;
-            bumped_index = replace_hazard(&bumped_index, Arc::clone(&bumped))?;
             bumped_market.try_insert_mut(bumped)?;
         }
-        revalue(&bumped_market.insert_credit_index(index_id, bumped_index)?)
+        revalue(&bumped_market)
     };
     sensitivity_central_diff(reprice(bump_bp)?, reprice(-bump_bp)?, bump_bp)
 }

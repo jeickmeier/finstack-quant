@@ -231,8 +231,28 @@ fn test_near_expiry_greeks_decline() {
         .cds_maturity_months(13)
         .build(as_of);
 
-    let long_vega = long_dated.vega(&market, as_of).unwrap();
-    let short_vega = short_dated.vega(&market, as_of).unwrap();
+    let long_vega = *long_dated
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Vega],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .unwrap()
+        .measures
+        .get("vega")
+        .unwrap();
+    let short_vega = *short_dated
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Vega],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .unwrap()
+        .measures
+        .get("vega")
+        .unwrap();
 
     // Longer-dated should have higher vega
     assert!(

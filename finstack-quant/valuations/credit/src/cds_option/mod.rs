@@ -61,13 +61,11 @@
 #[doc(hidden)]
 pub mod bloomberg_quadrature;
 pub(crate) mod metrics;
-pub(crate) mod parameters;
 #[doc(hidden)]
 pub mod pricer;
 
 mod strike;
 mod types;
 
-pub use parameters::CdsOptionParams;
-pub use strike::{CdsOptionStrike, CdsOptionStrikeKind};
+pub use strike::CdsOptionStrike;
 pub use types::{CdsOption, CdsOptionBuilder, ProtectionStartConvention};

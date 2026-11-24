@@ -11,7 +11,7 @@
 //!
 //! # Validation
 //!
-//! `CdsOption::new` validates all inputs at construction time:
+//! `CdsOption::validate` (run automatically on deserialization and pricing) checks:
 //! - Spread strikes must be positive and within the distressed-credit bound;
 //!   clean-price strikes must be positive percentage points (values above
 //!   100 are valid)
@@ -19,7 +19,7 @@
 //!   explicit positive coupon, both index factors in (0, 1] with
 //!   `f <= f0`, and realized loss bounded by the removed original notional
 //! - Option expiry must precede underlying CDS maturity
-//! - Recovery rate must be in (0, 1)
+//! - Recovery rate must be in [0, 1)
 //! - Implied volatility override must be in (0, 5] when specified
 //! - Only European exercise is supported; settlement may be cash or physical
 //!
@@ -29,7 +29,6 @@
 //! decimal form (e.g. 0.30 for 30%) for both strike conventions. The
 //! Bloomberg CDSO terminal expects the same.
 
-use crate::CreditParams;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
@@ -38,8 +37,16 @@ use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::instruments::SettlementType;
 use rust_decimal::Decimal;
 
-use super::parameters::CdsOptionParams;
 use finstack_quant_valuations_core::impl_instrument_base;
+
+/// Spread-strike upper bound — `0.10` decimal = 1000 bp = 10% spread,
+/// matching the Bloomberg CDSO calibration guard for distressed credit.
+const MAX_STRIKE: f64 = 0.10;
+
+/// Serde default for `index_factor`: a full index (no defaults settled).
+fn default_index_factor() -> f64 {
+    1.0
+}
 
 /// Maximum valid implied volatility (inclusive upper bound).
 /// 500% lognormal vol is extremely high but theoretically valid.
@@ -84,7 +91,7 @@ pub enum ProtectionStartConvention {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct CdsOption {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -193,13 +200,14 @@ pub struct CdsOption {
     /// `(1−R)·(1−q_te)` FEP-equivalent contribution; single-name options
     /// knock out on default and skip it.
     #[serde(default)]
+    #[builder(default)]
     pub underlying_is_index: bool,
     /// Current index factor `f` at valuation: the surviving fraction of the
     /// original index notional, in `(0, 1]`. Defaults to `1.0` (no settled
     /// defaults) and scales the notional only when `underlying_is_index`.
     /// See [`Self::strike_index_factor`] for the original factor `f0`
     /// attached to a clean-price strike.
-    #[serde(default = "super::parameters::default_index_factor")]
+    #[serde(default = "default_index_factor")]
     #[builder(default = 1.0)]
     pub index_factor: f64,
     /// Original index factor `f0` attached to the option strike.
@@ -235,6 +243,7 @@ pub struct CdsOption {
     /// from the option strike, set this explicitly so the strike-adjustment
     /// term `H(K) = ξN(c − K)A(K)` (DOCS 2055833 Eq. 2.4) is populated.
     #[serde(default)]
+    #[builder(default)]
     #[serde(with = "finstack_quant_core::wire::optional_decimal")]
     #[cfg_attr(
         feature = "json-schema",
@@ -243,17 +252,52 @@ pub struct CdsOption {
     pub coupon_bp: Option<Decimal>,
 }
 
+finstack_quant_valuations_core::validate_on_deserialize!(CdsOption);
+
 impl CdsOption {
     /// Validate the CdsOption parameters.
     fn validate(&self) -> finstack_quant_core::Result<()> {
+        use super::strike::CdsOptionStrike;
         use finstack_quant_core::validation;
 
-        super::parameters::validate_common_terms(
-            &self.strike,
-            self.expiry,
-            self.underlying_maturity,
-            self.index_factor,
-        )?;
+        match &self.strike {
+            CdsOptionStrike::Spread(spread) => {
+                let strike_f64 = spread.as_f64();
+                if strike_f64 <= 0.0 {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "strike must be positive, got {}",
+                        spread
+                    )));
+                }
+                if strike_f64 > MAX_STRIKE {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "strike {} exceeds maximum {}",
+                        spread, MAX_STRIKE
+                    )));
+                }
+            }
+            CdsOptionStrike::CleanPricePct(price_pct) => {
+                let price_f64 = price_pct.as_f64();
+                if price_f64 <= 0.0 {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "clean-price strike must be positive percentage points, got {}",
+                        price_pct
+                    )));
+                }
+            }
+        }
+        if self.expiry >= self.underlying_maturity {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "option expiry ({}) must be before CDS maturity ({})",
+                self.expiry, self.underlying_maturity
+            )));
+        }
+        if !self.index_factor.is_finite() || self.index_factor <= 0.0 || self.index_factor > 1.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "index_factor must be finite and in (0, 1], got {}",
+                self.index_factor
+            )));
+        }
         self.validate_strike_state()?;
         validation::validate_money_gt(self.notional, 0.0, "CDS option notional")?;
 
@@ -404,70 +448,20 @@ impl CdsOption {
     pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::currency::Currency;
         use time::macros::date;
-        let option_params = CdsOptionParams::call(
-            super::strike::CdsOptionStrike::Spread(Decimal::new(1, 2)), // 0.01 = 100bp
-            date!(2025 - 06 - 20),
-            date!(2030 - 06 - 20),
-            Money::from((10_000_000_i64, Currency::USD)),
-        )?;
-        let credit_params = crate::CreditParams::corporate_standard("CORP", "CORP-HAZARD");
-        CdsOption::new(
-            InstrumentId::new("CDSOPT-CALL-CORP-5Y"),
-            &option_params,
-            &credit_params,
-            "USD-OIS",
-            "CDSOPT-VOL",
-        )
-    }
 
-    /// Create a new credit option using parameter structs with validation.
-    ///
-    /// # Arguments
-    ///
-    /// - `id`: Unique instrument identifier
-    /// - `option_params`: deal-level fields (strike as decimal rate, expiry, CDS maturity, notional, option type)
-    /// - `credit_params`: reference entity, recovery rate, and the hazard `credit_curve_id`
-    /// - `discount_curve_id`: discount curve identifier for discounting cashflows
-    /// - `vol_surface_id`: volatility surface identifier for the CDS option
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if any validation fails. See [`CdsOptionParams`] for parameter constraints.
-    pub fn new(
-        id: impl Into<InstrumentId>,
-        option_params: &CdsOptionParams,
-        credit_params: &CreditParams,
-        discount_curve_id: impl Into<CurveId>,
-        vol_surface_id: impl Into<CurveId>,
-    ) -> finstack_quant_core::Result<Self> {
-        let option = Self {
-            id: id.into(),
-            strike: option_params.strike,
-            option_type: option_params.option_type,
-            expiry: option_params.expiry,
-            underlying_maturity: option_params.underlying_maturity,
-            notional: option_params.notional,
-            settlement: option_params.settlement,
-            exercise_settlement_date: None,
-            underlying_start_date: None,
-            protection_start_convention: option_params.protection_start_convention,
-            knockout: false,
-            recovery_rate: credit_params.recovery_rate,
-            discount_curve_id: discount_curve_id.into(),
-            credit_curve_id: credit_params.credit_curve_id.to_owned(),
-            vol_surface_id: vol_surface_id.into(),
-            underlying_convention:
-                finstack_quant_valuations_core::market::conventions::CdsConvention::default(),
-            instrument_pricing_overrides: Default::default(),
-            metric_pricing_overrides: Default::default(),
-            scenario_pricing_overrides: Default::default(),
-            attributes: Attributes::new(),
-            underlying_is_index: option_params.underlying_is_index,
-            index_factor: option_params.index_factor,
-            strike_index_factor: option_params.strike_index_factor,
-            realized_loss: 0.0,
-            coupon_bp: option_params.coupon_bp,
-        };
+        let option = Self::builder()
+            .id(InstrumentId::new("CDSOPT-CALL-CORP-5Y"))
+            .strike(super::strike::CdsOptionStrike::Spread(Decimal::new(1, 2))) // 0.01 = 100bp
+            .option_type(OptionType::Call)
+            .expiry(date!(2025 - 06 - 20))
+            .underlying_maturity(date!(2030 - 06 - 20))
+            .notional(Money::from((10_000_000_i64, Currency::USD)))
+            .settlement(SettlementType::Cash)
+            .recovery_rate(0.40)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .credit_curve_id(CurveId::new("CORP-HAZARD"))
+            .vol_surface_id(CurveId::new("CDSOPT-VOL"))
+            .build()?;
         option.validate()?;
         Ok(option)
     }
@@ -537,107 +531,6 @@ impl CdsOption {
             }
             ProtectionStartConvention::Forward => Ok(self.expiry),
         }
-    }
-
-    /// CDS option Δ for spread strikes uses Black-76 N(d₁) on the
-    /// model forward par spread and the contractual strike spread.
-    ///
-    /// Returned as a unit-less ratio (multiply by 100 for the displayed
-    /// percentage). Calls Δ ≥ 0, puts Δ ≤ 0; zero at or after expiry.
-    ///
-    /// Clean-price strikes use the curve-reprice hedge ratio
-    /// `option_CS01 / underlying_spread_DV01`, which re-bootstraps the hazard
-    /// curve through a [`RecalibrationProvider`]. This method has no provider,
-    /// so request [`MetricId::Delta`] through the pricing registry with
-    /// `PricingOptions` carrying a recalibration provider instead.
-    ///
-    /// # Arguments
-    ///
-    /// * `market` - Market holding the discount curve, the hazard curve named
-    ///   by `credit_curve_id`, and the vol surface (unless an implied
-    ///   volatility override is quoted on the instrument).
-    /// * `as_of` - Valuation date; Δ is zero when it is on or after expiry.
-    ///
-    /// # Errors
-    ///
-    /// - `Error::Calibration` with category `recalibration_provider_missing`
-    ///   for a [`CdsOptionStrikeKind::CleanPricePct`] strike before expiry.
-    /// - Validation errors for unsupported option configurations, and
-    ///   not-found errors when a required curve or surface is missing.
-    ///
-    /// [`RecalibrationProvider`]: finstack_quant_valuations_core::recalibration::RecalibrationProvider
-    /// [`MetricId::Delta`]: finstack_quant_valuations_core::metrics::MetricId::Delta
-    /// [`CdsOptionStrikeKind::CleanPricePct`]: crate::cds_option::CdsOptionStrikeKind::CleanPricePct
-    pub fn delta(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<f64> {
-        finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
-        super::metrics::delta::delta_with_provider(self, market, as_of, None)
-    }
-
-    /// CDS option Γ for spread strikes: central difference of the Black-76
-    /// N(d₁) delta across a ±5 bp move in the displayed ATM forward
-    /// (DOCS 2055833 §2.5). Returned as a unit-less number; zero at or
-    /// after expiry.
-    ///
-    /// Clean-price strikes use the change in the curve-reprice hedge-ratio
-    /// delta under a ±5 bp par-quote spread bump, which re-bootstraps the
-    /// hazard curve through a [`RecalibrationProvider`]. This method has no
-    /// provider, so request [`MetricId::Gamma`] through the pricing registry
-    /// with `PricingOptions` carrying a recalibration provider instead.
-    ///
-    /// # Arguments
-    ///
-    /// * `market` - Market holding the discount curve, the hazard curve named
-    ///   by `credit_curve_id`, and the vol surface (unless an implied
-    ///   volatility override is quoted on the instrument).
-    /// * `as_of` - Valuation date; Γ is zero when it is on or after expiry.
-    ///
-    /// # Errors
-    ///
-    /// - `Error::Calibration` with category `recalibration_provider_missing`
-    ///   for a [`CdsOptionStrikeKind::CleanPricePct`] strike before expiry.
-    /// - Validation errors for unsupported option configurations, and
-    ///   not-found errors when a required curve or surface is missing.
-    ///
-    /// [`RecalibrationProvider`]: finstack_quant_valuations_core::recalibration::RecalibrationProvider
-    /// [`MetricId::Gamma`]: finstack_quant_valuations_core::metrics::MetricId::Gamma
-    /// [`CdsOptionStrikeKind::CleanPricePct`]: crate::cds_option::CdsOptionStrikeKind::CleanPricePct
-    pub fn gamma(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<f64> {
-        finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
-        super::metrics::gamma::gamma_with_provider(self, market, as_of, None)
-    }
-
-    /// Bloomberg CDSO Vega(1%) — one-sided forward difference of the
-    /// canonical Bloomberg quadrature NPV on a `+0.01` lognormal-vol
-    /// bump (DOCS 2055833 §2.5).
-    pub fn vega(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<f64> {
-        finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
-        super::metrics::vega(self, market, as_of)
-    }
-
-    /// Bloomberg CDSO θ: change in option premium for a one-calendar-day
-    /// decrease in option maturity (DOCS 2055833 §2.5). Implemented by
-    /// shortening the exercise time `t_e` by `1/365.25` and re-pricing
-    /// with the same calibrated forward; the year denominator (365.25)
-    /// is the Bloomberg convention.
-    pub fn theta(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<f64> {
-        finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
-        super::pricer::theta(self, market, as_of)
     }
 
     /// Solve for the Bloomberg CDSO implied volatility `σ` that reproduces
@@ -730,22 +623,23 @@ mod tests {
 
     #[test]
     fn cash_settlement_date_defaults_to_t_plus_settle_lag() {
-        let option_params = CdsOptionParams::call(
-            CdsOptionStrike::Spread(Decimal::from_str_exact("0.0058395400").expect("valid strike")),
-            date!(2026 - 06 - 26),
-            date!(2031 - 06 - 20),
-            Money::from((10_000_000_i64, Currency::USD)),
-        )
-        .expect("valid option params");
-        let credit_params = CreditParams::corporate_standard("IBM", "IBM-USD-SENIOR");
-        let option = CdsOption::new(
-            "IBM-USD-CDSO-PAYER-ATM-3M-20260502",
-            &option_params,
-            &credit_params,
-            "USD-S531-SWAP",
-            "IBM-CDSO-VOL",
-        )
-        .expect("valid option");
+        let option = CdsOption::builder()
+            .id(InstrumentId::new("IBM-USD-CDSO-PAYER-ATM-3M-20260502"))
+            .strike(CdsOptionStrike::Spread(
+                Decimal::from_str_exact("0.0058395400").expect("valid strike"),
+            ))
+            .option_type(OptionType::Call)
+            .expiry(date!(2026 - 06 - 26))
+            .underlying_maturity(date!(2031 - 06 - 20))
+            .notional(Money::from((10_000_000_i64, Currency::USD)))
+            .settlement(SettlementType::Cash)
+            .recovery_rate(0.40)
+            .discount_curve_id(CurveId::new("USD-S531-SWAP"))
+            .credit_curve_id(CurveId::new("IBM-USD-SENIOR"))
+            .vol_surface_id(CurveId::new("IBM-CDSO-VOL"))
+            .build()
+            .expect("valid option");
+        option.validate().expect("valid option invariants");
 
         let as_of = date!(2026 - 05 - 02);
         // No explicit underlying_start_date → default Spot convention uses
@@ -760,25 +654,24 @@ mod tests {
 
     #[test]
     fn index_option_requires_coupon_bp() {
-        let option_params = CdsOptionParams::call(
-            CdsOptionStrike::Spread(Decimal::from_str_exact("0.005").expect("valid strike")),
-            date!(2026 - 06 - 26),
-            date!(2031 - 06 - 20),
-            Money::from((10_000_000_i64, Currency::USD)),
-        )
-        .expect("valid option params")
-        .as_index(1.0)
-        .expect("valid index factor");
-        let credit_params = CreditParams::corporate_standard("CDX", "CDX-IG");
-
-        let err = CdsOption::new(
-            "CDX-CDSO-MISSING-COUPON",
-            &option_params,
-            &credit_params,
-            "USD-S531-SWAP",
-            "CDX-CDSO-VOL",
-        )
-        .expect_err("index option without contractual coupon should fail");
+        let err = CdsOption::builder()
+            .id(InstrumentId::new("CDX-CDSO-MISSING-COUPON"))
+            .strike(CdsOptionStrike::Spread(
+                Decimal::from_str_exact("0.005").expect("valid strike"),
+            ))
+            .option_type(OptionType::Call)
+            .expiry(date!(2026 - 06 - 26))
+            .underlying_maturity(date!(2031 - 06 - 20))
+            .notional(Money::from((10_000_000_i64, Currency::USD)))
+            .settlement(SettlementType::Cash)
+            .recovery_rate(0.40)
+            .discount_curve_id(CurveId::new("USD-S531-SWAP"))
+            .credit_curve_id(CurveId::new("CDX-IG"))
+            .vol_surface_id(CurveId::new("CDX-CDSO-VOL"))
+            .underlying_is_index(true)
+            .index_factor(1.0)
+            .build()
+            .expect_err("index option without contractual coupon should fail");
 
         assert!(
             err.to_string().contains("coupon_bp"),
@@ -807,35 +700,43 @@ mod tests {
         assert!(error.to_string().contains("on or after legal expiry"));
     }
 
-    /// Clean-price strikes need a recalibration provider, which only the
-    /// metric path supplies; the inherent `delta`/`gamma` fail closed with
-    /// the documented `recalibration_provider_missing` error.
+    /// Clean-price strikes need a recalibration provider; the internal entry
+    /// points fail closed with `recalibration_provider_missing` when none is supplied.
     #[test]
-    fn inherent_delta_gamma_reject_clean_price_strikes_without_provider() {
+    fn delta_gamma_with_provider_reject_clean_price_strikes_without_provider() {
         use finstack_quant_core::market_data::context::MarketContext;
 
         let as_of = date!(2025 - 01 - 02);
-        let params = CdsOptionParams::new(
-            CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)),
-            date!(2026 - 01 - 02),
-            date!(2030 - 01 - 02),
-            Money::from((10_000_000_i64, Currency::USD)),
-            OptionType::Call,
-        )
-        .expect("valid params")
-        .as_index(1.0)
-        .expect("valid factor")
-        .with_strike_index_factor(1.0)
-        .expect("valid strike factor")
-        .with_coupon_bp(Decimal::new(500, 0));
-        let credit = CreditParams::corporate_standard("HY", "HZ-SN");
-        let option = CdsOption::new("CDSO-PRICE-STRIKE", &params, &credit, "USD-OIS", "CDSO-VOL")
+        let option = CdsOption::builder()
+            .id(InstrumentId::new("CDSO-PRICE-STRIKE"))
+            .strike(CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)))
+            .option_type(OptionType::Call)
+            .expiry(date!(2026 - 01 - 02))
+            .underlying_maturity(date!(2030 - 01 - 02))
+            .notional(Money::from((10_000_000_i64, Currency::USD)))
+            .settlement(SettlementType::Cash)
+            .recovery_rate(0.40)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .credit_curve_id(CurveId::new("HZ-SN"))
+            .vol_surface_id(CurveId::new("CDSO-VOL"))
+            .underlying_is_index(true)
+            .index_factor(1.0)
+            .strike_index_factor(1.0)
+            .coupon_bp(Decimal::new(500, 0))
+            .build()
             .expect("valid option");
+        option.validate().expect("valid option invariants");
         let market = MarketContext::new();
 
         for (name, result) in [
-            ("delta", option.delta(&market, as_of)),
-            ("gamma", option.gamma(&market, as_of)),
+            (
+                "delta",
+                super::super::metrics::delta::delta_with_provider(&option, &market, as_of, None),
+            ),
+            (
+                "gamma",
+                super::super::metrics::gamma::gamma_with_provider(&option, &market, as_of, None),
+            ),
         ] {
             match result {
                 Err(finstack_quant_core::Error::Calibration { category, .. }) => {

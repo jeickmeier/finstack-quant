@@ -12,11 +12,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::StubKind;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::PayReceive;
-use finstack_quant_valuations::instruments::credit_derivatives::CreditParams;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
-    CdsOptionParams, CdsOptionStrike,
+    CdsOption, CdsOptionStrike,
 };
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
@@ -171,29 +169,38 @@ fn cds_tranche_new_carries_schedule_stub_and_date_regime() {
 
 #[test]
 fn cds_option_accepts_zero_recovery_like_every_credit_instrument() {
-    let option_params = CdsOptionParams::call(
-        CdsOptionStrike::Spread(rust_decimal::Decimal::new(1, 2)),
-        date!(2025 - 06 - 20),
-        date!(2030 - 06 - 20),
-        Money::new(10_000_000.0, Currency::USD).expect("money"),
-    )
-    .expect("option params");
-    let credit_params = CreditParams::new("ACME", 0.0, "ACME-HAZARD");
-    let option = CdsOption::new(
-        "CDSO-ZERO-R",
-        &option_params,
-        &credit_params,
-        "USD-OIS",
-        "CDSO-VOL",
-    )
-    .expect("zero recovery is inside the shared [0, 1) domain");
+    let base_builder = || {
+        CdsOption::builder()
+            .id("CDSO-ZERO-R".into())
+            .strike(CdsOptionStrike::Spread(rust_decimal::Decimal::new(1, 2)))
+            .option_type(finstack_quant_models::types::OptionType::Call)
+            .expiry(date!(2025 - 06 - 20))
+            .underlying_maturity(date!(2030 - 06 - 20))
+            .notional(Money::new(10_000_000.0, Currency::USD).expect("money"))
+            .settlement(finstack_quant_valuations::instruments::SettlementType::Cash)
+            .discount_curve_id("USD-OIS".into())
+            .credit_curve_id("ACME-HAZARD".into())
+            .vol_surface_id("CDSO-VOL".into())
+    };
+    let option = base_builder().recovery_rate(0.0).build().expect("builder");
+    finstack_quant_valuations::instruments::Instrument::validate_for_pricing(&option)
+        .expect("zero recovery is inside the shared [0, 1) domain");
     assert_eq!(option.recovery_rate, 0.0);
     assert_eq!(option.index_factor, 1.0);
     assert_eq!(option.realized_loss, 0.0);
 
-    let one = CreditParams::new("ACME", 1.0, "ACME-HAZARD");
     assert!(
-        CdsOption::new("CDSO-FULL-R", &option_params, &one, "USD-OIS", "CDSO-VOL").is_err(),
+        base_builder()
+            .id("CDSO-FULL-R".into())
+            .recovery_rate(1.0)
+            .build()
+            .is_err(),
+        "full recovery leaves no protection and is rejected at build"
+    );
+    let mut mutated = option;
+    mutated.recovery_rate = 1.0;
+    assert!(
+        finstack_quant_valuations::instruments::Instrument::validate_for_pricing(&mutated).is_err(),
         "full recovery leaves no protection and is rejected"
     );
 }

@@ -43,14 +43,11 @@ pub(super) fn validate_recovery_consistency(cds_recovery: f64, surv: &HazardCurv
 // - For survival: use the hazard curve's day-count convention
 // - For accrual: use the instrument's premium leg day-count convention
 
-/// Compute time from hazard curve's base date using its day-count convention.
+/// Compute time from hazard curve's base date using its day-count and calendar context.
 #[inline]
 pub(super) fn haz_t(surv: &HazardCurve, date: Date) -> Result<f64> {
-    surv.day_count().year_fraction(
-        surv.base_date(),
-        date,
-        finstack_quant_core::dates::DayCountContext::default(),
-    )
+    surv.day_count()
+        .year_fraction(surv.base_date(), date, surv.day_count_context())
 }
 
 /// Inverse mapping from hazard-curve time (years) to a calendar date.
@@ -90,10 +87,10 @@ pub(crate) fn date_from_hazard_time(surv: &HazardCurve, t: f64) -> Date {
 
     // Universal path: start from a generous 365.25 d/y estimate, then
     // refine using forward differences. For 30/360 this typically
-    // converges in 1 step; for Bus/252 (which depends on the local holiday
-    // calendar via its DayCount impl) it converges in <5.
+    // converges in 1 step; for Bus/252 (which depends on the hazard
+    // curve's holiday calendar) it uses the curve's own day-count context.
     let mut date = base + Duration::days((t * 365.25).round() as i64);
-    let ctx = finstack_quant_core::dates::DayCountContext::default();
+    let ctx = surv.day_count_context();
     for _ in 0..30 {
         let Ok(yf) = day_count.year_fraction(base, date, ctx) else {
             return date;
@@ -202,7 +199,7 @@ pub(super) fn isda_standard_model_boundaries(
         let hazard_time = surv.day_count().signed_year_fraction(
             surv.base_date(),
             knot_date,
-            finstack_quant_core::dates::DayCountContext::default(),
+            surv.day_count_context(),
         )?;
         if hazard_time > t_start && hazard_time < t_end {
             boundaries.push(hazard_time);
@@ -238,14 +235,11 @@ pub(super) fn isda_standard_model_boundaries(
 /// values that could produce inf/NaN results.
 #[inline]
 pub(super) fn sp_cond_to(surv: &HazardCurve, as_of: Date, date: Date) -> Result<f64> {
-    let t_asof = haz_t(surv, as_of)?;
-    let t_date = haz_t(surv, date)?;
-    let sp_asof = surv.sp(t_asof)?;
-    let sp_date = surv.sp(t_date)?;
-    // Conditional survival: S(date) / S(as_of)
-    // Use floor constant to prevent division by near-zero producing inf/NaN
-    if sp_asof > credit::SURVIVAL_PROBABILITY_FLOOR {
-        Ok(sp_date / sp_asof)
+    if date <= as_of {
+        return Ok(1.0);
+    }
+    if surv.sp_on_date(as_of)? > credit::SURVIVAL_PROBABILITY_FLOOR {
+        Ok(1.0 - surv.conditional_default_prob(as_of, date)?)
     } else {
         Ok(0.0) // Already defaulted (or effectively defaulted) by as_of
     }

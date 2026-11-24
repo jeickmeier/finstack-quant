@@ -3,12 +3,11 @@
 use super::common::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::SettlementType;
-use finstack_quant_valuations::instruments::credit_derivatives::CreditParams;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionParams;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionStrike;
 use rust_decimal::Decimal;
 use time::macros::date;
@@ -19,23 +18,20 @@ fn test_cds_option_construction() {
     let expiry = date!(2026 - 01 - 01);
     let maturity = date!(2031 - 01 - 01);
 
-    let option_params = CdsOptionParams::call(
-        CdsOptionStrike::Spread(Decimal::new(1, 2)), // 0.01 = 100bp
-        expiry,
-        maturity,
-        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-    )
-    .expect("valid call params");
-    let credit_params = CreditParams::corporate_standard("CORP", "HZ-CORP");
-
-    let option = CdsOption::new(
-        "TEST-CDSOPT",
-        &option_params,
-        &credit_params,
-        "USD-OIS",
-        "CDS-VOL",
-    )
-    .expect("valid CDS option");
+    let option = CdsOption::builder()
+        .id(InstrumentId::new("TEST-CDSOPT"))
+        .strike(CdsOptionStrike::Spread(Decimal::new(1, 2))) // 0.01 = 100bp
+        .option_type(OptionType::Call)
+        .expiry(expiry)
+        .underlying_maturity(maturity)
+        .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .settlement(SettlementType::Cash)
+        .recovery_rate(0.40)
+        .discount_curve_id(CurveId::new("USD-OIS"))
+        .credit_curve_id(CurveId::new("HZ-CORP"))
+        .vol_surface_id(CurveId::new("CDS-VOL"))
+        .build()
+        .expect("valid CDS option");
 
     assert_eq!(option.id(), "TEST-CDSOPT");
     assert_eq!(option.strike.spread_decimal(), Some(Decimal::new(1, 2)));
