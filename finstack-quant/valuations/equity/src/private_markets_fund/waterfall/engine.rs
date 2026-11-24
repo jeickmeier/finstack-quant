@@ -37,6 +37,7 @@ impl<'a> EquityWaterfallEngine<'a> {
 
     /// Run the waterfall allocation on the given events.
     pub fn run(&self, events: &[FundEvent]) -> finstack_quant_core::Result<AllocationLedger> {
+        self.spec.validate()?;
         // Validate and sort events. Same-date ties order contributions before
         // distributions/proceeds (the standard treatment: capital called on a
         // date is at risk before cash distributed on that date), so the
@@ -246,11 +247,10 @@ impl<'a> EquityWaterfallEngine<'a> {
             self.lp_net_history(params.all_events, params.prior_rows, params.allocation_date)?;
 
         // Precompute holdback percent (0.0 if no clawback or no holdback)
-        let holdback_decimal: f64 = (match &self.spec.clawback {
+        let holdback_decimal: f64 = match &self.spec.clawback {
             Some(c) => c.holdback_decimal.unwrap_or(0.0),
             _ => 0.0,
-        })
-        .clamp(0.0, 1.0);
+        };
 
         for (idx, tranche) in self.spec.tranches.iter().enumerate() {
             if remaining_amount <= 1e-6 {
@@ -354,6 +354,7 @@ impl<'a> EquityWaterfallEngine<'a> {
                     let to_gp_paid = to_gp_gross * (1.0 - holdback_decimal);
                     gp_carry_cum += to_gp_gross;
                     remaining_amount -= catchup_amount;
+                    lp_allocated_in_call_so_far += to_lp;
                     (to_lp, to_gp_paid, Arc::from("Catch-Up"), gp_carry_cum)
                 }
 

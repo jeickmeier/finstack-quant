@@ -44,7 +44,11 @@ pub(crate) fn dividend01_central_diff(
     let current_scalar = context.curves.get_price(div_yield_id)?;
     let q0 = scalar_numeric_value(current_scalar);
     let q_up_val = q0 + ONE_BASIS_POINT;
-    let q_down_val = (q0 - ONE_BASIS_POINT).max(0.0);
+    let q_down_val = if q0 >= 0.0 {
+        (q0 - ONE_BASIS_POINT).max(0.0)
+    } else {
+        q0 - ONE_BASIS_POINT
+    };
     let actual_width = q_up_val - q_down_val;
 
     let curves_up = replace_scalar_value(
@@ -53,14 +57,14 @@ pub(crate) fn dividend01_central_diff(
         current_scalar,
         q_up_val,
     )?;
-    let pv_up = instrument.value(&curves_up, as_of)?.amount();
+    let pv_up = context.reprice_instrument_raw(instrument, &curves_up, as_of)?;
     let curves_down = replace_scalar_value(
         &context.curves,
         div_yield_id.as_str(),
         current_scalar,
         q_down_val,
     )?;
-    let pv_down = instrument.value(&curves_down, as_of)?.amount();
+    let pv_down = context.reprice_instrument_raw(instrument, &curves_down, as_of)?;
 
     // MetricId contract: Dividend01 is $/bp (dPV for a 1bp absolute q move).
     // The up-bump always lifts the width by `ONE_BASIS_POINT`, so it is
@@ -75,7 +79,11 @@ mod tests {
     /// Mirror the bump-width logic from `dividend01_central_diff`.
     fn bump_geometry(q0: f64) -> (f64, f64, f64) {
         let q_up = q0 + ONE_BASIS_POINT;
-        let q_down = (q0 - ONE_BASIS_POINT).max(0.0);
+        let q_down = if q0 >= 0.0 {
+            (q0 - ONE_BASIS_POINT).max(0.0)
+        } else {
+            q0 - ONE_BASIS_POINT
+        };
         (q_up, q_down, q_up - q_down)
     }
 
@@ -94,5 +102,13 @@ mod tests {
         assert!(q_down.abs() < 1e-18);
         assert!(width < 2.0 * ONE_BASIS_POINT);
         assert!(((q_up + q_down) / 2.0 - q0).abs() > 1e-9);
+    }
+
+    #[test]
+    fn symmetric_when_yield_is_negative() {
+        let q0 = -0.005;
+        let (q_up, q_down, width) = bump_geometry(q0);
+        assert!((width - 2.0 * ONE_BASIS_POINT).abs() < 1e-12);
+        assert!(((q_up + q_down) / 2.0 - q0).abs() < 1e-15);
     }
 }

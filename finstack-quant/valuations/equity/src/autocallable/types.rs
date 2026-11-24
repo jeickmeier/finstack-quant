@@ -653,4 +653,18 @@ mod validation_tests {
             .expect_err("missing path model must fail");
         assert!(error.to_string().contains("path_model"));
     }
+
+    #[test]
+    fn autocallable_returns_zero_on_expiry_date() {
+        use finstack_quant_valuations_core::instruments::Instrument;
+
+        let opt = base_builder().build().expect("valid autocallable");
+        let pv = opt
+            .value(
+                &finstack_quant_core::market_data::context::MarketContext::new(),
+                opt.expiry,
+            )
+            .expect("value on expiry");
+        assert_eq!(pv.amount(), 0.0);
+    }
 }

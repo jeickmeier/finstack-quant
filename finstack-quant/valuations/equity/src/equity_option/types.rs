@@ -71,7 +71,6 @@ use finstack_quant_models::types::{ExerciseStyle, OptionType};
 use finstack_quant_valuations_core::instruments::SettlementType;
 use time::macros::date;
 
-use super::parameters::{EquityOptionMarketData, EquityOptionParams};
 use finstack_quant_core::validation;
 use finstack_quant_valuations_core::impl_instrument_base;
 
@@ -133,7 +132,7 @@ impl EquityOptionExercise {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct EquityOption {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -264,52 +263,9 @@ pub struct EquityOption {
     pub attributes: Attributes,
 }
 
-impl EquityOption {
-    /// Create a vanilla equity option from a parameter bundle and explicit
-    /// market-data identifiers.
-    ///
-    /// Use this constructor when the option must bind to specific discount,
-    /// spot, volatility and dividend-yield objects; [`Self::european`] uses the
-    /// generic default ids instead.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Trade identifier stored on the option and used in results and serialization.
-    /// * `ticker` - Underlying equity ticker used to derive the spot and volatility identifiers.
-    /// * `option_params` - Strike (in `currency` per underlying unit), expiry, call/put,
-    ///   exercise style, settlement type, quantity and currency; build it with
-    ///   [`EquityOptionParams::call`] or [`EquityOptionParams::put`].
-    /// * `market_data` - Discount curve, spot, volatility surface and optional
-    ///   dividend-yield ids resolved from the `MarketContext` at pricing time.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the builder fails validation.
-    pub fn european_with_market_data(
-        id: impl Into<InstrumentId>,
-        ticker: impl Into<String>,
-        option_params: EquityOptionParams,
-        market_data: EquityOptionMarketData,
-    ) -> finstack_quant_core::Result<Self> {
-        Self::builder()
-            .id(id.into())
-            .underlying_ticker(ticker.into())
-            .strike(option_params.strike)
-            .option_type(option_params.option_type)
-            .exercise_style(option_params.exercise_style)
-            .expiry(option_params.expiry)
-            .quantity(option_params.quantity)
-            .currency(option_params.currency)
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .settlement(option_params.settlement)
-            .discount_curve_id(market_data.discount_curve_id)
-            .spot_id(market_data.spot_id)
-            .vol_surface_id(market_data.vol_surface_id)
-            .div_yield_id_opt(market_data.div_yield_id)
-            .attributes(Attributes::new())
-            .build()
-    }
+finstack_quant_valuations_core::validate_on_deserialize!(EquityOption);
 
+impl EquityOption {
     /// Validate structural and lifecycle invariants.
     ///
     /// Checks strike/quantity validity and, when an exercise observation is
@@ -335,6 +291,28 @@ impl EquityOption {
             return Err(finstack_quant_core::Error::Validation(
                 "Equity option discrete dividend dates must be strictly increasing".into(),
             ));
+        }
+        if self.exercise_style == ExerciseStyle::Bermudan {
+            let Some(dates) = self.exercise_dates.as_deref() else {
+                return Err(finstack_quant_core::Error::Validation(
+                    "Bermudan equity option requires exercise_dates".into(),
+                ));
+            };
+            if dates.is_empty() {
+                return Err(finstack_quant_core::Error::Validation(
+                    "Bermudan equity option exercise_dates must be non-empty".into(),
+                ));
+            }
+            if dates.windows(2).any(|window| window[0] >= window[1]) {
+                return Err(finstack_quant_core::Error::Validation(
+                    "Bermudan equity option exercise_dates must be strictly increasing".into(),
+                ));
+            }
+            if dates.iter().any(|&date| date > self.expiry) {
+                return Err(finstack_quant_core::Error::Validation(
+                    "Bermudan equity option exercise_dates must not exceed expiry".into(),
+                ));
+            }
         }
         if let Some(exercise) = self.exercise {
             validation::validate_f64_finite(exercise.spot, "equity option exercise spot")?;
@@ -383,23 +361,30 @@ impl EquityOption {
     ///
     /// Returns an at-the-money SPX call option with 6 months to expiry.
     pub fn example() -> finstack_quant_core::Result<Self> {
-        let market_data = EquityOptionMarketData::new("USD-OIS", "EQUITY-SPOT", "EQUITY-VOL")
-            .with_div_yield_id("EQUITY-DIVYIELD");
-
-        Self::european_with_market_data(
-            "SPX-CALL-4500",
-            "SPX",
-            EquityOptionParams::call(4500.0, date!(2024 - 06 - 21), 100.0, Currency::USD)
-                .with_settlement(SettlementType::Cash),
-            market_data,
-        )
+        Self::builder()
+            .id(InstrumentId::new("SPX-CALL-4500"))
+            .underlying_ticker("SPX".to_string())
+            .strike(4500.0)
+            .option_type(OptionType::Call)
+            .exercise_style(ExerciseStyle::European)
+            .expiry(date!(2024 - 06 - 21))
+            .quantity(100.0)
+            .currency(Currency::USD)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .settlement(SettlementType::Cash)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .spot_id(PriceId::new("EQUITY-SPOT"))
+            .vol_surface_id(CurveId::new("EQUITY-VOL"))
+            .div_yield_id_opt(Some(PriceId::new("EQUITY-DIVYIELD")))
+            .attributes(Attributes::new())
+            .build()
     }
 
     /// Create a cash-settled European option with the generic default market-data ids.
     ///
     /// Discount uses `{currency}-OIS`, spot uses `{ticker}-SPOT` and volatility
     /// uses `{ticker}-VOL`. The default has zero continuous dividend yield.
-    /// Use [`Self::european_with_market_data`] to designate other market inputs.
+    /// Use [`Self::builder`] to designate other market inputs.
     ///
     /// # Errors
     ///
@@ -424,16 +409,25 @@ impl EquityOption {
         currency: Currency,
         option_type: OptionType,
     ) -> finstack_quant_core::Result<Self> {
-        let option_params =
-            EquityOptionParams::new(strike, expiry, option_type, quantity, currency)
-                .with_settlement(SettlementType::Cash);
         let ticker = ticker.into();
-        let market_data = EquityOptionMarketData::new(
-            format!("{currency}-OIS"),
-            format!("{ticker}-SPOT"),
-            format!("{ticker}-VOL"),
-        );
-        Self::european_with_market_data(id, ticker, option_params, market_data)
+        let spot_id = format!("{ticker}-SPOT");
+        let vol_id = format!("{ticker}-VOL");
+        Self::builder()
+            .id(id.into())
+            .underlying_ticker(ticker)
+            .strike(strike)
+            .option_type(option_type)
+            .exercise_style(ExerciseStyle::European)
+            .expiry(expiry)
+            .quantity(quantity)
+            .currency(currency)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .settlement(SettlementType::Cash)
+            .discount_curve_id(CurveId::new(format!("{currency}-OIS")))
+            .spot_id(PriceId::new(spot_id))
+            .vol_surface_id(CurveId::new(vol_id))
+            .attributes(Attributes::new())
+            .build()
     }
 
     /// Recover decimal annualized volatility using the option's exercise and dividend model.
@@ -521,27 +515,36 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for Equit
         use finstack_quant_valuations_core::instruments::OptionGreekKind;
         let mut greeks = finstack_quant_valuations_core::instruments::OptionGreeks::default();
         match request.greek {
-            OptionGreekKind::Delta => {
-                greeks.delta = Some(pricing::compute_greeks(self, market, as_of)?.delta)
-            }
-            OptionGreekKind::Gamma => {
-                greeks.gamma = Some(pricing::compute_greeks(self, market, as_of)?.gamma)
-            }
-            OptionGreekKind::Vega => {
-                greeks.vega = Some(pricing::compute_greeks(self, market, as_of)?.vega)
-            }
-            OptionGreekKind::Theta => {
-                greeks.theta = Some(pricing::compute_greeks(self, market, as_of)?.theta)
-            }
-            OptionGreekKind::Rho => {
-                greeks.rho_bp = Some(pricing::compute_greeks(self, market, as_of)?.rho)
+            OptionGreekKind::Delta
+            | OptionGreekKind::Gamma
+            | OptionGreekKind::Vega
+            | OptionGreekKind::Theta
+            | OptionGreekKind::Rho => {
+                let computed = pricing::compute_greeks(self, market, as_of)?;
+                greeks.delta = Some(computed.delta);
+                greeks.gamma = Some(computed.gamma);
+                greeks.vega = Some(computed.vega);
+                greeks.theta = Some(computed.theta);
+                greeks.rho_bp = Some(computed.rho);
             }
             OptionGreekKind::Vanna => {
-                greeks.vanna = self.option_vanna(market, as_of, request.bumps)?
+                greeks.vanna = self.fd_second_order_greek(
+                    market,
+                    as_of,
+                    OptionGreekKind::Vanna,
+                    None,
+                    request.bumps,
+                )?;
             }
             OptionGreekKind::Volga => {
-                greeks.volga =
-                    self.option_volga(market, as_of, request.require_base_pv()?, request.bumps)?
+                let base_pv = request.require_base_pv()?;
+                greeks.volga = self.fd_second_order_greek(
+                    market,
+                    as_of,
+                    OptionGreekKind::Volga,
+                    Some(base_pv),
+                    request.bumps,
+                )?;
             }
             OptionGreekKind::ForeignRho => {}
         }
@@ -549,142 +552,53 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for Equit
     }
 }
 impl EquityOption {
-    fn option_vanna(
+    fn fd_second_order_greek(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        kind: finstack_quant_valuations_core::instruments::OptionGreekKind,
+        base_pv: Option<f64>,
         bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_valuations_core::instruments::Instrument;
+        use finstack_quant_core::money::Money;
+        use finstack_quant_valuations_core::instruments::OptionGreekKind;
+        use finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::{
+            GenericFdVanna, GenericFdVolga,
+        };
+        use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
+        use std::sync::Arc;
 
-        // Spot bump: ±`spot_bump_decimal` (relative, on the spot scalar).
-        // Vol bump: ±`vol_bump_decimal` (absolute, parallel surface bump).
-        let spot =
-            finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
-                market.get_price(&self.spot_id)?,
-                self.currency,
-            )?;
-        let spot_bump_abs = spot * bumps.spot_bump_decimal;
-        if spot_bump_abs <= 0.0 {
+        if self
+            .exercise
+            .as_ref()
+            .is_some_and(|exercise| exercise.date <= as_of)
+        {
             return Ok(Some(0.0));
         }
 
-        let vol_bump_abs = self
-            .instrument_pricing_overrides
-            .market_quotes
-            .implied_volatility
-            .map_or(bumps.vol_bump_decimal, |volatility| {
-                bumps.vol_bump_decimal.min(volatility * 0.5)
-            });
+        let base_money = match base_pv {
+            Some(pv) => Money::from_model_value(pv, self.currency)?,
+            None => Money::from((0_i64, self.currency)),
+        };
+        let mut overrides = self.metric_pricing_overrides.clone();
+        overrides.bump_config.spot_bump_decimal = Some(bumps.spot_bump_decimal);
+        overrides.bump_config.vol_bump_decimal = Some(bumps.vol_bump_decimal);
 
-        let (up, curves_vol_up) = finstack_quant_valuations_core::metrics::bump_active_volatility(
-            self,
-            market,
-            self.vol_surface_id.as_str(),
-            vol_bump_abs,
-        )?;
-        let (down, curves_vol_dn) =
-            finstack_quant_valuations_core::metrics::bump_active_volatility(
-                self,
-                market,
-                self.vol_surface_id.as_str(),
-                -vol_bump_abs,
-            )?;
+        let mut context = MetricContext::new(
+            Arc::new(self.clone()),
+            Arc::new(market.clone()),
+            as_of,
+            base_money,
+            MetricContext::default_config(),
+        );
+        context.set_metric_pricing_overrides(Some(overrides));
 
-        // Delta at sigma+:
-        let pv_su = up
-            .value(
-                &finstack_quant_valuations_core::metrics::bump_scalar_price(
-                    &curves_vol_up,
-                    &self.spot_id,
-                    bumps.spot_bump_decimal,
-                )?,
-                as_of,
-            )?
-            .amount();
-        let pv_sd = up
-            .value(
-                &finstack_quant_valuations_core::metrics::bump_scalar_price(
-                    &curves_vol_up,
-                    &self.spot_id,
-                    -bumps.spot_bump_decimal,
-                )?,
-                as_of,
-            )?
-            .amount();
-        let delta_up = (pv_su - pv_sd) / (2.0 * spot_bump_abs);
-
-        // Delta at sigma-:
-        let pv_su = down
-            .value(
-                &finstack_quant_valuations_core::metrics::bump_scalar_price(
-                    &curves_vol_dn,
-                    &self.spot_id,
-                    bumps.spot_bump_decimal,
-                )?,
-                as_of,
-            )?
-            .amount();
-        let pv_sd = down
-            .value(
-                &finstack_quant_valuations_core::metrics::bump_scalar_price(
-                    &curves_vol_dn,
-                    &self.spot_id,
-                    -bumps.spot_bump_decimal,
-                )?,
-                as_of,
-            )?
-            .amount();
-        let delta_dn = (pv_su - pv_sd) / (2.0 * spot_bump_abs);
-
-        // Report vanna per **vol point** on the σ axis (consistent with vega
-        // and `MetricId::Vanna`): normalize by the bump width expressed in
-        // vol points.
-        let width = 2.0
-            * vol_bump_abs
-            * finstack_quant_valuations_core::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
-        Ok(Some((delta_up - delta_dn) / width))
-    }
-    fn option_volga(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-        base_pv: f64,
-        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_valuations_core::instruments::Instrument;
-
-        let vol_bump_abs = self
-            .instrument_pricing_overrides
-            .market_quotes
-            .implied_volatility
-            .map_or(bumps.vol_bump_decimal, |volatility| {
-                bumps.vol_bump_decimal.min(volatility * 0.5)
-            });
-        let (up, curves_vol_up) = finstack_quant_valuations_core::metrics::bump_active_volatility(
-            self,
-            market,
-            self.vol_surface_id.as_str(),
-            vol_bump_abs,
-        )?;
-        let (down, curves_vol_dn) =
-            finstack_quant_valuations_core::metrics::bump_active_volatility(
-                self,
-                market,
-                self.vol_surface_id.as_str(),
-                -vol_bump_abs,
-            )?;
-
-        let pv_up = up.value(&curves_vol_up, as_of)?.amount();
-        let pv_dn = down.value(&curves_vol_dn, as_of)?.amount();
-
-        // Report volga per **vol point squared** to match the library-wide
-        // per-vol-point vega convention (and `MetricId::Volga`). The second
-        // difference is taken in absolute-vol units, so normalize by the bump
-        // expressed in vol points, squared.
-        let width =
-            vol_bump_abs * finstack_quant_valuations_core::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
-        Ok(Some((pv_up - 2.0 * base_pv + pv_dn) / (width * width)))
+        let value = match kind {
+            OptionGreekKind::Vanna => GenericFdVanna.calculate(&mut context)?,
+            OptionGreekKind::Volga => GenericFdVolga.calculate(&mut context)?,
+            _ => return Ok(None),
+        };
+        Ok(Some(value))
     }
 }
 
@@ -896,20 +810,26 @@ mod tests {
     }
 
     #[test]
-    fn market_data_constructor_preserves_explicit_market_ids() {
+    fn builder_preserves_explicit_market_ids() {
         let expiry = date(2025, 12, 31);
-        let market_data =
-            EquityOptionMarketData::new(CurveId::new(DISC_ID), SPOT_ID, CurveId::new(VOL_ID))
-                .with_div_yield_id(PriceId::new(DIV_ID));
-
-        let option = EquityOption::european_with_market_data(
-            "SPX-CALL-CUSTOM",
-            "SPX",
-            EquityOptionParams::call(100.0, expiry, 100.0, Currency::USD)
-                .with_settlement(SettlementType::Cash),
-            market_data,
-        )
-        .expect("custom market-data constructor should succeed");
+        let option = EquityOption::builder()
+            .id(InstrumentId::new("SPX-CALL-CUSTOM"))
+            .underlying_ticker("SPX".to_string())
+            .strike(100.0)
+            .option_type(OptionType::Call)
+            .exercise_style(ExerciseStyle::European)
+            .expiry(expiry)
+            .quantity(100.0)
+            .currency(Currency::USD)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .settlement(SettlementType::Cash)
+            .discount_curve_id(CurveId::new(DISC_ID))
+            .spot_id(PriceId::new(SPOT_ID))
+            .vol_surface_id(CurveId::new(VOL_ID))
+            .div_yield_id_opt(Some(PriceId::new(DIV_ID)))
+            .attributes(Attributes::new())
+            .build()
+            .expect("custom market-data builder should succeed");
 
         assert_eq!(option.id, InstrumentId::new("SPX-CALL-CUSTOM"));
         assert_eq!(option.underlying_ticker, "SPX");

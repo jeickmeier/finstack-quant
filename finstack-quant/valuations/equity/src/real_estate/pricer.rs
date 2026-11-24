@@ -79,9 +79,15 @@ pub(crate) fn pv_with_rf_bump_dcf(
     let rate = asset
         .discount_rate
         .ok_or_else(|| Error::Validation("Missing discount_rate for DCF".into()))?;
-    if rate <= -1.0 {
+    if !rate.is_finite() || rate <= -1.0 {
         return Err(Error::Validation(
             "discount_rate must be greater than -100%".into(),
+        ));
+    }
+    let effective_rate = rate + bump;
+    if !effective_rate.is_finite() || effective_rate <= -1.0 {
+        return Err(Error::Validation(
+            "discount_rate + bump must be finite and greater than -100%".into(),
         ));
     }
 
@@ -102,7 +108,7 @@ pub(crate) fn pv_with_rf_bump_dcf(
         .iter()
         .map(|(date, amount)| {
             let t = year_fraction(asset, as_of, *date)?;
-            Ok(amount / (1.0 + rate + bump).powf(t))
+            Ok(amount / (1.0 + effective_rate).powf(t))
         })
         .collect::<finstack_quant_core::Result<Vec<f64>>>()?
         .into_iter()
@@ -111,12 +117,16 @@ pub(crate) fn pv_with_rf_bump_dcf(
     let pv_terminal = match terminal_at_horizon {
         Some((date, amount)) => {
             let t = year_fraction(asset, as_of, date)?;
-            amount / (1.0 + rate + bump).powf(t)
+            amount / (1.0 + effective_rate).powf(t)
         }
         None => 0.0,
     };
 
-    Ok(pv_flows + pv_terminal - pv_acq_cost)
+    let total = pv_flows + pv_terminal - pv_acq_cost;
+    if !total.is_finite() {
+        return Err(Error::Validation("DCF present value must be finite".into()));
+    }
+    Ok(total)
 }
 
 pub(crate) fn compute_npv_direct_cap(
@@ -126,7 +136,7 @@ pub(crate) fn compute_npv_direct_cap(
     let cap_rate = asset
         .cap_rate
         .ok_or_else(|| Error::Validation("Missing cap_rate for direct cap".into()))?;
-    if cap_rate <= 0.0 {
+    if !cap_rate.is_finite() || cap_rate <= 0.0 {
         return Err(Error::Validation("cap_rate must be positive".into()));
     }
 
@@ -136,7 +146,13 @@ pub(crate) fn compute_npv_direct_cap(
         first_noi(asset, as_of)?
     };
 
-    Ok(noi / cap_rate)
+    let npv = noi / cap_rate;
+    if !npv.is_finite() {
+        return Err(Error::Validation(
+            "Direct cap present value must be finite".into(),
+        ));
+    }
+    Ok(npv)
 }
 
 /// Valuation horizon: `sale_date` when set (must be on/after `as_of`),

@@ -74,6 +74,7 @@ pub(super) fn option(
         .option_type(option_type)
         .exercise_style(exercise_style)
         .expiry(expiry)
+        .exercise_dates_opt(matches!(exercise_style, ExerciseStyle::Bermudan).then(|| vec![expiry]))
         .quantity(100.0)
         .currency(Currency::USD)
         .day_count(DayCount::Act365F)

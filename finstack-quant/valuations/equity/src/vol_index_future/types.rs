@@ -97,8 +97,7 @@ use finstack_quant_valuations_core::instruments::ListedFutureTerms;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-#[builder(validate = VolatilityIndexFuture::validate)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct VolatilityIndexFuture {
     /// Unique identifier.
     pub id: InstrumentId,
@@ -139,6 +138,8 @@ pub struct VolatilityIndexFuture {
     #[serde(default)]
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(VolatilityIndexFuture);
 
 impl VolatilityIndexFuture {
     /// Create a canonical example VIX future for testing and documentation.
@@ -264,7 +265,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for VolatilityIndex
     ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
     {
         let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
-        deps.add_series_id(self.vol_index_curve_id.as_str());
+        deps.add_forward_curve(self.vol_index_curve_id.clone());
         Ok(deps)
     }
 

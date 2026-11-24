@@ -22,7 +22,7 @@ use finstack_quant_valuations_core::instruments::ListedFutureTerms;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct EquityTotalReturnFuture {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -69,6 +69,8 @@ pub struct EquityTotalReturnFuture {
     #[serde(default)]
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(EquityTotalReturnFuture);
 
 /// Model price and analytical first-order risks for one TRF mark.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -141,27 +143,11 @@ impl EquityTotalReturnFuture {
         id: &PriceId,
         label: &str,
     ) -> finstack_quant_core::Result<f64> {
-        let scalar = market.get_price(id)?;
-        let value = match (scalar.get_unitless(), scalar.get_price()) {
-            (Some(value), _) => value,
-            (None, Some(money)) => {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "EquityTotalReturnFuture {label} must be unitless, got Price({})",
-                    money.currency()
-                )));
-            }
-            (None, None) => {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "EquityTotalReturnFuture {label} must be unitless"
-                )));
-            }
-        };
-        if !value.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "EquityTotalReturnFuture {label} must be finite"
-            )));
-        }
-        Ok(value)
+        finstack_quant_valuations_core::instruments::pricing::market_inputs::get_unitless_scalar_strict(
+            market,
+            id.as_str(),
+            &format!("EquityTotalReturnFuture {label}"),
+        )
     }
 
     fn projection(
@@ -170,6 +156,12 @@ impl EquityTotalReturnFuture {
         as_of: Date,
     ) -> finstack_quant_core::Result<TrfProjection> {
         self.validate()?;
+        if as_of > self.terms.settlement_date {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "EquityTotalReturnFuture '{}' cannot project fair price after settlement_date {}",
+                self.id, self.terms.settlement_date
+            )));
+        }
         let spot = self.point_scalar(market, &self.spot_id, "spot")?;
         if spot <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(
@@ -251,6 +243,10 @@ impl EquityTotalReturnFuture {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
+        self.validate()?;
+        if as_of > self.terms.last_trading_date {
+            return Ok(0.0);
+        }
         Ok(self.terms.point_delta()? * self.projection(market, as_of)?.spot_derivative)
     }
 
@@ -265,6 +261,10 @@ impl EquityTotalReturnFuture {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
+        self.validate()?;
+        if as_of > self.terms.last_trading_date {
+            return Ok(0.0);
+        }
         Ok(self.terms.point_delta()? * self.projection(market, as_of)?.spread_bp_derivative)
     }
 }
@@ -396,6 +396,6 @@ mod tests {
         let error = future
             .fair_price(&market, as_of)
             .expect_err("money-valued spread must fail");
-        assert!(error.to_string().contains("must be unitless"));
+        assert!(error.to_string().contains("unitless"));
     }
 }

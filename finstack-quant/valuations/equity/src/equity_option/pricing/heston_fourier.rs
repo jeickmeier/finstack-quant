@@ -123,4 +123,41 @@ mod tests {
             "unexpected error message: {msg}"
         );
     }
+
+    #[test]
+    fn heston_fourier_prices_without_vol_surface() {
+        use finstack_quant_core::dates::DayCount;
+        use finstack_quant_core::market_data::scalars::MarketScalar;
+        use finstack_quant_core::market_data::term_structures::DiscountCurve;
+
+        let as_of = date(2025, 1, 1);
+        let expiry = date(2026, 1, 1);
+        let opt = option(expiry, OptionType::Call, ExerciseStyle::European);
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (2.0, (-0.03 * 2.0_f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+            .build()
+            .expect("discount curve");
+        let market_no_vol = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert curve")
+            .insert_price("SPX-SPOT", MarketScalar::unitless(100.0).expect("spot"))
+            .insert_price("SPX-DIV", MarketScalar::unitless(0.01).expect("div"))
+            .insert_price("HESTON_KAPPA", MarketScalar::unitless(1.5).expect("kappa"))
+            .insert_price("HESTON_THETA", MarketScalar::unitless(0.04).expect("theta"))
+            .insert_price(
+                "HESTON_SIGMA_V",
+                MarketScalar::unitless(0.3).expect("sigma_v"),
+            )
+            .insert_price("HESTON_RHO", MarketScalar::unitless(-0.5).expect("rho"))
+            .insert_price("HESTON_V0", MarketScalar::unitless(0.04).expect("v0"));
+
+        let res = EquityOptionHestonFourierPricer
+            .price_dyn(&opt, &market_no_vol, as_of)
+            .expect("Heston Fourier prices without VolSurface");
+        assert!(res.value.amount() > 0.0 && res.value.amount().is_finite());
+    }
 }

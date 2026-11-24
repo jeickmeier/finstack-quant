@@ -149,13 +149,29 @@ pub(crate) fn model_inputs(
     model: ModelKey,
     validate: impl FnOnce() -> std::result::Result<(), PricingError>,
 ) -> std::result::Result<ModelInputs, PricingError> {
+    model_inputs_with(inst, market, as_of, model, true, validate)
+}
+
+fn model_inputs_with(
+    inst: &EquityOption,
+    market: &MarketContext,
+    as_of: Date,
+    model: ModelKey,
+    require_vol_surface: bool,
+    validate: impl FnOnce() -> std::result::Result<(), PricingError>,
+) -> std::result::Result<ModelInputs, PricingError> {
     if let Some(pv) =
         resolve_lifecycle_value(inst, market, as_of).map_err(|e| model_error(inst, model, e))?
     {
         return Ok(ModelInputs::Settled(pv));
     }
     validate()?;
-    let inputs = collect_inputs(inst, market, as_of).map_err(|e| model_error(inst, model, e))?;
+    let inputs = if require_vol_surface {
+        collect_inputs(inst, market, as_of)
+    } else {
+        collect_base_inputs(inst, market, as_of)
+    }
+    .map_err(|e| model_error(inst, model, e))?;
     if inputs.t_vol <= 0.0 {
         let intrinsic = match inst.option_type {
             OptionType::Call => (inputs.spot - inst.strike).max(0.0),
@@ -173,6 +189,8 @@ pub(crate) fn model_inputs(
 /// [`model_inputs`] for the European stochastic-volatility models (Heston,
 /// rough Heston, rough Bergomi): rejects non-European exercise and future
 /// discrete dividends, whose escrowed-dividend treatment is Black-Scholes-only.
+/// Skips `VolSurface` lookup because these models read their stochastic-vol
+/// parameters instead of a BSM surface.
 ///
 /// # Errors
 ///
@@ -185,7 +203,7 @@ pub(crate) fn stochastic_vol_inputs(
     model: ModelKey,
     model_name: &str,
 ) -> std::result::Result<ModelInputs, PricingError> {
-    model_inputs(inst, market, as_of, model, || {
+    model_inputs_with(inst, market, as_of, model, false, || {
         require_european(inst, model_name).map_err(|e| model_error(inst, model, e))?;
         reject_future_discrete_dividends_for_stochastic_vol(inst, as_of, model, model_name)
     })
@@ -285,7 +303,7 @@ pub(crate) fn future_dividends(
 /// - Dividend yield `q` is set to 0.0 (dividends are already priced into S*)
 ///
 /// This is the QuantLib-standard approach for discrete dividends in Black-Scholes.
-pub(crate) fn collect_inputs(
+fn collect_base_inputs(
     inst: &EquityOption,
     curves: &MarketContext,
     as_of: Date,
@@ -346,21 +364,40 @@ pub(crate) fn collect_inputs(
         (raw_spot, q)
     };
 
-    let sigma = finstack_quant_valuations_core::instruments::pricing::volatility::resolve_sigma_at(
-        &inst.instrument_pricing_overrides.market_quotes,
-        curves,
-        inst.vol_surface_id.as_str(),
-        t_vol,
-        inst.strike,
-    )?;
-
     Ok(EquityOptionInputs {
         spot,
         r,
         q,
-        sigma,
+        sigma: 0.0,
         t_vol,
     })
+}
+
+/// Collect market inputs for equity option pricing.
+///
+/// Fetches discount curve, spot, dividend yield (with discrete dividend
+/// adjustment if configured), and volatility surface. Validates that effective
+/// rate `r` and volatility `sigma` are well-defined when `t_vol > 0`.
+pub(crate) fn collect_inputs(
+    inst: &EquityOption,
+    curves: &MarketContext,
+    as_of: Date,
+) -> Result<EquityOptionInputs> {
+    let mut inputs = collect_base_inputs(inst, curves, as_of)?;
+    if inputs.t_vol == 0.0 {
+        return Ok(inputs);
+    }
+
+    inputs.sigma =
+        finstack_quant_valuations_core::instruments::pricing::volatility::resolve_sigma_at(
+            &inst.instrument_pricing_overrides.market_quotes,
+            curves,
+            inst.vol_surface_id.as_str(),
+            inputs.t_vol,
+            inst.strike,
+        )?;
+
+    Ok(inputs)
 }
 
 fn future_dividend_amounts(inst: &EquityOption, as_of: Date) -> Result<Vec<(f64, f64)>> {

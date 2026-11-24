@@ -29,7 +29,7 @@ use finstack_quant_valuations_core::instruments::MarketDependencies;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct Equity {
     /// Unique identifier for the equity
     pub id: InstrumentId,
@@ -86,6 +86,8 @@ pub struct Equity {
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(Equity);
 
 impl Equity {
     fn validate(&self) -> finstack_quant_core::Result<()> {
@@ -260,25 +262,10 @@ impl Equity {
 
     /// Resolve dividend yield (annualized, decimal) for the equity
     pub fn dividend_yield(&self, market: &MarketContext) -> finstack_quant_core::Result<f64> {
-        if let Some(explicit_id) = self.div_yield_id.as_deref() {
-            let value = market
-                .get_price(explicit_id)?
-                .get_unitless()
-                .ok_or_else(|| {
-                    finstack_quant_core::Error::Validation(format!(
-                        "Equity '{}' dividend yield '{}' must be unitless",
-                        self.id, explicit_id
-                    ))
-                })?;
-            if !value.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Equity '{}' dividend yield '{}' must be finite, got {value}",
-                    self.id, explicit_id
-                )));
-            }
-            return Ok(value);
-        }
-        Ok(0.0)
+        finstack_quant_valuations_core::instruments::pricing::market_inputs::resolve_optional_dividend_yield(
+            market,
+            self.div_yield_id.as_ref(),
+        )
     }
 
     /// Calculate forward price per share using continuous-compound approximation
@@ -322,13 +309,15 @@ impl Equity {
         let fwd = if !self.discrete_dividends.is_empty() {
             let mut pv_dividends = 0.0;
             for (ex_date, amount) in &self.discrete_dividends {
-                let t_div = disc.day_count().year_fraction(
-                    as_of,
-                    *ex_date,
-                    finstack_quant_core::dates::DayCountContext::default(),
-                )?;
-                if t_div > 0.0 && t_div <= t {
-                    pv_dividends += amount * disc.df_between_dates(as_of, *ex_date)?;
+                if *ex_date > as_of {
+                    let t_div = disc.day_count().year_fraction(
+                        as_of,
+                        *ex_date,
+                        finstack_quant_core::dates::DayCountContext::default(),
+                    )?;
+                    if t_div <= t {
+                        pv_dividends += amount * disc.df_between_dates(as_of, *ex_date)?;
+                    }
                 }
             }
             (s0.amount() - pv_dividends) / df_horizon
@@ -608,5 +597,21 @@ mod lifecycle_tests {
                 assert!(error_msg.len() > 10);
             }
         }
+    }
+
+    #[test]
+    fn forward_price_per_share_skips_historical_dividends() {
+        let as_of = create_date(2025, Month::March, 1).expect("valid date");
+        let market = create_test_market_context();
+        let mut equity = Equity::new("AAPL", "Apple Inc.", Currency::USD).with_quoted_spot(150.0);
+        equity.discount_curve_id = CurveId::new("USD-OIS");
+        equity.discrete_dividends = vec![
+            (create_date(2024, Month::December, 15).expect("valid"), 2.0),
+            (create_date(2025, Month::June, 1).expect("valid"), 1.5),
+        ];
+        let fwd = equity
+            .forward_price_per_share(&market, as_of, 0.5)
+            .expect("forward skips historical dividend");
+        assert!(fwd.amount().is_finite() && fwd.amount() > 0.0);
     }
 }

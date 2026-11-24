@@ -146,29 +146,6 @@ impl TrsReturnModel for EquityReturnModel<'_> {
         // once its start fixing is recorded, and fully future until then.
         let has_locked_start = t_start < 0.0
             || (t_start == 0.0 && self.observed_period_start_level(period_start).is_some());
-        let (fwd_start, fwd_end) = if t_end <= 0.0 {
-            (
-                self.period_start_level(period_start)?,
-                self.period_end_level(period_end, as_of)?,
-            )
-        } else if has_locked_start {
-            let df_end = disc.as_ref().df_between_dates(as_of, period_end)?;
-            let start_level = self.period_start_level(period_start)?;
-            let ex_div_spot = self.spot - pv_discrete_dividends_to(period_end)?;
-            let fwd_spot_end = ex_div_spot * df_end.recip() * (-carry_div_yield * t_end).exp();
-            (start_level, fwd_spot_end)
-        } else {
-            let df_start = disc.as_ref().df_between_dates(as_of, period_start)?;
-            let df_end = disc.as_ref().df_between_dates(as_of, period_end)?;
-            let fwd_start = (self.spot - pv_discrete_dividends_to(period_start)?)
-                * df_start.recip()
-                * (-carry_div_yield * t_start).exp();
-            let fwd_end = (self.spot - pv_discrete_dividends_to(period_end)?)
-                * df_end.recip()
-                * (-carry_div_yield * t_end).exp();
-            (fwd_start, fwd_end)
-        };
-        // Dividend return component, net of withholding tax.
         let dt = self.trs.schedule.params.day_count.year_fraction(
             period_start,
             period_end,
@@ -177,8 +154,31 @@ impl TrsReturnModel for EquityReturnModel<'_> {
         let tax_rate = self.trs.dividend_tax_rate.clamp(0.0, 1.0);
 
         if uses_discrete_dividends {
-            let payment_date = self.trs.schedule.payment_date_for(period_end)?;
-            let payment_df = disc.as_ref().df_between_dates(as_of, payment_date)?;
+            let (fwd_start, fwd_end) = if t_end <= 0.0 {
+                (
+                    self.period_start_level(period_start)?,
+                    self.period_end_level(period_end, as_of)?,
+                )
+            } else if has_locked_start {
+                let df_end = disc.as_ref().df_between_dates(as_of, period_end)?;
+                let start_level = self.period_start_level(period_start)?;
+                let ex_div_spot = self.spot - pv_discrete_dividends_to(period_end)?;
+                (start_level, ex_div_spot * df_end.recip())
+            } else {
+                let df_start = disc.as_ref().df_between_dates(as_of, period_start)?;
+                let df_end = disc.as_ref().df_between_dates(as_of, period_end)?;
+                let fwd_start =
+                    (self.spot - pv_discrete_dividends_to(period_start)?) * df_start.recip();
+                let fwd_end = (self.spot - pv_discrete_dividends_to(period_end)?) * df_end.recip();
+                (fwd_start, fwd_end)
+            };
+            if !fwd_start.is_finite() || fwd_start <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "EquityTRS '{}': period start forward/fixing must be finite and positive, got {fwd_start}",
+                    self.trs.id.as_str()
+                )));
+            }
+            let mut payment_df_cache: Option<f64> = None;
             let mut net_dividends = Vec::new();
             for (dividend_date, amount) in &self.trs.discrete_dividends {
                 let in_period = *dividend_date > period_start && *dividend_date <= period_end;
@@ -191,6 +191,16 @@ impl TrsReturnModel for EquityReturnModel<'_> {
                 }
                 let settlement_ratio = match self.trs.dividend_settlement {
                     TrsDividendSettlement::OnDividendDate => {
+                        let payment_df = match payment_df_cache {
+                            Some(df) => df,
+                            None => {
+                                let payment_date =
+                                    self.trs.schedule.payment_date_for(period_end)?;
+                                let df = disc.as_ref().df_between_dates(as_of, payment_date)?;
+                                payment_df_cache = Some(df);
+                                df
+                            }
+                        };
                         disc.as_ref().df_between_dates(as_of, *dividend_date)? / payment_df
                     }
                     TrsDividendSettlement::AtPeriodEnd => 1.0,
@@ -202,18 +212,49 @@ impl TrsReturnModel for EquityReturnModel<'_> {
                     .chain(std::iter::once(-fwd_start))
                     .chain(net_dividends),
             )? / fwd_start)
+        } else if !has_locked_start && t_end > 0.0 {
+            // Spot cancels analytically for a fully future proportional
+            // return. Evaluate the carry ratio directly to avoid numerical
+            // spot sensitivity from dividing two projected spot levels.
+            let df_start = disc.as_ref().df_between_dates(as_of, period_start)?;
+            let df_end = disc.as_ref().df_between_dates(as_of, period_end)?;
+            let gross_ratio = df_start / df_end;
+            let carry_factor = (-carry_div_yield * (t_end - t_start)).exp();
+            let price_return = gross_ratio * carry_factor - 1.0;
+            let dividend_return = gross_ratio * (1.0 - carry_factor) * (1.0 - tax_rate);
+            Ok(price_return + dividend_return)
         } else {
-            let dividend_return = self.div_yield * dt * (1.0 - tax_rate);
-            let price_return = if !has_locked_start {
-                // Spot cancels analytically for a fully future proportional
-                // return. Evaluate the carry ratio directly to avoid numerical
-                // spot sensitivity from dividing two projected spot levels.
-                let df_start = disc.as_ref().df_between_dates(as_of, period_start)?;
-                let df_end = disc.as_ref().df_between_dates(as_of, period_end)?;
-                df_start / df_end * (-carry_div_yield * (t_end - t_start)).exp() - 1.0
+            let (fwd_start, fwd_end, unpaid_div_dt) = if t_end <= 0.0 {
+                let unpaid_dt = match self.trs.dividend_settlement {
+                    TrsDividendSettlement::AtPeriodEnd => dt,
+                    TrsDividendSettlement::OnDividendDate => 0.0,
+                };
+                (
+                    self.period_start_level(period_start)?,
+                    self.period_end_level(period_end, as_of)?,
+                    unpaid_dt,
+                )
             } else {
-                (fwd_end - fwd_start) / fwd_start
+                let df_end = disc.as_ref().df_between_dates(as_of, period_end)?;
+                let start_level = self.period_start_level(period_start)?;
+                let fwd_spot_end = self.spot * df_end.recip() * (-carry_div_yield * t_end).exp();
+                let unpaid_dt = match self.trs.dividend_settlement {
+                    TrsDividendSettlement::AtPeriodEnd => dt,
+                    TrsDividendSettlement::OnDividendDate => t_end,
+                };
+                (start_level, fwd_spot_end, unpaid_dt)
             };
+            if !fwd_start.is_finite() || fwd_start <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "EquityTRS '{}': period start forward/fixing must be finite and positive, got {fwd_start}",
+                    self.trs.id.as_str()
+                )));
+            }
+            let carry_factor = (-carry_div_yield * unpaid_div_dt).exp();
+            let price_ratio = fwd_end / fwd_start;
+            let price_return = price_ratio - 1.0;
+            let gross_ratio = price_ratio / carry_factor;
+            let dividend_return = gross_ratio * (1.0 - carry_factor) * (1.0 - tax_rate);
             Ok(price_return + dividend_return)
         }
     }
@@ -666,5 +707,129 @@ mod tests {
             "flat-market new trade TR leg should be ~0, got {}",
             pv.amount()
         );
+    }
+
+    #[test]
+    fn continuous_dividend_has_zero_arbitrage_leak_at_zero_tax() {
+        let as_of = date(2025, 1, 1);
+        let period_start = date(2025, 1, 1);
+        let period_end = date(2026, 1, 1);
+        let r = 0.04_f64;
+        let q = 0.05_f64;
+        let disc = DiscountCurve::builder("DISC")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (2.0, (-r * 2.0).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+            .build()
+            .expect("discount curve");
+        let context = MarketContext::new().try_insert(disc).expect("curve");
+
+        let mut trs = EquityTotalReturnSwap::example().expect("TRS");
+        trs.financing_leg.discount_curve_id = CurveId::new("DISC");
+        trs.dividend_tax_rate = 0.0;
+
+        let inputs = super::PeriodReturnInputs {
+            as_of,
+            period_start,
+            period_end,
+            t_start: 0.0,
+            t_end: 1.0,
+        };
+        let total_return = EquityReturnModel {
+            trs: &trs,
+            spot: 100.0,
+            div_yield: q,
+        }
+        .period_return(&inputs, &context)
+        .expect("period return");
+
+        let expected = r.exp() - 1.0;
+        assert!(
+            (total_return - expected).abs() < 1e-12,
+            "gross continuous dividend return ({total_return}) must equal funding growth ({expected})"
+        );
+    }
+
+    #[test]
+    fn completed_unpaid_continuous_period_pays_no_extra_dividend_under_on_dividend_date() {
+        let period_start = date(2025, 1, 1);
+        let period_end = date(2025, 4, 1);
+        let as_of = date(2025, 4, 3);
+        let disc = DiscountCurve::builder("DISC")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (1.0, 0.96)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+            .build()
+            .expect("discount curve");
+        let context = MarketContext::new().try_insert(disc).expect("curve");
+
+        let mut trs = EquityTotalReturnSwap::example().expect("TRS");
+        trs.financing_leg.discount_curve_id = CurveId::new("DISC");
+        trs.dividend_tax_rate = 0.25;
+        trs.dividend_settlement = TrsDividendSettlement::OnDividendDate;
+        trs.past_fixings = vec![(period_start, 100.0), (period_end, 102.0)];
+
+        let inputs = super::PeriodReturnInputs {
+            as_of,
+            period_start,
+            period_end,
+            t_start: -92.0 / 365.0,
+            t_end: -2.0 / 365.0,
+        };
+        let ret = EquityReturnModel {
+            trs: &trs,
+            spot: 103.0,
+            div_yield: 0.04,
+        }
+        .period_return(&inputs, &context)
+        .expect("period return");
+        assert!(
+            (ret - 0.02).abs() < 1e-12,
+            "OnDividendDate completed period should only realize price return 0.02, got {ret}"
+        );
+    }
+
+    #[test]
+    fn discrete_dividend_branch_rejects_non_positive_forward_start() {
+        let as_of = date(2025, 1, 1);
+        let period_start = date(2025, 2, 1);
+        let period_end = date(2025, 3, 1);
+        let context = MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("DISC")
+                    .base_date(as_of)
+                    .day_count(DayCount::Act365F)
+                    .knots([(0.0, 1.0), (1.0, 1.0)])
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("curve"),
+            )
+            .expect("insert curve");
+        let mut trs = EquityTotalReturnSwap::example().expect("TRS");
+        trs.financing_leg.discount_curve_id = CurveId::new("DISC");
+        trs.discrete_dividends = vec![(date(2025, 1, 15), 200.0)];
+
+        let err = EquityReturnModel {
+            trs: &trs,
+            spot: 100.0,
+            div_yield: 0.0,
+        }
+        .period_return(
+            &super::PeriodReturnInputs {
+                as_of,
+                period_start,
+                period_end,
+                t_start: 31.0 / 365.0,
+                t_end: 59.0 / 365.0,
+            },
+            &context,
+        )
+        .expect_err("negative fwd_start must fail");
+        assert!(err.to_string().contains("finite and positive"), "{err}");
     }
 }

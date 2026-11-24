@@ -223,12 +223,12 @@ fn test_equity_trs_discrete_dividends_preserve_small_amounts_after_large_amounts
         .expect("insert market curve")
         .insert_price(
             "SPX-SPOT",
-            MarketScalar::unitless(100.0).expect("valid scalar"),
+            MarketScalar::unitless(1.5e16).expect("valid scalar"),
         );
 
     let mut trs = TestEquityTrsBuilder::new()
         .notional(Money::new(1.0, USD).expect("valid money fixture"))
-        .initial_level(100.0)
+        .initial_level(1.5e16)
         .build();
     trs.financing_leg.discount_curve_id = CurveId::new("DISC");
     trs.underlying.div_yield_id = None;

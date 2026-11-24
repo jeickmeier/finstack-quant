@@ -140,7 +140,7 @@ macro_rules! impl_focused_pricing_overrides {
 /// ```
 #[macro_export]
 macro_rules! validate_on_deserialize {
-    ($ty:ty) => {
+    ($ty:ty, $validate:path) => {
         impl ::serde::Serialize for $ty {
             fn serialize<S: ::serde::Serializer>(
                 &self,
@@ -155,11 +155,13 @@ macro_rules! validate_on_deserialize {
                 d: D,
             ) -> ::core::result::Result<Self, D::Error> {
                 let value = <$ty>::deserialize(d)?;
-                $crate::instruments::Instrument::validate_invariants(&value)
-                    .map_err(::serde::de::Error::custom)?;
+                $validate(&value).map_err(::serde::de::Error::custom)?;
                 ::core::result::Result::Ok(value)
             }
         }
+    };
+    ($ty:ty) => {
+        $crate::validate_on_deserialize!($ty, $crate::instruments::Instrument::validate_invariants);
     };
 }
 

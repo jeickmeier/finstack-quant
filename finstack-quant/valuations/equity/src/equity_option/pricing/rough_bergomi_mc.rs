@@ -657,23 +657,23 @@ mod variance_strip_tests {
         let as_of = date!(2025 - 01 - 01);
         let expiry = date!(2026 - 01 - 01);
         let (market, example) = market_and_option();
-        let option = EquityOption::european_with_market_data(
-            "XI0-DETERMINISTIC-LIMIT",
-            "SPX",
-            crate::equity_option::parameters::EquityOptionParams::new(
-                100.0,
-                expiry,
-                finstack_quant_models::types::OptionType::Call,
-                1.0,
-                Currency::USD,
-            ),
-            crate::equity_option::parameters::EquityOptionMarketData::new(
-                "USD-OIS",
-                "EQUITY-SPOT",
-                example.vol_surface_id,
-            ),
-        )
-        .expect("option");
+        let option = EquityOption::builder()
+            .id("XI0-DETERMINISTIC-LIMIT".into())
+            .underlying_ticker("SPX".to_string())
+            .strike(100.0)
+            .option_type(finstack_quant_models::types::OptionType::Call)
+            .exercise_style(finstack_quant_models::types::ExerciseStyle::European)
+            .expiry(expiry)
+            .quantity(1.0)
+            .currency(Currency::USD)
+            .day_count(DayCount::Act365F)
+            .settlement(finstack_quant_valuations_core::instruments::SettlementType::Cash)
+            .discount_curve_id("USD-OIS".into())
+            .spot_id("EQUITY-SPOT".into())
+            .vol_surface_id(example.vol_surface_id)
+            .attributes(Default::default())
+            .build()
+            .expect("option");
         let discount = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .day_count(DayCount::Act365F)
@@ -752,23 +752,23 @@ mod variance_strip_tests {
         let as_of = date!(2025 - 01 - 01);
         let expiry = date!(2026 - 01 - 01);
         let (market, example) = market_and_option();
-        let option = EquityOption::european_with_market_data(
-            "RBERGOMI-PATH-EDGE-CASES",
-            "SPX",
-            crate::equity_option::parameters::EquityOptionParams::new(
-                100.0,
-                expiry,
-                finstack_quant_models::types::OptionType::Call,
-                1.0,
-                Currency::USD,
-            ),
-            crate::equity_option::parameters::EquityOptionMarketData::new(
-                "USD-OIS",
-                "EQUITY-SPOT",
-                example.vol_surface_id,
-            ),
-        )
-        .expect("option");
+        let option = EquityOption::builder()
+            .id("RBERGOMI-PATH-EDGE-CASES".into())
+            .underlying_ticker("SPX".to_string())
+            .strike(100.0)
+            .option_type(finstack_quant_models::types::OptionType::Call)
+            .exercise_style(finstack_quant_models::types::ExerciseStyle::European)
+            .expiry(expiry)
+            .quantity(1.0)
+            .currency(Currency::USD)
+            .day_count(DayCount::Act365F)
+            .settlement(finstack_quant_valuations_core::instruments::SettlementType::Cash)
+            .discount_curve_id("USD-OIS".into())
+            .spot_id("EQUITY-SPOT".into())
+            .vol_surface_id(example.vol_surface_id)
+            .attributes(Default::default())
+            .build()
+            .expect("option");
         let discount =
             DiscountCurve::flat("USD-OIS", as_of, 0.03, DayCount::Act365F).expect("discount curve");
         let market = market

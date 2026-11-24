@@ -1264,3 +1264,52 @@ fn lp_irr_to_date_propagates_invalid_day_count_and_handles_same_sign_flows() {
         .expect_err("unsupported day_count must not be masked as None");
     assert!(matches!(err, finstack_quant_core::Error::Validation(_)));
 }
+
+#[test]
+fn partial_catchup_credits_lp_share_toward_subsequent_promote_hurdle() {
+    let spec = PeFundWaterfallSpec::builder()
+        .return_of_capital()
+        .preferred_irr(0.08)
+        .catch_up(0.5)
+        .catch_up_mode(CatchUpMode::Partial)
+        .promote_tier(0.15, 0.8, 0.2)
+        .build()
+        .expect("valid waterfall spec");
+
+    let events = vec![
+        FundEvent::contribution(
+            test_date(2021, 1, 1),
+            Money::from((1_000_i64, test_currency())),
+        ),
+        FundEvent::distribution(
+            test_date(2022, 1, 1),
+            Money::from((1_200_i64, test_currency())),
+        ),
+    ];
+
+    let ledger = EquityWaterfallEngine::new(&spec)
+        .run(&events)
+        .expect("waterfall execution");
+
+    let catchup = ledger
+        .rows
+        .iter()
+        .find(|row| row.tranche.as_ref() == "Catch-Up")
+        .expect("catch-up row");
+    assert!((catchup.to_lp.amount() - catchup.to_gp.amount()).abs() < 1e-6);
+
+    let promote = ledger
+        .rows
+        .iter()
+        .find(|row| row.tranche.contains("Promote 15.0%+"))
+        .expect("promote row");
+    let expected_catchup = 0.2 * 80.0 / (0.5 - 0.2);
+    let remaining_after_catchup = 120.0 - expected_catchup;
+    let remaining_pre_split = 150.0 - 80.0 - 0.5 * expected_catchup;
+    let expected_promote_gp = (remaining_after_catchup - remaining_pre_split) * 0.2;
+    assert!(
+        (promote.to_gp.amount() - expected_promote_gp).abs() < 1e-3,
+        "promote GP split must credit Catch-Up LP allocation toward 15% hurdle: got {}, expected {expected_promote_gp}",
+        promote.to_gp.amount()
+    );
+}

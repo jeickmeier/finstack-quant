@@ -85,9 +85,7 @@
 //! - equity option pricer module for pricing implementations
 
 pub(crate) mod metrics;
-pub(crate) mod parameters;
 pub(crate) mod pricing;
 mod types;
 
-pub use parameters::{EquityOptionMarketData, EquityOptionParams};
 pub use types::{EquityOption, EquityOptionBuilder, EquityOptionExercise};

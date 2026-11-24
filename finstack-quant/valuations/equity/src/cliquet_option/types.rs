@@ -158,6 +158,24 @@ impl CliquetOption {
                 last_reset, self.expiry
             )));
         }
+        for (name, value) in [
+            ("local_floor", self.local_floor),
+            ("local_cap", self.local_cap),
+            ("global_floor", self.global_floor),
+            ("global_cap", self.global_cap),
+        ] {
+            if !value.is_finite() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CliquetOption {name} must be finite, got {value}"
+                )));
+            }
+        }
+        if self.payoff_type == CliquetPayoffType::Multiplicative && self.local_floor < -1.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CliquetOption multiplicative payoff requires local_floor >= -1.0, got {}",
+                self.local_floor
+            )));
+        }
         if self.local_floor > self.local_cap {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "CliquetOption local_floor ({}) must be <= local_cap ({})",
@@ -438,5 +456,23 @@ mod validation_tests {
             finstack_quant_valuations_core::instruments::Instrument::expiry(&opt),
             Some(opt.expiry)
         );
+    }
+
+    #[test]
+    fn rejects_non_finite_bounds_and_invalid_multiplicative_floor() {
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let mut opt = CliquetOption::example().expect("example builds");
+            opt.local_cap = bad;
+            assert!(opt.validate().is_err());
+
+            let mut opt = CliquetOption::example().expect("example builds");
+            opt.global_cap = bad;
+            assert!(opt.validate().is_err());
+        }
+
+        let mut opt = CliquetOption::example().expect("example builds");
+        opt.payoff_type = CliquetPayoffType::Multiplicative;
+        opt.local_floor = -1.1;
+        assert!(opt.validate().is_err());
     }
 }

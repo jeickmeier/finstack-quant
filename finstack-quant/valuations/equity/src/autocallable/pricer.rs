@@ -41,7 +41,7 @@ impl AutocallableMcPricer {
         Option<finstack_quant_models::monte_carlo::results::MoneyEstimate>,
     )> {
         inst.validate()?;
-        if as_of > inst.expiry {
+        if as_of >= inst.expiry {
             return Ok((Money::from((0_i64, inst.notional.currency())), None));
         }
         let initial_spot =

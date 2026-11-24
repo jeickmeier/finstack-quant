@@ -54,8 +54,8 @@ pub(crate) fn register_equity_option_metrics(
             (Theta, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::equity_option::EquityOption>::theta()),
             (Rho, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::equity_option::EquityOption>::rho()),
             (ImpliedVol, ImpliedVolCalculator),
-            (Vanna, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::equity_option::EquityOption>::vanna()),
-            (Volga, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::equity_option::EquityOption>::volga()),
+            (Vanna, EquitySecondOrderGreek::Vanna),
+            (Volga, EquitySecondOrderGreek::Volga),
             (Charm, super::spot_greek_decay::CharmCalculator),
             (Color, super::spot_greek_decay::ColorCalculator),
             (Speed, SpeedCalculator),
@@ -65,6 +65,32 @@ pub(crate) fn register_equity_option_metrics(
         ]
     }
     Ok(())
+}
+
+enum EquitySecondOrderGreek {
+    Vanna,
+    Volga,
+}
+
+impl MetricCalculator for EquitySecondOrderGreek {
+    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        use finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::{
+            GenericFdVanna, GenericFdVolga,
+        };
+
+        let option: &EquityOption = context.instrument_as()?;
+        if option
+            .exercise
+            .as_ref()
+            .is_some_and(|exercise| exercise.date <= context.as_of)
+        {
+            return Ok(0.0);
+        }
+        match self {
+            Self::Vanna => GenericFdVanna.calculate(context),
+            Self::Volga => GenericFdVolga.calculate(context),
+        }
+    }
 }
 
 /// Implied volatility calculator for equity options.

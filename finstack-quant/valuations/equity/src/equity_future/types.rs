@@ -23,8 +23,7 @@ use finstack_quant_valuations_core::instruments::VolatilityDependency;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-#[builder(validate = EquityFuture::validate)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct EquityFuture {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -88,6 +87,8 @@ pub struct EquityFuture {
     #[serde(default)]
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(EquityFuture);
 
 impl EquityFuture {
     /// Validate position, currency, dividend, and quanto invariants.
@@ -195,33 +196,10 @@ impl EquityFuture {
     }
 
     fn dividend_yield(&self, market: &MarketContext) -> finstack_quant_core::Result<f64> {
-        self.div_yield_id.as_ref().map_or(Ok(0.0), |id| {
-            let scalar = market.get_price(id)?;
-            let yield_value = match (scalar.get_unitless(), scalar.get_price()) {
-                (Some(value), _) => value,
-                (None, Some(money)) => {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "EquityFuture '{}' dividend yield '{}' must be unitless, got Price({})",
-                        self.id,
-                        id,
-                        money.currency()
-                    )));
-                }
-                (None, None) => {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "EquityFuture '{}' dividend yield '{}' must be unitless",
-                        self.id, id
-                    )));
-                }
-            };
-            if !yield_value.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "EquityFuture '{}' dividend yield must be finite",
-                    self.id
-                )));
-            }
-            Ok(yield_value)
-        })
+        finstack_quant_valuations_core::instruments::pricing::market_inputs::resolve_optional_dividend_yield(
+            market,
+            self.div_yield_id.as_ref(),
+        )
     }
 
     fn domestic_projection(
@@ -230,6 +208,12 @@ impl EquityFuture {
         as_of: Date,
     ) -> finstack_quant_core::Result<(f64, f64, f64)> {
         self.validate()?;
+        if as_of > self.terms.settlement_date {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "EquityFuture '{}' cannot project fair price after settlement_date {}",
+                self.id, self.terms.settlement_date
+            )));
+        }
         let spot = self.spot(market)?;
         let discount = market.get_discount(self.carry_curve_id())?;
         let df = discount.df_between_dates(as_of, self.terms.settlement_date)?;
@@ -289,23 +273,12 @@ impl EquityFuture {
             t,
             domestic_forward,
         );
-        let fx_scalar = market.get_price(&quanto.fx_spot_id)?;
-        let fx_spot = match (fx_scalar.get_unitless(), fx_scalar.get_price()) {
-            (Some(value), _) => value,
-            (None, Some(money)) => {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "EquityFuture quanto FX spot '{}' must be unitless settlement-per-underlying, got Price({})",
-                    quanto.fx_spot_id,
-                    money.currency()
-                )));
-            }
-            (None, None) => {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "EquityFuture quanto FX spot '{}' must be unitless settlement-per-underlying",
-                    quanto.fx_spot_id
-                )));
-            }
-        };
+        let fx_spot =
+            finstack_quant_valuations_core::instruments::pricing::market_inputs::get_unitless_scalar_strict(
+                market,
+                quanto.fx_spot_id.as_str(),
+                "EquityFuture quanto FX spot",
+            )?;
         if !fx_spot.is_finite() || fx_spot <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(
                 "EquityFuture quanto FX spot must be finite and positive".to_string(),
@@ -398,6 +371,10 @@ impl EquityFuture {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
+        self.validate()?;
+        if as_of > self.terms.last_trading_date {
+            return Ok(0.0);
+        }
         let (domestic_forward, domestic_spot_derivative, t) =
             self.domestic_projection(market, as_of)?;
         let adjusted_forward = self.apply_quanto_adjustment(market, as_of, domestic_forward, t)?;
@@ -725,6 +702,6 @@ mod tests {
         let error = future
             .fair_price(&market, as_of)
             .expect_err("money-valued dividend yield must fail");
-        assert!(error.to_string().contains("must be unitless"));
+        assert!(error.to_string().contains("unitless"));
     }
 }

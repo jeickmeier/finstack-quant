@@ -6,16 +6,10 @@
 
 use crate::cliquet_option::CliquetOption;
 use crate::spot_pinned::{SpotPinnable, SpotPinnedFd};
-use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::types::PriceId;
-use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::metrics::MetricCalculator;
-use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
-use finstack_quant_valuations_core::metrics::bump_discount_curve_parallel;
-use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 
 impl SpotPinnable for CliquetOption {
     fn unpinned_spot(&self) -> Option<(&PriceId, Currency)> {
@@ -53,7 +47,7 @@ pub(crate) fn register_cliquet_option_metrics(
         instrument: InstrumentType::CliquetOption,
         metrics: [
             (Vega, finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega),
-            (Rho, RhoCalculator),
+            (Rho, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_discount_only())),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             (Delta, SpotPinnedFd::<CliquetOption, _>::new(GenericFdDelta)),
@@ -63,51 +57,6 @@ pub(crate) fn register_cliquet_option_metrics(
         ]
     }
     Ok(())
-}
-
-/// Rho calculator for cliquet options.
-///
-/// Computes rho (interest rate sensitivity) via finite differences: bump the
-/// discount curve by the resolved `rate_bump_bp` (default 1bp), reprice, and
-/// report the PV change per 1bp.
-///
-/// Units & sign:
-/// - Rho is per +1bp parallel discount move
-/// - Rho = (PV(rate + bump) − PV(base)) / rate_bump_bp
-/// - Positive Rho means the instrument gains value when rates go up
-///
-/// The payoff settles at `expiry`, which can fall after the last reset date,
-/// so a cliquet whose resets are all observed still carries discount risk
-/// until `expiry`.
-pub(crate) struct RhoCalculator;
-
-impl MetricCalculator for RhoCalculator {
-    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let bump_bp = bump_config::resolve(context)?.rate_bump_bp;
-        let option: &CliquetOption = context.instrument_as()?;
-        let as_of = context.as_of;
-        let base_pv = context.base_value.amount();
-
-        // Discount risk runs to settlement at `expiry`, not to the last reset.
-        let t = option.day_count.year_fraction(
-            as_of,
-            option.expiry,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
-            return Ok(0.0);
-        }
-
-        // The helper's argument is in basis points (1.0 = 1bp).
-        let curves_bumped =
-            bump_discount_curve_parallel(&context.curves, &option.discount_curve_id, bump_bp)?;
-
-        // Reprice with bumped curve
-        let pv_bumped = option.value(&curves_bumped, as_of)?.amount();
-
-        // Rho per 1bp = (PV(rate + bump) − PV(base)) / bump_bp
-        Ok((pv_bumped - base_pv) / bump_bp)
-    }
 }
 
 #[cfg(test)]
@@ -223,11 +172,10 @@ mod rho_tests {
     }
 
     /// A fully observed cliquet is a fixed cashflow at `expiry`, so its rho is
-    /// the discount sensitivity PV·(exp(−δr·τ) − 1) per bp of δr, with τ the
-    /// curve time from `as_of` to `expiry`. The two old defects both zeroed
-    /// it: the time guard stopped at the last reset date, and the bump was
-    /// 0.0001bp. Tolerance 1e-9·|PV| covers only the f64 rounding of the
-    /// repricing (the log-linear curve makes the shock exact).
+    /// the central-difference discount sensitivity
+    /// `PV·(exp(−δr·τ) − exp(+δr·τ)) / (2·δr_bp)` per bp of δr, with τ the
+    /// curve time from `as_of` to `expiry`. Tolerance `1e-9·|PV|` covers only
+    /// f64 rounding of the repricing (the log-linear curve makes the shock exact).
     #[test]
     fn fully_observed_cliquet_rho_is_discount_sensitivity() {
         let as_of = date(2025, Month::January, 10);
@@ -248,12 +196,20 @@ mod rho_tests {
             }
             let (pv, rho) = rho(&option, &mkt, as_of);
             let bp = bump_bp.unwrap_or(1.0);
-            let expected = pv * ((-bp * 1e-4 * tau).exp() - 1.0) / bp;
+            let expected = pv * ((-bp * 1e-4 * tau).exp() - (bp * 1e-4 * tau).exp()) / (2.0 * bp);
             assert!(pv > 0.0, "locked-in payoff must be positive: {pv}");
             assert!(
                 (rho - expected).abs() <= 1e-9 * pv.abs(),
                 "rho at {bp}bp: expected {expected}, got {rho}"
             );
         }
+    }
+
+    #[test]
+    fn expired_cliquet_rho_is_zero() {
+        let mkt = market(date(2025, Month::January, 10));
+        let option = fully_observed_option();
+        let (_, expired_rho) = rho(&option, &mkt, option.expiry);
+        assert_eq!(expired_rho, 0.0);
     }
 }

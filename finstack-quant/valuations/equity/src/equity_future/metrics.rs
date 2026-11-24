@@ -18,8 +18,9 @@ impl MetricCalculator for Basis {
         let future: &crate::equity_future::EquityFuture = context.instrument_as()?;
         let futures_price = future
             .terms
-            .quoted_price
-            .map_or_else(|| future.fair_price(&context.curves, context.as_of), Ok)?;
+            .resolve_mark(future.id.as_str(), context.as_of, || {
+                future.fair_price(&context.curves, context.as_of)
+            })?;
         let spot =
             finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
                 context.curves.get_price(&future.spot_id)?,

@@ -424,21 +424,31 @@ fn equity_vol_factor() -> FactorDefinition {
 /// 6-month ATM option at σ = 20%, so both comparisons use 1e-3 relative.
 #[test]
 fn vol_factor_delta_matches_equity_option_vega() -> Result<()> {
+    use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::math::special_functions::norm_pdf;
-    use finstack_quant_models::types::OptionType;
-    use finstack_quant_valuations::instruments::equity::equity_option::{
-        EquityOption, EquityOptionMarketData, EquityOptionParams,
-    };
+    use finstack_quant_models::types::{ExerciseStyle, OptionType};
+    use finstack_quant_valuations::instruments::SettlementType;
+    use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 
     let as_of = make_date(2025, Month::January, 2)?;
     let expiry = make_date(2025, Month::July, 2)?;
-    let option = EquityOption::european_with_market_data(
-        "EQ-VOL-FACTOR",
-        "SPX",
-        EquityOptionParams::new(100.0, expiry, OptionType::Call, 100.0, Currency::USD),
-        EquityOptionMarketData::new("USD-OIS", "EQUITY-SPOT", "EQUITY-VOL")
-            .with_div_yield_id("EQUITY-DIVYIELD"),
-    )?;
+    let option = EquityOption::builder()
+        .id("EQ-VOL-FACTOR".into())
+        .underlying_ticker("SPX".to_string())
+        .strike(100.0)
+        .option_type(OptionType::Call)
+        .exercise_style(ExerciseStyle::European)
+        .expiry(expiry)
+        .quantity(100.0)
+        .currency(Currency::USD)
+        .day_count(DayCount::Act365F)
+        .settlement(SettlementType::Cash)
+        .discount_curve_id("USD-OIS".into())
+        .spot_id("EQUITY-SPOT".into())
+        .vol_surface_id("EQUITY-VOL".into())
+        .div_yield_id_opt(Some("EQUITY-DIVYIELD".into()))
+        .attributes(Default::default())
+        .build()?;
     let market = equity_vol_market(as_of)?;
 
     let metric = option.price_with_metrics(

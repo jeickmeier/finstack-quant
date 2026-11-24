@@ -276,10 +276,10 @@ impl RealEstateAsset {
             }
         }
         if let Some(dr) = self.discount_rate
-            && !dr.is_finite()
+            && (!dr.is_finite() || dr <= -1.0)
         {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "RealEstateAsset '{}' discount_rate must be finite, got {}",
+                "RealEstateAsset '{}' discount_rate must be finite and greater than -1.0, got {}",
                 self.id.as_str(),
                 dr
             )));
@@ -329,11 +329,46 @@ impl RealEstateAsset {
                 noi
             )));
         }
+        for (label, opt_money) in [
+            ("sale_price", self.sale_price),
+            ("purchase_price", self.purchase_price),
+            ("appraisal_value", self.appraisal_value),
+        ] {
+            if let Some(money) = opt_money {
+                if money.currency() != self.currency {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "RealEstateAsset '{}' {} currency {} does not match instrument currency {}",
+                        self.id.as_str(),
+                        label,
+                        money.currency(),
+                        self.currency
+                    )));
+                }
+                if !money.amount().is_finite() || money.amount() < 0.0 {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "RealEstateAsset '{}' {} must be finite and non-negative, got {}",
+                        self.id.as_str(),
+                        label,
+                        money.amount()
+                    )));
+                }
+            }
+        }
         for (label, items) in [
             ("acquisition_costs", &self.acquisition_costs),
             ("disposition_costs", &self.disposition_costs),
         ] {
             for (i, money) in items.iter().enumerate() {
+                if money.currency() != self.currency {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "RealEstateAsset '{}' {}[{}] currency {} does not match instrument currency {}",
+                        self.id.as_str(),
+                        label,
+                        i,
+                        money.currency(),
+                        self.currency
+                    )));
+                }
                 if !money.amount().is_finite() || money.amount() < 0.0 {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "RealEstateAsset '{}' {}[{}] must be a finite, non-negative outflow \

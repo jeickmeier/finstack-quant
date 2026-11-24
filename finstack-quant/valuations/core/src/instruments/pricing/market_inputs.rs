@@ -57,6 +57,12 @@ pub fn resolve_optional_dividend_yield(
     })?;
 
     if let Some(v) = scalar.get_unitless() {
+        if !v.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Dividend yield '{}' must be finite, got {v}",
+                div_id
+            )));
+        }
         Ok(v)
     } else if let Some(m) = scalar.get_price() {
         Err(finstack_quant_core::Error::Validation(format!(
@@ -88,11 +94,19 @@ pub fn get_unitless_scalar_strict(
     model: &str,
 ) -> finstack_quant_core::Result<f64> {
     match market.get_price(key) {
-        Ok(scalar) => scalar.get_unitless().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "{model} parameter '{key}' must be a unitless market scalar, got {scalar:?}"
-            ))
-        }),
+        Ok(scalar) => {
+            let v = scalar.get_unitless().ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "{model} parameter '{key}' must be a unitless market scalar, got {scalar:?}"
+                ))
+            })?;
+            if !v.is_finite() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{model} parameter '{key}' must be finite, got {v}"
+                )));
+            }
+            Ok(v)
+        }
         Err(_) => Err(finstack_quant_core::Error::from(
             finstack_quant_core::InputError::NotFound {
                 id: format!("{key} (required by {model})"),

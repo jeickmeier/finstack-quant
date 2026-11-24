@@ -43,9 +43,7 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::Cds
 use finstack_quant_valuations::instruments::credit_derivatives::{
     PremiumLegSpec, ProtectionLegSpec,
 };
-use finstack_quant_valuations::instruments::equity::equity_option::{
-    EquityOption, EquityOptionMarketData, EquityOptionParams,
-};
+use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::equity::spot::Equity;
 use finstack_quant_valuations::instruments::equity::variance_swap::VarianceSwap;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
@@ -706,23 +704,24 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
     for i in 0..positions_per_common {
         let option_id = format!("OPTION_{}", i);
         let contract_size = 100.0;
-        let option_params = EquityOptionParams::new(
-            150.0,
-            maturity_2y(),
-            OptionType::Call,
-            contract_size,
-            Currency::USD,
-        )
-        .with_exercise_style(ExerciseStyle::European)
-        .with_settlement(SettlementType::Cash);
-        let option = EquityOption::european_with_market_data(
-            option_id.clone(),
-            "AAPL",
-            option_params,
-            EquityOptionMarketData::new("USD-OIS", "EQUITY-SPOT", "EQUITY-VOL")
-                .with_div_yield_id("EQUITY-DIVYIELD"),
-        )
-        .unwrap();
+        let option = EquityOption::builder()
+            .id(option_id.clone().into())
+            .underlying_ticker("AAPL".to_string())
+            .strike(150.0)
+            .option_type(OptionType::Call)
+            .exercise_style(ExerciseStyle::European)
+            .expiry(maturity_2y())
+            .quantity(contract_size)
+            .currency(Currency::USD)
+            .day_count(DayCount::Act365F)
+            .settlement(SettlementType::Cash)
+            .discount_curve_id("USD-OIS".into())
+            .spot_id("EQUITY-SPOT".into())
+            .vol_surface_id("EQUITY-VOL".into())
+            .div_yield_id_opt(Some("EQUITY-DIVYIELD".into()))
+            .attributes(Attributes::new())
+            .build()
+            .unwrap();
         let entity_id = format!("FUND_{}", (i % 5) + 1);
         builder = builder.position(
             Position::new(

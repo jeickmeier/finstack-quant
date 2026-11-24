@@ -55,6 +55,12 @@ impl finstack_quant_valuations_core::metrics::MetricCalculator for DeltaVolCalcu
         context: &mut finstack_quant_valuations_core::metrics::MetricContext,
     ) -> finstack_quant_core::Result<f64> {
         let future: &VolatilityIndexFuture = context.instrument_as()?;
+        if context.as_of >= future.terms.settlement_date
+            || context.as_of > future.terms.last_trading_date
+            || future.terms.quoted_price.is_some()
+        {
+            return Ok(0.0);
+        }
         future.delta_vol()
     }
 }

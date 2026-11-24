@@ -46,27 +46,32 @@
 //! # Quick Example
 //!
 //! ```rust
-//! use finstack_quant_valuations_equity::equity_option::{EquityOptionMarketData, EquityOptionParams};
 //! use finstack_quant_valuations_equity::equity_option::EquityOption;
 //! use finstack_quant_core::currency::Currency;
-//! use finstack_quant_core::money::Money;
-//! use finstack_quant_core::types::{CurveId, PriceId};
+//! use finstack_quant_core::types::{Attributes, CurveId, InstrumentId, PriceId};
+//! use finstack_quant_models::types::{ExerciseStyle, OptionType};
+//! use finstack_quant_valuations_core::instruments::SettlementType;
 //! use time::macros::date;
 //!
 //! // Create a 6-month ATM call option
-//! let market_data = EquityOptionMarketData::new(
-//!     CurveId::new("USD-OIS"),
-//!     "EQUITY-SPOT",
-//!     CurveId::new("EQUITY-VOL"),
-//! )
-//! .with_div_yield_id(PriceId::new("EQUITY-DIVYIELD"));
-//! let option = EquityOption::european_with_market_data(
-//!     "SPX-CALL-4500",
-//!     "SPX",
-//!     EquityOptionParams::call(4500.0, date!(2025 - 07 - 15), 100.0, Currency::USD),
-//!     market_data,
-//! )
-//! .expect("valid option");
+//! let option = EquityOption::builder()
+//!     .id(InstrumentId::new("SPX-CALL-4500"))
+//!     .underlying_ticker("SPX".to_string())
+//!     .strike(4500.0)
+//!     .option_type(OptionType::Call)
+//!     .exercise_style(ExerciseStyle::European)
+//!     .expiry(date!(2025 - 07 - 15))
+//!     .quantity(100.0)
+//!     .currency(Currency::USD)
+//!     .day_count(finstack_quant_core::dates::DayCount::Act365F)
+//!     .settlement(SettlementType::Cash)
+//!     .discount_curve_id(CurveId::new("USD-OIS"))
+//!     .spot_id("EQUITY-SPOT".into())
+//!     .vol_surface_id(CurveId::new("EQUITY-VOL"))
+//!     .div_yield_id_opt(Some(PriceId::new("EQUITY-DIVYIELD")))
+//!     .attributes(Attributes::new())
+//!     .build()
+//!     .expect("valid option");
 //! ```
 //!
 //! # Greeks

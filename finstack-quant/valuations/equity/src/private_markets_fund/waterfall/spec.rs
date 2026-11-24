@@ -94,7 +94,7 @@ pub struct ClawbackSpec {
 /// Complete waterfall specification.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct PeFundWaterfallSpec {
     /// Allocation style (European vs American)
     pub style: WaterfallStyle,
@@ -119,6 +119,11 @@ pub struct PeFundWaterfallSpec {
 fn default_day_count() -> DayCount {
     DayCount::Act365F
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(
+    PeFundWaterfallSpec,
+    PeFundWaterfallSpec::validate
+);
 
 impl PeFundWaterfallSpec {
     /// Create a new waterfall specification builder.

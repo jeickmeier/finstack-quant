@@ -80,12 +80,22 @@ impl VarianceSwap {
         if w == 0.0 {
             return self.remaining_forward_variance(curves, as_of);
         }
-        let realized = self.partial_realized_variance(curves, as_of)?;
-        if w >= 1.0 {
-            return Ok(realized);
+        let forward = (w < 1.0)
+            .then(|| self.remaining_forward_variance(curves, as_of))
+            .transpose()?;
+        let dates = self.observation_dates()?;
+        if w < 1.0
+            && self.realized_var_method
+                == finstack_quant_core::math::stats::RealizedVarMethod::YangZhang
+            && dates.partition_point(|date| *date <= as_of) < 2
+        {
+            return Ok(forward.unwrap_or(0.0));
         }
-        let forward = self.remaining_forward_variance(curves, as_of)?;
-        Ok(realized * w + forward * (1.0 - w))
+        let realized = self.partial_realized_variance(curves, as_of)?;
+        match forward {
+            Some(fwd) => Ok(realized * w + fwd * (1.0 - w)),
+            None => Ok(realized),
+        }
     }
 
     /// Get observation dates based on frequency.

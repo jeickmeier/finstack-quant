@@ -161,12 +161,29 @@ impl MetricCalculator for CarryAccruedCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let ledger = allocation_ledger(context)?;
 
-        Ok(ledger
-            .rows
-            .iter()
-            .rfind(|r| r.date <= context.as_of)
-            .map(|r| r.gp_carry_cum.amount())
-            .unwrap_or(0.0))
+        let mut latest_fund: Option<(usize, f64)> = None;
+        let mut latest_deal_idx: Option<usize> = None;
+        let mut per_deal: indexmap::IndexMap<&str, f64> = indexmap::IndexMap::new();
+
+        for (idx, row) in ledger.rows.iter().enumerate() {
+            if row.date > context.as_of {
+                continue;
+            }
+            if let Some(deal_id) = row.deal_id.as_deref() {
+                latest_deal_idx = Some(idx);
+                per_deal.insert(deal_id, row.gp_carry_cum.amount());
+            } else {
+                latest_fund = Some((idx, row.gp_carry_cum.amount()));
+            }
+        }
+
+        if let Some((fund_idx, fund_carry)) = latest_fund
+            && latest_deal_idx.is_none_or(|deal_idx| fund_idx > deal_idx)
+        {
+            return Ok(fund_carry);
+        }
+
+        Ok(per_deal.values().copied().sum())
     }
 }
 
@@ -783,5 +800,76 @@ mod tests {
             assert!(context.ext::<Arc<AllocationLedger>>().is_none());
         }
         WATERFALL_CALLS.with(|count| assert_eq!(count.get(), 2));
+    }
+
+    #[test]
+    fn carry_accrued_sums_latest_deal_carries_in_american_waterfall() {
+        use crate::private_markets_fund::waterfall::{
+            FundEvent, PeFundWaterfallSpec, WaterfallStyle,
+        };
+        use finstack_quant_core::currency::Currency;
+        use finstack_quant_core::types::{Attributes, InstrumentId};
+
+        let spec = PeFundWaterfallSpec::builder()
+            .style(WaterfallStyle::American)
+            .return_of_capital()
+            .promote_tier(0.0, 0.8, 0.2)
+            .build()
+            .expect("valid american spec");
+        let events = vec![
+            FundEvent::contribution(
+                test_date(2020, 1, 1),
+                Money::from((100_i64, test_currency())),
+            )
+            .with_deal_id("DEAL-A"),
+            FundEvent::proceeds(
+                test_date(2021, 1, 1),
+                Money::from((150_i64, test_currency())),
+                "DEAL-A",
+            ),
+            FundEvent::contribution(
+                test_date(2020, 6, 1),
+                Money::from((100_i64, test_currency())),
+            )
+            .with_deal_id("DEAL-B"),
+            FundEvent::proceeds(
+                test_date(2022, 1, 1),
+                Money::from((200_i64, test_currency())),
+                "DEAL-B",
+            ),
+        ];
+        let fund = PrivateMarketsFund::builder()
+            .id(InstrumentId::new("AM-FUND-CARRY"))
+            .currency(Currency::USD)
+            .waterfall_spec(spec)
+            .events(events)
+            .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
+            .attributes(Attributes::default())
+            .build()
+            .expect("fund builds");
+
+        let mut mid_ctx = MetricContext::new(
+            Arc::new(fund.clone()),
+            Arc::new(finstack_quant_core::market_data::context::MarketContext::new()),
+            test_date(2021, 6, 1),
+            Money::from((0_i64, test_currency())),
+            MetricContext::default_config(),
+        );
+        let mid_carry = CarryAccruedCalculator
+            .calculate(&mut mid_ctx)
+            .expect("mid carry");
+        assert!((mid_carry - 10.0).abs() < 1e-9, "got {mid_carry}");
+
+        let mut end_ctx = MetricContext::new(
+            Arc::new(fund),
+            Arc::new(finstack_quant_core::market_data::context::MarketContext::new()),
+            test_date(2022, 6, 1),
+            Money::from((0_i64, test_currency())),
+            MetricContext::default_config(),
+        );
+        let end_carry = CarryAccruedCalculator
+            .calculate(&mut end_ctx)
+            .expect("end carry");
+        assert!((end_carry - 30.0).abs() < 1e-9, "got {end_carry}");
     }
 }

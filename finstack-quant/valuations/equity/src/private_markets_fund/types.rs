@@ -33,7 +33,7 @@ thread_local! {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct PrivateMarketsFund {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -94,6 +94,8 @@ pub struct PrivateMarketsFund {
     #[builder(default)]
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(PrivateMarketsFund);
 
 impl PrivateMarketsFund {
     /// Create a validated private markets fund instrument.
@@ -189,14 +191,7 @@ impl PrivateMarketsFund {
     pub fn run_waterfall(&self) -> finstack_quant_core::Result<AllocationLedger> {
         #[cfg(test)]
         WATERFALL_CALLS.with(|count| count.set(count.get() + 1));
-        for event in &self.events {
-            if event.amount.currency() != self.currency {
-                return Err(finstack_quant_core::Error::CurrencyMismatch {
-                    expected: self.currency,
-                    actual: event.amount.currency(),
-                });
-            }
-        }
+        finstack_quant_valuations_core::instruments::Instrument::validate_invariants(self)?;
         let engine = EquityWaterfallEngine::new(&self.waterfall_spec);
         engine.run(&self.events)
     }
@@ -273,6 +268,7 @@ impl Instrument for PrivateMarketsFund {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
+        self.validate_invariants()?;
         if self.unrealized_nav.is_some()
             && self.events.iter().any(|event| {
                 event.date > as_of
@@ -289,18 +285,9 @@ impl Instrument for PrivateMarketsFund {
                 self.id
             )));
         }
-        let nav = match self.unrealized_nav {
-            Some(nav) => {
-                if nav.currency() != self.currency {
-                    return Err(finstack_quant_core::Error::CurrencyMismatch {
-                        expected: self.currency,
-                        actual: nav.currency(),
-                    });
-                }
-                nav
-            }
-            None => Money::from((0_i64, self.currency)),
-        };
+        let nav = self
+            .unrealized_nav
+            .unwrap_or_else(|| Money::from((0_i64, self.currency)));
 
         let future_flows: Vec<(Date, Money)> = self
             .lp_cashflows()?
