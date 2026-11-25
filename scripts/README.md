@@ -162,10 +162,11 @@ scenarios:
 - **attribution** — T0/T1 plus expected-attribution JSON under
   `finstack-quant/valuations/tests/data/quantlib_parity/`.
 
-Product builders are split by asset class: `bonds.py`, `credit.py`,
-`carry.py`, `commodity.py`, `deposits.py`, `fx.py`, `fx_exotics.py`, `fx_touch.py`,
-`options.py`, `rate_options.py`, `rates.py`, `short_rate.py`, `stochastic_vol.py`,
-`attribution.py`, with shared determinism helpers in `common.py`
+Product builders are split by asset class: `basis.py`, `bonds.py`, `carry.py`,
+`commodity.py`, `commodity_swaption.py`, `convertible.py`, `credit.py`,
+`credit_index.py`, `deposits.py`, `fx.py`, `fx_exotics.py`, `fx_touch.py`,
+`inflation.py`, `ndf.py`, `options.py`, `rate_options.py`, `rates.py`,
+`short_rate.py`, `stochastic_vol.py`, `attribution.py`, with shared determinism helpers in `common.py`
 (fixed valuation/capture dates, QuantLib >= 1.41 floor). `generate.py` is the
 CLI; `--check` reports generator drift instead of writing.
 

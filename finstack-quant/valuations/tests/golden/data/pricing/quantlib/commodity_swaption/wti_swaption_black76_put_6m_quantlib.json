@@ -1,0 +1,162 @@
+{
+  "expected": {
+    "delta": -15704.170287574863,
+    "npv": 219008.49175451326,
+    "vega": 8421.601616868618
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "business_day_convention": "modified_following",
+        "commodity_type": "Energy",
+        "currency": "USD",
+        "day_count": "act_365f",
+        "discount_curve_id": "USD-OIS",
+        "expiry": "2026-10-30",
+        "fixed_price": 78.0,
+        "forward_curve_id": "WTI-FORWARD",
+        "id": "WTI-SWAPTION-BLACK76-PUT-6M-QUANTLIB",
+        "option_type": "put",
+        "quantity": 10000.0,
+        "swap_frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "underlying_maturity": "2027-11-03",
+        "underlying_start_date": "2026-11-03",
+        "underlying_ticker": "CL",
+        "unit": "BBL",
+        "vol_surface_id": "WTI-VOL"
+      },
+      "type": "commodity_swaption"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        },
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "flat",
+          "id": "WTI-FORWARD",
+          "interp_style": "linear",
+          "knot_points": [
+            [
+              0.0,
+              80.0
+            ],
+            [
+              1.0,
+              80.0
+            ],
+            [
+              20.0,
+              80.0
+            ]
+          ],
+          "level_kind": "price",
+          "type": "price"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {},
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [
+        {
+          "expiries": [
+            0.25,
+            1.0,
+            2.0
+          ],
+          "id": "WTI-VOL",
+          "interpolation_mode": "vol",
+          "quote_type": "black_lognormal",
+          "secondary_axis": "strike",
+          "secondary_values": [
+            40.0,
+            80.0,
+            160.0
+          ],
+          "vols_row_major": [
+            0.3,
+            0.3,
+            0.3,
+            0.3,
+            0.3,
+            0.3,
+            0.3,
+            0.3,
+            0.3
+          ]
+        }
+      ],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-23",
+    "description": "QuantLib Black-76 six-month WTI put swaption on a one-year quarterly swap.",
+    "domain": "commodity.commodity_swaption",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-23",
+    "name": "wti_swaption_black76_put_6m_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product commodity_swaption_put",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43 BlackCalculator: flat forward swap price 80.0, strike 78.0, lognormal volatility 0.3, Act/365F time to expiry 2026-10-30; discount = annuity = sum of FlatForward (continuous Act/365F, 0.04) discount factors on 2027-02-03, 2027-05-03, 2027-08-03, 2027-11-03; quantity 10000 BBL per period. Delta is per unit forward swap price, vega per volatility point.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "black76",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "delta": {
+      "rel": 5e-09,
+      "tolerance_reason": "QuantLib BlackCalculator and Finstack evaluate the same Black-76 formula on the flat forward swap price with the sum of payment-date discount factors as annuity."
+    },
+    "npv": {
+      "rel": 5e-09,
+      "tolerance_reason": "QuantLib BlackCalculator and Finstack evaluate the same Black-76 formula on the flat forward swap price with the sum of payment-date discount factors as annuity."
+    },
+    "vega": {
+      "rel": 5e-09,
+      "tolerance_reason": "QuantLib BlackCalculator and Finstack evaluate the same Black-76 formula on the flat forward swap price with the sum of payment-date discount factors as annuity."
+    }
+  }
+}

@@ -1,0 +1,178 @@
+{
+  "expected": {
+    "dv01": -242.7721501317923,
+    "npv": 841613.5682864535
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "cashflow_spec": {
+          "fixed": {
+            "business_day_convention": "unadjusted",
+            "calendar_id": "weekends_only",
+            "day_count": "act_365f",
+            "frequency": {
+              "count": 12,
+              "unit": "months"
+            },
+            "rate": "0",
+            "stub": "none"
+          }
+        },
+        "conversion": {
+          "anti_dilution": "none",
+          "dividend_adjustment": "none",
+          "policy": "voluntary",
+          "ratio": 10000.0
+        },
+        "credit_curve_id": "ACME-HAZARD",
+        "discount_curve_id": "USD-OIS",
+        "div_yield_id": "ACME-DIVYIELD",
+        "id": "USD-CONVERTIBLE-TF-OTM-3Y-QUANTLIB",
+        "instrument_pricing_overrides": {
+          "model_config": {
+            "tree_steps": 1096
+          }
+        },
+        "issue_date": "2026-04-30",
+        "maturity": "2029-04-30",
+        "notional": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "recovery_rate": 0.0,
+        "spot_id": "ACME-SPOT",
+        "vol_surface_id": "ACME-VOL-QL"
+      },
+      "type": "convertible_bond"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        },
+        {
+          "base": "2026-04-30",
+          "currency": "USD",
+          "day_count": "act_365f",
+          "fx_policy": null,
+          "id": "ACME-HAZARD",
+          "issuer": null,
+          "knot_points": [
+            [
+              30.0,
+              0.02
+            ]
+          ],
+          "recovery_rate": 0.0,
+          "seniority": null,
+          "type": "hazard"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {
+        "ACME-DIVYIELD": {
+          "unitless": 0.03
+        },
+        "ACME-SPOT": {
+          "price": {
+            "amount": "40.0",
+            "currency": "USD"
+          }
+        }
+      },
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [
+        {
+          "expiries": [
+            0.25,
+            1.0,
+            2.0
+          ],
+          "id": "ACME-VOL-QL",
+          "interpolation_mode": "vol",
+          "quote_type": "black_lognormal",
+          "secondary_axis": "strike",
+          "secondary_values": [
+            50.0,
+            100.0,
+            150.0
+          ],
+          "vols_row_major": [
+            0.3,
+            0.3,
+            0.3,
+            0.3,
+            0.3,
+            0.3,
+            0.3,
+            0.3,
+            0.3
+          ]
+        }
+      ],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-23",
+    "description": "QuantLib Tsiveriotis-Fernandes three-year zero-coupon convertible, spot at 40% of the conversion price.",
+    "domain": "fixed_income.convertible",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-23",
+    "name": "usd_convertible_tf_otm_3y_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product tf_convertible_out_of_the_money",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43 BinomialCRRConvertibleEngine (17536 steps) on a ConvertibleZeroCouponBond with American conversion and a flat credit spread of 0.02: spot 40.0, flat 0.3 volatility, 0.03 continuous dividend yield, flat 0.04 continuous Act/365F curve. The Finstack bond carries a flat 0.02 hazard curve with zero recovery, which is the same spread. The bond pays no coupon because QuantLib forfeits a coupon on conversion and Finstack retains it. Issuer calls and holder puts are not compared: on a cash redemption Finstack resets the conversion probability to zero, as the model's cash-only component requires, and QuantLib leaves it unchanged.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "tsiveriotis_fernandes",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "dv01": {
+      "rel": 0.02,
+      "tolerance_reason": "Both sides price the Tsiveriotis-Fernandes convertible on a binomial lattice: QuantLib at 17536 steps and Finstack at 1096 steps. The reference DV01 is a central difference over 10bp either side, per bp: QuantLib's lattice price is not smooth in the rate at 1bp, and its own 1bp DV01 moves by 1.6% between 1096, 4384 and 17536 steps, while the 10bp estimate is stable to 0.1%. Finstack's DV01 is a 1bp bump on a 1096-step lattice, so the bound is the 1bp estimator's dispersion."
+    },
+    "npv": {
+      "rel": 0.0001,
+      "tolerance_reason": "Both sides price the Tsiveriotis-Fernandes convertible on a binomial lattice: QuantLib at 17536 steps and Finstack at 1096 steps. With a credit spread QuantLib's lattice converges more slowly than the credit-free one: its at-the-money price moves by 2.1e-4 from 1096 to 4384 steps and 8.5e-5 from 4384 to 17536, so the reference is within about 1e-4 of its own limit. QuantLib compounds the blended rate simply per step and Finstack continuously, a difference of order one step."
+    }
+  }
+}

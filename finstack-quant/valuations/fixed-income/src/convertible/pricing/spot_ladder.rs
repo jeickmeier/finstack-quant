@@ -18,8 +18,8 @@ use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use serde::{Deserialize, Serialize};
 
 use super::engine::{
-    compute_conversion_value, prepare_for_pricing, price_bond_floor, price_convertible_bond,
-    spot_bump_prices,
+    ConvertibleModel, compute_conversion_value, prepare_for_pricing, price_bond_floor,
+    price_convertible_bond, spot_bump_prices,
 };
 use crate::convertible::ConvertibleBond;
 
@@ -227,7 +227,7 @@ pub fn convertible_spot_ladder(
         Some(&bond.metric_pricing_overrides),
     )?);
     let inputs = prepare_for_pricing(bond, market, as_of)?;
-    let bond_floor = price_bond_floor(bond, market, as_of)?;
+    let bond_floor = price_bond_floor(bond, market, as_of, ConvertibleModel::DefaultableEquity)?;
     // A mandatory-variable bond delivers a share count that moves with the stock, so
     // no one ratio is the share exposure the delta bands read.
     let fixed_ratio = match bond.conversion.policy {
@@ -242,10 +242,17 @@ pub fn convertible_spot_ladder(
         .map(|spot| {
             let moved = inputs.market_at_spot(market, spot)?;
             let price = price_convertible_bond(bond, &moved, as_of)?.amount();
-            let delta =
-                spot_bump_prices(bond, &moved, &inputs, spot, bumps.spot_bump_decimal, as_of)?
-                    .map(|bump| bump.delta())
-                    .filter(|delta| delta.is_finite());
+            let delta = spot_bump_prices(
+                bond,
+                &moved,
+                &inputs,
+                spot,
+                bumps.spot_bump_decimal,
+                as_of,
+                ConvertibleModel::DefaultableEquity,
+            )?
+            .map(|bump| bump.delta())
+            .filter(|delta| delta.is_finite());
             let hedge_ratio = delta
                 .zip(fixed_ratio)
                 .map(|(delta, ratio)| delta / ratio)
@@ -464,7 +471,8 @@ mod tests {
         );
         assert_eq!(
             row.bond_floor,
-            price_bond_floor(&bond, &market, AS_OF).expect("floor")
+            price_bond_floor(&bond, &market, AS_OF, ConvertibleModel::DefaultableEquity)
+                .expect("floor")
         );
     }
 
@@ -477,8 +485,10 @@ mod tests {
             MarketScalar::price(Money::new(300.0, Currency::USD).expect("spot")),
         );
         assert_eq!(
-            price_bond_floor(&bond, &market, AS_OF).expect("floor"),
-            price_bond_floor(&bond, &moved, AS_OF).expect("floor")
+            price_bond_floor(&bond, &market, AS_OF, ConvertibleModel::DefaultableEquity)
+                .expect("floor"),
+            price_bond_floor(&bond, &moved, AS_OF, ConvertibleModel::DefaultableEquity)
+                .expect("floor")
         );
     }
 

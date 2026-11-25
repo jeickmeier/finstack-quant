@@ -118,12 +118,11 @@ fn coupon_on_valuation_date_is_not_added_to_tree_step_zero() {
     let inputs = prepare_for_pricing(&bond, &market, as_of).expect("pricing inputs");
     let valuator = ConvertibleBondValuator::new(
         &bond,
-        &inputs.cashflow_schedule,
-        inputs.time_to_maturity,
+        &inputs,
         50,
         as_of,
         &market,
-        inputs.volatility,
+        super::ConvertibleModel::DefaultableEquity,
     )
     .expect("valuator");
 
@@ -1032,12 +1031,11 @@ fn convertible_seasoned_window_preserves_exercise_dates() {
         let inputs = prepare_for_pricing(&bond, &market, as_of).expect("window inputs");
         let valuator = ConvertibleBondValuator::new(
             &bond,
-            &inputs.cashflow_schedule,
-            inputs.time_to_maturity,
+            &inputs,
             steps,
             as_of,
             &market,
-            inputs.volatility,
+            super::ConvertibleModel::DefaultableEquity,
         )
         .expect("seasoned window");
         for step in 0..=steps {
@@ -1144,12 +1142,11 @@ fn convertible_forced_delivery_overrides_put_and_retains_risky_coupon() {
                 let inputs = prepare_for_pricing(&bond, &market, as_of).expect("inputs");
                 let valuator = ConvertibleBondValuator::new(
                     &bond,
-                    &inputs.cashflow_schedule,
-                    inputs.time_to_maturity,
+                    &inputs,
                     steps,
                     as_of,
                     &market,
-                    inputs.volatility,
+                    super::ConvertibleModel::DefaultableEquity,
                 )
                 .expect("valuator");
                 let engine = CreditTreeEngine {
@@ -1445,4 +1442,144 @@ fn convertible_clean_price_excludes_cash_paid_before_settlement() {
         "{} != {expected_clean}",
         result.measures["clean_price"]
     );
+}
+
+// Tsiveriotis-Fernandes lattice
+
+/// Price `bond` at `spot` on the Tsiveriotis-Fernandes lattice with a flat
+/// hazard curve attached (or none when `hazard` is `None`).
+fn tf_price(bond: &ConvertibleBond, spot: f64, hazard: Option<(f64, f64)>) -> f64 {
+    use super::{ConvertibleModel, price_convertible_bond_with_model};
+    use finstack_quant_core::market_data::term_structures::HazardCurve;
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+    let mut market = create_test_market_context()
+        .insert_price("AAPL", MarketScalar::unitless(spot).expect("valid scalar"));
+    let mut bond = bond.clone();
+    if let Some((rate, recovery)) = hazard {
+        market = market
+            .try_insert(
+                HazardCurve::flat("CREDIT", as_of, rate, recovery, DayCount::Act365F)
+                    .expect("hazard curve"),
+            )
+            .expect("insert market curve");
+        bond.credit_curve_id = Some("CREDIT".into());
+        bond.recovery_rate = Some(recovery);
+    }
+    price_convertible_bond_with_model(
+        &bond,
+        &market,
+        as_of,
+        ConvertibleModel::TsiveriotisFernandes,
+    )
+    .expect("Tsiveriotis-Fernandes price")
+    .amount()
+}
+
+#[test]
+fn tf_without_credit_reproduces_the_default_tree_bit_for_bit() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+    let bond = create_test_bond();
+    for spot in [50.0, 100.0, 150.0, 400.0] {
+        let market = create_test_market_context()
+            .insert_price("AAPL", MarketScalar::unitless(spot).expect("valid scalar"));
+        let tree = price_convertible_bond(&bond, &market, as_of)
+            .expect("tree price")
+            .amount();
+        assert_eq!(tf_price(&bond, spot, None).to_bits(), tree.to_bits());
+    }
+}
+
+#[test]
+fn tf_deep_out_of_the_money_price_is_the_spread_discounted_bond_floor() {
+    use super::{ConvertibleModel, price_bond_floor};
+    use finstack_quant_core::market_data::term_structures::HazardCurve;
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+    let mut bond = create_test_bond();
+    bond.credit_curve_id = Some("CREDIT".into());
+    bond.recovery_rate = Some(0.0);
+    let floor_at = |hazard: f64| {
+        let market = create_test_market_context()
+            .try_insert(
+                HazardCurve::flat("CREDIT", as_of, hazard, 0.0, DayCount::Act365F)
+                    .expect("hazard curve"),
+            )
+            .expect("insert market curve");
+        price_bond_floor(
+            &bond,
+            &market,
+            as_of,
+            ConvertibleModel::TsiveriotisFernandes,
+        )
+        .expect("bond floor")
+    };
+    // Conversion is worthless at a share price of 0.01, so the convertible is
+    // the straight bond, every cash flow discounted at r + s.
+    let price = tf_price(&create_test_bond(), 0.01, Some((0.03, 0.0)));
+    let floor = floor_at(0.03);
+    assert!(
+        (price - floor).abs() < 1e-9 * floor,
+        "price {price} vs bond floor {floor}"
+    );
+    // A flat 3% spread over five years takes roughly exp(-0.15) off the
+    // redemption; the floor must sit well below the risk-free one.
+    let risk_free_floor = floor_at(1e-12);
+    assert!(floor < 0.90 * risk_free_floor && floor > 0.80 * risk_free_floor);
+}
+
+#[test]
+fn tf_deep_in_the_money_price_ignores_the_credit_spread() {
+    // At a share price of 10,000 the holder converts at once: the claim is all
+    // equity, so no credit spread applies.
+    let bond = create_test_bond();
+    let conversion_value = 10.0 * 10_000.0;
+    for hazard in [None, Some((0.03, 0.0)), Some((0.20, 0.4))] {
+        let price = tf_price(&bond, 10_000.0, hazard);
+        assert!(
+            (price - conversion_value).abs() < 1e-9 * conversion_value,
+            "hazard {hazard:?}: price {price} vs conversion value {conversion_value}"
+        );
+    }
+}
+
+#[test]
+fn tf_price_falls_with_the_spread_and_recovery_scales_it() {
+    let bond = create_test_bond();
+    let at_the_money = 100.0;
+    let prices: Vec<f64> = [0.0_f64, 0.01, 0.03, 0.08]
+        .iter()
+        .map(|&hazard| tf_price(&bond, at_the_money, Some((hazard.max(1e-12), 0.0))))
+        .collect();
+    assert!(
+        prices.windows(2).all(|pair| pair[1] < pair[0]),
+        "prices must fall as the spread widens: {prices:?}"
+    );
+    // The spread is hazard * (1 - recovery): 5% hazard at 40% recovery is the
+    // same spread as 3% hazard at zero recovery.
+    let with_recovery = tf_price(&bond, at_the_money, Some((0.05, 0.4)));
+    let equivalent = tf_price(&bond, at_the_money, Some((0.03, 0.0)));
+    assert!(
+        (with_recovery - equivalent).abs() < 1e-9 * equivalent,
+        "{with_recovery} vs {equivalent}"
+    );
+    // Full recovery leaves no spread, so the credit-free price returns.
+    let full_recovery = tf_price(&bond, at_the_money, Some((0.05, 1.0)));
+    let credit_free = tf_price(&bond, at_the_money, None);
+    assert!((full_recovery - credit_free).abs() < 1e-9 * credit_free);
+}
+
+#[test]
+fn tf_price_lies_between_the_bond_floor_and_the_credit_free_price() {
+    // A partly cash, partly equity claim is discounted at a rate between r and
+    // r + s, so it is worth more than the same bond with every node treated as
+    // cash and less than with no spread at all.
+    let bond = create_test_bond();
+    for spot in [60.0, 100.0, 140.0] {
+        let risky = tf_price(&bond, spot, Some((0.05, 0.0)));
+        let credit_free = tf_price(&bond, spot, None);
+        assert!(risky < credit_free, "spot {spot}: {risky} vs {credit_free}");
+        assert!(
+            risky > 10.0 * spot,
+            "spot {spot}: {risky} below conversion value"
+        );
+    }
 }

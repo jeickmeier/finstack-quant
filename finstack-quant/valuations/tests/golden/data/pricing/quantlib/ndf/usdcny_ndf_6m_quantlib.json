@@ -1,0 +1,139 @@
+{
+  "expected": {
+    "dv01": 1.2622263215143903,
+    "fx01": 13750.31540927446,
+    "npv": -25175.552303813467
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "base_currency": "CNY",
+        "contract_rate": 7.0,
+        "domestic_discount_curve_id": "USD-OIS",
+        "fixing_date": "2026-10-28",
+        "fixing_source": "pboc",
+        "foreign_discount_curve_id": "CNY-OIS",
+        "id": "USDCNY-NDF-6M-QUANTLIB",
+        "maturity": "2026-10-30",
+        "notional": {
+          "amount": "10000000",
+          "currency": "CNY"
+        },
+        "quote_convention": "base_per_settlement",
+        "settlement_currency": "USD"
+      },
+      "type": "ndf"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        },
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "CNY-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.5488116360940264
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        }
+      ],
+      "dividends": [],
+      "fx": {
+        "config": {
+          "cache_capacity": 256,
+          "pivot_currency": "USD"
+        },
+        "pinned_quotes": [],
+        "provider_pinned_quotes": [],
+        "provider_quotes": [],
+        "quotes": [
+          [
+            "USD",
+            "CNY",
+            7.2
+          ]
+        ]
+      },
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {},
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-23",
+    "description": "Six-month off-market USD/CNY non-deliverable forward valued on QuantLib discount curves.",
+    "domain": "fx.ndf",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-23",
+    "name": "usdcny_ndf_6m_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product ndf",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43 FlatForward discount factors (continuous Act/365F, USD 0.04, CNY 0.02) to maturity 2026-10-30; forward F = S*DF_USD/DF_CNY with spot S = 7.2 CNY per USD; USD settlement N*(1/F - 1/K)*DF_USD, N = 10000000 CNY, K = 7.0. DV01 is the central 1bp parallel move of both curves; FX01 the central 1% relative move of the CNY/USD rate.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "dv01": {
+      "rel": 1e-09,
+      "tolerance_reason": "One USD settlement N*(1/F - 1/K) with the covered-interest-parity forward F = S*DF_USD/DF_CNY, discounted on QuantLib flat curves, against the same valuation in Finstack; only floating-point evaluation order differs."
+    },
+    "fx01": {
+      "rel": 1e-09,
+      "tolerance_reason": "One USD settlement N*(1/F - 1/K) with the covered-interest-parity forward F = S*DF_USD/DF_CNY, discounted on QuantLib flat curves, against the same valuation in Finstack; only floating-point evaluation order differs."
+    },
+    "npv": {
+      "rel": 1e-09,
+      "tolerance_reason": "One USD settlement N*(1/F - 1/K) with the covered-interest-parity forward F = S*DF_USD/DF_CNY, discounted on QuantLib flat curves, against the same valuation in Finstack; only floating-point evaluation order differs."
+    }
+  }
+}

@@ -29,6 +29,7 @@ impl MetricCalculator for CleanPriceCalculator {
             &context.curves,
             context.as_of,
             context.base_value.amount(),
+            super::model::selected_model(context)?,
         )?;
         let accrued = calculate_accrued_interest(bond, &context.curves, context.as_of)?;
         Ok(dirty_price - accrued)

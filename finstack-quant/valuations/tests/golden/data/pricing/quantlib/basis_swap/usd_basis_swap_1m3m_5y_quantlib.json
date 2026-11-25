@@ -1,0 +1,196 @@
+{
+  "expected": {
+    "basis_par_spread": 14.953314171721459,
+    "dv01": 5.051321850391105,
+    "npv": -27303.455496501643,
+    "pv_primary": 1921756.5712932653,
+    "pv_reference": 1949060.026789767
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "allow_calendar_fallback": false,
+        "allow_same_curve": false,
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "id": "USD-BASIS-1M3M-5Y-QUANTLIB",
+        "notional": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "primary_leg": {
+          "business_day_convention": "unadjusted",
+          "calendar_id": "weekends_only",
+          "compounding": "simple",
+          "day_count": "act_360",
+          "discount_curve_id": "USD-OIS",
+          "end": "2031-05-06",
+          "end_of_month": false,
+          "fixing_calendar_id": null,
+          "forward_curve_id": "USD-TERM-1M",
+          "frequency": {
+            "count": 1,
+            "unit": "months"
+          },
+          "index_id": "USD-TERM-1M",
+          "payment_lag_days": 0,
+          "reset_lag_days": 0,
+          "spread_bp": "9",
+          "start": "2026-05-06",
+          "stub": "none"
+        },
+        "reference_leg": {
+          "business_day_convention": "unadjusted",
+          "calendar_id": "weekends_only",
+          "compounding": "simple",
+          "day_count": "act_360",
+          "discount_curve_id": "USD-OIS",
+          "end": "2031-05-06",
+          "end_of_month": false,
+          "fixing_calendar_id": null,
+          "forward_curve_id": "USD-TERM-3M",
+          "frequency": {
+            "count": 3,
+            "unit": "months"
+          },
+          "index_id": "USD-TERM-3M",
+          "payment_lag_days": 0,
+          "reset_lag_days": 0,
+          "spread_bp": "0",
+          "start": "2026-05-06",
+          "stub": "none"
+        }
+      },
+      "type": "basis_swap"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        },
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-TERM-1M",
+          "index_tenor": {
+            "count": 1,
+            "unit": "months"
+          },
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.2879409081307702
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "forward"
+        },
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-TERM-3M",
+          "index_tenor": {
+            "count": 3,
+            "unit": "months"
+          },
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.2752707830897524
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "forward"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {},
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-23",
+    "description": "QuantLib native five-year USD 1M-plus-spread versus 3M term-rate basis swap.",
+    "domain": "rates.basis_swap",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-23",
+    "name": "usd_basis_swap_1m3m_5y_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product basis_swap",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43 Swap of two IborLeg legs priced by DiscountingSwapEngine on flat continuous Act/365F curves (discount 0.04, 1M projection 0.0415, 3M projection 0.043); receive 1M + 9.0 bp, pay 3M flat, unadjusted Act/360 periods equal to the index tenors. NPV, leg NPVs and leg BPS are QuantLib outputs; basis_par_spread is spread - NPV / primary leg BPS and dv01 is the sum of three 1 bp central differences, one per curve, in the generator.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "basis_par_spread": {
+      "abs": 1e-09,
+      "tolerance_reason": "Same aligned cash flows as the NPV; 1e-7 of NPV residual over the primary annuity of about 4,500 per basis point is below 1e-9 bp."
+    },
+    "dv01": {
+      "abs": 1e-07,
+      "tolerance_reason": "QuantLib DiscountingSwapEngine and Finstack sum the same simple Act/360 forwards and discount factors on exactly aligned unadjusted schedules; only floating-point residual remains."
+    },
+    "npv": {
+      "abs": 1e-07,
+      "tolerance_reason": "QuantLib DiscountingSwapEngine and Finstack sum the same simple Act/360 forwards and discount factors on exactly aligned unadjusted schedules; only floating-point residual remains."
+    },
+    "pv_primary": {
+      "abs": 1e-07,
+      "tolerance_reason": "QuantLib DiscountingSwapEngine and Finstack sum the same simple Act/360 forwards and discount factors on exactly aligned unadjusted schedules; only floating-point residual remains."
+    },
+    "pv_reference": {
+      "abs": 1e-07,
+      "tolerance_reason": "QuantLib DiscountingSwapEngine and Finstack sum the same simple Act/360 forwards and discount factors on exactly aligned unadjusted schedules; only floating-point residual remains."
+    }
+  }
+}

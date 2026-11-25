@@ -10,7 +10,7 @@
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 
-use crate::convertible::pricing::calculate_convertible_greeks;
+use crate::convertible::pricing::calculate_convertible_greeks_with_model;
 use crate::convertible::types::ConvertibleBond;
 use finstack_quant_valuations_core::instruments::GreekBumps;
 
@@ -20,7 +20,13 @@ fn tree_greek(context: &mut MetricContext, requested: MetricId) -> Result<f64> {
         &finstack_quant_valuations_core::metrics::sensitivities::bump_config::resolve(context)?,
     );
     let bond = context.instrument_as::<ConvertibleBond>()?;
-    let greeks = calculate_convertible_greeks(bond, &context.curves, bumps, context.as_of)?;
+    let greeks = calculate_convertible_greeks_with_model(
+        bond,
+        &context.curves,
+        bumps,
+        context.as_of,
+        super::model::selected_model(context)?,
+    )?;
     let values = [
         (MetricId::Delta, greeks.delta),
         (MetricId::Gamma, greeks.gamma),

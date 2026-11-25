@@ -19,7 +19,36 @@ use finstack_quant_valuations_core::instruments::{GreekBumps, Instrument};
 use finstack_quant_valuations_core::metrics::bump_discount_curve_parallel;
 
 use super::credit_tree::{CreditTreeEngine, CreditTreeMarketInputs, terminal_payoff};
+use super::tf_tree::TsiveriotisFernandesEngine;
 use super::valuator::ConvertibleBondValuator;
+use finstack_quant_valuations_core::pricer::ModelKey;
+
+/// Credit model of the convertible lattice.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ConvertibleModel {
+    /// Jump-to-default equity lattice with recovery of principal
+    /// ([`ModelKey::Tree`]).
+    DefaultableEquity,
+    /// Tsiveriotis-Fernandes blended discounting
+    /// ([`ModelKey::TsiveriotisFernandes`]).
+    TsiveriotisFernandes,
+}
+
+impl ConvertibleModel {
+    /// Resolve the lattice from the pricing model a valuation selected.
+    ///
+    /// `None` is a valuation outside the pricer registry, which prices with
+    /// the instrument's default model.
+    pub(crate) fn from_model_key(model: Option<ModelKey>) -> Result<Self> {
+        match model {
+            None | Some(ModelKey::Tree) => Ok(Self::DefaultableEquity),
+            Some(ModelKey::TsiveriotisFernandes) => Ok(Self::TsiveriotisFernandes),
+            Some(other) => Err(Error::Validation(format!(
+                "convertible bonds price with the tree or tsiveriotis_fernandes model, got {other}"
+            ))),
+        }
+    }
+}
 
 /// Compute the conversion value for any conversion policy given the spot price.
 ///
@@ -319,6 +348,7 @@ pub(super) fn spot_bump_prices(
     spot: f64,
     bump_pct: f64,
     as_of: Date,
+    model: ConvertibleModel,
 ) -> Result<Option<SpotBumpPrices>> {
     let spot_bump = bump_pct * spot;
     if spot_bump <= 0.0 {
@@ -328,9 +358,59 @@ pub(super) fn spot_bump_prices(
     let market_down = inputs.market_at_spot(market, spot - spot_bump)?;
     Ok(Some(SpotBumpPrices {
         spot_bump,
-        price_up: price_convertible_bond(bond, &market_up, as_of)?.amount(),
-        price_down: price_convertible_bond(bond, &market_down, as_of)?.amount(),
+        price_up: price_convertible_bond_with_model(bond, &market_up, as_of, model)?.amount(),
+        price_down: price_convertible_bond_with_model(bond, &market_down, as_of, model)?.amount(),
     }))
+}
+
+/// Present-value factors of one unit of cash and of one unit of recoverable
+/// principal paid at a future date, under the selected credit model.
+struct CashFactors {
+    /// Risk-free discount factor to the payment date.
+    df: f64,
+    /// Credit weight of promised cash: survival on the defaultable-equity
+    /// lattice, the spread factor on the Tsiveriotis-Fernandes one. The value
+    /// today of one unit of promised cash is `df * credit`.
+    credit: f64,
+    /// Extra value today per unit of principal from recovery on default; zero
+    /// under Tsiveriotis-Fernandes, where recovery is inside the spread.
+    recovery: f64,
+}
+
+/// Discount one unit of cash from `date` to `as_of` under `model`.
+///
+/// The defaultable-equity model weights the payment by survival and pays
+/// recovery on default. Tsiveriotis-Fernandes discounts it at the credit
+/// spread, `survival^(1 - recovery)`, with no separate recovery leg.
+fn cash_factors(
+    model: ConvertibleModel,
+    bond: &ConvertibleBond,
+    market: &MarketContext,
+    as_of: Date,
+    date: Date,
+) -> Result<CashFactors> {
+    let df = market
+        .get_discount(bond.discount_curve_id.as_str())?
+        .df_between_dates(as_of, date)?;
+    let hazard = bond
+        .credit_curve_id
+        .as_ref()
+        .map(|id| market.get_hazard(id.as_str()))
+        .transpose()?;
+    let survival = conditional_survival(hazard.as_deref(), as_of, date)?;
+    let recovery_rate = bond.recovery_rate.unwrap_or(0.0);
+    Ok(match model {
+        ConvertibleModel::DefaultableEquity => CashFactors {
+            df,
+            credit: survival,
+            recovery: recovery_rate * crate::rates_credit::continuous_frp_weight(df, survival)?,
+        },
+        ConvertibleModel::TsiveriotisFernandes => CashFactors {
+            df,
+            credit: survival.powf(1.0 - recovery_rate),
+            recovery: 0.0,
+        },
+    })
 }
 
 /// Resolve an already-exercised contract without recreating its debt or options.
@@ -338,6 +418,7 @@ fn resolved_value(
     bond: &ConvertibleBond,
     market: &MarketContext,
     as_of: Date,
+    model: ConvertibleModel,
 ) -> Result<Option<Money>> {
     if let Some(claim) = &bond.resolved_settlement {
         if as_of < claim.exercise_date {
@@ -348,18 +429,9 @@ fn resolved_value(
         if as_of >= claim.delivery_date {
             return Ok(Some(Money::new(0.0, bond.notional.currency())?));
         }
-        let discount = market.get_discount(bond.discount_curve_id.as_str())?;
-        let df = discount.df_between_dates(as_of, claim.delivery_date)?;
-        let hazard = bond
-            .credit_curve_id
-            .as_ref()
-            .map(|id| market.get_hazard(id.as_str()))
-            .transpose()?;
-        let survival = conditional_survival(hazard.as_deref(), as_of, claim.delivery_date)?;
         // Pending fixed cash has its own contractual principal; the extinguished
         // bond notional must never be recovered again.
-        let recovery = bond.recovery_rate.unwrap_or(0.0)
-            * crate::rates_credit::continuous_frp_weight(df, survival)?;
+        let factors = cash_factors(model, bond, market, as_of, claim.delivery_date)?;
         let shares_value = if claim.shares > 0.0 {
             let spot = bond.spot_value(market.get_price(&bond.spot_id)?)?;
             let tau =
@@ -370,8 +442,8 @@ fn resolved_value(
         };
         return Ok(Some(Money::from_model_value(
             shares_value
-                + claim.cash.amount() * df * survival
-                + claim.recovery_basis.amount() * recovery,
+                + claim.cash.amount() * factors.df * factors.credit
+                + claim.recovery_basis.amount() * factors.recovery,
             bond.notional.currency(),
         )?));
     }
@@ -391,12 +463,6 @@ fn resolved_value(
     // A same-day conversion/redemption has already settled. Retain only earned
     // coupons whose contractual accrual ended before exercise but pay later.
     let schedule = build_convertible_schedule(bond, market)?;
-    let discount = market.get_discount(bond.discount_curve_id.as_str())?;
-    let hazard = bond
-        .credit_curve_id
-        .as_ref()
-        .map(|id| market.get_hazard(id.as_str()))
-        .transpose()?;
     let mut value = 0.0;
     for cf in schedule
         .get_flows()
@@ -410,15 +476,13 @@ fn resolved_value(
             && !cf.get_kind().is_principal_like();
         let pending_redemption = mandatory_date.is_none() && cf.get_kind().is_principal_like();
         if earned_coupon || pending_redemption {
-            let survival = conditional_survival(hazard.as_deref(), as_of, cf.get_date())?;
-            let df = discount.df_between_dates(as_of, cf.get_date())?;
+            let factors = cash_factors(model, bond, market, as_of, cf.get_date())?;
             let recovery = if pending_redemption {
-                bond.recovery_rate.unwrap_or(0.0)
-                    * crate::rates_credit::continuous_frp_weight(df, survival)?
+                factors.recovery
             } else {
                 0.0
             };
-            value += cf.get_amount().amount() * (df * survival + recovery);
+            value += cf.get_amount().amount() * (factors.df * factors.credit + recovery);
         }
     }
     Ok(Some(Money::from_model_value(
@@ -436,18 +500,13 @@ fn price_convertible_bond_with_inputs(
     market_context: &MarketContext,
     inputs: &PricingInputs,
     as_of: Date,
+    model: ConvertibleModel,
 ) -> Result<Money> {
-    if let Some(value) = resolved_value(bond, market_context, as_of)? {
+    if let Some(value) = resolved_value(bond, market_context, as_of, model)? {
         return Ok(value);
     }
 
     if inputs.time_to_maturity <= 0.0 {
-        let discount = market_context.get_discount(bond.discount_curve_id.as_str())?;
-        let hazard = bond
-            .credit_curve_id
-            .as_ref()
-            .map(|id| market_context.get_hazard(id.as_str()))
-            .transpose()?;
         let mut maturity_coupon = 0.0;
         let mut redemption_pv = 0.0;
         let mut principal = 0.0;
@@ -457,16 +516,13 @@ fn price_convertible_bond_with_inputs(
             .iter()
             .filter(|cf| cf.get_date() >= as_of && cf.get_kind().is_cash_settlement())
         {
-            let survival = conditional_survival(hazard.as_deref(), as_of, cf.get_date())?;
-            let df = discount.df_between_dates(as_of, cf.get_date())?;
+            let factors = cash_factors(model, bond, market_context, as_of, cf.get_date())?;
             if cf.get_kind().is_principal_like() {
                 principal += cf.get_amount().amount();
-                redemption_pv += cf.get_amount().amount()
-                    * (df * survival
-                        + bond.recovery_rate.unwrap_or(0.0)
-                            * crate::rates_credit::continuous_frp_weight(df, survival)?);
+                redemption_pv +=
+                    cf.get_amount().amount() * (factors.df * factors.credit + factors.recovery);
             } else {
-                maturity_coupon += cf.get_amount().amount() * df * survival;
+                maturity_coupon += cf.get_amount().amount() * factors.df * factors.credit;
             }
         }
         let redemption_value = bond
@@ -517,28 +573,32 @@ fn price_convertible_bond_with_inputs(
 
     let steps = tree_steps(bond)?;
 
-    let valuator = ConvertibleBondValuator::new(
-        bond,
-        &inputs.cashflow_schedule,
-        inputs.time_to_maturity,
-        steps,
-        as_of,
-        market_context,
-        inputs.volatility,
-    )?;
+    let valuator = ConvertibleBondValuator::new(bond, inputs, steps, as_of, market_context, model)?;
 
-    let engine = CreditTreeEngine {
-        valuator: &valuator,
-        steps,
-        time_to_maturity: inputs.time_to_maturity,
-    };
-
-    let (pv_amount, _) = engine.price(CreditTreeMarketInputs {
+    let lattice_inputs = CreditTreeMarketInputs {
         spot: inputs.spot,
         volatility: inputs.volatility,
         risk_free_rate: inputs.risk_free_rate,
         dividend_yield: inputs.dividend_yield,
-    })?;
+    };
+    let pv_amount = match model {
+        ConvertibleModel::DefaultableEquity => {
+            CreditTreeEngine {
+                valuator: &valuator,
+                steps,
+                time_to_maturity: inputs.time_to_maturity,
+            }
+            .price(lattice_inputs)?
+            .0
+        }
+        ConvertibleModel::TsiveriotisFernandes => TsiveriotisFernandesEngine {
+            valuator: &valuator,
+            steps,
+            time_to_maturity: inputs.time_to_maturity,
+            recovery_rate: bond.recovery_rate.unwrap_or(0.0),
+        }
+        .price(lattice_inputs)?,
+    };
 
     Money::from_model_value(pv_amount, bond.notional.currency())
 }
@@ -562,13 +622,26 @@ pub fn price_convertible_bond(
     market: &MarketContext,
     as_of: Date,
 ) -> Result<Money> {
+    price_convertible_bond_with_model(bond, market, as_of, ConvertibleModel::DefaultableEquity)
+}
+
+/// Price a convertible bond on the selected credit lattice.
+///
+/// See [`price_convertible_bond`] for the inputs; `model` chooses between the
+/// defaultable-equity lattice and the Tsiveriotis-Fernandes one.
+pub(crate) fn price_convertible_bond_with_model(
+    bond: &ConvertibleBond,
+    market: &MarketContext,
+    as_of: Date,
+    model: ConvertibleModel,
+) -> Result<Money> {
     bond.validate_for_pricing()?;
     tree_steps(bond)?;
-    if let Some(value) = resolved_value(bond, market, as_of)? {
+    if let Some(value) = resolved_value(bond, market, as_of, model)? {
         return Ok(value);
     }
     let inputs = prepare_for_pricing(bond, market, as_of)?;
-    price_convertible_bond_with_inputs(bond, market, &inputs, as_of)
+    price_convertible_bond_with_inputs(bond, market, &inputs, as_of, model)
 }
 
 /// Value the straight cash component on the canonical convertible tree grid.
@@ -578,8 +651,9 @@ pub(crate) fn price_bond_floor(
     bond: &ConvertibleBond,
     market_context: &MarketContext,
     as_of: Date,
+    model: ConvertibleModel,
 ) -> Result<f64> {
-    if let Some(value) = resolved_value(bond, market_context, as_of)? {
+    if let Some(value) = resolved_value(bond, market_context, as_of, model)? {
         return Ok(value.amount());
     }
     if as_of == bond.maturity {
@@ -596,15 +670,17 @@ pub(crate) fn price_bond_floor(
     }
     let inputs = prepare_for_pricing(bond, market_context, as_of)?;
     let steps = tree_steps(bond)?;
-    let valuator = ConvertibleBondValuator::new(
-        bond,
-        &inputs.cashflow_schedule,
-        inputs.time_to_maturity,
-        steps,
-        as_of,
-        market_context,
-        inputs.volatility,
-    )?;
+    let valuator =
+        ConvertibleBondValuator::new(bond, &inputs, steps, as_of, market_context, model)?;
+    if model == ConvertibleModel::TsiveriotisFernandes {
+        return TsiveriotisFernandesEngine {
+            valuator: &valuator,
+            steps,
+            time_to_maturity: inputs.time_to_maturity,
+            recovery_rate: bond.recovery_rate.unwrap_or(0.0),
+        }
+        .bond_floor();
+    }
     let payment = |step| {
         valuator.coupon_map.get(&step).copied().unwrap_or(0.0)
             + valuator.principal_map.get(&step).copied().unwrap_or(0.0)
@@ -662,6 +738,26 @@ pub fn calculate_convertible_greeks(
     bumps: GreekBumps,
     as_of: Date,
 ) -> Result<ConvertibleGreeks> {
+    calculate_convertible_greeks_with_model(
+        bond,
+        market,
+        bumps,
+        as_of,
+        ConvertibleModel::DefaultableEquity,
+    )
+}
+
+/// Greeks of a convertible bond on the selected credit lattice.
+///
+/// See [`calculate_convertible_greeks`] for the definitions and inputs; every
+/// bumped valuation reprices with `model`.
+pub(crate) fn calculate_convertible_greeks_with_model(
+    bond: &ConvertibleBond,
+    market: &MarketContext,
+    bumps: GreekBumps,
+    as_of: Date,
+    model: ConvertibleModel,
+) -> Result<ConvertibleGreeks> {
     bond.validate_for_pricing()?;
     tree_steps(bond)?;
     for (name, value) in [
@@ -681,7 +777,7 @@ pub fn calculate_convertible_greeks(
     // The base price is computed inline to avoid a second prepare_for_pricing call
     // (which would duplicate cashflow schedule build and market data resolution).
     let inputs = prepare_for_pricing(bond, market, as_of)?;
-    let base_price = price_convertible_bond_with_inputs(bond, market, &inputs, as_of)?;
+    let base_price = price_convertible_bond_with_inputs(bond, market, &inputs, as_of, model)?;
 
     let mut greeks = ConvertibleGreeks {
         price: base_price.amount(),
@@ -693,7 +789,9 @@ pub fn calculate_convertible_greeks(
     };
 
     // ---- Delta & Gamma: bump equity spot (central differences) ----
-    if let Some(bump) = spot_bump_prices(bond, market, &inputs, inputs.spot, bump_pct, as_of)? {
+    if let Some(bump) =
+        spot_bump_prices(bond, market, &inputs, inputs.spot, bump_pct, as_of, model)?
+    {
         greeks.delta = bump.delta();
         greeks.gamma = (bump.price_up - 2.0 * greeks.price + bump.price_down)
             / (bump.spot_bump * bump.spot_bump);
@@ -715,17 +813,19 @@ pub fn calculate_convertible_greeks(
             .instrument_pricing_overrides
             .market_quotes
             .implied_volatility = Some(vol_down);
-        let price_vol_up = price_convertible_bond(&bond_up, market, as_of)?.amount();
-        let price_vol_down = match price_convertible_bond(&bond_down, market, as_of) {
-            Ok(price) => price.amount(),
-            Err(Error::Validation(_)) => {
-                // All other inputs already priced successfully. A lower quote
-                // can violate the lattice's drift/probability constraint.
-                vol_down = inputs.volatility;
-                base_price.amount()
-            }
-            Err(error) => return Err(error),
-        };
+        let price_vol_up =
+            price_convertible_bond_with_model(&bond_up, market, as_of, model)?.amount();
+        let price_vol_down =
+            match price_convertible_bond_with_model(&bond_down, market, as_of, model) {
+                Ok(price) => price.amount(),
+                Err(Error::Validation(_)) => {
+                    // All other inputs already priced successfully. A lower quote
+                    // can violate the lattice's drift/probability constraint.
+                    vol_down = inputs.volatility;
+                    base_price.amount()
+                }
+                Err(error) => return Err(error),
+            };
         let actual_width = vol_up - vol_down;
 
         // Vega per 1% vol move: central difference with actual bump width.
@@ -743,8 +843,10 @@ pub fn calculate_convertible_greeks(
         let market_rate_down =
             bump_discount_curve_parallel(market, &bond.discount_curve_id, -h_rate)?;
 
-        let price_rate_up = price_convertible_bond(bond, &market_rate_up, as_of)?.amount();
-        let price_rate_down = price_convertible_bond(bond, &market_rate_down, as_of)?.amount();
+        let price_rate_up =
+            price_convertible_bond_with_model(bond, &market_rate_up, as_of, model)?.amount();
+        let price_rate_down =
+            price_convertible_bond_with_model(bond, &market_rate_down, as_of, model)?.amount();
 
         // Rho per 1bp: central difference over the 2·h_rate bp width
         greeks.rho = (price_rate_up - price_rate_down) / (2.0 * h_rate);
@@ -764,7 +866,8 @@ pub fn calculate_convertible_greeks(
             // (for example, `ExtrapolationPolicy::None` past the final knot);
             // that error propagates rather than repricing on `t`.
             let rolled_market = market.condition(next_day)?;
-            let fwd_price = price_convertible_bond(bond, &rolled_market, next_day)?;
+            let fwd_price =
+                price_convertible_bond_with_model(bond, &rolled_market, next_day, model)?;
             // Theta = P(t+1d) - P(t), reported as change per calendar day.
             greeks.theta = fwd_price.amount() - greeks.price;
         }
@@ -846,25 +949,20 @@ pub(crate) fn settlement_dirty_price(
     market: &MarketContext,
     as_of: Date,
     present_value: f64,
+    model: ConvertibleModel,
 ) -> Result<f64> {
     let settle = settlement_date(bond, as_of)?;
     if settle == as_of {
         return Ok(present_value);
     }
     let discount = market.get_discount(bond.discount_curve_id.as_str())?;
-    let hazard = bond
-        .credit_curve_id
-        .as_ref()
-        .map(|id| market.get_hazard(id.as_str()))
-        .transpose()?;
     let schedule = build_convertible_schedule(bond, market)?;
     let mut interim = 0.0;
     for cf in schedule.get_flows().iter().filter(|cf| {
         cf.get_date() > as_of && cf.get_date() <= settle && cf.get_kind().is_cash_settlement()
     }) {
-        let survival = conditional_survival(hazard.as_deref(), as_of, cf.get_date())?;
-        interim +=
-            cf.get_amount().amount() * discount.df_between_dates(as_of, cf.get_date())? * survival;
+        let factors = cash_factors(model, bond, market, as_of, cf.get_date())?;
+        interim += cf.get_amount().amount() * factors.df * factors.credit;
     }
     Ok((present_value - interim) / discount.df_between_dates(as_of, settle)?)
 }

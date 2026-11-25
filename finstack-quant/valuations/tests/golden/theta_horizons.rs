@@ -59,6 +59,11 @@ const EXPECTED_FAILURES: &[(&str, &[&str], &str)] = &[
     ("registry/trs_fixed_income_index", &["1M", "6M"], HELD),
     ("registry/range_accrual", &["6M"], HELD),
     (
+        "golden/quantlib/ndf/usdcny_ndf_6m_quantlib",
+        &["6M"],
+        "the 6M roll passes the fixing date; an NDF's observed_fixing is instrument-held and not rolled",
+    ),
+    (
         "golden/quantlib/commodity_asian_option/wti_arithmetic_asian_call_1y_quantlib",
         &["6M"],
         "the 6M roll crosses the July and October fixings; a commodity Asian's past_fixings are instrument-held and not rolled",

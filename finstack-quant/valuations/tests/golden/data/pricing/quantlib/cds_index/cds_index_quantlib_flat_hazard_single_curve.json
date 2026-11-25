@@ -1,0 +1,170 @@
+{
+  "expected": {
+    "dv01": 18.575378565466963,
+    "npv": -57793.8132781625,
+    "par_spread": 87.37589484206777,
+    "premium_leg_pv": 457805.22702512733,
+    "protection_leg_pv": 400011.4137469648,
+    "risky_pv01": 4569.281676165757
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {
+            "calendar": "WeekendsOnly",
+            "discount_rate_continuous": "0.03",
+            "flat_hazard_rate": "0.015",
+            "quantlib_engine": "IsdaCdsEngine",
+            "quantlib_version": "1.43",
+            "schedule_generation": "DateGeneration.CDS"
+          },
+          "tags": [
+            "golden",
+            "quantlib",
+            "cds-index",
+            "flat-hazard",
+            "single-curve"
+          ]
+        },
+        "constituents": [],
+        "convention": "isda_na",
+        "id": "QL-FLAT-HAZARD-CDS-INDEX-5Y-20260105",
+        "include_valuation_date_cashflows": false,
+        "index_factor": 1.0,
+        "index_name": "QL.FLAT.INDEX",
+        "notional": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "num_constituents": 125,
+        "premium_leg": {
+          "calendar_id": "weekends_only",
+          "coupon_bp": "100.0",
+          "date_regime": "standard",
+          "day_count": "act_360",
+          "discount_curve_id": "USD-FLAT-3PCT",
+          "end": "2030-12-20",
+          "frequency": {
+            "count": 3,
+            "unit": "months"
+          },
+          "start": "2025-12-22"
+        },
+        "pricing": "single_curve",
+        "protection_leg": {
+          "credit_curve_id": "QL-INDEX-FLAT-HAZARD",
+          "recovery_rate": 0.4,
+          "settlement_delay": 0
+        },
+        "series": 1,
+        "side": "pay",
+        "valuation_convention": "quant_lib_isda_parity",
+        "version": 1
+      },
+      "type": "cds_index"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "envelope": {
+      "market_data": [],
+      "plan": {
+        "description": "Pre-built deterministic flat curves; no calibration steps required.",
+        "id": "cds_index_quantlib_flat_hazard_single_curve_tier_a_wrap",
+        "quote_sets": {},
+        "settings": {
+          "fx": {
+            "cache_capacity": 256,
+            "pivot_currency": "USD"
+          }
+        },
+        "steps": []
+      },
+      "prior_market": [
+        {
+          "base": "2026-01-05",
+          "currency": null,
+          "day_count": "act_365f",
+          "id": "QL-INDEX-FLAT-HAZARD",
+          "issuer": null,
+          "kind": "hazard_curve",
+          "knot_points": [
+            [
+              10.0,
+              0.015
+            ]
+          ],
+          "recovery_rate": 0.4,
+          "seniority": null
+        },
+        {
+          "base": "2026-01-05",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "fx_policy": null,
+          "id": "USD-FLAT-3PCT",
+          "interp_style": "log_linear",
+          "kind": "discount_curve",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              10.0,
+              0.7408182206817179
+            ]
+          ],
+          "rate_calibration": null
+        }
+      ],
+      "schema": "finstack_quant.calibration/1"
+    },
+    "kind": "envelope"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-07-11",
+    "description": "QuantLib IsdaCdsEngine flat hazard/flat discount CDS index benchmark priced on a single index hazard curve with index factor 1.0.",
+    "domain": "credit.cds_index",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-07-11",
+    "name": "cds_index_quantlib_flat_hazard_single_curve",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product cds_index",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43; CreditDefaultSwap with IsdaCdsEngine(Taylor, HalfDayBias, Piecewise), flat 1.5% Actual/365F index hazard and flat 3% continuous Actual/365F discount curve.",
+    "valuation_date": "2026-01-05"
+  },
+  "model": "hazard_rate",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "dv01": {
+      "abs": 0.1,
+      "tolerance_reason": "QuantLib central finite difference under a 1bp parallel continuous-rate bump with the index hazard curve held fixed; same tolerance as the single-name CDS fixture."
+    },
+    "npv": {
+      "abs": 1.0,
+      "tolerance_reason": "Strict executable QuantLib IsdaCdsEngine decomposition benchmark; same tolerance as the single-name cds_quantlib_flat_hazard_decomposition fixture, which a single-curve index with index_factor 1.0 must reproduce."
+    },
+    "par_spread": {
+      "abs": 0.01,
+      "tolerance_reason": "Strict executable QuantLib IsdaCdsEngine decomposition benchmark; same tolerance as the single-name cds_quantlib_flat_hazard_decomposition fixture, which a single-curve index with index_factor 1.0 must reproduce."
+    },
+    "premium_leg_pv": {
+      "abs": 1.0,
+      "tolerance_reason": "Strict executable QuantLib IsdaCdsEngine decomposition benchmark; same tolerance as the single-name cds_quantlib_flat_hazard_decomposition fixture, which a single-curve index with index_factor 1.0 must reproduce."
+    },
+    "protection_leg_pv": {
+      "abs": 1.0,
+      "tolerance_reason": "Strict executable QuantLib IsdaCdsEngine decomposition benchmark; same tolerance as the single-name cds_quantlib_flat_hazard_decomposition fixture, which a single-curve index with index_factor 1.0 must reproduce."
+    },
+    "risky_pv01": {
+      "abs": 0.1,
+      "tolerance_reason": "Canonical sum of discounted survival-weighted accruals over the QuantLib coupon schedule and flat curves (not an engine output), excluding the accrual-on-default contribution included in QuantLib couponLegNPV; same tolerance as the single-name CDS fixture."
+    }
+  }
+}

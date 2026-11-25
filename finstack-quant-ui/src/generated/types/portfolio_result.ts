@@ -2924,7 +2924,8 @@ export interface D_9Ac3B1Be80F4Eff446Fb {
     | "rough_heston_fourier"
     | "pde_crank_nicolson_1d"
     | "pde_adi_2d"
-    | "bloomberg_cdso";
+    | "bloomberg_cdso"
+    | "tsiveriotis_fernandes";
   requested_as_of: Date2;
   /**
    * Scenario price shock already applied to `value`, as a decimal
@@ -3310,7 +3311,8 @@ export interface DB613C7Ee220C23Ada4E9 {
     | "rough_heston_fourier"
     | "pde_crank_nicolson_1d"
     | "pde_adi_2d"
-    | "bloomberg_cdso";
+    | "bloomberg_cdso"
+    | "tsiveriotis_fernandes";
 }
 /**
  * Stochastic pricing result for a structured credit deal.
@@ -5490,7 +5492,8 @@ export interface DAdb505B22Deadbdfe62E {
     | "rough_heston_fourier"
     | "pde_crank_nicolson_1d"
     | "pde_adi_2d"
-    | "bloomberg_cdso";
+    | "bloomberg_cdso"
+    | "tsiveriotis_fernandes";
   /**
    * Deterministic random seed used for the run.
    */

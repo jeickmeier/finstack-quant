@@ -6,9 +6,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::{Error, Result};
 
+use super::engine::{ConvertibleModel, PricingInputs};
 use crate::convertible::ConvertibleBond;
 use crate::{ConversionEvent, ConversionPolicy, PriceTrigger};
-use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::math::time_grid::map_date_to_step;
 
 /// Contractual debt events and exercise decisions for the defaultable-equity tree.
@@ -73,15 +73,21 @@ impl ConvertibleBondValuator {
     ///
     /// Unlike the flat-rate approach, this extracts per-step discount factors from the
     /// risk-free and credit curves, capturing the full shape of the yield curve.
+    ///
+    /// `model` decides how a payment moved onto the lattice grid keeps its
+    /// present value: by survival and recovery on the defaultable-equity
+    /// lattice, by the credit spread on the Tsiveriotis-Fernandes one.
     pub(super) fn new(
         bond: &ConvertibleBond,
-        cashflow_schedule: &CashFlowSchedule,
-        time_to_maturity: f64,
+        inputs: &PricingInputs,
         steps: usize,
         base_date: Date,
         market_context: &MarketContext,
-        volatility: f64,
+        model: ConvertibleModel,
     ) -> Result<Self> {
+        let cashflow_schedule = &inputs.cashflow_schedule;
+        let time_to_maturity = inputs.time_to_maturity;
+        let volatility = inputs.volatility;
         // Use effective conversion ratio (includes anti-dilution adjustments)
         let conversion_ratio = bond.effective_conversion_ratio().ok_or_else(|| {
             Error::Internal("convertible tree pricer requires effective conversion ratio".into())
@@ -114,6 +120,17 @@ impl ConvertibleBondValuator {
         let survival_between = |start: Date, end: Date| {
             super::engine::conditional_survival(hazard.as_deref(), start, end)
         };
+        // Credit discount of a cash payment between two dates: survival on
+        // the defaultable-equity lattice, the spread factor
+        // `survival^(1 - recovery)` on the Tsiveriotis-Fernandes one.
+        let loss_given_default = 1.0 - bond.recovery_rate.unwrap_or(0.0);
+        let credit_discount = |start: Date, end: Date| -> Result<f64> {
+            let survival = survival_between(start, end)?;
+            Ok(match model {
+                ConvertibleModel::DefaultableEquity => survival,
+                ConvertibleModel::TsiveriotisFernandes => survival.powf(loss_given_default),
+            })
+        };
         let mut coupon_map: FxHashMap<usize, f64> = FxHashMap::default();
         let mut principal_map: FxHashMap<usize, f64> = FxHashMap::default();
         for cf in cashflow_schedule.get_flows() {
@@ -131,24 +148,26 @@ impl ConvertibleBondValuator {
             // Preserve the contractual payment PV when a date is rounded onto
             // the equity grid, including final coupons paid after maturity.
             let correction = rf_curve.df_between_dates(base_date, cf.get_date())?
-                * survival_between(base_date, cf.get_date())?
+                * credit_discount(base_date, cf.get_date())?
                 / (rf_curve.df_between_dates(base_date, step_dates[step])?
-                    * survival_between(base_date, step_dates[step])?);
+                    * credit_discount(base_date, step_dates[step])?);
             let target = if cf.get_kind().is_principal_like() {
                 &mut principal_map
             } else {
                 &mut coupon_map
             };
-            let tail_recovery =
-                if cf.get_kind().is_principal_like() && cf.get_date() > bond.maturity {
-                    bond.recovery_rate.unwrap_or(0.0)
-                        * crate::rates_credit::continuous_frp_weight(
-                            rf_curve.df_between_dates(bond.maturity, cf.get_date())?,
-                            survival_between(bond.maturity, cf.get_date())?,
-                        )?
-                } else {
-                    0.0
-                };
+            let tail_recovery = if model == ConvertibleModel::DefaultableEquity
+                && cf.get_kind().is_principal_like()
+                && cf.get_date() > bond.maturity
+            {
+                bond.recovery_rate.unwrap_or(0.0)
+                    * crate::rates_credit::continuous_frp_weight(
+                        rf_curve.df_between_dates(bond.maturity, cf.get_date())?,
+                        survival_between(bond.maturity, cf.get_date())?,
+                    )?
+            } else {
+                0.0
+            };
             *target.entry(step).or_insert(0.0) +=
                 cf.get_amount().amount() * (correction + tail_recovery);
         }

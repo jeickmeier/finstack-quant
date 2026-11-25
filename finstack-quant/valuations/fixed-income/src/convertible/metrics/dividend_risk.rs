@@ -10,7 +10,6 @@
 use crate::convertible::ConvertibleBond;
 use finstack_quant_core::Result;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
-use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{
     MetricCalculator, MetricContext, replace_scalar_value, scalar_numeric_value,
     scaled_central_diff_by_width,
@@ -42,7 +41,7 @@ impl MetricCalculator for DividendRiskCalculator {
             current_scalar,
             q_up_val,
         )?;
-        let pv_up = convertible.value(&curves_up, as_of)?.amount();
+        let pv_up = super::model::model_value(context, convertible, &curves_up, as_of)?;
 
         let curves_down = replace_scalar_value(
             &context.curves,
@@ -50,7 +49,7 @@ impl MetricCalculator for DividendRiskCalculator {
             current_scalar,
             q_down_val,
         )?;
-        let pv_down = convertible.value(&curves_down, as_of)?.amount();
+        let pv_down = super::model::model_value(context, convertible, &curves_down, as_of)?;
 
         // MetricId contract: Dividend01 is $/bp (dPV for a 1bp absolute q move).
         // Use the *actual* bump width since the downside bump is clamped at 0;

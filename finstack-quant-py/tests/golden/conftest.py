@@ -89,6 +89,15 @@ class UnresolvedMetric:
 
 
 _DOMAIN_RUNNERS = {
+    "commodity.commodity_swaption": "pricing_common",
+    "credit.cds_index": "pricing_common",
+    "fx.ndf": "pricing_common",
+    "rates.basis_swap": "pricing_common",
+    "rates.xccy_swap": "pricing_common",
+    "rates.yoy_inflation_swap": "pricing_common",
+    "rates.inflation_cap_floor": "pricing_common",
+    "rates.cms_swap": "pricing_common",
+    "rates.cms_spread_option": "pricing_common",
     "commodity.commodity_asian_option": "pricing_common",
     "commodity.commodity_spot_option": "pricing_common",
     "commodity.commodity_spread_option": "pricing_common",

@@ -87,7 +87,7 @@ want it; domain-specific numerics (stochastic processes, payoffs) belong in
 | `math::summation` | `kahan_sum`, `neumaier_sum`, `NeumaierAccumulator`. |
 | `math::special_functions` | `norm_cdf`, `norm_pdf`, `erf`, `ln_gamma`, `standard_normal_inv_cdf`, Student-t CDF/inverse. |
 | `math::linalg` | Cholesky (`cholesky_decomposition`, `cholesky_correlation`), `symmetric_eigen`, correlation-matrix construction and validation. |
-| `math::interp` | `Interpolator`, `InterpStyle`, `ExtrapolationPolicy`, `ValidationPolicy` and the strategies (`LinearStrategy`, `LogLinearStrategy`, `CubicHermiteStrategy`, `MonotoneConvexStrategy`, `PiecewiseQuadraticForwardStrategy`). |
+| `math::interp` | `Interpolator`, `InterpStyle`, `ExtrapolationPolicy` and the strategies (`LinearStrategy`, `LogLinearStrategy`, `CubicHermiteStrategy`, `MonotoneConvexStrategy`, `PiecewiseQuadraticForwardStrategy`). |
 | `math::solver` / `math::solver_multi` | `BrentSolver` and `LevenbergMarquardtSolver` for root finding and least-squares calibration. |
 | `math::integration` | Gauss-Legendre (fixed, composite, adaptive), Gauss-Hermite. |
 | `math::random` | `Pcg64Rng`, `RandomNumberGenerator`, `SobolRng` (up to `MAX_SOBOL_DIMENSION` = 40), `BrownianBridge`, Poisson inversion, `box_muller`. |
