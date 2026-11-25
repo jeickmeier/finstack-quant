@@ -264,7 +264,7 @@
           "metric": "embedded_option_value",
           "value": {
             "ok": true,
-            "value": -84125.97062133625
+            "value": -84125.97062134184
           }
         },
         {
@@ -822,7 +822,7 @@
           "metric": "embedded_option_value",
           "value": {
             "ok": true,
-            "value": -1602282.591698056
+            "value": -1602282.591698058
           }
         },
         {
@@ -1489,42 +1489,42 @@
           "metric": "ytm",
           "value": {
             "ok": true,
-            "value": 0.04285546530372347
+            "value": 0.04285894479010053
           }
         },
         {
           "metric": "ytw",
           "value": {
             "ok": true,
-            "value": 0.04285546530372347
+            "value": 0.04285894479010053
           }
         },
         {
           "metric": "ytc",
           "value": {
             "ok": true,
-            "value": 0.04285546530372347
+            "value": 0.04285894479010053
           }
         },
         {
           "metric": "yt2y",
           "value": {
             "ok": true,
-            "value": 0.024236684280374354
+            "value": 0.024243637897822645
           }
         },
         {
           "metric": "yt3y",
           "value": {
             "ok": true,
-            "value": 0.0346179152406951
+            "value": 0.03462294167962073
           }
         },
         {
           "metric": "yt4y",
           "value": {
             "ok": true,
-            "value": 0.039773972414133114
+            "value": 0.03977803341504815
           }
         },
         {
@@ -1570,14 +1570,14 @@
           "metric": "recovery01",
           "value": {
             "ok": true,
-            "value": 7109.563406300085
+            "value": 7109.563406300551
           }
         },
         {
           "metric": "jump_to_default",
           "value": {
             "ok": true,
-            "value": -648814.7906242692
+            "value": -648686.801779956
           }
         }
       ]

@@ -2353,6 +2353,8 @@
         "funding_cost",
         "hvar",
         "inflation01",
+        "inflation_convexity",
+        "par_rate",
         "pull_to_par",
         "roll_down",
         "theta",

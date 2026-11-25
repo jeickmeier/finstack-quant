@@ -1744,15 +1744,15 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/loan-yield/cases.json",
-      "sha256": "0f0fe068d19255ac9de6b7e2e44342cfb1a4b750e8cdc2a9385fee8bcee14ecc"
+      "sha256": "93c6bdcbdff86c34853e6df410f395b1f81e2c0768532b43cfa181d73a0fd79a"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/bond-credit/cases.json",
-      "sha256": "d15867cca19ab6b2605d82dc21b94dd2d32b5b9add1096d64fdb6583bb8e2bbb"
+      "sha256": "72bafcd3cfffca1828eb7e58de06a7248f9faa25788b940da9148b1b65abd3ef"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/convertible/cases.json",
-      "sha256": "737282afda8a4191b96283ad17eeeb3a444c31eaf7f9e92834261bdbeec1d550"
+      "sha256": "5849caf4be57d1ac929cf77c38a2ff8a4723e5ba75dec4a1e6c6c28fc874c976"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/workout-ladder/cases.json",
@@ -1760,7 +1760,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/quote-converter/cases.json",
-      "sha256": "780ba26fe1818a0f947bfff6bf568bcdb915ded6400066634b3eb303179e3079"
+      "sha256": "b317196569b61d59c0dec7807f635e0de105ad780a51d58dc07577bb32f63abc"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/application/cases.json",
