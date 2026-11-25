@@ -1,0 +1,226 @@
+{
+  "expected": {
+    "dv01": -16.828216271140263,
+    "npv": 66385.98071142467
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "allow_calendar_fallback": false,
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "id": "USDEUR-XCCY-5Y-QUANTLIB",
+        "leg1": {
+          "leg": {
+            "business_day_convention": "unadjusted",
+            "calendar_id": "weekends_only",
+            "compounding": "simple",
+            "day_count": "act_360",
+            "discount_curve_id": "USD-OIS",
+            "end": "2031-05-06",
+            "end_of_month": false,
+            "fixing_calendar_id": null,
+            "forward_curve_id": "USD-TERM-3M",
+            "frequency": {
+              "count": 3,
+              "unit": "months"
+            },
+            "index_id": "USD-TERM-3M",
+            "payment_lag_days": 0,
+            "reset_lag_days": 0,
+            "spread_bp": "0",
+            "start": "2026-05-06",
+            "stub": "none"
+          },
+          "notional": {
+            "amount": "10000000",
+            "currency": "USD"
+          },
+          "side": "receive"
+        },
+        "leg2": {
+          "leg": {
+            "business_day_convention": "unadjusted",
+            "calendar_id": "weekends_only",
+            "compounding": "simple",
+            "day_count": "act_360",
+            "discount_curve_id": "EUR-OIS",
+            "end": "2031-05-06",
+            "end_of_month": false,
+            "fixing_calendar_id": null,
+            "forward_curve_id": "EUR-TERM-3M",
+            "frequency": {
+              "count": 3,
+              "unit": "months"
+            },
+            "index_id": "EUR-TERM-3M",
+            "payment_lag_days": 0,
+            "reset_lag_days": 0,
+            "spread_bp": "-15",
+            "start": "2026-05-06",
+            "stub": "none"
+          },
+          "notional": {
+            "amount": "9000000",
+            "currency": "EUR"
+          },
+          "side": "pay"
+        },
+        "notional_exchange": "initial_and_final",
+        "reporting_currency": "USD"
+      },
+      "type": "xccy_swap"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        },
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "EUR-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.5488116360940264
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        },
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-TERM-3M",
+          "index_tenor": {
+            "count": 3,
+            "unit": "months"
+          },
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.2752707830897524
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "forward"
+        },
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "EUR-TERM-3M",
+          "index_tenor": {
+            "count": 3,
+            "unit": "months"
+          },
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.5015760690660556
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "forward"
+        }
+      ],
+      "dividends": [],
+      "fx": {
+        "config": {
+          "cache_capacity": 256,
+          "pivot_currency": "USD"
+        },
+        "pinned_quotes": [],
+        "provider_pinned_quotes": [],
+        "provider_quotes": [],
+        "quotes": [
+          [
+            "EUR",
+            "USD",
+            1.1
+          ]
+        ]
+      },
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {},
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-23",
+    "description": "Five-year receive-USD pay-EUR float-float cross-currency swap with initial and final notional exchange, valued on QuantLib legs.",
+    "domain": "rates.xccy_swap",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-23",
+    "name": "usdeur_xccy_swap_5y_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product xccy_swap",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43 has no generic cross-currency swap instrument. QuantLib parts: each currency's IborLeg coupons plus SimpleCashFlow notional exchanges, valued by CashFlows.npv on that currency's flat continuous Act/365F discount curve (USD discount 0.04, projection 0.043; EUR discount 0.02, projection 0.023). Generator arithmetic: NPV = USD leg NPV - 1.1 * EUR leg NPV (receive USD 10000000 flat, pay EUR 9000000 -15.0 bp, spot conversion), and dv01 as the 1 bp central difference with all four curves shifted together.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "dv01": {
+      "abs": 1e-07,
+      "tolerance_reason": "Both engines discount the same simple Act/360 forwards and notional exchanges on exactly aligned unadjusted schedules and convert the EUR leg at the same spot; only floating-point residual remains."
+    },
+    "npv": {
+      "abs": 1e-07,
+      "tolerance_reason": "Both engines discount the same simple Act/360 forwards and notional exchanges on exactly aligned unadjusted schedules and convert the EUR leg at the same spot; only floating-point residual remains."
+    }
+  }
+}

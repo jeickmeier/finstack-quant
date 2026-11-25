@@ -1,0 +1,416 @@
+{
+  "expected": {
+    "dv01": -53.93755817314377,
+    "inflation01": 4446.532578562386,
+    "npv": 107816.03456745064,
+    "par_rate": 0.024898441652104752
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "base_cpi": null,
+        "business_day_convention": "modified_following",
+        "calendar_id": "weekends_only",
+        "day_count": "one_one",
+        "discount_curve_id": "USD-OIS",
+        "fixed_rate": "0.0225",
+        "id": "USD-ZC-INFLATION-SWAP-5Y-QUANTLIB",
+        "inflation_index_id": "US-CPI",
+        "interpolation": "linear",
+        "lag": {
+          "months": 3
+        },
+        "maturity": "2031-04-30",
+        "notional": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "side": "pay",
+        "start_date": "2026-04-30"
+      },
+      "type": "inflation_swap"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        },
+        {
+          "base_date": "2026-03-01",
+          "day_count": "act_365f",
+          "extrapolation": "flat",
+          "id": "US-CPI",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              300.0
+            ],
+            [
+              0.08493150684931507,
+              300.6298144251267
+            ],
+            [
+              0.16712328767123288,
+              301.2405711577102
+            ],
+            [
+              0.25205479452054796,
+              301.872990014872
+            ],
+            [
+              0.33424657534246577,
+              302.48627237141153
+            ],
+            [
+              0.4191780821917808,
+              303.12130643055264
+            ],
+            [
+              0.5041095890410959,
+              303.7576736683967
+            ],
+            [
+              0.5863013698630137,
+              304.37478493070324
+            ],
+            [
+              0.6712328767123288,
+              305.0137836980173
+            ],
+            [
+              0.7534246575342466,
+              305.63344686176754
+            ],
+            [
+              0.8383561643835616,
+              306.27508804055
+            ],
+            [
+              0.9232876712328767,
+              306.9180762688997
+            ],
+            [
+              1.0,
+              307.5
+            ],
+            [
+              1.084931506849315,
+              308.14555978575487
+            ],
+            [
+              1.167123287671233,
+              308.7715854366529
+            ],
+            [
+              1.252054794520548,
+              309.41981476524376
+            ],
+            [
+              1.3342465753424657,
+              310.0484291806968
+            ],
+            [
+              1.4191780821917808,
+              310.69933909131646
+            ],
+            [
+              1.5041095890410958,
+              311.3516155101066
+            ],
+            [
+              1.5863013698630137,
+              311.98415455397077
+            ],
+            [
+              1.6712328767123288,
+              312.6391282904676
+            ],
+            [
+              1.7534246575342465,
+              313.2742830333117
+            ],
+            [
+              1.8383561643835618,
+              313.9319652415638
+            ],
+            [
+              1.9232876712328768,
+              314.5910281756221
+            ],
+            [
+              2.0027397260273974,
+              315.20882346875044
+            ],
+            [
+              2.0876712328767124,
+              315.8705670152433
+            ],
+            [
+              2.16986301369863,
+              316.5122867189208
+            ],
+            [
+              2.254794520547945,
+              317.17676673193887
+            ],
+            [
+              2.336986301369863,
+              317.82114009880206
+            ],
+            [
+              2.421917808219178,
+              318.4883678942836
+            ],
+            [
+              2.506849315068493,
+              319.1569964553999
+            ],
+            [
+              2.589041095890411,
+              319.8053928385364
+            ],
+            [
+              2.673972602739726,
+              320.47678633734654
+            ],
+            [
+              2.756164383561644,
+              321.127863993322
+            ],
+            [
+              2.841095890410959,
+              321.8020338634991
+            ],
+            [
+              2.926027397260274,
+              322.4776190733736
+            ],
+            [
+              3.0027397260273974,
+              323.0890440554692
+            ],
+            [
+              3.0876712328767124,
+              323.76733119062436
+            ],
+            [
+              3.16986301369863,
+              324.4250938868938
+            ],
+            [
+              3.254794520547945,
+              325.10618590023734
+            ],
+            [
+              3.336986301369863,
+              325.76666860127216
+            ],
+            [
+              3.421917808219178,
+              326.4505770916407
+            ],
+            [
+              3.506849315068493,
+              327.1359213667849
+            ],
+            [
+              3.589041095890411,
+              327.80052765949983
+            ],
+            [
+              3.673972602739726,
+              328.48870599578015
+            ],
+            [
+              3.756164383561644,
+              329.15606059315496
+            ],
+            [
+              3.841095890410959,
+              329.84708471008656
+            ],
+            [
+              3.926027397260274,
+              330.5395595502079
+            ],
+            [
+              4.002739726027397,
+              331.1662701568559
+            ],
+            [
+              4.087671232876712,
+              331.8615144703899
+            ],
+            [
+              4.16986301369863,
+              332.5357212340661
+            ],
+            [
+              4.254794520547946,
+              333.2338405477432
+            ],
+            [
+              4.336986301369863,
+              333.9108353163039
+            ],
+            [
+              4.421917808219178,
+              334.61184151893167
+            ],
+            [
+              4.506849315068493,
+              335.3143194009545
+            ],
+            [
+              4.589041095890411,
+              335.99554085098725
+            ],
+            [
+              4.673972602739726,
+              336.7009236456746
+            ],
+            [
+              4.756164383561644,
+              337.3849621079839
+            ],
+            [
+              4.841095890410959,
+              338.0932618278387
+            ],
+            [
+              4.926027397260274,
+              338.8030485389631
+            ],
+            [
+              5.002739726027397,
+              339.44542691077726
+            ],
+            [
+              5.087671232876712,
+              340.1580523321496
+            ],
+            [
+              5.16986301369863,
+              340.84911426491766
+            ],
+            [
+              5.254794520547946,
+              341.56468656143676
+            ]
+          ],
+          "type": "inflation"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [
+        {
+          "currency": "USD",
+          "expected_releases": [
+            {
+              "expected_release": "2031-02-15",
+              "known_on": "2026-04-30",
+              "reference_month": "2031-01-01"
+            },
+            {
+              "expected_release": "2031-03-15",
+              "known_on": "2026-04-30",
+              "reference_month": "2031-02-01"
+            }
+          ],
+          "id": "US-CPI",
+          "knowledge_date": "2026-04-30",
+          "observations": [
+            {
+              "available_on": "2026-02-13",
+              "reference_month": "2026-01-01",
+              "value": 299.0
+            },
+            {
+              "available_on": "2026-03-13",
+              "reference_month": "2026-02-01",
+              "value": 299.6
+            },
+            {
+              "available_on": "2026-04-14",
+              "reference_month": "2026-03-01",
+              "value": 300.0
+            }
+          ]
+        }
+      ],
+      "prices": {},
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-24",
+    "description": "QuantLib native 5Y pay-fixed zero-coupon inflation swap on flat nominal and zero-inflation curves.",
+    "domain": "rates.inflation_swap",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-24",
+    "name": "usd_zc_inflation_swap_5y_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product zero_coupon_inflation_swap",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43 ZeroCouponInflationSwap with DiscountingSwapEngine on a flat Act/365F continuous nominal curve and a flat annually compounded Act/365F ZeroInflationCurve based on the March 2026 fixing. Three-month lag and CPI.Linear interpolation; the start reference index comes from the published January and February 2026 fixings. The Finstack inflation curve knots are QuantLib's projected monthly index fixings. DV01 and Inflation01 are central one-basis-point differences of the QuantLib NPV in the nominal zero rate and the zero-inflation rate.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "dv01": {
+      "rel": 1e-09,
+      "tolerance_reason": "QuantLib native ZeroCouponInflationSwap and Finstack discount the same two bullet cash flows off identical monthly CPI levels; tolerance allows only cross-engine floating-point residual."
+    },
+    "inflation01": {
+      "rel": 1e-09,
+      "tolerance_reason": "QuantLib native ZeroCouponInflationSwap and Finstack discount the same two bullet cash flows off identical monthly CPI levels; tolerance allows only cross-engine floating-point residual."
+    },
+    "npv": {
+      "rel": 1e-09,
+      "tolerance_reason": "QuantLib native ZeroCouponInflationSwap and Finstack discount the same two bullet cash flows off identical monthly CPI levels; tolerance allows only cross-engine floating-point residual."
+    },
+    "par_rate": {
+      "rel": 1e-09,
+      "tolerance_reason": "QuantLib native ZeroCouponInflationSwap and Finstack discount the same two bullet cash flows off identical monthly CPI levels; tolerance allows only cross-engine floating-point residual."
+    }
+  }
+}

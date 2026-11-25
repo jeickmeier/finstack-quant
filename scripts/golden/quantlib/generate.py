@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .attribution import build_bond_fixture, build_fx_forward_fixture, build_irs_fixture
+from .basis import build_basis_swap, build_xccy_swap
 from .bonds import (
     build_fixed_callable_oas_bond,
     build_fixed_hazard_bond,
@@ -22,8 +23,11 @@ from .commodity import (
     build_commodity_spread_call,
     build_commodity_spread_put,
 )
+from .commodity_swaption import build_commodity_swaption_call, build_commodity_swaption_put
 from .common import require_supported_quantlib, write_or_check
+from .convertible import build_zero_coupon_convertible
 from .credit import build_single_name_cds
+from .credit_index import build_cds_index
 from .deposits import build_deposit
 from .fx import build_fx_forward
 from .fx_exotics import (
@@ -34,6 +38,13 @@ from .fx_exotics import (
     build_quanto_option,
 )
 from .fx_touch import build_fx_no_touch, build_fx_one_touch_at_expiry, build_fx_one_touch_at_hit
+from .inflation import (
+    build_yoy_inflation_cap_black,
+    build_yoy_inflation_floor_normal,
+    build_yoy_inflation_swap,
+    build_zero_coupon_inflation_swap,
+)
+from .ndf import build_ndf
 from .options import (
     build_arithmetic_asian_option,
     build_barrier_option,
@@ -192,6 +203,50 @@ PRODUCTS: dict[str, tuple[str, Callable[[], dict[str, Any]]]] = {
     "equity_future": (
         "equity_future/spx_future_3m_quantlib.json",
         build_equity_future,
+    ),
+    "basis_swap": (
+        "basis_swap/usd_basis_swap_1m3m_5y_quantlib.json",
+        build_basis_swap,
+    ),
+    "xccy_swap": (
+        "xccy_swap/usdeur_xccy_swap_5y_quantlib.json",
+        build_xccy_swap,
+    ),
+    "cds_index": (
+        "cds_index/cds_index_quantlib_flat_hazard_single_curve.json",
+        build_cds_index,
+    ),
+    "commodity_swaption_call": (
+        "commodity_swaption/wti_swaption_black76_call_6m_quantlib.json",
+        build_commodity_swaption_call,
+    ),
+    "commodity_swaption_put": (
+        "commodity_swaption/wti_swaption_black76_put_6m_quantlib.json",
+        build_commodity_swaption_put,
+    ),
+    "ndf": (
+        "ndf/usdcny_ndf_6m_quantlib.json",
+        build_ndf,
+    ),
+    "convertible_zero_coupon": (
+        "convertible/usd_convertible_zero_coupon_3y_quantlib.json",
+        build_zero_coupon_convertible,
+    ),
+    "zero_coupon_inflation_swap": (
+        "inflation_swap/usd_zc_inflation_swap_5y_quantlib.json",
+        build_zero_coupon_inflation_swap,
+    ),
+    "yoy_inflation_swap": (
+        "yoy_inflation_swap/usd_yoy_inflation_swap_3y_quantlib.json",
+        build_yoy_inflation_swap,
+    ),
+    "yoy_inflation_cap_black": (
+        "inflation_cap_floor/usd_yoy_inflation_cap_black_quantlib.json",
+        build_yoy_inflation_cap_black,
+    ),
+    "yoy_inflation_floor_normal": (
+        "inflation_cap_floor/usd_yoy_inflation_floor_normal_quantlib.json",
+        build_yoy_inflation_floor_normal,
     ),
     "quanto_option": (
         "quanto_option/nky_usd_quanto_call_1y_quantlib.json",
