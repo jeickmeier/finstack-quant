@@ -34,6 +34,7 @@ from .convertible import (
 from .credit import build_single_name_cds
 from .credit_index import build_cds_index
 from .deposits import build_deposit
+from .future_options import FUTURE_OPTION_BUILDERS
 from .fx import build_fx_forward
 from .fx_exotics import (
     build_fx_barrier_option,
@@ -291,6 +292,7 @@ PRODUCTS: dict[str, tuple[str, Callable[[], dict[str, Any]]]] = {
         build_floating_lookback_option,
     ),
     **LINEAR_BUILDERS,
+    **FUTURE_OPTION_BUILDERS,
 }
 DEFERRED_PRODUCTS: dict[str, tuple[str, Callable[[], dict[str, Any]]]] = {
     "irs": ("irs/usd_sofr_5y_quantlib.json", build_irs),

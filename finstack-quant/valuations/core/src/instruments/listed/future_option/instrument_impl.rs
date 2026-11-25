@@ -181,6 +181,32 @@ macro_rules! impl_future_option_instrument {
                 Some(self.terms.settlement.terminal_date())
             }
 
+            /// Record the expiry observation a theta roll reaches.
+            ///
+            /// Theta holds the market fixed, and the futures price is a
+            /// quote on the instrument, so an option whose expiry lies in
+            /// `(as_of, rolled_date]` with no recorded exercise expires at
+            /// its quoted `terms.futures_price`.
+            ///
+            /// # Arguments
+            /// * `market` - Market at `as_of`; not read, the held price is on the instrument.
+            /// * `as_of` - Valuation date the roll starts from.
+            /// * `rolled_date` - Date theta reprices at.
+            fn theta_observed_state(
+                &self,
+                market: &finstack_quant_core::market_data::context::MarketContext,
+                as_of: finstack_quant_core::dates::Date,
+                rolled_date: finstack_quant_core::dates::Date,
+            ) -> finstack_quant_core::Result<Option<Box<dyn $crate::instruments::Instrument>>> {
+                let _ = market;
+                let Some(terms) = self.terms.expired_over_roll(as_of, rolled_date)? else {
+                    return Ok(None);
+                };
+                let mut observed = self.clone();
+                observed.terms = terms;
+                Ok(Some(Box::new(observed)))
+            }
+
             $crate::impl_focused_pricing_overrides!();
         }
 

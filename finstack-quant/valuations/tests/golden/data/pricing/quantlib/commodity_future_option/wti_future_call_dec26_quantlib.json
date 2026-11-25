@@ -1,0 +1,112 @@
+{
+  "expected": {
+    "delta": 23818.525285589716,
+    "npv": 317018.72461643355
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "id": "WTI-FUTURE-CALL-DEC26-QUANTLIB",
+        "instrument_pricing_overrides": {
+          "market_quotes": {
+            "implied_volatility": 0.32
+          }
+        },
+        "terms": {
+          "contracts": 50.0,
+          "currency": "USD",
+          "day_count": "act_365f",
+          "discount_curve_id": "USD-OIS",
+          "exercise_style": "european",
+          "expiry": "2026-11-17",
+          "futures_price": 82.0,
+          "model": "black76",
+          "multiplier": 1000.0,
+          "option_type": "call",
+          "position": "long",
+          "premium_style": "premium_paid",
+          "settlement": {
+            "payment_date": "2026-11-17",
+            "type": "cash"
+          },
+          "strike": 85.0,
+          "underlying": "WTI_FUTURE_CALL_DEC26_QUANTLIB-UNDERLYING"
+        }
+      },
+      "type": "commodity_future_option"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {},
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-24",
+    "description": "European Black-76 call on a crude oil future, premium paid at expiry.",
+    "domain": "commodity.commodity_future_option",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-24",
+    "name": "wti_future_call_dec26_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product commodity_future_option",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43 blackFormula: F = 82.0, K = 85.0, volatility 0.32, Act/365F time 0.5506849315068493 to 2026-11-17; premium discounted from 2026-11-17 on a FlatForward curve (continuous Act/365F, 0.04); long 50 contracts, multiplier 1000.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "delta": {
+      "rel": 1e-09,
+      "tolerance_reason": "Central difference of the QuantLib price over the futures-price bump Finstack defines for this sensitivity (1% relative for delta, 0.01% for the delta inside DV01); only the closed-form residual remains."
+    },
+    "npv": {
+      "rel": 1e-09,
+      "tolerance_reason": "QuantLib blackFormula and Finstack evaluate the same closed form on the same futures price, strike, volatility and Act/365F expiry time; the residual is the normal-distribution implementation."
+    }
+  }
+}

@@ -65,6 +65,11 @@ fn is_pricing_domain(domain: &str) -> bool {
             | "listed.volatility_index_future"
             | "fx.fx_spot"
             | "rates.repo"
+            | "commodity.commodity_future_option"
+            | "listed.equity_future_option"
+            | "listed.fx_future_option"
+            | "listed.volatility_index_future_option"
+            | "rates.interest_rate_future_option"
     )
 }
 

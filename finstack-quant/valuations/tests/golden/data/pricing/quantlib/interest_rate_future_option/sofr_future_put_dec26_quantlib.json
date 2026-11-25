@@ -1,0 +1,118 @@
+{
+  "expected": {
+    "delta": -95305.40569576187,
+    "dv01": 860.9975374640319,
+    "npv": 38953.98152323407
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "id": "SOFR-FUTURE-PUT-DEC26-QUANTLIB",
+        "instrument_pricing_overrides": {
+          "market_quotes": {
+            "implied_volatility": 0.85
+          }
+        },
+        "terms": {
+          "contracts": 100.0,
+          "currency": "USD",
+          "day_count": "act_365f",
+          "discount_curve_id": "USD-OIS",
+          "exercise_style": "european",
+          "expiry": "2026-12-11",
+          "futures_price": 96.25,
+          "model": "normal",
+          "multiplier": 2500.0,
+          "option_type": "put",
+          "position": "long",
+          "premium_style": "premium_paid",
+          "settlement": {
+            "payment_date": "2026-12-11",
+            "type": "cash"
+          },
+          "strike": 96.0,
+          "underlying": "SOFR_FUTURE_PUT_DEC26_QUANTLIB-UNDERLYING",
+          "underlying_price_change_per_bp": -0.01
+        }
+      },
+      "type": "interest_rate_future_option"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {},
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-24",
+    "description": "European Bachelier put on a three-month rate future, premium paid at expiry.",
+    "domain": "rates.interest_rate_future_option",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-24",
+    "name": "sofr_future_put_dec26_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product interest_rate_future_option",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43 bachelierBlackFormula: F = 96.25, K = 96.0, volatility 0.85, Act/365F time 0.6164383561643836 to 2026-12-11; premium discounted from 2026-12-11 on a FlatForward curve (continuous Act/365F, 0.04); long 100 contracts, multiplier 2500.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "delta": {
+      "rel": 1e-09,
+      "tolerance_reason": "Central difference of the QuantLib price over the futures-price bump Finstack defines for this sensitivity (1% relative for delta, 0.01% for the delta inside DV01); only the closed-form residual remains."
+    },
+    "dv01": {
+      "rel": 1e-09,
+      "tolerance_reason": "Central difference of the QuantLib price over the futures-price bump Finstack defines for this sensitivity (1% relative for delta, 0.01% for the delta inside DV01); only the closed-form residual remains."
+    },
+    "npv": {
+      "rel": 1e-09,
+      "tolerance_reason": "QuantLib bachelierBlackFormula and Finstack evaluate the same closed form on the same futures price, strike, volatility and Act/365F expiry time; the residual is the normal-distribution implementation."
+    }
+  }
+}

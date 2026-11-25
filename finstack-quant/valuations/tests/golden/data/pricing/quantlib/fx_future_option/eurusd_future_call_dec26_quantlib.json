@@ -1,0 +1,113 @@
+{
+  "expected": {
+    "delta": 2100013.2501034467,
+    "npv": 32632.046540622578
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "id": "EURUSD-FUTURE-CALL-DEC26-QUANTLIB",
+        "instrument_pricing_overrides": {
+          "market_quotes": {
+            "implied_volatility": 0.075
+          }
+        },
+        "terms": {
+          "contracts": 40.0,
+          "currency": "USD",
+          "day_count": "act_365f",
+          "discount_curve_id": "USD-OIS",
+          "exercise_style": "european",
+          "expiry": "2026-12-04",
+          "futures_price": 1.11,
+          "model": "black76",
+          "multiplier": 125000.0,
+          "option_reference_price": 0.0125,
+          "option_type": "call",
+          "position": "long",
+          "premium_style": "futures_style",
+          "settlement": {
+            "payment_date": "2026-12-04",
+            "type": "cash"
+          },
+          "strike": 1.125,
+          "underlying": "EURUSD_FUTURE_CALL_DEC26_QUANTLIB-UNDERLYING"
+        }
+      },
+      "type": "fx_future_option"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {},
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-24",
+    "description": "European Black-76 call on a EUR/USD future with futures-style premium margining.",
+    "domain": "listed.fx_future_option",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-24",
+    "name": "eurusd_future_call_dec26_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product fx_future_option",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43 blackFormula: F = 1.11, K = 1.125, volatility 0.075, Act/365F time 0.5972602739726027 to 2026-12-04; futures-style margining against reference price 0.0125; long 40 contracts, multiplier 125000.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "delta": {
+      "rel": 1e-09,
+      "tolerance_reason": "Central difference of the QuantLib price over the futures-price bump Finstack defines for this sensitivity (1% relative for delta, 0.01% for the delta inside DV01); only the closed-form residual remains."
+    },
+    "npv": {
+      "rel": 1e-09,
+      "tolerance_reason": "QuantLib blackFormula and Finstack evaluate the same closed form on the same futures price, strike, volatility and Act/365F expiry time; the residual is the normal-distribution implementation."
+    }
+  }
+}

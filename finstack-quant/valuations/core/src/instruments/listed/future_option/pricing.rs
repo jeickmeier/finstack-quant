@@ -277,6 +277,29 @@ impl FutureOptionTerms {
         Ok(self.position_scale() * (unit_quote - reference))
     }
 
+    /// Terms with the expiry observation a theta roll reaches, if any.
+    ///
+    /// Returns `Some` when expiry lies in `(as_of, rolled_date]` and no
+    /// exercise is recorded: the copy expires at the quoted `futures_price`,
+    /// which theta holds fixed.
+    ///
+    /// # Arguments
+    ///
+    /// * `as_of` - Valuation date the roll starts from.
+    /// * `rolled_date` - Date theta reprices at.
+    pub fn expired_over_roll(
+        &self,
+        as_of: Date,
+        rolled_date: Date,
+    ) -> finstack_quant_core::Result<Option<Self>> {
+        if self.exercise.is_some() || self.expiry <= as_of || self.expiry > rolled_date {
+            return Ok(None);
+        }
+        let mut observed = self.clone();
+        observed.exercise = Some(FutureOptionExercise::new(self.expiry, self.futures_price)?);
+        Ok(Some(observed))
+    }
+
     fn finite_difference_bump(&self, relative: f64, minimum: f64) -> f64 {
         let requested = (self.futures_price.abs() * relative).max(minimum);
         if self.model == FutureOptionModel::Black76 {
