@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, open, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,6 +10,10 @@ assert(["https:", "http:"].includes(base.protocol));
 if (!base.pathname.endsWith("/")) base.pathname += "/";
 const built =
   process.argv[3] ?? fileURLToPath(new URL("../public/r/", import.meta.url));
+const cli = fileURLToPath(import.meta.resolve("shadcn"));
+const { overrides } = JSON.parse(
+  await readFile(new URL("../package.json", import.meta.url), "utf8"),
+);
 const evidence = fileURLToPath(
   new URL("../test-results/public/", import.meta.url),
 );
@@ -48,7 +52,7 @@ await writeFile(
 );
 await writeFile(
   path.join(consumer, "package.json"),
-  JSON.stringify({ private: true, type: "module" }),
+  JSON.stringify({ private: true, type: "module", overrides }),
 );
 await writeFile(
   path.join(consumer, "tsconfig.json"),
@@ -59,19 +63,23 @@ await writeFile(
 await writeFile(path.join(consumer, "globals.css"), "@import 'tailwindcss';\n");
 const commands = [];
 async function run(args, filename) {
-  const parts = [];
-  const code = await new Promise((resolve, reject) => {
-    const child = spawn(args[0], args.slice(1), {
-      cwd: consumer,
-      env: process.env,
+  const outputPath = path.join(evidence, filename);
+  const log = await open(outputPath, "w");
+  let code;
+  try {
+    code = await new Promise((resolve, reject) => {
+      const child = spawn(args[0], args.slice(1), {
+        cwd: consumer,
+        env: process.env,
+        stdio: ["ignore", log.fd, log.fd],
+      });
+      child.once("error", reject);
+      child.once("close", resolve);
     });
-    child.stdout.on("data", (chunk) => parts.push(chunk));
-    child.stderr.on("data", (chunk) => parts.push(chunk));
-    child.once("error", reject);
-    child.once("exit", resolve);
-  });
-  const output = Buffer.concat(parts).toString();
-  await writeFile(path.join(evidence, filename), output);
+  } finally {
+    await log.close();
+  }
+  const output = await readFile(outputPath, "utf8");
   commands.push({ command: args.join(" "), exitCode: code });
   assert.equal(code, 0, output.slice(-2000));
   return output;
@@ -104,7 +112,7 @@ for (let offset = 0; offset < registry.items.length; offset += 8)
     }),
   );
 const view = await run(
-  ["npx", "--yes", "shadcn@4.21.0", "view", "@finstack/pricing-workbench"],
+  [process.execPath, cli, "view", "@finstack/pricing-workbench"],
   "view.txt",
 );
 assert(
@@ -112,36 +120,35 @@ assert(
     view.includes('"wasmVersion"'),
 );
 await run(
-  ["npx", "--yes", "shadcn@4.21.0", "mcp", "init", "--client", "claude"],
+  [process.execPath, cli, "mcp", "init", "--client", "claude"],
   "mcp-init.txt",
 );
 const mcpConfig = JSON.parse(
   await readFile(path.join(consumer, ".mcp.json"), "utf8"),
 );
-assert(mcpConfig.mcpServers.shadcn);
+const server = mcpConfig.mcpServers.shadcn;
+assert.equal(server.command, "npx");
+assert.deepEqual(server.args.slice(1), ["mcp"]);
 await run(
   [
     "npm",
     "install",
     "--ignore-scripts",
     "--save-dev",
-    "@modelcontextprotocol/sdk@1.30.0",
+    "@modelcontextprotocol/client@2.4.0",
   ],
   "sdk-install.txt",
 );
 const require = createRequire(path.join(consumer, "package.json"));
-const { Client } = require("@modelcontextprotocol/sdk/client/index.js");
-const {
-  StdioClientTransport,
-} = require("@modelcontextprotocol/sdk/client/stdio.js");
-const server = mcpConfig.mcpServers.shadcn;
+const { Client } = require("@modelcontextprotocol/client");
+const { StdioClientTransport } = require("@modelcontextprotocol/client/stdio");
 const client = new Client({
   name: "registry-public-verification",
   version: "1.0.0",
 });
 const transport = new StdioClientTransport({
-  command: server.command,
-  args: server.args,
+  command: process.execPath,
+  args: [cli, ...server.args.slice(1)],
   cwd: consumer,
   env: process.env,
   stderr: "pipe",

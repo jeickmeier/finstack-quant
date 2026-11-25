@@ -161,7 +161,7 @@
         }
       ],
       "registryDependencies": [],
-      "dependencies": ["lossless-json@4.3.1", "zod@4.6.5"],
+      "dependencies": ["lossless-json@4.3.1", "zod@4.6.6"],
       "categories": [],
       "meta": { "version": "0.2.0", "wasmVersion": "0.11.0", "schemaIds": [] }
     },

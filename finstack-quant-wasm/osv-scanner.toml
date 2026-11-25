@@ -1,5 +1,0 @@
-# Advisory exceptions for this directory's npm lockfile.
-[[IgnoredVulns]]
-id = "GHSA-fc5q-39xc-vjpf"
-reason = "Picomatch is pulled in through tinyglobby by the WASM TypeScript generator, a development tool that compiles repository schemas through the programmatic API. The latest npm release (4.0.7) is affected. Reassess for a patched release by 2026-12-17."
-ignoreUntil = 2026-12-17

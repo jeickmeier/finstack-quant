@@ -618,7 +618,7 @@
         "button",
         "popover"
       ],
-      "dependencies": ["react@19.2.8", "zod@4.6.5"],
+      "dependencies": ["react@19.2.8", "zod@4.6.6"],
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",

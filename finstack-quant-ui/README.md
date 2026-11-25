@@ -296,7 +296,7 @@ defaults to the repository web package.
 
 ## Registry distribution
 
-`mise run ui-build` uses shadcn 4.21.0 and writes installable JSON to `public/r`.
+`mise run ui-build` uses shadcn 4.23.0 and writes installable JSON to `public/r`.
 `finstack-base` pins Base UI 1.8.0, React 19.2.8 and Tailwind 4.3.3. Financial
 components compose the official shadcn Base UI components using `base-nova`.
 Their `registryDependencies` install upstream controls under `components/ui`;

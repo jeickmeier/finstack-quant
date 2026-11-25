@@ -9,3 +9,9 @@ updates:
     groups:
       github-actions:
         patterns: ["*"]
+  - package-ecosystem: npm
+    directories:
+      - /docs-site
+      - /finstack-quant-ui
+    schedule:
+      interval: weekly
