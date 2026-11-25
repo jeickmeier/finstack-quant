@@ -182,21 +182,25 @@ impl MetricCalculator for VannaCalculator {
                 .bump([target.into_bump(BumpSpec::parallel_bp(-rate_bump_bp))])?;
             let curves_uu =
                 bump_surface_vol_absolute(&curves_ru, vol_surface_id.as_str(), vol_bump)?;
-            let curves_ud =
-                bump_surface_vol_absolute(&curves_ru, vol_surface_id.as_str(), -vol_bump)?;
             let curves_du =
                 bump_surface_vol_absolute(&curves_rd, vol_surface_id.as_str(), vol_bump)?;
-            let curves_dd =
-                bump_surface_vol_absolute(&curves_rd, vol_surface_id.as_str(), -vol_bump)?;
-
             let pv_uu = context.reprice_raw(&curves_uu, as_of)?;
-            let pv_ud = context.reprice_raw(&curves_ud, as_of)?;
             let pv_du = context.reprice_raw(&curves_du, as_of)?;
-            let pv_dd = context.reprice_raw(&curves_dd, as_of)?;
 
             let rate_step = rate_bump_bp * finstack_quant_core::math::units::ONE_BASIS_POINT;
             let vol_step_pts = vol_bump * VOL_POINTS_PER_ABSOLUTE_VOL;
-            return Ok((pv_uu - pv_ud - pv_du + pv_dd) / (4.0 * rate_step * vol_step_pts));
+            if let Ok(curves_ud) =
+                bump_surface_vol_absolute(&curves_ru, vol_surface_id.as_str(), -vol_bump)
+                && let Ok(curves_dd) =
+                    bump_surface_vol_absolute(&curves_rd, vol_surface_id.as_str(), -vol_bump)
+                && let Ok(pv_ud) = context.reprice_raw(&curves_ud, as_of)
+                && let Ok(pv_dd) = context.reprice_raw(&curves_dd, as_of)
+            {
+                return Ok((pv_uu - pv_ud - pv_du + pv_dd) / (4.0 * rate_step * vol_step_pts));
+            }
+            let pv_ru = context.reprice_raw(&curves_ru, as_of)?;
+            let pv_rd = context.reprice_raw(&curves_rd, as_of)?;
+            return Ok(((pv_uu - pv_ru) - (pv_du - pv_rd)) / (2.0 * rate_step * vol_step_pts));
         }
 
         let inst = context.instrument_as::<CmsOption>()?;
@@ -204,6 +208,11 @@ impl MetricCalculator for VannaCalculator {
         let as_of = context.as_of;
         inst.validate()?;
         let strike = inst.strike_f64()?;
+        if !strike.is_finite() || strike <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "Black CMS option requires positive strike for Vanna".to_owned(),
+            ));
+        }
 
         let mut total_vanna = 0.0;
         let discount_curve = curves.get_discount(inst.discount_curve_id.as_ref())?;
@@ -275,6 +284,14 @@ impl MetricCalculator for VannaCalculator {
             };
 
             let adjusted_rate = forward_swap_rate + conv_adj;
+            if !adjusted_rate.is_finite() || adjusted_rate <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Black CMS option requires positive convexity-adjusted rate, got {adjusted_rate}"
+                )));
+            }
+            if !vol.is_finite() || vol <= 1e-12 {
+                continue;
+            }
 
             // 4. Black-76 Vanna and Gamma
             // Vanna_Black = - N'(d1) * d2 / sigma
@@ -339,20 +356,25 @@ impl MetricCalculator for VolgaCalculator {
         let base_pv = context.reprice_raw(&std::sync::Arc::clone(&context.curves), as_of)?;
 
         let vol_bump = bump_config::resolve(context)?.vol_bump_decimal;
+        let width = vol_bump * VOL_POINTS_PER_ABSOLUTE_VOL;
 
         let curves_vol_up =
             bump_surface_vol_absolute(&context.curves, vol_surface_id.as_str(), vol_bump)?;
         let pv_vol_up = context.reprice_raw(&curves_vol_up, as_of)?;
 
-        let curves_vol_down =
-            bump_surface_vol_absolute(&context.curves, vol_surface_id.as_str(), -vol_bump)?;
-        let pv_vol_down = context.reprice_raw(&curves_vol_down, as_of)?;
+        if let Ok(curves_vol_down) =
+            bump_surface_vol_absolute(&context.curves, vol_surface_id.as_str(), -vol_bump)
+            && let Ok(pv_vol_down) = context.reprice_raw(&curves_vol_down, as_of)
+        {
+            // Volga per **vol point squared** (consistent with `MetricId::Volga`).
+            return Ok((pv_vol_up - 2.0 * base_pv + pv_vol_down) / (width * width));
+        }
 
-        // Volga per **vol point squared** (consistent with `MetricId::Volga`):
-        // normalize by the bump in vol points, squared. Dividing by the raw
-        // `vol_bump²` would overstate volga by 100² = 10,000×.
-        let width = vol_bump * VOL_POINTS_PER_ABSOLUTE_VOL;
-        let volga = (pv_vol_up - 2.0 * base_pv + pv_vol_down) / (width * width);
-        Ok(volga)
+        // Low-volatility regime where `-vol_bump` fails: fall back to a
+        // forward second difference using `+vol_bump` and `+2 * vol_bump`.
+        let curves_vol_2up =
+            bump_surface_vol_absolute(&context.curves, vol_surface_id.as_str(), 2.0 * vol_bump)?;
+        let pv_vol_2up = context.reprice_raw(&curves_vol_2up, as_of)?;
+        Ok((pv_vol_2up - 2.0 * pv_vol_up + base_pv) / (width * width))
     }
 }

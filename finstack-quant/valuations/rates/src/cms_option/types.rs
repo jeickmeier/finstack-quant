@@ -21,7 +21,7 @@ use rust_decimal::prelude::ToPrimitive;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct CmsOption {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -115,6 +115,8 @@ pub struct CmsOption {
     pub attributes: Attributes,
 }
 
+finstack_quant_valuations_core::validate_on_deserialize!(CmsOption);
+
 impl CmsOption {
     /// Reference swap observed by this instrument's CMS fixings.
     pub fn reference_swap(&self) -> CmsReferenceSwap<'_> {
@@ -133,6 +135,11 @@ impl CmsOption {
 
     /// Validate CMS option schedule vectors.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        finstack_quant_core::validation::validate_money_gt(
+            self.notional,
+            0.0,
+            "CmsOption notional",
+        )?;
         crate::cms_common::cms_tenor_months(self.cms_tenor, "CmsOption cms_tenor")?;
         if self.fixing_dates.len() != self.payment_dates.len()
             || self.fixing_dates.len() != self.accrual_fractions.len()
@@ -347,5 +354,13 @@ mod validation_tests {
             inst.accrual_fractions[0] = valid;
             inst.validate().expect("nonnegative accrual");
         }
+    }
+
+    #[test]
+    fn serde_rejects_non_positive_notional_across_cms_instruments() {
+        let opt = CmsOption::example().expect("example");
+        let mut bad_opt = serde_json::to_value(&opt).expect("serialize");
+        bad_opt["notional"]["amount"] = serde_json::json!(0.0);
+        assert!(serde_json::from_value::<CmsOption>(bad_opt).is_err());
     }
 }

@@ -81,6 +81,7 @@ impl CmsOptionPricer {
         as_of: Date,
         convexity_scale: f64,
     ) -> Result<f64> {
+        inst.validate()?;
         let mut total_pv = 0.0;
         let strike = inst.strike_f64()?;
         let discount_curve = curves.get_discount(inst.discount_curve_id.as_ref())?;
@@ -187,6 +188,11 @@ impl CmsOptionPricer {
 
             let convexity_adj = raw_convexity_adj * convexity_scale;
             let adjusted_rate = forward_swap_rate + convexity_adj;
+            if !adjusted_rate.is_finite() || adjusted_rate <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Black CMS option requires positive convexity-adjusted rate, got {adjusted_rate}"
+                )));
+            }
 
             // 3. Black Price — the option payoff uses the strike vol σ(K) so
             //    the smile is captured at the option strike.

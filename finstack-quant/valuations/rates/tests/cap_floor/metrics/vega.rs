@@ -312,21 +312,19 @@ fn test_hull_white_1f_market_and_sigma_vegas_are_distinct() {
         .model_config
         .hw1f_mean_reversion = Some(0.03);
     atm_cap.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
-    let result = atm_cap
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::Vega, MetricId::HwSigmaVega],
-            opts.clone(),
-        )
-        .unwrap()
-        .measures;
-    let market_vega = *result.get("vega").unwrap();
-    let sigma_vega = *result.get("hw_sigma_vega").unwrap();
+    let err = atm_cap
+        .price_with_metrics(&market, as_of, &[MetricId::Vega], opts.clone())
+        .expect_err("HullWhite1F cap/floor must reject market surface Vega");
     assert!(
-        market_vega.abs() < 1e-8,
-        "fixed HW params must have zero market-quote vega, got {market_vega}"
+        err.to_string().contains("hw_sigma_vega"),
+        "expected hw_sigma_vega guidance, got {err}"
     );
+    let sigma_vega = *atm_cap
+        .price_with_metrics(&market, as_of, &[MetricId::HwSigmaVega], opts.clone())
+        .unwrap()
+        .measures
+        .get("hw_sigma_vega")
+        .unwrap();
     assert!(
         sigma_vega > 0.0,
         "HW1F direct sigma vega must be positive, got {sigma_vega}"
@@ -408,19 +406,22 @@ fn test_hull_white_1f_pricing_does_not_sample_vol_surface() {
         .with_model(ModelKey::HullWhite1F);
 
     let base = cap
-        .price_with_metrics(&market, as_of, &[MetricId::Vega], opts.clone())
+        .price_with_metrics(&market, as_of, &[], opts.clone())
         .unwrap();
     let shocked = cap
-        .price_with_metrics(&shocked_market, as_of, &[MetricId::Vega], opts)
+        .price_with_metrics(&shocked_market, as_of, &[], opts.clone())
         .unwrap();
 
     let base_pv = base.value.amount();
     let shocked_pv = shocked.value.amount();
-    let vega = *base.measures.get("vega").unwrap();
-    assert!(vega.abs() < 1e-12, "surface vega must be zero: {vega}");
     assert_eq!(
         shocked_pv, base_pv,
         "HW cap pricing must not sample the volatility surface"
+    );
+    assert!(
+        cap.price_with_metrics(&market, as_of, &[MetricId::Vega], opts)
+            .is_err(),
+        "HullWhite1F cap/floor must reject surface Vega"
     );
 }
 

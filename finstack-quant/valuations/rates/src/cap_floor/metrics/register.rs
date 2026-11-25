@@ -26,7 +26,7 @@ pub(crate) fn register_cap_floor_metrics(
             (Gamma, GammaCalculator),
             (Vega, super::vega::VegaCalculator),
             (HwSigmaVega, super::vega::HwSigmaVegaCalculator),
-            (Dv01, super::dv01::Dv01Calculator),
+            (Dv01, crate::rate_bucketed_dv01::RateDv01(false)),
             (Theta, super::theta::ThetaCalculator),
             // Rho = parallel bump of the discount curve only. Routing through
             // the unified DV01 calculator keeps Rho aligned with the workspace

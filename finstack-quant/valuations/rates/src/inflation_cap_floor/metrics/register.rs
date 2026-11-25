@@ -22,7 +22,7 @@ pub(crate) fn register_inflation_cap_floor_metrics(
             (Vega, VegaCalculator),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
-            (Inflation01, super::inflation01::Inflation01Calculator),
+            (Inflation01, crate::inflation_fd::Inflation01Calculator::<InflationCapFloor>::new()),
             (Gamma, crate::inflation_fd::InflationGammaCalculator::<InflationCapFloor>::new()),
         ]
     };
@@ -56,19 +56,43 @@ impl MetricCalculator for VegaCalculator {
         let vol_bump = bump_config::resolve(context)?.vol_bump_decimal;
         let option: &InflationCapFloor = context.instrument_as()?;
         let as_of = context.as_of;
+        let denom_points = vol_bump * VOL_POINTS_PER_ABSOLUTE_VOL;
+
+        if let Some(sigma) = option
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility
+        {
+            let mut bumped = option.clone();
+            bumped
+                .instrument_pricing_overrides
+                .market_quotes
+                .implied_volatility = Some(sigma + vol_bump);
+            let pv_up = context.reprice_instrument_raw(&bumped, &context.curves, as_of)?;
+            if sigma > vol_bump {
+                bumped
+                    .instrument_pricing_overrides
+                    .market_quotes
+                    .implied_volatility = Some(sigma - vol_bump);
+                let pv_down = context.reprice_instrument_raw(&bumped, &context.curves, as_of)?;
+                return Ok((pv_up - pv_down) / (2.0 * denom_points));
+            }
+            return Ok((pv_up - context.base_value.amount()) / denom_points);
+        }
 
         // Bump vol surface up
         let curves_up =
             bump_surface_vol_absolute(&context.curves, option.vol_surface_id.as_str(), vol_bump)?;
         let pv_up = context.reprice_raw(&curves_up, as_of)?;
 
-        // Bump vol surface down
-        let curves_down =
-            bump_surface_vol_absolute(&context.curves, option.vol_surface_id.as_str(), -vol_bump)?;
-        let pv_down = context.reprice_raw(&curves_down, as_of)?;
-
-        // Central difference per unit vol, rescaled to per vol point (1% = 0.01
-        // absolute vol) to match the workspace vega convention.
-        Ok((pv_up - pv_down) / (2.0 * vol_bump * VOL_POINTS_PER_ABSOLUTE_VOL))
+        // Prefer central difference; fall back to forward difference if bumping
+        // down pushes a low-volatility surface below zero or is otherwise invalid.
+        if let Ok(curves_down) =
+            bump_surface_vol_absolute(&context.curves, option.vol_surface_id.as_str(), -vol_bump)
+            && let Ok(pv_down) = context.reprice_raw(&curves_down, as_of)
+        {
+            return Ok((pv_up - pv_down) / (2.0 * denom_points));
+        }
+        Ok((pv_up - context.base_value.amount()) / denom_points)
     }
 }

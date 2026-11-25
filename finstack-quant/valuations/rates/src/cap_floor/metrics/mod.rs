@@ -14,7 +14,6 @@
 //! - ImpliedVol (placeholder)
 
 mod caplet;
-mod dv01;
 mod implied_vol;
 mod register;
 mod theta;

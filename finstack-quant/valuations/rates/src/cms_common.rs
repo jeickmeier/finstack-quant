@@ -296,12 +296,27 @@ impl<I: CmsConvexityPricing + Send + Sync + 'static>
 /// * `rate` - Flat discount/par rate `k` as a decimal.
 /// * `tenor_years` - Swap tenor `n` in years.
 /// * `m` - Fixed-leg payments per year (see [`Tenor::payments_per_year`]).
-pub fn par_annuity(rate: f64, tenor_years: f64, m: f64) -> f64 {
-    if rate.abs() < 1e-9 {
-        return tenor_years;
+/// # Errors
+///
+/// Returns [`finstack_quant_core::Error::Validation`] if any input is
+/// non-finite, `m <= 0`, or `1 + rate / m <= 0`.
+pub fn par_annuity(rate: f64, tenor_years: f64, m: f64) -> Result<f64> {
+    if !rate.is_finite() || !tenor_years.is_finite() || !m.is_finite() || m <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "par_annuity requires finite inputs and positive payment frequency m, got rate={rate}, tenor={tenor_years}, m={m}"
+        )));
     }
-    let discount = (1.0 + rate / m).powf(-tenor_years * m);
-    (1.0 - discount) / rate
+    let compounding_factor = 1.0 + rate / m;
+    if compounding_factor <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "par_annuity requires 1 + rate / m > 0, got rate={rate}, m={m}"
+        )));
+    }
+    if rate.abs() < 1e-9 {
+        return Ok(tenor_years);
+    }
+    let discount = compounding_factor.powf(-tenor_years * m);
+    Ok((1.0 - discount) / rate)
 }
 
 /// ACT/365F year fraction from `start` to `end`, signed when payment precedes swap start.
@@ -580,10 +595,11 @@ mod tests {
 
     #[test]
     fn par_annuity_limit_and_formula() {
-        assert_eq!(par_annuity(0.0, 10.0, 2.0), 10.0);
-        let a = par_annuity(0.05, 10.0, 2.0);
+        assert_eq!(par_annuity(0.0, 10.0, 2.0).expect("zero rate"), 10.0);
+        let a = par_annuity(0.05, 10.0, 2.0).expect("5% rate");
         let expected = (1.0 - (1.025f64).powf(-20.0)) / 0.05;
         assert!((a - expected).abs() < 1e-12);
+        assert!(par_annuity(-2.0, 10.0, 2.0).is_err());
     }
 
     fn registry_index(

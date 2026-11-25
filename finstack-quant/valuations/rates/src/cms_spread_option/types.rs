@@ -46,7 +46,7 @@ use rust_decimal::Decimal;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct CmsSpreadOption {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -162,6 +162,8 @@ pub struct CmsSpreadOption {
     pub attributes: Attributes,
 }
 
+finstack_quant_valuations_core::validate_on_deserialize!(CmsSpreadOption);
+
 impl CmsSpreadOption {
     /// Strike as an `f64` decimal rate for the pricing kernels.
     pub(crate) fn strike_rate(&self) -> f64 {
@@ -176,6 +178,7 @@ impl CmsSpreadOption {
     /// - Expiry date is before or on payment date
     /// - Correlation is in [-1, 1]
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        validation::validate_money_gt(self.notional, 0.0, "CmsSpreadOption notional")?;
         let long_months = crate::cms_common::cms_tenor_months(
             self.long_cms_tenor,
             "CmsSpreadOption long_cms_tenor",

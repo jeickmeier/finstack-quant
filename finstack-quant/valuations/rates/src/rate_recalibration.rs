@@ -7,7 +7,7 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::pricer::ModelKey;
-use finstack_quant_valuations_core::recalibration::{QuoteBump, RateMarketRecalibrationRequest};
+use finstack_quant_valuations_core::recalibration::RateMarketRecalibrationRequest;
 use std::sync::Arc;
 
 /// Hull-White 1F rate delta or gamma, when the request selected that model.
@@ -60,55 +60,6 @@ fn rate_greek(context: &MetricContext, curve_id: &CurveId, second: bool) -> Resu
     } else {
         Ok((up - down) / (2.0 * h))
     }
-}
-
-/// Recalibrate linked discount and forward curves for a parallel quote bump.
-///
-/// # Arguments
-///
-/// * `context` - Metric context supplying base curves and recalibration provider.
-/// * `discount_curve_id` - Discount curve identifier in `context.curves`.
-/// * `forward_curve_id` - Linked projection curve identifier in `context.curves`.
-/// * `bump_bp` - Parallel quote shock in basis points.
-pub(crate) fn bump_rate_market_cached(
-    context: &MetricContext,
-    discount_curve_id: &CurveId,
-    forward_curve_id: &CurveId,
-    bump_bp: f64,
-) -> Result<Arc<MarketContext>> {
-    rebuild_rate_market(
-        context,
-        RateMarketRecalibrationRequest::LinkedDiscountForward {
-            market: Arc::clone(&context.curves),
-            discount_curve_id: discount_curve_id.clone(),
-            forward_curve_id: forward_curve_id.clone(),
-            bump: QuoteBump::ParallelBp(bump_bp),
-        },
-        "dv01",
-    )
-}
-
-/// Recalibrate a single OIS curve for a parallel quote bump.
-///
-/// # Arguments
-///
-/// * `context` - Metric context supplying base curves and recalibration provider.
-/// * `curve_id` - Single OIS discount/projection curve identifier.
-/// * `bump_bp` - Parallel quote shock in basis points.
-pub(crate) fn bump_single_ois_rate_market_cached(
-    context: &MetricContext,
-    curve_id: &CurveId,
-    bump_bp: f64,
-) -> Result<Arc<MarketContext>> {
-    rebuild_rate_market(
-        context,
-        RateMarketRecalibrationRequest::SingleOis {
-            market: Arc::clone(&context.curves),
-            curve_id: curve_id.clone(),
-            bump: QuoteBump::ParallelBp(bump_bp),
-        },
-        "dv01",
-    )
 }
 
 /// Execute one rate-market replay through the context's injected provider.
