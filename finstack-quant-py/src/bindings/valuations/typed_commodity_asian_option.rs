@@ -62,12 +62,6 @@ impl PyCommodityAsianOption {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.underlying)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_asian_option", "CommodityAsianOption.strike")]
-    #[getter]
-    fn strike(&self) -> f64 {
-        self.inner.strike
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_asian_option", "CommodityAsianOption.option_type")]
     #[getter]
     fn option_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -102,42 +96,32 @@ impl PyCommodityAsianOption {
             .collect()
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_asian_option", "CommodityAsianOption.quantity")]
-    #[getter]
-    fn quantity(&self) -> f64 {
-        self.inner.quantity
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_asian_option", "CommodityAsianOption.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::date_utils::date_to_py(py, self.inner.expiry)
     }
+}
+
+crate::bindings::macros::py_getters!(PyCommodityAsianOption |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_asian_option", "CommodityAsianOption.strike")]
+    strike -> f64 = s.inner.strike;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_asian_option", "CommodityAsianOption.quantity")]
+    quantity -> f64 = s.inner.quantity;
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_asian_option", "CommodityAsianOption.forward_curve_id")]
-    #[getter]
-    fn forward_curve_id(&self) -> String {
-        self.inner.forward_curve_id.to_string()
-    }
+    forward_curve_id -> String = s.inner.forward_curve_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_asian_option", "CommodityAsianOption.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_asian_option", "CommodityAsianOption.vol_surface_id")]
-    #[getter]
-    fn vol_surface_id(&self) -> String {
-        self.inner.vol_surface_id.to_string()
-    }
+    vol_surface_id -> String = s.inner.vol_surface_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_asian_option", "CommodityAsianOption.day_count")]
-    #[getter]
-    fn day_count(&self) -> crate::bindings::core::dates::daycount::PyDayCount {
-        crate::bindings::core::dates::daycount::PyDayCount::from_inner(self.inner.day_count)
-    }
-}
+    day_count -> crate::bindings::core::dates::daycount::PyDayCount = crate::bindings::core::dates::daycount::PyDayCount::from_inner(s.inner.day_count);
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_asian_option", "CommodityAsianOptionBuilder")]
 #[pyclass(
@@ -286,3 +270,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyCommodityAsianOptionBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["CommodityAsianOption", "CommodityAsianOptionBuilder"];

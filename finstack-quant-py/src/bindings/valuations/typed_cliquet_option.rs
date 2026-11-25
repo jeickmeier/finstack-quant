@@ -57,12 +57,6 @@ impl PyCliquetOption {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.underlying_ticker")]
-    #[getter]
-    fn underlying_ticker(&self) -> String {
-        self.inner.underlying_ticker.to_string()
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.reset_dates")]
     #[getter]
     fn reset_dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
@@ -81,76 +75,10 @@ impl PyCliquetOption {
         crate::bindings::date_utils::date_to_py(py, self.inner.expiry)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.local_cap")]
-    #[getter]
-    fn local_cap(&self) -> f64 {
-        self.inner.local_cap
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.local_floor")]
-    #[getter]
-    fn local_floor(&self) -> f64 {
-        self.inner.local_floor
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.global_cap")]
-    #[getter]
-    fn global_cap(&self) -> f64 {
-        self.inner.global_cap
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.global_floor")]
-    #[getter]
-    fn global_floor(&self) -> f64 {
-        self.inner.global_floor
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.day_count")]
-    #[getter]
-    fn day_count(&self) -> crate::bindings::core::dates::daycount::PyDayCount {
-        crate::bindings::core::dates::daycount::PyDayCount::from_inner(self.inner.day_count)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.spot_id")]
-    #[getter]
-    fn spot_id(&self) -> String {
-        self.inner.spot_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.vol_surface_id")]
-    #[getter]
-    fn vol_surface_id(&self) -> String {
-        self.inner.vol_surface_id.to_string()
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.path_model")]
     #[getter]
     fn path_model<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.path_model)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.div_yield_id")]
-    #[getter]
-    fn div_yield_id(&self) -> Option<String> {
-        self.inner.div_yield_id.as_ref().map(ToString::to_string)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.initial_level")]
-    #[getter]
-    fn initial_level(&self) -> Option<f64> {
-        self.inner.initial_level
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.past_fixings")]
@@ -169,6 +97,44 @@ impl PyCliquetOption {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.payoff_type)
     }
 }
+
+crate::bindings::macros::py_getters!(PyCliquetOption |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.underlying_ticker")]
+    underlying_ticker -> String = s.inner.underlying_ticker.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.local_cap")]
+    local_cap -> f64 = s.inner.local_cap;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.local_floor")]
+    local_floor -> f64 = s.inner.local_floor;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.global_cap")]
+    global_cap -> f64 = s.inner.global_cap;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.global_floor")]
+    global_floor -> f64 = s.inner.global_floor;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.notional")]
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.day_count")]
+    day_count -> crate::bindings::core::dates::daycount::PyDayCount = crate::bindings::core::dates::daycount::PyDayCount::from_inner(s.inner.day_count);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.discount_curve_id")]
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.spot_id")]
+    spot_id -> String = s.inner.spot_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.vol_surface_id")]
+    vol_surface_id -> String = s.inner.vol_surface_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.div_yield_id")]
+    div_yield_id -> Option<String> = s.inner.div_yield_id.as_ref().map(ToString::to_string);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.initial_level")]
+    initial_level -> Option<f64> = s.inner.initial_level;
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOptionBuilder")]
 #[pyclass(
@@ -349,3 +315,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyCliquetOptionBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["CliquetOption", "CliquetOptionBuilder"];

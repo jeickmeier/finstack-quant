@@ -68,18 +68,6 @@ impl PyCommodityForward {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.underlying)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.quantity")]
-    #[getter]
-    fn quantity(&self) -> f64 {
-        self.inner.quantity
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.multiplier")]
-    #[getter]
-    fn multiplier(&self) -> f64 {
-        self.inner.multiplier
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -98,79 +86,50 @@ impl PyCommodityForward {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.position)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.contract_price")]
-    #[getter]
-    fn contract_price(&self) -> Option<f64> {
-        self.inner.contract_price
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.quoted_forward")]
-    #[getter]
-    fn quoted_forward(&self) -> Option<f64> {
-        self.inner.quoted_forward
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.forward_curve_id")]
-    #[getter]
-    fn forward_curve_id(&self) -> String {
-        self.inner.forward_curve_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.spot_id")]
-    #[getter]
-    fn spot_id(&self) -> Option<String> {
-        self.inner.spot_id.as_ref().map(ToString::to_string)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.exchange")]
-    #[getter]
-    fn exchange(&self) -> Option<String> {
-        self.inner.exchange.as_ref().map(ToString::to_string)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.contract_month")]
-    #[getter]
-    fn contract_month(&self) -> Option<String> {
-        self.inner.contract_month.as_ref().map(ToString::to_string)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.convention")]
     #[getter]
     fn convention<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.convention)
     }
+}
+
+crate::bindings::macros::py_getters!(PyCommodityForward |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.quantity")]
+    quantity -> f64 = s.inner.quantity;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.multiplier")]
+    multiplier -> f64 = s.inner.multiplier;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.contract_price")]
+    contract_price -> Option<f64> = s.inner.contract_price;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.quoted_forward")]
+    quoted_forward -> Option<f64> = s.inner.quoted_forward;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.forward_curve_id")]
+    forward_curve_id -> String = s.inner.forward_curve_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.spot_id")]
+    spot_id -> Option<String> = s.inner.spot_id.as_ref().map(ToString::to_string);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.discount_curve_id")]
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.exchange")]
+    exchange -> Option<String> = s.inner.exchange.as_ref().map(ToString::to_string);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.contract_month")]
+    contract_month -> Option<String> = s.inner.contract_month.as_ref().map(ToString::to_string);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.settlement_days")]
-    #[getter]
-    fn settlement_days(&self) -> Option<u32> {
-        self.inner.settlement_days
-    }
+    settlement_days -> Option<u32> = s.inner.settlement_days;
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.settlement_calendar_id")]
-    #[getter]
-    fn settlement_calendar_id(&self) -> Option<String> {
-        self.inner
-            .settlement_calendar_id
-            .as_ref()
-            .map(ToString::to_string)
-    }
+    settlement_calendar_id -> Option<String> = s.inner .settlement_calendar_id .as_ref() .map(ToString::to_string);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.settlement_business_day_convention")]
-    #[getter]
-    fn settlement_business_day_convention(&self) -> PyResult<Option<String>> {
-        self.inner
-            .settlement_business_day_convention
-            .as_ref()
-            .map(super::convert::enum_to_py_string)
-            .transpose()
-    }
-}
+    settlement_business_day_convention -> PyResult<Option<String>> = s.inner .settlement_business_day_convention .as_ref() .map(super::convert::enum_to_py_string) .transpose();
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForwardBuilder")]
 #[pyclass(
@@ -354,3 +313,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyCommodityForwardBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["CommodityForward", "CommodityForwardBuilder"];

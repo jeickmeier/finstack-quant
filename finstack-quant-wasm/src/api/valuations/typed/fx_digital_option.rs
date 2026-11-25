@@ -197,7 +197,7 @@ setters!(JsFxDigitalOptionBuilder, "FxDigitalOptionBuilder", {
     /// @param value - Strike exchange rate (quote per base)
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    strike as strike: "number" => js_wire,
+    strike as strike: "number" => js_f64,
     /// Set the contract's option type.
     /// @param value - Option type (call or put on base currency)
     /// @returns The active builder.

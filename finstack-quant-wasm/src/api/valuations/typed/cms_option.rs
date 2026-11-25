@@ -161,32 +161,32 @@ setters!(JsCmsOptionBuilder, "CmsOptionBuilder", {
     /// @param value - Rate-index convention-registry key of the underlying swap (e.g. USD-SOFR-OIS). When set, provides default values for swap_fixed_frequency, swap_float_frequency, swap_fixed_day_count, and swap_float_day_count. Individual fields still override the convention when explicitly set. Required for USD CMS.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    index_id as indexId: "NonNullable<generated.valuations.CmsOption['index_id']> | null" => js_wire via index_id_opt,
+    index_id as indexId: "NonNullable<generated.valuations.CmsOption['index_id']> | null" => optional_id via index_id_opt,
     /// Set the contract's cms fixing index id.
     /// @param value - Explicit CMS benchmark fixing identifier used for historical fixings (FIXING:<cms_fixing_index_id>), distinct from forward_curve_id and index_id.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    cms_fixing_index_id as cmsFixingIndexId: "NonNullable<generated.valuations.CmsOption['cms_fixing_index_id']> | null" => js_wire via cms_fixing_index_id_opt,
+    cms_fixing_index_id as cmsFixingIndexId: "NonNullable<generated.valuations.CmsOption['cms_fixing_index_id']> | null" => optional_id via cms_fixing_index_id_opt,
     /// Set the contract's swap fixed frequency.
     /// @param value - Fixed leg frequency of the underlying swap (overrides convention if set)
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    swap_fixed_frequency as swapFixedFrequency: "NonNullable<generated.valuations.CmsOption['swap_fixed_frequency']> | null" => js_wire via swap_fixed_frequency_opt,
+    swap_fixed_frequency as swapFixedFrequency: "NonNullable<generated.valuations.CmsOption['swap_fixed_frequency']> | null" => opt_wire via swap_fixed_frequency_opt,
     /// Set the contract's swap float frequency.
     /// @param value - Floating leg frequency of the underlying swap (overrides convention if set)
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    swap_float_frequency as swapFloatFrequency: "NonNullable<generated.valuations.CmsOption['swap_float_frequency']> | null" => js_wire via swap_float_frequency_opt,
+    swap_float_frequency as swapFloatFrequency: "NonNullable<generated.valuations.CmsOption['swap_float_frequency']> | null" => opt_wire via swap_float_frequency_opt,
     /// Set the contract's swap fixed day count.
     /// @param value - Day count convention of the underlying swap fixed leg (overrides convention if set)
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    swap_fixed_day_count as swapFixedDayCount: "NonNullable<generated.valuations.CmsOption['swap_fixed_day_count']> | null" => js_wire via swap_fixed_day_count_opt,
+    swap_fixed_day_count as swapFixedDayCount: "NonNullable<generated.valuations.CmsOption['swap_fixed_day_count']> | null" => opt_wire via swap_fixed_day_count_opt,
     /// Set the contract's swap float day count.
     /// @param value - Optional day count convention of the underlying swap floating leg
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    swap_float_day_count as swapFloatDayCount: "NonNullable<generated.valuations.CmsOption['swap_float_day_count']> | null" => js_wire via swap_float_day_count_opt,
+    swap_float_day_count as swapFloatDayCount: "NonNullable<generated.valuations.CmsOption['swap_float_day_count']> | null" => opt_wire via swap_float_day_count_opt,
     /// Set the contract's discount curve id.
     /// @param value - Discount curve ID for present value calculations
     /// @returns The active builder.

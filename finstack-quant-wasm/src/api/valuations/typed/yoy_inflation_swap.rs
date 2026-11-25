@@ -159,17 +159,17 @@ setters!(JsYoYInflationSwapBuilder, "YoYInflationSwapBuilder", {
     /// @param value - Explicit contractual CPI observation lag; missing terms fail reference resolution.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    lag as lag: "NonNullable<generated.valuations.YoYInflationSwap['lag']> | null" => js_wire via lag_opt,
+    lag as lag: "NonNullable<generated.valuations.YoYInflationSwap['lag']> | null" => opt_wire via lag_opt,
     /// Set the contract's interpolation.
     /// @param value - Explicit contractual monthly reference-index interpolation; no source default is used.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    interpolation as interpolation: "NonNullable<generated.valuations.YoYInflationSwap['interpolation']> | null" => js_wire via interpolation_opt,
+    interpolation as interpolation: "NonNullable<generated.valuations.YoYInflationSwap['interpolation']> | null" => opt_wire via interpolation_opt,
     /// Set the contract's base cpi.
     /// @param value - Observed contractual reference CPI at start, with lag and interpolation already applied. If absent, start CPI must resolve from market observations.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    base_cpi as baseCpi: "number | null" => js_wire via base_cpi_opt,
+    base_cpi as baseCpi: "number | null" => opt_f64 via base_cpi_opt,
     /// Set the contract's business day convention.
     /// @param value - Business day convention for payment date adjustment.
     /// @returns The active builder.

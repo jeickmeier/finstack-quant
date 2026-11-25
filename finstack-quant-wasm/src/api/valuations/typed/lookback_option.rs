@@ -38,7 +38,7 @@ getters!(JsLookbackOption, "LookbackOption", |i| {
     default_model as defaultModel: "string" => text(Instrument::default_model(i)),
     /// Read the contract's underlying ticker.
     /// @returns Underlying asset ticker symbol
-    underlying_ticker as underlyingTicker: "string" => json(i.underlying_ticker),
+    underlying_ticker as underlyingTicker: "string" => text(i.underlying_ticker),
     /// Read the contract's strike.
     /// @returns Strike price (None for floating strike lookbacks)
     strike as strike: "NonNullable<generated.valuations.LookbackOption['strike']> | null" => json(i.strike),
@@ -65,16 +65,16 @@ getters!(JsLookbackOption, "LookbackOption", |i| {
     day_count as dayCount: "DayCount" => day_count(i.day_count),
     /// Read the contract's discount curve id.
     /// @returns Discount curve ID for present value calculations
-    discount_curve_id as discountCurveId: "string" => json(i.discount_curve_id),
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
     /// Read the contract's spot id.
     /// @returns Spot price identifier
-    spot_id as spotId: "string" => json(i.spot_id),
+    spot_id as spotId: "string" => text(i.spot_id),
     /// Read the contract's vol surface id.
     /// @returns Volatility surface ID
-    vol_surface_id as volSurfaceId: "string" => json(i.vol_surface_id),
+    vol_surface_id as volSurfaceId: "string" => text(i.vol_surface_id),
     /// Read the contract's div yield id.
     /// @returns Optional dividend-yield scalar ID
-    div_yield_id as divYieldId: "string | null" => json(i.div_yield_id),
+    div_yield_id as divYieldId: "string | null" => opt_text(i.div_yield_id),
     /// Read the contract's monitoring.
     /// @returns Contractual monitoring of the path extremum. continuous (default) prices with the Goldman-Sosin-Gatto closed form. discrete observes the extremum only on the strictly increasing observation_dates (no later than expiry) and prices by Monte Carlo.
     monitoring as monitoring: "generated.valuations.LookbackOption['monitoring']" => json(i.monitoring),
@@ -104,17 +104,11 @@ builder_class!(
     JsLookbackOptionBuilder, "LookbackOptionBuilder", LookbackOptionBuilder, JsLookbackOption, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = LookbackOption)]
-impl JsLookbackOption {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsLookbackOptionBuilder {
-        JsLookbackOptionBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsLookbackOption, "LookbackOption", JsLookbackOptionBuilder
+);
 
 setters!(JsLookbackOptionBuilder, "LookbackOptionBuilder", {
     /// Set the stable contract identifier.
@@ -131,7 +125,7 @@ setters!(JsLookbackOptionBuilder, "LookbackOptionBuilder", {
     /// @param value - Strike price (None for floating strike lookbacks)
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    strike as strike: "NonNullable<generated.valuations.LookbackOption['strike']> | null" => js_wire via strike_opt,
+    strike as strike: "NonNullable<generated.valuations.LookbackOption['strike']> | null" => opt_f64 via strike_opt,
     /// Set the contract's option type.
     /// @param value - Option type (call or put)
     /// @returns The active builder.
@@ -151,17 +145,17 @@ setters!(JsLookbackOptionBuilder, "LookbackOptionBuilder", {
     /// @param value - Terminal underlying fixing observed at expiry, in the same quote units as strike. Required when valuing after expiry so the realized payoff cannot move with a later market spot snapshot. At expiry itself, the current market spot is treated as the terminal fixing when this field is absent.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    expiry_fixing as expiryFixing: "number | null" => js_wire via expiry_fixing_opt,
+    expiry_fixing as expiryFixing: "number | null" => opt_f64 via expiry_fixing_opt,
     /// Set the contract's quantity.
     /// @param value - Number of underlying units the option is written on; PV and Greeks scale linearly with it.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    quantity as quantity: "number" => js_wire,
+    quantity as quantity: "number" => js_f64,
     /// Set the contract's currency.
     /// @param value - Currency of the strike, premium and present value.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    currency as currency: "string" => js_wire,
+    currency as currency: "string" => js_currency,
     /// Set the contract's discount curve id.
     /// @param value - Discount curve ID for present value calculations
     /// @returns The active builder.
@@ -191,12 +185,12 @@ setters!(JsLookbackOptionBuilder, "LookbackOptionBuilder", {
     /// @param value - Observed minimum underlying level since inception, in the same quote units as strike (required for Floating Call / Fixed Put once seasoned).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    observed_min as observedMin: "number | null" => js_wire via observed_min_opt,
+    observed_min as observedMin: "number | null" => opt_f64 via observed_min_opt,
     /// Set the contract's observed max.
     /// @param value - Observed maximum underlying level since inception, in the same quote units as strike (required for Floating Put / Fixed Call once seasoned).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    observed_max as observedMax: "number | null" => js_wire via observed_max_opt,
+    observed_max as observedMax: "number | null" => opt_f64 via observed_max_opt,
 });
 common_setters!(JsLookbackOptionBuilder, "LookbackOptionBuilder");
 

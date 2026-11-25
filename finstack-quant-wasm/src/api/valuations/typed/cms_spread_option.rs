@@ -189,42 +189,42 @@ setters!(JsCmsSpreadOptionBuilder, "CmsSpreadOptionBuilder", {
     /// @param value - Gaussian-copula correlation between the two CMS rates, a decimal in [-1, 1].
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    correlation as correlation: "number" => js_wire,
+    correlation as correlation: "number" => js_f64,
     /// Set the contract's index id.
     /// @param value - Rate-index convention-registry key of the underlying CMS swaps (e.g. EUR-ESTR-OIS). Required for USD CMS; other supported currencies use their registered overnight-index default when omitted. Supplies calendar, settlement lag and default leg conventions. Individual leg fields override the index.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    index_id as indexId: "NonNullable<generated.valuations.CmsSpreadOption['index_id']> | null" => js_wire via index_id_opt,
+    index_id as indexId: "NonNullable<generated.valuations.CmsSpreadOption['index_id']> | null" => optional_id via index_id_opt,
     /// Set the contract's long cms fixing index id.
     /// @param value - Explicit CMS benchmark fixing identifier for the long-tenor leg (FIXING:<long_cms_fixing_index_id>), distinct from forward_curve_id, index_id, and short_cms_fixing_index_id.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    long_cms_fixing_index_id as longCmsFixingIndexId: "NonNullable<generated.valuations.CmsSpreadOption['long_cms_fixing_index_id']> | null" => js_wire via long_cms_fixing_index_id_opt,
+    long_cms_fixing_index_id as longCmsFixingIndexId: "NonNullable<generated.valuations.CmsSpreadOption['long_cms_fixing_index_id']> | null" => optional_id via long_cms_fixing_index_id_opt,
     /// Set the contract's short cms fixing index id.
     /// @param value - Explicit CMS benchmark fixing identifier for the short-tenor leg (FIXING:<short_cms_fixing_index_id>), distinct from forward_curve_id, index_id, and long_cms_fixing_index_id.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    short_cms_fixing_index_id as shortCmsFixingIndexId: "NonNullable<generated.valuations.CmsSpreadOption['short_cms_fixing_index_id']> | null" => js_wire via short_cms_fixing_index_id_opt,
+    short_cms_fixing_index_id as shortCmsFixingIndexId: "NonNullable<generated.valuations.CmsSpreadOption['short_cms_fixing_index_id']> | null" => optional_id via short_cms_fixing_index_id_opt,
     /// Set the contract's swap fixed frequency.
     /// @param value - Fixed leg frequency of the underlying CMS swaps (overrides convention).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    swap_fixed_frequency as swapFixedFrequency: "NonNullable<generated.valuations.CmsSpreadOption['swap_fixed_frequency']> | null" => js_wire via swap_fixed_frequency_opt,
+    swap_fixed_frequency as swapFixedFrequency: "NonNullable<generated.valuations.CmsSpreadOption['swap_fixed_frequency']> | null" => opt_wire via swap_fixed_frequency_opt,
     /// Set the contract's swap float frequency.
     /// @param value - Floating leg frequency of the underlying CMS swaps (overrides convention).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    swap_float_frequency as swapFloatFrequency: "NonNullable<generated.valuations.CmsSpreadOption['swap_float_frequency']> | null" => js_wire via swap_float_frequency_opt,
+    swap_float_frequency as swapFloatFrequency: "NonNullable<generated.valuations.CmsSpreadOption['swap_float_frequency']> | null" => opt_wire via swap_float_frequency_opt,
     /// Set the contract's swap fixed day count.
     /// @param value - Fixed leg day count of the underlying CMS swaps (overrides convention).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    swap_fixed_day_count as swapFixedDayCount: "NonNullable<generated.valuations.CmsSpreadOption['swap_fixed_day_count']> | null" => js_wire via swap_fixed_day_count_opt,
+    swap_fixed_day_count as swapFixedDayCount: "NonNullable<generated.valuations.CmsSpreadOption['swap_fixed_day_count']> | null" => opt_wire via swap_fixed_day_count_opt,
     /// Set the contract's swap float day count.
     /// @param value - Floating leg day count of the underlying CMS swaps (overrides convention).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    swap_float_day_count as swapFloatDayCount: "NonNullable<generated.valuations.CmsSpreadOption['swap_float_day_count']> | null" => js_wire via swap_float_day_count_opt,
+    swap_float_day_count as swapFloatDayCount: "NonNullable<generated.valuations.CmsSpreadOption['swap_float_day_count']> | null" => opt_wire via swap_float_day_count_opt,
 });
 common_setters!(JsCmsSpreadOptionBuilder, "CmsSpreadOptionBuilder");
 

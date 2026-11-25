@@ -6,6 +6,7 @@ import datetime
 from datetime import date
 from typing import Any
 import pandas as pd
+from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.types import Attributes
 from finstack_quant.valuations import ValuationResult
@@ -407,6 +408,126 @@ class EquityFuture:
         """
         ...
 
+    @property
+    def underlying_ticker(self) -> str:
+        """Ticker of the underlying equity or index, independent of the spot quote key.
+
+        Returns
+        -------
+        str
+            Underlying equity or index ticker symbol.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def underlying_currency(self) -> str:
+        """ISO currency code of one underlying spot price unit.
+
+        Returns
+        -------
+        str
+            Three-letter ISO-4217 currency code.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def discount_curve_id(self) -> str:
+        """Market identifier of the financing discount curve.
+
+        Returns
+        -------
+        str
+            Discount curve identifier.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def spot_id(self) -> str:
+        """Market quote identifier for the underlying spot price.
+
+        Returns
+        -------
+        str
+            Spot price identifier.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def div_yield_id(self) -> str | None:
+        """Optional market quote identifier for the continuous decimal dividend yield.
+
+        Returns
+        -------
+        str | None
+            Dividend yield quote identifier, or ``None``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def discrete_dividends(self) -> list[tuple[date, float]]:
+        """Ex-date and cash amount per share in underlying currency for each discrete dividend.
+
+        Returns
+        -------
+        list[tuple[datetime.date, float]]
+            Sorted ``(ex_date, amount)`` pairs.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def vol_surface_id(self) -> str | None:
+        """Optional equity volatility surface identifier used for quanto pricing.
+
+        Returns
+        -------
+        str | None
+            Volatility surface identifier, or ``None``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def quanto(self) -> dict[str, object] | None:
+        """Optional conversion policy, FX volatility and correlation inputs for quanto valuation.
+
+        Returns
+        -------
+        dict[str, object] | None
+            Quanto specification in serde dict form, or ``None``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
 class EquityFutureBuilder:
     """Fluent builder for listed contracts with explicit lifecycle terms.
 
@@ -498,13 +619,13 @@ class EquityFutureBuilder:
         """
         ...
 
-    def underlying_currency(self, value: str) -> EquityFutureBuilder:
+    def underlying_currency(self, value: Currency | str) -> EquityFutureBuilder:
         """Set the contract's underlying currency.
 
         Parameters
         ----------
-        value : str
-            ISO currency of one underlying spot price unit.
+        value : Currency | str
+            Currency or three-letter ISO code of one underlying spot price unit.
 
         Returns
         -------

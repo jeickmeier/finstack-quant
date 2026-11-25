@@ -112,3 +112,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyRangeAccrualBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["RangeAccrual", "RangeAccrualBuilder"];

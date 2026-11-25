@@ -53,19 +53,19 @@ getters!(JsCommoditySpreadOption, "CommoditySpreadOption", |i| {
     quantity as quantity: "number" => json(i.quantity),
     /// Read the contract's leg1 forward curve id.
     /// @returns Forward/price curve ID for leg 1 (the "long" commodity).
-    leg1_forward_curve_id as leg1ForwardCurveId: "string" => json(i.leg1_forward_curve_id),
+    leg1_forward_curve_id as leg1ForwardCurveId: "string" => text(i.leg1_forward_curve_id),
     /// Read the contract's leg2 forward curve id.
     /// @returns Forward/price curve ID for leg 2 (the "short" commodity).
-    leg2_forward_curve_id as leg2ForwardCurveId: "string" => json(i.leg2_forward_curve_id),
+    leg2_forward_curve_id as leg2ForwardCurveId: "string" => text(i.leg2_forward_curve_id),
     /// Read the contract's leg1 vol surface id.
     /// @returns Volatility surface ID for leg 1.
-    leg1_vol_surface_id as leg1VolSurfaceId: "string" => json(i.leg1_vol_surface_id),
+    leg1_vol_surface_id as leg1VolSurfaceId: "string" => text(i.leg1_vol_surface_id),
     /// Read the contract's leg2 vol surface id.
     /// @returns Volatility surface ID for leg 2.
-    leg2_vol_surface_id as leg2VolSurfaceId: "string" => json(i.leg2_vol_surface_id),
+    leg2_vol_surface_id as leg2VolSurfaceId: "string" => text(i.leg2_vol_surface_id),
     /// Read the contract's discount curve id.
     /// @returns Discount curve ID for present value.
-    discount_curve_id as discountCurveId: "string" => json(i.discount_curve_id),
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
     /// Read the contract's correlation.
     /// @returns Correlation between the two commodity prices, in [-1, 1].
     correlation as correlation: "number" => json(i.correlation),
@@ -92,17 +92,11 @@ builder_class!(
     JsCommoditySpreadOptionBuilder, "CommoditySpreadOptionBuilder", CommoditySpreadOptionBuilder, JsCommoditySpreadOption, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = CommoditySpreadOption)]
-impl JsCommoditySpreadOption {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsCommoditySpreadOptionBuilder {
-        JsCommoditySpreadOptionBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsCommoditySpreadOption, "CommoditySpreadOption", JsCommoditySpreadOptionBuilder
+);
 
 setters!(JsCommoditySpreadOptionBuilder, "CommoditySpreadOptionBuilder", {
     /// Set the stable contract identifier.
@@ -114,7 +108,7 @@ setters!(JsCommoditySpreadOptionBuilder, "CommoditySpreadOptionBuilder", {
     /// @param value - Settlement currency.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    currency as currency: "string" => js_wire,
+    currency as currency: "string" => js_currency,
     /// Set the contract's option type.
     /// @param value - Option type (call or put on the spread S1 - S2).
     /// @returns The active builder.
@@ -129,12 +123,12 @@ setters!(JsCommoditySpreadOptionBuilder, "CommoditySpreadOptionBuilder", {
     /// @param value - Spread strike price K in the payoff max(S1 - S2 - K, 0).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    strike as strike: "number" => js_wire,
+    strike as strike: "number" => js_f64,
     /// Set the contract's quantity.
     /// @param value - Notional quantity (number of units).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    quantity as quantity: "number" => js_wire,
+    quantity as quantity: "number" => js_f64,
     /// Set the contract's leg1 forward curve id.
     /// @param value - Forward/price curve ID for leg 1 (the "long" commodity).
     /// @returns The active builder.
@@ -164,7 +158,7 @@ setters!(JsCommoditySpreadOptionBuilder, "CommoditySpreadOptionBuilder", {
     /// @param value - Correlation between the two commodity prices, in [-1, 1].
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    correlation as correlation: "number" => js_wire,
+    correlation as correlation: "number" => js_f64,
 });
 common_setters!(
     JsCommoditySpreadOptionBuilder,

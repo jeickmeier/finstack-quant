@@ -62,12 +62,6 @@ impl PyLeveredRealEstateEquity {
         instrument_expiry(py, &self.inner)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_levered_real_estate_equity", "LeveredRealEstateEquity.currency")]
-    #[getter]
-    fn currency(&self) -> String {
-        self.inner.currency.to_string()
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_levered_real_estate_equity", "LeveredRealEstateEquity.asset")]
     #[getter]
     fn asset<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -80,6 +74,11 @@ impl PyLeveredRealEstateEquity {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.financing)
     }
 }
+
+crate::bindings::macros::py_getters!(PyLeveredRealEstateEquity |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_levered_real_estate_equity", "LeveredRealEstateEquity.currency")]
+    currency -> String = s.inner.currency.to_string();
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_levered_real_estate_equity", "LeveredRealEstateEquityBuilder")]
 #[pyclass(
@@ -142,3 +141,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyLeveredRealEstateEquityBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["LeveredRealEstateEquity", "LeveredRealEstateEquityBuilder"];

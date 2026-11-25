@@ -406,6 +406,21 @@ class VolatilityIndexFuture:
         """
         ...
 
+    @property
+    def vol_index_curve_id(self) -> str:
+        """Market price-curve identifier for futures index levels expressed in index points.
+
+        Returns
+        -------
+        str
+            Volatility index curve identifier.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
 class VolatilityIndexFutureBuilder:
     """Fluent builder for listed contracts with explicit lifecycle terms.
 

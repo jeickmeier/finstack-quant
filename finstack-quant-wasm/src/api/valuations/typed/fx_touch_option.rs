@@ -203,7 +203,7 @@ setters!(JsFxTouchOptionBuilder, "FxTouchOptionBuilder", {
     /// @param value - Barrier level (exchange rate that triggers the touch)
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    barrier as barrier: "number" => js_wire,
+    barrier as barrier: "number" => js_f64,
     /// Set the contract's touch type.
     /// @param value - Touch type (one-touch or no-touch)
     /// @returns The active builder.
@@ -228,7 +228,7 @@ setters!(JsFxTouchOptionBuilder, "FxTouchOptionBuilder", {
     /// @param value - First date on which barrier monitoring is active. When set, a live valuation after this date requires observed_barrier_breached.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    monitoring_start_date as monitoringStartDate: "string | null" => js_wire via monitoring_start_date_opt,
+    monitoring_start_date as monitoringStartDate: "string | null" => opt_date via monitoring_start_date_opt,
     /// Set the contract's domestic discount curve id.
     /// @param value - Domestic currency discount curve ID
     /// @returns The active builder.
@@ -248,7 +248,7 @@ setters!(JsFxTouchOptionBuilder, "FxTouchOptionBuilder", {
     /// @param value - Observed barrier event state for expired valuations. Some(true) means the barrier was touched during the option life, Some(false) means it was observed not to have touched, and None means the historical touch state is unavailable. This is only required once the option has expired. Without it, a touched-and-reverted path cannot be distinguished from an untouched path using the terminal spot alone.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    observed_barrier_breached as observedBarrierBreached: "boolean | null" => js_wire via observed_barrier_breached_opt,
+    observed_barrier_breached as observedBarrierBreached: "boolean | null" => opt_bool via observed_barrier_breached_opt,
 });
 common_setters!(JsFxTouchOptionBuilder, "FxTouchOptionBuilder");
 

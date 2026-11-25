@@ -88,22 +88,22 @@ setters!(JsInterestRateFutureBuilder, "InterestRateFutureBuilder", {
     /// @param value - Optional observation date for term-rate settlement, in ISO calendar days. Pass null to clear it.
     /// @returns The active builder.
     /// @throws FinstackError for invalid inputs or an inactive builder.
-    fixing_date as fixingDate: "string | null" => js_wire via fixing_date_opt,
+    fixing_date as fixingDate: "string | null" => opt_date via fixing_date_opt,
     /// Set the contract's period start.
     /// @param value - Optional start date of the reference rate accrual period. Pass null to clear it.
     /// @returns The active builder.
     /// @throws FinstackError for invalid inputs or an inactive builder.
-    period_start as periodStart: "string | null" => js_wire via period_start_opt,
+    period_start as periodStart: "string | null" => opt_date via period_start_opt,
     /// Set the contract's period end.
     /// @param value - Optional end date of the reference rate accrual period. Pass null to clear it.
     /// @returns The active builder.
     /// @throws FinstackError for invalid inputs or an inactive builder.
-    period_end as periodEnd: "string | null" => js_wire via period_end_opt,
+    period_end as periodEnd: "string | null" => opt_date via period_end_opt,
     /// Set the contract's day count.
     /// @param value - Accrual and convexity clock day-count convention.
     /// @returns The active builder.
     /// @throws FinstackError for invalid inputs or an inactive builder.
-    day_count as dayCount: "string" => js_wire,
+    day_count as dayCount: "string" => js_parse,
     /// Set the contract's contract specs.
     /// @param value - Exchange face, price tick, cycle months and optional decimal convexity adjustment.
     /// @returns The active builder.
@@ -113,12 +113,12 @@ setters!(JsInterestRateFutureBuilder, "InterestRateFutureBuilder", {
     /// @param value - Market identifier of the futures settlement discount curve.
     /// @returns The active builder.
     /// @throws FinstackError for invalid inputs or an inactive builder.
-    discount_curve_id as discountCurveId: "string" => js_wire,
+    discount_curve_id as discountCurveId: "string" => id,
     /// Set the contract's forward curve id.
     /// @param value - Market identifier of the quoted reference-rate projection curve.
     /// @returns The active builder.
     /// @throws FinstackError for invalid inputs or an inactive builder.
-    forward_curve_id as forwardCurveId: "string" => js_wire,
+    forward_curve_id as forwardCurveId: "string" => id,
     /// Set the contract's compounding.
     /// @param value - Calculation convention for the rate period, including overnight averaging or compounding.
     /// @returns The active builder.
@@ -128,16 +128,16 @@ setters!(JsInterestRateFutureBuilder, "InterestRateFutureBuilder", {
     /// @param value - Optional fixing-series identifier for observed resets. Pass null to clear it.
     /// @returns The active builder.
     /// @throws FinstackError for invalid inputs or an inactive builder.
-    index_id as indexId: "string | null" => js_wire via index_id_opt,
+    index_id as indexId: "string | null" => optional_id via index_id_opt,
     /// Set the contract's fixing calendar id.
     /// @param value - Optional business-day calendar for looking up historical fixings. Pass null to clear it.
     /// @returns The active builder.
     /// @throws FinstackError for invalid inputs or an inactive builder.
-    fixing_calendar_id as fixingCalendarId: "string | null" => js_wire via fixing_calendar_id_opt,
+    fixing_calendar_id as fixingCalendarId: "string | null" => optional_id via fixing_calendar_id_opt,
     /// Set the contract's vol surface id.
     /// @param value - Optional surface supplying absolute normal-rate convexity volatility. Pass null to clear it.
     /// @returns The active builder.
     /// @throws FinstackError for invalid inputs or an inactive builder.
-    vol_surface_id as volSurfaceId: "string | null" => js_wire via vol_surface_id_opt,
+    vol_surface_id as volSurfaceId: "string | null" => optional_id via vol_surface_id_opt,
 });
 common_setters!(JsInterestRateFutureBuilder, "InterestRateFutureBuilder");

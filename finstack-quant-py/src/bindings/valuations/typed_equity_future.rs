@@ -63,14 +63,50 @@ impl PyEquityFuture {
         instrument_expiry(py, &self.inner)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_future", "EquityFuture.terms")]
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_future", "EquityFuture.discrete_dividends")]
     #[getter]
-    fn terms(&self) -> PyListedFutureTerms {
-        PyListedFutureTerms {
-            inner: self.inner.terms.clone(),
-        }
+    fn discrete_dividends<'py>(&self, py: Python<'py>) -> PyResult<Vec<(Bound<'py, PyAny>, f64)>> {
+        self.inner
+            .discrete_dividends
+            .iter()
+            .map(|(date, amount)| {
+                crate::bindings::date_utils::date_to_py(py, *date)
+                    .map(|day| (day.into_any(), *amount))
+            })
+            .collect()
+    }
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_future", "EquityFuture.quanto")]
+    #[getter]
+    fn quanto<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.quanto)
     }
 }
+
+crate::bindings::macros::py_getters!(PyEquityFuture |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_future", "EquityFuture.terms")]
+    terms -> PyListedFutureTerms = PyListedFutureTerms {
+        inner: s.inner.terms.clone(),
+    };
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_future", "EquityFuture.underlying_ticker")]
+    underlying_ticker -> String = s.inner.underlying_ticker.clone();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_future", "EquityFuture.underlying_currency")]
+    underlying_currency -> String = s.inner.underlying_currency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_future", "EquityFuture.discount_curve_id")]
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_future", "EquityFuture.spot_id")]
+    spot_id -> String = s.inner.spot_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_future", "EquityFuture.div_yield_id")]
+    div_yield_id -> Option<String> = s.inner.div_yield_id.as_ref().map(ToString::to_string);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_future", "EquityFuture.vol_surface_id")]
+    vol_surface_id -> Option<String> = s.inner.vol_surface_id.as_ref().map(ToString::to_string);
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_future", "EquityFutureBuilder")]
 #[pyclass(
@@ -113,7 +149,7 @@ impl PyEquityFutureBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let value = py_to_serde(value.py(), value, "underlying_currency")?;
+        let value = crate::bindings::core::currency::extract_currency(value)?;
         builder_set!(slf, |b: EquityFutureBuilder| b.underlying_currency(value))
     }
 
@@ -181,9 +217,12 @@ impl PyEquityFutureBuilder {
     }
 }
 
-/// Register the bond future and its builder.
+/// Register the equity future and its builder.
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyEquityFuture>()?;
     module.add_class::<PyEquityFutureBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["EquityFuture", "EquityFutureBuilder"];

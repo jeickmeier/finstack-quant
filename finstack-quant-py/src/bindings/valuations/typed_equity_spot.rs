@@ -59,48 +59,6 @@ impl PyEquity {
         instrument_expiry(py, &self.inner)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_spot", "Equity.ticker")]
-    #[getter]
-    fn ticker(&self) -> String {
-        self.inner.ticker.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_spot", "Equity.currency")]
-    #[getter]
-    fn currency(&self) -> String {
-        self.inner.currency.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_spot", "Equity.quantity")]
-    #[getter]
-    fn quantity(&self) -> Option<f64> {
-        self.inner.quantity
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_spot", "Equity.quoted_spot")]
-    #[getter]
-    fn quoted_spot(&self) -> Option<f64> {
-        self.inner.quoted_spot
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_spot", "Equity.spot_id")]
-    #[getter]
-    fn spot_id(&self) -> Option<String> {
-        self.inner.spot_id.as_ref().map(ToString::to_string)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_spot", "Equity.div_yield_id")]
-    #[getter]
-    fn div_yield_id(&self) -> Option<String> {
-        self.inner.div_yield_id.as_ref().map(ToString::to_string)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_spot", "Equity.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_spot", "Equity.discrete_dividends")]
     #[getter]
     fn discrete_dividends<'py>(&self, py: Python<'py>) -> PyResult<Vec<(Bound<'py, PyAny>, f64)>> {
@@ -114,6 +72,29 @@ impl PyEquity {
             .collect()
     }
 }
+
+crate::bindings::macros::py_getters!(PyEquity |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_spot", "Equity.ticker")]
+    ticker -> String = s.inner.ticker.clone();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_spot", "Equity.currency")]
+    currency -> String = s.inner.currency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_spot", "Equity.quantity")]
+    quantity -> Option<f64> = s.inner.quantity;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_spot", "Equity.quoted_spot")]
+    quoted_spot -> Option<f64> = s.inner.quoted_spot;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_spot", "Equity.spot_id")]
+    spot_id -> Option<String> = s.inner.spot_id.as_ref().map(ToString::to_string);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_spot", "Equity.div_yield_id")]
+    div_yield_id -> Option<String> = s.inner.div_yield_id.as_ref().map(ToString::to_string);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_spot", "Equity.discount_curve_id")]
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_spot", "EquityBuilder")]
 #[pyclass(
@@ -221,3 +202,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyEquityBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["Equity", "EquityBuilder"];

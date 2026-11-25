@@ -185,12 +185,12 @@ setters!(JsInflationCapFloorBuilder, "InflationCapFloorBuilder", {
     /// @param value - Explicit contractual CPI observation lag; missing terms fail reference resolution.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    lag as lag: "NonNullable<generated.valuations.InflationCapFloor['lag']> | null" => js_wire via lag_opt,
+    lag as lag: "NonNullable<generated.valuations.InflationCapFloor['lag']> | null" => opt_wire via lag_opt,
     /// Set the contract's interpolation.
     /// @param value - Explicit contractual monthly CPI interpolation; no source default is used. Defaults to monthly step interpolation when neither source supplies it.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    interpolation as interpolation: "NonNullable<generated.valuations.InflationCapFloor['interpolation']> | null" => js_wire via interpolation_opt,
+    interpolation as interpolation: "NonNullable<generated.valuations.InflationCapFloor['interpolation']> | null" => opt_wire via interpolation_opt,
     /// Set the contract's volatility expiry.
     /// @param value - Clock used by the volatility surface's annualized quotes. This is independent of CPI publication policy; changing it requires matching quotes, not merely relabelling the old surface.
     /// @returns The active builder.

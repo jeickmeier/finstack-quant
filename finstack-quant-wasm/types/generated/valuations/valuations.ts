@@ -15297,7 +15297,7 @@ export interface Tarn {
  * creating a path-dependent "snowball" accumulation:
  *
  * ```text
- * c_i = max(c_{i-1} + fixed_rate - L_i, 0)
+ * c_i = max(c_{i-1} + fixed_rate - gearing * L_i, coupon_floor)
  * ```
  *
  * where L_i is the floating rate and c_0 = initial_coupon.
@@ -15349,7 +15349,7 @@ export interface Snowball {
    */
   forward_curve_id: Id;
   /**
-   * Multiplier on the floating fixing (1.0 for snowball, variable for inverse floater).
+   * Multiplier on the floating fixing applied in both `Snowball` and `InverseFloater` variants.
    */
   gearing: number;
   /**

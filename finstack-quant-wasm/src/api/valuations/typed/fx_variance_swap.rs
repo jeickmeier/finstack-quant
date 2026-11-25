@@ -153,12 +153,12 @@ setters!(JsFxVarianceSwapBuilder, "FxVarianceSwapBuilder", {
     /// @param value - Base currency (foreign)
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    base_currency as baseCurrency: "string" => js_wire,
+    base_currency as baseCurrency: "string" => js_currency,
     /// Set the contract's quote currency.
     /// @param value - Quote currency (domestic)
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    quote_currency as quoteCurrency: "string" => js_wire,
+    quote_currency as quoteCurrency: "string" => js_currency,
     /// Set the contract's spot id.
     /// @param value - Optional spot identifier used to look up historical series.
     /// @returns The active builder.
@@ -168,7 +168,7 @@ setters!(JsFxVarianceSwapBuilder, "FxVarianceSwapBuilder", {
     /// @param value - Strike variance (annualized)
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    strike_variance as strikeVariance: "number" => js_wire,
+    strike_variance as strikeVariance: "number" => js_f64,
     /// Set the contract's start date.
     /// @param value - Start date of observation period
     /// @returns The active builder.
@@ -183,7 +183,7 @@ setters!(JsFxVarianceSwapBuilder, "FxVarianceSwapBuilder", {
     /// @param value - Optional cash-settlement date. Defaults to the adjusted final observation date.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    settlement_date as settlementDate: "string | null" => js_wire via settlement_date_opt,
+    settlement_date as settlementDate: "string | null" => opt_date via settlement_date_opt,
     /// Set the contract's observation frequency.
     /// @param value - Observation frequency
     /// @returns The active builder.
@@ -208,7 +208,7 @@ setters!(JsFxVarianceSwapBuilder, "FxVarianceSwapBuilder", {
     /// @param value - Preserve month-end rolls for month/year observation frequencies.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    observation_end_of_month as observationEndOfMonth: "boolean" => js_wire,
+    observation_end_of_month as observationEndOfMonth: "boolean" => js_bool,
     /// Set the contract's realized var method.
     /// @param value - Method for calculating realized variance (defaults to CloseToClose)
     /// @returns The active builder.
@@ -218,7 +218,7 @@ setters!(JsFxVarianceSwapBuilder, "FxVarianceSwapBuilder", {
     /// @param value - Trading days per year used to annualise daily realized variance. A contract term of the variance-swap confirmation: daily observations are annualised by trading_days_per_year / observation_frequency.count(). Must be finite and positive. Defaults to finstack_quant_valuations_core::constants::TRADING_DAYS_PER_YEAR (252).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    trading_days_per_year as tradingDaysPerYear: "number" => js_wire,
+    trading_days_per_year as tradingDaysPerYear: "number" => js_f64,
     /// Set the contract's open series id.
     /// @param value - Series ID for open prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang). Defaults to spot_id (or currency-pair string) when absent.
     /// @returns The active builder.
@@ -243,7 +243,7 @@ setters!(JsFxVarianceSwapBuilder, "FxVarianceSwapBuilder", {
     /// @param value - Contractual closing fixing immediately before the first Yang–Zhang target bar. Resolved exactly in the same close series as the target bars.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    previous_close_date as previousCloseDate: "string | null" => js_wire via previous_close_date_opt,
+    previous_close_date as previousCloseDate: "string | null" => opt_date via previous_close_date_opt,
     /// Set the contract's side.
     /// @param value - Pay/receive variance
     /// @returns The active builder.

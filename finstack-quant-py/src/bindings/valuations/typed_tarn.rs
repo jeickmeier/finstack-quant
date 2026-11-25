@@ -67,24 +67,6 @@ impl PyTarn {
         crate::bindings::core::money::decimal_to_py(py, self.inner.fixed_rate)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_tarn", "Tarn.coupon_floor")]
-    #[getter]
-    fn coupon_floor(&self) -> f64 {
-        self.inner.coupon_floor
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_tarn", "Tarn.target_coupon")]
-    #[getter]
-    fn target_coupon(&self) -> f64 {
-        self.inner.target_coupon
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_tarn", "Tarn.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_tarn", "Tarn.start_date")]
     #[getter]
     fn start_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -108,31 +90,30 @@ impl PyTarn {
     fn index_tenor<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.index_tenor)
     }
+}
+
+crate::bindings::macros::py_getters!(PyTarn |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_tarn", "Tarn.coupon_floor")]
+    coupon_floor -> f64 = s.inner.coupon_floor;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_tarn", "Tarn.target_coupon")]
+    target_coupon -> f64 = s.inner.target_coupon;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_tarn", "Tarn.notional")]
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_tarn", "Tarn.forward_curve_id")]
-    #[getter]
-    fn forward_curve_id(&self) -> String {
-        self.inner.forward_curve_id.to_string()
-    }
+    forward_curve_id -> String = s.inner.forward_curve_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_tarn", "Tarn.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_tarn", "Tarn.vol_surface_id")]
-    #[getter]
-    fn vol_surface_id(&self) -> Option<String> {
-        self.inner.vol_surface_id.as_ref().map(ToString::to_string)
-    }
+    vol_surface_id -> Option<String> = s.inner.vol_surface_id.as_ref().map(ToString::to_string);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_tarn", "Tarn.day_count")]
-    #[getter]
-    fn day_count(&self) -> crate::bindings::core::dates::daycount::PyDayCount {
-        crate::bindings::core::dates::daycount::PyDayCount::from_inner(self.inner.day_count)
-    }
-}
+    day_count -> crate::bindings::core::dates::daycount::PyDayCount = crate::bindings::core::dates::daycount::PyDayCount::from_inner(s.inner.day_count);
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_tarn", "TarnBuilder")]
 #[pyclass(
@@ -271,3 +252,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyTarnBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["Tarn", "TarnBuilder"];

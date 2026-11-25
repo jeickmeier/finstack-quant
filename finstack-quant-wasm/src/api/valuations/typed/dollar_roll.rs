@@ -137,7 +137,7 @@ setters!(JsDollarRollBuilder, "DollarRollBuilder", {
     /// @param value - Pass-through coupon rate.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    coupon as coupon: "number" => js_wire,
+    coupon as coupon: "number" => js_f64,
     /// Set the contract's term.
     /// @param value - Original loan term.
     /// @returns The active builder.
@@ -147,22 +147,22 @@ setters!(JsDollarRollBuilder, "DollarRollBuilder", {
     /// @param value - Front-month settlement year.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    front_settlement_year as frontSettlementYear: "number" => js_wire,
+    front_settlement_year as frontSettlementYear: "number" => js_int,
     /// Set the contract's front settlement month.
     /// @param value - Front-month settlement month (1-12).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    front_settlement_month as frontSettlementMonth: "number" => js_wire,
+    front_settlement_month as frontSettlementMonth: "number" => js_uint,
     /// Set the contract's back settlement year.
     /// @param value - Back-month settlement year.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    back_settlement_year as backSettlementYear: "number" => js_wire,
+    back_settlement_year as backSettlementYear: "number" => js_int,
     /// Set the contract's back settlement month.
     /// @param value - Back-month settlement month (1-12).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    back_settlement_month as backSettlementMonth: "number" => js_wire,
+    back_settlement_month as backSettlementMonth: "number" => js_uint,
     /// Set the contract's settlement class.
     /// @param value - SIFMA settlement class of the deliverable pools (A/B/C/D), used for both legs. Required: never inferred from agency or term.
     /// @returns The active builder.
@@ -172,32 +172,32 @@ setters!(JsDollarRollBuilder, "DollarRollBuilder", {
     /// @param value - Explicit front-month settlement date override. When set, bypasses the SIFMA calendar lookup for the front leg.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    front_settlement_date as frontSettlementDate: "string | null" => js_wire via front_settlement_date_opt,
+    front_settlement_date as frontSettlementDate: "string | null" => opt_date via front_settlement_date_opt,
     /// Set the contract's back settlement date.
     /// @param value - Explicit back-month settlement date override. When set, bypasses the SIFMA calendar lookup for the back leg.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    back_settlement_date as backSettlementDate: "string | null" => js_wire via back_settlement_date_opt,
+    back_settlement_date as backSettlementDate: "string | null" => opt_date via back_settlement_date_opt,
     /// Set the contract's front price.
     /// @param value - Front-month price (sell price).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    front_price as frontPrice: "number" => js_wire,
+    front_price as frontPrice: "number" => js_f64,
     /// Set the contract's back price.
     /// @param value - Back-month price (buy price).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    back_price as backPrice: "number" => js_wire,
+    back_price as backPrice: "number" => js_f64,
     /// Set the contract's trade date.
     /// @param value - Trade date.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    trade_date as tradeDate: "string | null" => js_wire via trade_date_opt,
+    trade_date as tradeDate: "string | null" => opt_date via trade_date_opt,
     /// Set the contract's prepayment spec.
     /// @param value - Prepayment model of the generic pool both legs deliver. None uses the embedded generic PSA assumption of the TBA legs.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    prepayment_spec as prepaymentSpec: "NonNullable<generated.valuations.DollarRoll['prepayment_spec']> | null" => js_wire via prepayment_spec_opt,
+    prepayment_spec as prepaymentSpec: "NonNullable<generated.valuations.DollarRoll['prepayment_spec']> | null" => opt_wire via prepayment_spec_opt,
     /// Set the contract's discount curve id.
     /// @param value - Discount curve identifier.
     /// @returns The active builder.

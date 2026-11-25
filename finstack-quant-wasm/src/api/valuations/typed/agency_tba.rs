@@ -126,7 +126,7 @@ setters!(JsAgencyTbaBuilder, "AgencyTbaBuilder", {
     /// @param value - Pass-through coupon rate (e.g., 0.04 for 4%).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    coupon as coupon: "number" => js_wire,
+    coupon as coupon: "number" => js_f64,
     /// Set the contract's term.
     /// @param value - Original loan term.
     /// @returns The active builder.
@@ -136,12 +136,12 @@ setters!(JsAgencyTbaBuilder, "AgencyTbaBuilder", {
     /// @param value - Settlement year.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    settlement_year as settlementYear: "number" => js_wire,
+    settlement_year as settlementYear: "number" => js_int,
     /// Set the contract's settlement month.
     /// @param value - Settlement month (1-12).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    settlement_month as settlementMonth: "number" => js_wire,
+    settlement_month as settlementMonth: "number" => js_uint,
     /// Set the contract's settlement class.
     /// @param value - SIFMA settlement class of the deliverable pools (A/B/C/D). Required: it is never inferred from agency or term, because those labels do not establish security eligibility for a class.
     /// @returns The active builder.
@@ -151,32 +151,32 @@ setters!(JsAgencyTbaBuilder, "AgencyTbaBuilder", {
     /// @param value - Explicit settlement date override. When set, bypasses the SIFMA calendar lookup for settlement_year/settlement_month in AgencyTba::effective_settlement_date. Dollar rolls use this to keep leg pricing consistent with explicit roll settlement dates.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    settlement_date as settlementDate: "string | null" => js_wire via settlement_date_opt,
+    settlement_date as settlementDate: "string | null" => opt_date via settlement_date_opt,
     /// Set the contract's trade price.
     /// @param value - Trade price (percentage of par, e.g., 98.5).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    trade_price as tradePrice: "number" => js_wire,
+    trade_price as tradePrice: "number" => js_f64,
     /// Set the contract's trade date.
     /// @param value - Trade date.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    trade_date as tradeDate: "string | null" => js_wire via trade_date_opt,
+    trade_date as tradeDate: "string | null" => opt_date via trade_date_opt,
     /// Set the contract's pool factor.
     /// @param value - Current/original face ratio in (0, 1] for the assumed delivered pool. Defaults to 1.0 for a generic pool. Original face is notional / factor; the purchased current face remains notional. When an explicit pool is supplied, its factor is used and any specified factor must agree.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    pool_factor as poolFactor: "number | null" => js_wire via pool_factor_opt,
+    pool_factor as poolFactor: "number | null" => opt_f64 via pool_factor_opt,
     /// Set the contract's assumed pool.
     /// @param value - Optional assumed pool for valuation. Its current and original faces are scaled together to the trade's purchased current face. If absent, generic pool characteristics apply.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    assumed_pool as assumedPool: "NonNullable<generated.valuations.AgencyTba['assumed_pool']> | null" => js_wire via assumed_pool_opt,
+    assumed_pool as assumedPool: "NonNullable<generated.valuations.AgencyTba['assumed_pool']> | null" => opt_wire via assumed_pool_opt,
     /// Set the contract's prepayment spec.
     /// @param value - Prepayment model of the generic assumed pool. Applies only when assumed_pool is absent (an explicit pool carries its own model); None uses the embedded generic PSA assumption. Setting it together with assumed_pool is rejected.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    prepayment_spec as prepaymentSpec: "NonNullable<generated.valuations.AgencyTba['prepayment_spec']> | null" => js_wire via prepayment_spec_opt,
+    prepayment_spec as prepaymentSpec: "NonNullable<generated.valuations.AgencyTba['prepayment_spec']> | null" => opt_wire via prepayment_spec_opt,
     /// Set the contract's discount curve id.
     /// @param value - Discount curve identifier.
     /// @returns The active builder.

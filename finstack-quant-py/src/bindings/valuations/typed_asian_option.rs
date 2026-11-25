@@ -56,18 +56,6 @@ impl PyAsianOption {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_asian_option", "AsianOption.underlying_ticker")]
-    #[getter]
-    fn underlying_ticker(&self) -> String {
-        self.inner.underlying_ticker.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_asian_option", "AsianOption.strike")]
-    #[getter]
-    fn strike(&self) -> f64 {
-        self.inner.strike
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_asian_option", "AsianOption.option_type")]
     #[getter]
     fn option_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -98,48 +86,6 @@ impl PyAsianOption {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_asian_option", "AsianOption.quantity")]
-    #[getter]
-    fn quantity(&self) -> f64 {
-        self.inner.quantity
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_asian_option", "AsianOption.currency")]
-    #[getter]
-    fn currency(&self) -> String {
-        self.inner.currency.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_asian_option", "AsianOption.day_count")]
-    #[getter]
-    fn day_count(&self) -> crate::bindings::core::dates::daycount::PyDayCount {
-        crate::bindings::core::dates::daycount::PyDayCount::from_inner(self.inner.day_count)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_asian_option", "AsianOption.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_asian_option", "AsianOption.spot_id")]
-    #[getter]
-    fn spot_id(&self) -> String {
-        self.inner.spot_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_asian_option", "AsianOption.vol_surface_id")]
-    #[getter]
-    fn vol_surface_id(&self) -> String {
-        self.inner.vol_surface_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_asian_option", "AsianOption.div_yield_id")]
-    #[getter]
-    fn div_yield_id(&self) -> Option<String> {
-        self.inner.div_yield_id.as_ref().map(ToString::to_string)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_asian_option", "AsianOption.past_fixings")]
     #[getter]
     fn past_fixings<'py>(&self, py: Python<'py>) -> PyResult<Vec<(Bound<'py, PyAny>, f64)>> {
@@ -150,6 +96,35 @@ impl PyAsianOption {
             .collect()
     }
 }
+
+crate::bindings::macros::py_getters!(PyAsianOption |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_asian_option", "AsianOption.underlying_ticker")]
+    underlying_ticker -> String = s.inner.underlying_ticker.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_asian_option", "AsianOption.strike")]
+    strike -> f64 = s.inner.strike;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_asian_option", "AsianOption.quantity")]
+    quantity -> f64 = s.inner.quantity;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_asian_option", "AsianOption.currency")]
+    currency -> String = s.inner.currency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_asian_option", "AsianOption.day_count")]
+    day_count -> crate::bindings::core::dates::daycount::PyDayCount = crate::bindings::core::dates::daycount::PyDayCount::from_inner(s.inner.day_count);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_asian_option", "AsianOption.discount_curve_id")]
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_asian_option", "AsianOption.spot_id")]
+    spot_id -> String = s.inner.spot_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_asian_option", "AsianOption.vol_surface_id")]
+    vol_surface_id -> String = s.inner.vol_surface_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_asian_option", "AsianOption.div_yield_id")]
+    div_yield_id -> Option<String> = s.inner.div_yield_id.as_ref().map(ToString::to_string);
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_asian_option", "AsianOptionBuilder")]
 #[pyclass(
@@ -309,3 +284,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyAsianOptionBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["AsianOption", "AsianOptionBuilder"];

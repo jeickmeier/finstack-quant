@@ -67,17 +67,11 @@ builder_class!(
     JsLeveredRealEstateEquityBuilder, "LeveredRealEstateEquityBuilder", LeveredRealEstateEquityBuilder, JsLeveredRealEstateEquity, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = LeveredRealEstateEquity)]
-impl JsLeveredRealEstateEquity {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsLeveredRealEstateEquityBuilder {
-        JsLeveredRealEstateEquityBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsLeveredRealEstateEquity, "LeveredRealEstateEquity", JsLeveredRealEstateEquityBuilder
+);
 
 setters!(JsLeveredRealEstateEquityBuilder, "LeveredRealEstateEquityBuilder", {
     /// Set the stable contract identifier.
@@ -89,7 +83,7 @@ setters!(JsLeveredRealEstateEquityBuilder, "LeveredRealEstateEquityBuilder", {
     /// @param value - Currency (must match asset currency; financing PV is validated at valuation time).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    currency as currency: "string" => js_wire,
+    currency as currency: "string" => js_currency,
     /// Set the contract's asset.
     /// @param value - Underlying unlevered asset.
     /// @returns The active builder.

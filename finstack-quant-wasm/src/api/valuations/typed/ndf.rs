@@ -126,7 +126,7 @@ setters!(JsNdfBuilder, "NdfBuilder", {
     /// @param value - Contract forward rate. Interpretation depends on quote_convention: - BasePerSettlement: base per settlement (e.g., 7.25 CNY per USD) - SettlementPerBase: settlement per base (e.g., 0.138 USD per CNY) None values the NDF at-market: the contract rate equals the market forward, so the settlement amount and PV are zero.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    contract_rate as contractRate: "number | null" => js_wire via contract_rate_opt,
+    contract_rate as contractRate: "number | null" => opt_f64 via contract_rate_opt,
     /// Set the contract's domestic discount curve id.
     /// @param value - Settlement currency discount curve ID.
     /// @returns The active builder.
@@ -146,22 +146,22 @@ setters!(JsNdfBuilder, "NdfBuilder", {
     /// @param value - Observed fixing rate. Interpretation depends on quote_convention. If Some, NDF is post-fixing.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    observed_fixing as observedFixing: "number | null" => js_wire via observed_fixing_opt,
+    observed_fixing as observedFixing: "number | null" => opt_f64 via observed_fixing_opt,
     /// Set the contract's fixing source.
     /// @param value - Official fixing source/benchmark enum for type-safe specification. Use this field for validated fixing sources. See NdfFixingSource for supported benchmarks and their typical currencies.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    fixing_source as fixingSource: "NonNullable<generated.valuations.Ndf['fixing_source']> | null" => js_wire via fixing_source_opt,
+    fixing_source as fixingSource: "NonNullable<generated.valuations.Ndf['fixing_source']> | null" => opt_wire via fixing_source_opt,
     /// Set the contract's quoted spot.
     /// @param value - Optional spot rate override for forward rate calculation. Interpretation depends on quote_convention.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    quoted_spot as quotedSpot: "number | null" => js_wire via quoted_spot_opt,
+    quoted_spot as quotedSpot: "number | null" => opt_f64 via quoted_spot_opt,
     /// Set the contract's quoted forward.
     /// @param value - Explicit pre-fixing forward rate in quote_convention units. Use this for NDF market quotes or basis-adjusted forwards when a base currency discount curve is unavailable.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    quoted_forward as quotedForward: "number | null" => js_wire via quoted_forward_opt,
+    quoted_forward as quotedForward: "number | null" => opt_f64 via quoted_forward_opt,
     /// Set the contract's base calendar id.
     /// @param value - Optional base currency calendar.
     /// @returns The active builder.

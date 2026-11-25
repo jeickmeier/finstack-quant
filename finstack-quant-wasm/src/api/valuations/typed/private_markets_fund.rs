@@ -49,7 +49,7 @@ getters!(JsPrivateMarketsFund, "PrivateMarketsFund", |i| {
     events as events: "generated.valuations.PrivateMarketsFund['events']" => json(i.events),
     /// Read the contract's discount curve id.
     /// @returns Optional discount curve for future LP cashflows. When None, future cashflows are included undiscounted relative to the caller's valuation date.
-    discount_curve_id as discountCurveId: "string | null" => json(i.discount_curve_id),
+    discount_curve_id as discountCurveId: "string | null" => opt_text(i.discount_curve_id),
     /// Read the contract's unrealized nav.
     /// @returns Unrealized net asset value attributable to the LP, stated as of the fund's valuation date. Holder-view residual value : the fund's present value is the PV of LP cashflows strictly after the valuation date plus this NAV. When None, the residual value is zero — a fully realized fund prices to ~0. **Do not combine a NAV mark with forecast distribution events after the valuation date.** The NAV mark already embeds the value of the fund's future realizations, so supplying both double counts them: model either realized history + NAV mark (marked fund), or realized history + projected future events with no NAV (cashflow projection). The NAV is added undiscounted, taken as stated at the valuation date.
     unrealized_nav as unrealizedNav: "NonNullable<generated.valuations.PrivateMarketsFund['unrealized_nav']> | null" => json(i.unrealized_nav),
@@ -73,17 +73,11 @@ builder_class!(
     JsPrivateMarketsFundBuilder, "PrivateMarketsFundBuilder", PrivateMarketsFundBuilder, JsPrivateMarketsFund, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = PrivateMarketsFund)]
-impl JsPrivateMarketsFund {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsPrivateMarketsFundBuilder {
-        JsPrivateMarketsFundBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsPrivateMarketsFund, "PrivateMarketsFund", JsPrivateMarketsFundBuilder
+);
 
 setters!(JsPrivateMarketsFundBuilder, "PrivateMarketsFundBuilder", {
     /// Set the stable contract identifier.
@@ -95,7 +89,7 @@ setters!(JsPrivateMarketsFundBuilder, "PrivateMarketsFundBuilder", {
     /// @param value - Functional currency of the fund.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    currency as currency: "string" => js_wire,
+    currency as currency: "string" => js_currency,
     /// Set the contract's waterfall spec.
     /// @param value - Waterfall specification defining LP/GP allocation tiers.
     /// @returns The active builder.
@@ -115,6 +109,6 @@ setters!(JsPrivateMarketsFundBuilder, "PrivateMarketsFundBuilder", {
     /// @param value - Unrealized net asset value attributable to the LP, stated as of the fund's valuation date. Holder-view residual value : the fund's present value is the PV of LP cashflows strictly after the valuation date plus this NAV. When None, the residual value is zero — a fully realized fund prices to ~0. **Do not combine a NAV mark with forecast distribution events after the valuation date.** The NAV mark already embeds the value of the fund's future realizations, so supplying both double counts them: model either realized history + NAV mark (marked fund), or realized history + projected future events with no NAV (cashflow projection). The NAV is added undiscounted, taken as stated at the valuation date.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    unrealized_nav as unrealizedNav: "NonNullable<generated.valuations.PrivateMarketsFund['unrealized_nav']> | null" => js_wire via unrealized_nav_opt,
+    unrealized_nav as unrealizedNav: "NonNullable<generated.valuations.PrivateMarketsFund['unrealized_nav']> | null" => opt_wire via unrealized_nav_opt,
 });
 common_setters!(JsPrivateMarketsFundBuilder, "PrivateMarketsFundBuilder");

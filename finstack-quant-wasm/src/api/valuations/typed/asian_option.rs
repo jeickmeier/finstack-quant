@@ -38,7 +38,7 @@ getters!(JsAsianOption, "AsianOption", |i| {
     default_model as defaultModel: "string" => text(Instrument::default_model(i)),
     /// Read the contract's underlying ticker.
     /// @returns Underlying asset ticker symbol
-    underlying_ticker as underlyingTicker: "string" => json(i.underlying_ticker),
+    underlying_ticker as underlyingTicker: "string" => text(i.underlying_ticker),
     /// Read the contract's strike.
     /// @returns Strike price
     strike as strike: "number" => json(i.strike),
@@ -65,16 +65,16 @@ getters!(JsAsianOption, "AsianOption", |i| {
     day_count as dayCount: "DayCount" => day_count(i.day_count),
     /// Read the contract's discount curve id.
     /// @returns Discount curve ID for present value calculations
-    discount_curve_id as discountCurveId: "string" => json(i.discount_curve_id),
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
     /// Read the contract's spot id.
     /// @returns Spot price identifier
-    spot_id as spotId: "string" => json(i.spot_id),
+    spot_id as spotId: "string" => text(i.spot_id),
     /// Read the contract's vol surface id.
     /// @returns Volatility surface ID
-    vol_surface_id as volSurfaceId: "string" => json(i.vol_surface_id),
+    vol_surface_id as volSurfaceId: "string" => text(i.vol_surface_id),
     /// Read the contract's div yield id.
     /// @returns Optional dividend-yield scalar ID
-    div_yield_id as divYieldId: "string | null" => json(i.div_yield_id),
+    div_yield_id as divYieldId: "string | null" => opt_text(i.div_yield_id),
     /// Read the contract's past fixings.
     /// @returns Past fixings for seasoned options (date, observed price pairs). For seasoned options where some averaging observations have already occurred, provide the historical fixings here. Only fixings that match dates in fixing_dates and are on or before the valuation date are considered.
     past_fixings as pastFixings: "generated.valuations.AsianOption['past_fixings']" => dated_nums(i.past_fixings),
@@ -98,17 +98,11 @@ builder_class!(
     JsAsianOptionBuilder, "AsianOptionBuilder", AsianOptionBuilder, JsAsianOption, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = AsianOption)]
-impl JsAsianOption {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsAsianOptionBuilder {
-        JsAsianOptionBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsAsianOption, "AsianOption", JsAsianOptionBuilder
+);
 
 setters!(JsAsianOptionBuilder, "AsianOptionBuilder", {
     /// Set the stable contract identifier.
@@ -125,7 +119,7 @@ setters!(JsAsianOptionBuilder, "AsianOptionBuilder", {
     /// @param value - Strike price
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    strike as strike: "number" => js_wire,
+    strike as strike: "number" => js_f64,
     /// Set the contract's option type.
     /// @param value - Option type (call or put)
     /// @returns The active builder.
@@ -150,12 +144,12 @@ setters!(JsAsianOptionBuilder, "AsianOptionBuilder", {
     /// @param value - Number of underlying units the option is written on; PV and Greeks scale linearly with it.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    quantity as quantity: "number" => js_wire,
+    quantity as quantity: "number" => js_f64,
     /// Set the contract's currency.
     /// @param value - Currency of the strike, premium and present value.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    currency as currency: "string" => js_wire,
+    currency as currency: "string" => js_currency,
     /// Set the contract's discount curve id.
     /// @param value - Discount curve ID for present value calculations
     /// @returns The active builder.

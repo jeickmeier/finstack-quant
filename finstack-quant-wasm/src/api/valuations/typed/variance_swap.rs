@@ -42,16 +42,16 @@ getters!(JsVarianceSwap, "VarianceSwap", |i| {
     default_model as defaultModel: "string" => text(Instrument::default_model(i)),
     /// Read the contract's underlying ticker.
     /// @returns Underlying symbol (equity/index). A label only; market data is read through spot_id, vol_surface_id and div_yield_id.
-    underlying_ticker as underlyingTicker: "string" => json(i.underlying_ticker),
+    underlying_ticker as underlyingTicker: "string" => text(i.underlying_ticker),
     /// Read the contract's spot id.
     /// @returns Market-scalar id (MarketContext::get_price) of the underlying spot level. It is also the default close-price series id.
-    spot_id as spotId: "string" => json(i.spot_id),
+    spot_id as spotId: "string" => text(i.spot_id),
     /// Read the contract's vol surface id.
     /// @returns Volatility surface used to replicate the unobserved variance.
-    vol_surface_id as volSurfaceId: "string" => json(i.vol_surface_id),
+    vol_surface_id as volSurfaceId: "string" => text(i.vol_surface_id),
     /// Read the contract's div yield id.
     /// @returns Optional unitless continuous dividend-yield scalar id (decimal, 0.02 = 2%). None means a zero dividend yield.
-    div_yield_id as divYieldId: "string | null" => json(i.div_yield_id),
+    div_yield_id as divYieldId: "string | null" => opt_text(i.div_yield_id),
     /// Read the contract's notional.
     /// @returns Variance notional (in variance units)
     notional as notional: "Money" => money(i.notional),
@@ -72,7 +72,7 @@ getters!(JsVarianceSwap, "VarianceSwap", |i| {
     observation_frequency as observationFrequency: "generated.valuations.VarianceSwap['observation_frequency']" => json(i.observation_frequency),
     /// Read the contract's observation calendar id.
     /// @returns Exchange/fixing calendar used for every realized-variance observation.
-    observation_calendar_id as observationCalendarId: "string" => json(i.observation_calendar_id),
+    observation_calendar_id as observationCalendarId: "string" => text(i.observation_calendar_id),
     /// Read the contract's observation business day convention.
     /// @returns Business-day convention applied to observation dates.
     observation_business_day_convention as observationBusinessDayConvention: "generated.valuations.VarianceSwap['observation_business_day_convention']" => json(i.observation_business_day_convention),
@@ -90,16 +90,16 @@ getters!(JsVarianceSwap, "VarianceSwap", |i| {
     price_series_policy as priceSeriesPolicy: "generated.valuations.VarianceSwap['price_series_policy']" => json(i.price_series_policy),
     /// Read the contract's open series id.
     /// @returns Series ID for open prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
-    open_series_id as openSeriesId: "string | null" => json(i.open_series_id),
+    open_series_id as openSeriesId: "string | null" => opt_text(i.open_series_id),
     /// Read the contract's high series id.
     /// @returns Series ID for high prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
-    high_series_id as highSeriesId: "string | null" => json(i.high_series_id),
+    high_series_id as highSeriesId: "string | null" => opt_text(i.high_series_id),
     /// Read the contract's low series id.
     /// @returns Series ID for low prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
-    low_series_id as lowSeriesId: "string | null" => json(i.low_series_id),
+    low_series_id as lowSeriesId: "string | null" => opt_text(i.low_series_id),
     /// Read the contract's close series id.
     /// @returns Series ID for close prices. Defaults to spot_id when absent.
-    close_series_id as closeSeriesId: "string | null" => json(i.close_series_id),
+    close_series_id as closeSeriesId: "string | null" => opt_text(i.close_series_id),
     /// Read the contract's previous close date.
     /// @returns Contractual closing fixing immediately before the first Yang–Zhang target bar. Resolved exactly in the same close series as the target bars.
     previous_close_date as previousCloseDate: "string | null" => opt_date(i.previous_close_date),
@@ -108,7 +108,7 @@ getters!(JsVarianceSwap, "VarianceSwap", |i| {
     side as side: "generated.valuations.VarianceSwap['side']" => json(i.side),
     /// Read the contract's discount curve id.
     /// @returns Discount curve identifier
-    discount_curve_id as discountCurveId: "string" => json(i.discount_curve_id),
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
     /// Read the contract's day count.
     /// @returns Day count convention for time calculations
     day_count as dayCount: "DayCount" => day_count(i.day_count),
@@ -132,17 +132,11 @@ builder_class!(
     JsVarianceSwapBuilder, "VarianceSwapBuilder", VarianceSwapBuilder, JsVarianceSwap, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = VarianceSwap)]
-impl JsVarianceSwap {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsVarianceSwapBuilder {
-        JsVarianceSwapBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsVarianceSwap, "VarianceSwap", JsVarianceSwapBuilder
+);
 
 setters!(JsVarianceSwapBuilder, "VarianceSwapBuilder", {
     /// Set the stable contract identifier.
@@ -174,7 +168,7 @@ setters!(JsVarianceSwapBuilder, "VarianceSwapBuilder", {
     /// @param value - Strike variance (annualized)
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    strike_variance as strikeVariance: "number" => js_wire,
+    strike_variance as strikeVariance: "number" => js_f64,
     /// Set the contract's start date.
     /// @param value - Start date of observation period
     /// @returns The active builder.
@@ -189,7 +183,7 @@ setters!(JsVarianceSwapBuilder, "VarianceSwapBuilder", {
     /// @param value - Optional cash-settlement date. Defaults to the adjusted final observation date.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    settlement_date as settlementDate: "string | null" => js_wire via settlement_date_opt,
+    settlement_date as settlementDate: "string | null" => opt_date via settlement_date_opt,
     /// Set the contract's observation frequency.
     /// @param value - Observation frequency
     /// @returns The active builder.
@@ -209,7 +203,7 @@ setters!(JsVarianceSwapBuilder, "VarianceSwapBuilder", {
     /// @param value - Preserve month-end rolls for month/year observation frequencies.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    observation_end_of_month as observationEndOfMonth: "boolean" => js_wire,
+    observation_end_of_month as observationEndOfMonth: "boolean" => js_bool,
     /// Set the contract's realized var method.
     /// @param value - Method for calculating realized variance (defaults to CloseToClose)
     /// @returns The active builder.
@@ -219,7 +213,7 @@ setters!(JsVarianceSwapBuilder, "VarianceSwapBuilder", {
     /// @param value - Trading days per year used to annualise daily realized variance. A contract term of the variance-swap confirmation: daily observations are annualised by trading_days_per_year / observation_frequency.count(). Must be finite and positive. Defaults to finstack_quant_valuations_core::constants::TRADING_DAYS_PER_YEAR (252).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    trading_days_per_year as tradingDaysPerYear: "number" => js_wire,
+    trading_days_per_year as tradingDaysPerYear: "number" => js_f64,
     /// Set the contract's price series policy.
     /// @param value - Corporate-action policy applied to all historical price series. The selected policy is declarative: input series must already conform to it. Adjusted is appropriate for single-stock variance where splits must not create artificial returns; Raw is explicit for official index levels or contracts whose calculation agent retains raw observations.
     /// @returns The active builder.
@@ -249,7 +243,7 @@ setters!(JsVarianceSwapBuilder, "VarianceSwapBuilder", {
     /// @param value - Contractual closing fixing immediately before the first Yang–Zhang target bar. Resolved exactly in the same close series as the target bars.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    previous_close_date as previousCloseDate: "string | null" => js_wire via previous_close_date_opt,
+    previous_close_date as previousCloseDate: "string | null" => opt_date via previous_close_date_opt,
     /// Set the contract's side.
     /// @param value - Pay/receive variance
     /// @returns The active builder.

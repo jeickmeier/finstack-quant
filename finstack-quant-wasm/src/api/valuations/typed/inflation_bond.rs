@@ -141,7 +141,7 @@ setters!(JsInflationLinkedBondBuilder, "InflationLinkedBondBuilder", {
     /// @param value - Accrual year-fraction convention, such as 30_360.
     /// @returns The same builder for chaining.
     /// @throws TypeError for a mistyped value or FinstackError for invalid input or a consumed builder.
-    day_count as dayCount: "generated.valuations.InflationLinkedBond['day_count']" => js_wire,
+    day_count as dayCount: "generated.valuations.InflationLinkedBond['day_count']" => js_parse,
     /// Set the bond's base date.
     /// @param value - Reference CPI date from the issue terms, which may differ from the issue date.
     /// @returns The same builder for chaining.

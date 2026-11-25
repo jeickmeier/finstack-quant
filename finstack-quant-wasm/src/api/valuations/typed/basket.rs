@@ -54,7 +54,7 @@ getters!(JsBasket, "Basket", |i| {
     notional as notional: "Money" => money(i.notional),
     /// Read the contract's discount curve id.
     /// @returns Discount curve identifier for present value calculations
-    discount_curve_id as discountCurveId: "string" => json(i.discount_curve_id),
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
     /// Read the contract's pricing config.
     /// @returns Pricing configuration
     pricing_config as pricingConfig: "generated.valuations.Basket['pricing_config']" => json(i.pricing_config),
@@ -78,17 +78,11 @@ builder_class!(
     JsBasketBuilder, "BasketBuilder", BasketBuilder, JsBasket, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = Basket)]
-impl JsBasket {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsBasketBuilder {
-        JsBasketBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsBasket, "Basket", JsBasketBuilder
+);
 
 setters!(JsBasketBuilder, "BasketBuilder", {
     /// Set the stable contract identifier.
@@ -105,7 +99,7 @@ setters!(JsBasketBuilder, "BasketBuilder", {
     /// @param value - Total expense ratio (as decimal, e.g., 0.0025 = 0.25%) The explicit expense election supplies accrued cash.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    expense_ratio as expenseRatio: "number" => js_wire,
+    expense_ratio as expenseRatio: "number" => js_f64,
     /// Set the basket's accrued expense election.
     /// @param value - No expense or nonnegative reporting-currency cash per basket unit.
     /// @returns This builder for chaining.
@@ -116,7 +110,7 @@ setters!(JsBasketBuilder, "BasketBuilder", {
     /// @param value - Reporting currency of the basket: NAV and PV are stated in it and every constituent in another currency is FX-converted into it.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    reporting_currency as reportingCurrency: "string" => js_wire,
+    reporting_currency as reportingCurrency: "string" => js_currency,
     /// Set the contract's discount curve id.
     /// @param value - Discount curve identifier for present value calculations
     /// @returns The active builder.

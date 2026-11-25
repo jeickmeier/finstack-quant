@@ -56,12 +56,6 @@ impl PyCommoditySpreadOption {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spread_option", "CommoditySpreadOption.currency")]
-    #[getter]
-    fn currency(&self) -> String {
-        self.inner.currency.to_string()
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spread_option", "CommoditySpreadOption.option_type")]
     #[getter]
     fn option_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -73,61 +67,39 @@ impl PyCommoditySpreadOption {
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::date_utils::date_to_py(py, self.inner.expiry)
     }
+}
+
+crate::bindings::macros::py_getters!(PyCommoditySpreadOption |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spread_option", "CommoditySpreadOption.currency")]
+    currency -> String = s.inner.currency.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spread_option", "CommoditySpreadOption.strike")]
-    #[getter]
-    fn strike(&self) -> f64 {
-        self.inner.strike
-    }
+    strike -> f64 = s.inner.strike;
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spread_option", "CommoditySpreadOption.quantity")]
-    #[getter]
-    fn quantity(&self) -> f64 {
-        self.inner.quantity
-    }
+    quantity -> f64 = s.inner.quantity;
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spread_option", "CommoditySpreadOption.leg1_forward_curve_id")]
-    #[getter]
-    fn leg1_forward_curve_id(&self) -> String {
-        self.inner.leg1_forward_curve_id.to_string()
-    }
+    leg1_forward_curve_id -> String = s.inner.leg1_forward_curve_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spread_option", "CommoditySpreadOption.leg2_forward_curve_id")]
-    #[getter]
-    fn leg2_forward_curve_id(&self) -> String {
-        self.inner.leg2_forward_curve_id.to_string()
-    }
+    leg2_forward_curve_id -> String = s.inner.leg2_forward_curve_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spread_option", "CommoditySpreadOption.leg1_vol_surface_id")]
-    #[getter]
-    fn leg1_vol_surface_id(&self) -> String {
-        self.inner.leg1_vol_surface_id.to_string()
-    }
+    leg1_vol_surface_id -> String = s.inner.leg1_vol_surface_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spread_option", "CommoditySpreadOption.leg2_vol_surface_id")]
-    #[getter]
-    fn leg2_vol_surface_id(&self) -> String {
-        self.inner.leg2_vol_surface_id.to_string()
-    }
+    leg2_vol_surface_id -> String = s.inner.leg2_vol_surface_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spread_option", "CommoditySpreadOption.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spread_option", "CommoditySpreadOption.correlation")]
-    #[getter]
-    fn correlation(&self) -> f64 {
-        self.inner.correlation
-    }
+    correlation -> f64 = s.inner.correlation;
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spread_option", "CommoditySpreadOption.day_count")]
-    #[getter]
-    fn day_count(&self) -> crate::bindings::core::dates::daycount::PyDayCount {
-        crate::bindings::core::dates::daycount::PyDayCount::from_inner(self.inner.day_count)
-    }
-}
+    day_count -> crate::bindings::core::dates::daycount::PyDayCount = crate::bindings::core::dates::daycount::PyDayCount::from_inner(s.inner.day_count);
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spread_option", "CommoditySpreadOptionBuilder")]
 #[pyclass(
@@ -264,3 +236,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyCommoditySpreadOptionBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["CommoditySpreadOption", "CommoditySpreadOptionBuilder"];

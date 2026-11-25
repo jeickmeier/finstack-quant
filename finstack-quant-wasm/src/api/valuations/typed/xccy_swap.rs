@@ -108,11 +108,11 @@ setters!(JsXccySwapBuilder, "XccySwapBuilder", {
     /// @param value - PV reporting currency (output currency of value/npv).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    reporting_currency as reportingCurrency: "string" => js_wire,
+    reporting_currency as reportingCurrency: "string" => js_currency,
     /// Set the contract's allow calendar fallback.
     /// @param value - Allow a weekends-only calendar when either leg's leg.calendar_id is missing or cannot be resolved. When false (default), missing calendars are treated as input errors.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    allow_calendar_fallback as allowCalendarFallback: "boolean" => js_wire,
+    allow_calendar_fallback as allowCalendarFallback: "boolean" => js_bool,
 });
 common_setters!(JsXccySwapBuilder, "XccySwapBuilder");

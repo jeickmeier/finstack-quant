@@ -56,13 +56,13 @@ getters!(JsTarn, "Tarn", |i| {
     index_tenor as indexTenor: "generated.valuations.Tarn['index_tenor']" => json(i.index_tenor),
     /// Read the contract's forward curve id.
     /// @returns Rates forward curve that projects the floating index (also the fixing-series key).
-    forward_curve_id as forwardCurveId: "string" => json(i.forward_curve_id),
+    forward_curve_id as forwardCurveId: "string" => text(i.forward_curve_id),
     /// Read the contract's discount curve id.
     /// @returns Discount curve ID for PV calculations.
-    discount_curve_id as discountCurveId: "string" => json(i.discount_curve_id),
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
     /// Read the contract's vol surface id.
     /// @returns Optional normal-vol surface used to infer HW1F short-rate σ for stress scenarios.
-    vol_surface_id as volSurfaceId: "string | null" => json(i.vol_surface_id),
+    vol_surface_id as volSurfaceId: "string | null" => opt_text(i.vol_surface_id),
     /// Read the contract's day count.
     /// @returns Day count convention for coupon accrual.
     day_count as dayCount: "DayCount" => day_count(i.day_count),
@@ -86,17 +86,11 @@ builder_class!(
     JsTarnBuilder, "TarnBuilder", TarnBuilder, JsTarn, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = Tarn)]
-impl JsTarn {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsTarnBuilder {
-        JsTarnBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsTarn, "Tarn", JsTarnBuilder
+);
 
 setters!(JsTarnBuilder, "TarnBuilder", {
     /// Set the stable contract identifier.
@@ -113,12 +107,12 @@ setters!(JsTarnBuilder, "TarnBuilder", {
     /// @param value - Floor on each period's coupon (typically 0.0).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    coupon_floor as couponFloor: "number" => js_wire,
+    coupon_floor as couponFloor: "number" => js_f64,
     /// Set the contract's target coupon.
     /// @param value - Target cumulative coupon level (triggers early redemption). A zero target is allowed and represents redemption at the first future coupon date without coupon accrual.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    target_coupon as targetCoupon: "number" => js_wire,
+    target_coupon as targetCoupon: "number" => js_f64,
     /// Set the contract's start date.
     /// @param value - Accrual start of the first coupon period; also the first in-advance fixing date.
     /// @returns The active builder.

@@ -67,40 +67,10 @@ impl PySnowball {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.variant)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.initial_coupon")]
-    #[getter]
-    fn initial_coupon(&self) -> f64 {
-        self.inner.initial_coupon
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.fixed_rate")]
     #[getter]
     fn fixed_rate<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::core::money::decimal_to_py(py, self.inner.fixed_rate)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.gearing")]
-    #[getter]
-    fn gearing(&self) -> f64 {
-        self.inner.gearing
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.coupon_floor")]
-    #[getter]
-    fn coupon_floor(&self) -> f64 {
-        self.inner.coupon_floor
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.coupon_cap")]
-    #[getter]
-    fn coupon_cap(&self) -> Option<f64> {
-        self.inner.coupon_cap
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.start_date")]
@@ -121,28 +91,10 @@ impl PySnowball {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.forward_curve_id")]
-    #[getter]
-    fn forward_curve_id(&self) -> String {
-        self.inner.forward_curve_id.to_string()
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.index_tenor")]
     #[getter]
     fn index_tenor<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.index_tenor)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.vol_surface_id")]
-    #[getter]
-    fn vol_surface_id(&self) -> Option<String> {
-        self.inner.vol_surface_id.as_ref().map(ToString::to_string)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.call_provision")]
@@ -150,13 +102,36 @@ impl PySnowball {
     fn call_provision<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.call_provision)
     }
+}
+
+crate::bindings::macros::py_getters!(PySnowball |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.initial_coupon")]
+    initial_coupon -> f64 = s.inner.initial_coupon;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.gearing")]
+    gearing -> f64 = s.inner.gearing;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.coupon_floor")]
+    coupon_floor -> f64 = s.inner.coupon_floor;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.coupon_cap")]
+    coupon_cap -> Option<f64> = s.inner.coupon_cap;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.notional")]
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.forward_curve_id")]
+    forward_curve_id -> String = s.inner.forward_curve_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.discount_curve_id")]
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.vol_surface_id")]
+    vol_surface_id -> Option<String> = s.inner.vol_surface_id.as_ref().map(ToString::to_string);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.day_count")]
-    #[getter]
-    fn day_count(&self) -> crate::bindings::core::dates::daycount::PyDayCount {
-        crate::bindings::core::dates::daycount::PyDayCount::from_inner(self.inner.day_count)
-    }
-}
+    day_count -> crate::bindings::core::dates::daycount::PyDayCount = crate::bindings::core::dates::daycount::PyDayCount::from_inner(s.inner.day_count);
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "SnowballBuilder")]
 #[pyclass(
@@ -326,3 +301,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PySnowballBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["Snowball", "SnowballBuilder"];

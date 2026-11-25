@@ -134,7 +134,7 @@ setters!(JsRepoBuilder, "RepoBuilder", {
     /// @param value - Haircut percentage (as decimal, e.g., 0.02 = 2%)
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    haircut as haircut: "number" => js_wire,
+    haircut as haircut: "number" => js_f64,
     /// Set the contract's repo type.
     /// @param value - Type of repo
     /// @returns The active builder.
@@ -144,7 +144,7 @@ setters!(JsRepoBuilder, "RepoBuilder", {
     /// @param value - Whether this is a tri-party repo
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    triparty as triparty: "boolean" => js_wire,
+    triparty as triparty: "boolean" => js_bool,
     /// Set the contract's business day convention.
     /// @param value - Business day convention
     /// @returns The active builder.
@@ -164,7 +164,7 @@ setters!(JsRepoBuilder, "RepoBuilder", {
     /// @param value - Optional margin specification for mark-to-market margining. When present, enables margin call generation, collateral valuation, and margin interest calculations. See RepoMarginSpec for details.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    margin_spec as marginSpec: "NonNullable<generated.valuations.Repo['margin_spec']> | null" => js_wire via margin_spec_opt,
+    margin_spec as marginSpec: "NonNullable<generated.valuations.Repo['margin_spec']> | null" => opt_wire via margin_spec_opt,
 });
 common_setters!(JsRepoBuilder, "RepoBuilder");
 

@@ -393,3 +393,126 @@ macro_rules! builder_set {
     }};
 }
 pub(crate) use builder_set;
+
+/// Bind one `*FutureOption` wrapper, its fluent builder, `register`, and `EXPORTS`.
+macro_rules! py_future_option {
+    (
+        $ty:ident, $name:literal, $builder:ident, $builder_name:literal,
+        $rust_ty:ident, $rust_builder:ident, $module:literal
+    ) => {
+        use pyo3::prelude::*;
+
+        #[doc = $crate::bindings::pydoc::pydoc!($module, $name)]
+        #[pyclass(
+            name = $name,
+            module = "finstack_quant.valuations.instruments",
+            frozen,
+            skip_from_py_object
+        )]
+        #[derive(Clone)]
+        pub struct $ty {
+            pub(crate) inner: $rust_ty,
+        }
+
+        $crate::bindings::valuations::typed_macros::instrument_envelope_methods!(
+            $ty($name, module = $module),
+            $rust_ty,
+            builder = $builder($builder_name, no_fields),
+            seed = <$rust_ty>::builder(),
+        );
+        $crate::bindings::valuations::typed_macros::instrument_pricing_methods!(
+            $ty,
+            $name,
+            module = $module
+        );
+
+        #[pymethods]
+        impl $ty {
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_builder"))]
+            fn to_builder(&self) -> $builder {
+                $builder {
+                    inner: Some(self.inner.to_builder()),
+                }
+            }
+
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".example"))]
+            #[staticmethod]
+            fn example() -> PyResult<Self> {
+                <$rust_ty>::example()
+                    .map(|inner| Self { inner })
+                    .map_err($crate::errors::core_to_py)
+            }
+
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".expiry"))]
+            #[getter]
+            fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+                $crate::bindings::valuations::convert::instrument_expiry(py, &self.inner)
+            }
+        }
+
+        $crate::bindings::macros::py_getters!($ty |s| {
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".terms"))]
+            terms -> $crate::bindings::valuations::typed_listed::PyFutureOptionTerms =
+                $crate::bindings::valuations::typed_listed::PyFutureOptionTerms {
+                    inner: s.inner.terms.clone(),
+                };
+        });
+
+        #[doc = $crate::bindings::pydoc::pydoc!($module, $builder_name)]
+        #[pyclass(
+            name = $builder_name,
+            module = "finstack_quant.valuations.instruments",
+            skip_from_py_object
+        )]
+        pub struct $builder {
+            inner: Option<$rust_builder>,
+        }
+
+        #[pymethods]
+        impl $builder {
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($builder_name, ".id"))]
+            fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
+                let value = finstack_quant_core::types::InstrumentId::new(value);
+                $crate::bindings::valuations::typed_macros::builder_set!(
+                    slf,
+                    |b: $rust_builder| b.id(value)
+                )
+            }
+
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($builder_name, ".terms"))]
+            fn terms<'py>(
+                mut slf: PyRefMut<'py, Self>,
+                value: &$crate::bindings::valuations::typed_listed::PyFutureOptionTerms,
+            ) -> PyResult<PyRefMut<'py, Self>> {
+                let value = value.inner.clone();
+                $crate::bindings::valuations::typed_macros::builder_set!(
+                    slf,
+                    |b: $rust_builder| b.terms(value)
+                )
+            }
+
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($builder_name, ".attributes"))]
+            fn attributes<'py>(
+                mut slf: PyRefMut<'py, Self>,
+                value: &Bound<'_, PyAny>,
+            ) -> PyResult<PyRefMut<'py, Self>> {
+                let value = $crate::bindings::valuations::convert::attributes_from_py(value)?;
+                $crate::bindings::valuations::typed_macros::builder_set!(
+                    slf,
+                    |b: $rust_builder| b.attributes(value)
+                )
+            }
+        }
+
+        /// Register the future option and its builder.
+        pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+            module.add_class::<$ty>()?;
+            module.add_class::<$builder>()?;
+            Ok(())
+        }
+
+        /// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+        pub(crate) const EXPORTS: &[&str] = &[$name, $builder_name];
+    };
+}
+pub(crate) use py_future_option;

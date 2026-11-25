@@ -68,24 +68,6 @@ impl PyCommoditySwap {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.underlying)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwap.quantity")]
-    #[getter]
-    fn quantity(&self) -> f64 {
-        self.inner.quantity
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwap.fixed_price")]
-    #[getter]
-    fn fixed_price(&self) -> f64 {
-        self.inner.fixed_price
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwap.forward_curve_id")]
-    #[getter]
-    fn forward_curve_id(&self) -> String {
-        self.inner.forward_curve_id.to_string()
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwap.side")]
     #[getter]
     fn side<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -110,30 +92,6 @@ impl PyCommoditySwap {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.frequency)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwap.calendar_id")]
-    #[getter]
-    fn calendar_id(&self) -> Option<String> {
-        self.inner.calendar_id.as_ref().map(ToString::to_string)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwap.business_day_convention")]
-    #[getter]
-    fn business_day_convention(&self) -> PyResult<String> {
-        super::convert::enum_to_py_string(&self.inner.business_day_convention)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwap.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwap.index_lag_days")]
-    #[getter]
-    fn index_lag_days(&self) -> Option<i32> {
-        self.inner.index_lag_days
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwap.past_fixings")]
     #[getter]
     fn past_fixings<'py>(&self, py: Python<'py>) -> PyResult<Vec<(Bound<'py, PyAny>, f64)>> {
@@ -144,6 +102,29 @@ impl PyCommoditySwap {
             .collect()
     }
 }
+
+crate::bindings::macros::py_getters!(PyCommoditySwap |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwap.quantity")]
+    quantity -> f64 = s.inner.quantity;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwap.fixed_price")]
+    fixed_price -> f64 = s.inner.fixed_price;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwap.forward_curve_id")]
+    forward_curve_id -> String = s.inner.forward_curve_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwap.calendar_id")]
+    calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwap.business_day_convention")]
+    business_day_convention -> PyResult<String> = super::convert::enum_to_py_string(&s.inner.business_day_convention);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwap.discount_curve_id")]
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwap.index_lag_days")]
+    index_lag_days -> Option<i32> = s.inner.index_lag_days;
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwapBuilder")]
 #[pyclass(
@@ -291,3 +272,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyCommoditySwapBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["CommoditySwap", "CommoditySwapBuilder"];

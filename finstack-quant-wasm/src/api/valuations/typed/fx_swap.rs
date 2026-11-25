@@ -129,12 +129,12 @@ setters!(JsFxSwapBuilder, "FxSwapBuilder", {
     /// @param value - Optional near leg FX rate (quote per base). If absent, use the market outright forward from the valuation date to near settlement.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    near_rate as nearRate: "number | null" => js_wire via near_rate_opt,
+    near_rate as nearRate: "number | null" => opt_f64 via near_rate_opt,
     /// Set the contract's far rate.
     /// @param value - Optional far leg FX rate (quote per base). If absent, use the market outright forward from the valuation date to far settlement.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    far_rate as farRate: "number | null" => js_wire via far_rate_opt,
+    far_rate as farRate: "number | null" => opt_f64 via far_rate_opt,
     /// Set the contract's base calendar id.
     /// @param value - Optional base currency calendar for spot/settlement adjustment metadata.
     /// @returns The active builder.

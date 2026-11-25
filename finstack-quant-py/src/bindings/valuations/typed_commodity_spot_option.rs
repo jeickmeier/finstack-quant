@@ -62,12 +62,6 @@ impl PyCommoditySpotOption {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.underlying)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOption.strike")]
-    #[getter]
-    fn strike(&self) -> f64 {
-        self.inner.strike
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOption.option_type")]
     #[getter]
     fn option_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -101,18 +95,6 @@ impl PyCommoditySpotOption {
         crate::bindings::date_utils::date_to_py(py, self.inner.expiry)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOption.quantity")]
-    #[getter]
-    fn quantity(&self) -> f64 {
-        self.inner.quantity
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOption.multiplier")]
-    #[getter]
-    fn multiplier(&self) -> f64 {
-        self.inner.multiplier
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOption.settlement")]
     #[getter]
     fn settlement<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -124,43 +106,36 @@ impl PyCommoditySpotOption {
     fn exercise<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.exercise)
     }
+}
+
+crate::bindings::macros::py_getters!(PyCommoditySpotOption |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOption.strike")]
+    strike -> f64 = s.inner.strike;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOption.quantity")]
+    quantity -> f64 = s.inner.quantity;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOption.multiplier")]
+    multiplier -> f64 = s.inner.multiplier;
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOption.forward_curve_id")]
-    #[getter]
-    fn forward_curve_id(&self) -> String {
-        self.inner.forward_curve_id.to_string()
-    }
+    forward_curve_id -> String = s.inner.forward_curve_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOption.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOption.vol_surface_id")]
-    #[getter]
-    fn vol_surface_id(&self) -> String {
-        self.inner.vol_surface_id.to_string()
-    }
+    vol_surface_id -> String = s.inner.vol_surface_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOption.spot_id")]
-    #[getter]
-    fn spot_id(&self) -> Option<String> {
-        self.inner.spot_id.as_ref().map(ToString::to_string)
-    }
+    spot_id -> Option<String> = s.inner.spot_id.as_ref().map(ToString::to_string);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOption.quoted_forward")]
-    #[getter]
-    fn quoted_forward(&self) -> Option<f64> {
-        self.inner.quoted_forward
-    }
+    quoted_forward -> Option<f64> = s.inner.quoted_forward;
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOption.day_count")]
-    #[getter]
-    fn day_count(&self) -> crate::bindings::core::dates::daycount::PyDayCount {
-        crate::bindings::core::dates::daycount::PyDayCount::from_inner(self.inner.day_count)
-    }
-}
+    day_count -> crate::bindings::core::dates::daycount::PyDayCount = crate::bindings::core::dates::daycount::PyDayCount::from_inner(s.inner.day_count);
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOptionBuilder")]
 #[pyclass(
@@ -338,3 +313,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyCommoditySpotOptionBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["CommoditySpotOption", "CommoditySpotOptionBuilder"];

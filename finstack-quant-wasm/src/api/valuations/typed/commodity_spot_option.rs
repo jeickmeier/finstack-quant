@@ -68,16 +68,16 @@ getters!(JsCommoditySpotOption, "CommoditySpotOption", |i| {
     exercise as exercise: "NonNullable<generated.valuations.CommoditySpotOption['exercise']> | null" => json(i.exercise),
     /// Read the contract's forward curve id.
     /// @returns Forward/futures curve ID for price interpolation.
-    forward_curve_id as forwardCurveId: "string" => json(i.forward_curve_id),
+    forward_curve_id as forwardCurveId: "string" => text(i.forward_curve_id),
     /// Read the contract's discount curve id.
     /// @returns Discount curve ID for present value.
-    discount_curve_id as discountCurveId: "string" => json(i.discount_curve_id),
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
     /// Read the contract's vol surface id.
     /// @returns Volatility surface ID for implied vol.
-    vol_surface_id as volSurfaceId: "string" => json(i.vol_surface_id),
+    vol_surface_id as volSurfaceId: "string" => text(i.vol_surface_id),
     /// Read the contract's spot id.
     /// @returns Optional spot price ID (for spot-based pricing and American options). Numeric prices use the underlying currency; Money prices must match it.
-    spot_id as spotId: "string | null" => json(i.spot_id),
+    spot_id as spotId: "string | null" => opt_text(i.spot_id),
     /// Read the contract's quoted forward.
     /// @returns Optional quoted forward price (overrides curve lookup).
     quoted_forward as quotedForward: "number | null" => json(i.quoted_forward),
@@ -104,17 +104,11 @@ builder_class!(
     JsCommoditySpotOptionBuilder, "CommoditySpotOptionBuilder", CommoditySpotOptionBuilder, JsCommoditySpotOption, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = CommoditySpotOption)]
-impl JsCommoditySpotOption {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsCommoditySpotOptionBuilder {
-        JsCommoditySpotOptionBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsCommoditySpotOption, "CommoditySpotOption", JsCommoditySpotOptionBuilder
+);
 
 setters!(JsCommoditySpotOptionBuilder, "CommoditySpotOptionBuilder", {
     /// Set the stable contract identifier.
@@ -131,7 +125,7 @@ setters!(JsCommoditySpotOptionBuilder, "CommoditySpotOptionBuilder", {
     /// @param value - Strike price per unit.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    strike as strike: "number" => js_wire,
+    strike as strike: "number" => js_f64,
     /// Set the contract's option type.
     /// @param value - Option type (call or put).
     /// @returns The active builder.
@@ -146,7 +140,7 @@ setters!(JsCommoditySpotOptionBuilder, "CommoditySpotOptionBuilder", {
     /// @param value - Optional Bermudan exercise schedule. Required when exercise_style == ExerciseStyle::Bermudan.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    exercise_dates as exerciseDates: "NonNullable<generated.valuations.CommoditySpotOption['exercise_dates']> | null" => js_wire via exercise_dates_opt,
+    exercise_dates as exerciseDates: "NonNullable<generated.valuations.CommoditySpotOption['exercise_dates']> | null" => opt_wire via exercise_dates_opt,
     /// Set the contract's expiry.
     /// @param value - Option expiry date.
     /// @returns The active builder.
@@ -156,12 +150,12 @@ setters!(JsCommoditySpotOptionBuilder, "CommoditySpotOptionBuilder", {
     /// @param value - Contract quantity in units.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    quantity as quantity: "number" => js_wire,
+    quantity as quantity: "number" => js_f64,
     /// Set the contract's multiplier.
     /// @param value - Contract multiplier (typically 1.0 for OTC options).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    multiplier as multiplier: "number" => js_wire,
+    multiplier as multiplier: "number" => js_f64,
     /// Set the contract's settlement.
     /// @param value - Settlement type (physical or cash). Cash fixes the payoff on exercise; physical retains the marked delivery claim until its recorded settlement date.
     /// @returns The active builder.
@@ -171,7 +165,7 @@ setters!(JsCommoditySpotOptionBuilder, "CommoditySpotOptionBuilder", {
     /// @param value - Recorded exercise or expiry; required after expiry while settlement remains unpaid.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    exercise as exercise: "NonNullable<generated.valuations.CommoditySpotOption['exercise']> | null" => js_wire via exercise_opt,
+    exercise as exercise: "NonNullable<generated.valuations.CommoditySpotOption['exercise']> | null" => opt_wire via exercise_opt,
     /// Set the contract's forward curve id.
     /// @param value - Forward/futures curve ID for price interpolation.
     /// @returns The active builder.
@@ -196,7 +190,7 @@ setters!(JsCommoditySpotOptionBuilder, "CommoditySpotOptionBuilder", {
     /// @param value - Optional quoted forward price (overrides curve lookup).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    quoted_forward as quotedForward: "number | null" => js_wire via quoted_forward_opt,
+    quoted_forward as quotedForward: "number | null" => opt_f64 via quoted_forward_opt,
 });
 common_setters!(JsCommoditySpotOptionBuilder, "CommoditySpotOptionBuilder");
 

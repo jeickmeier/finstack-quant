@@ -67,34 +67,10 @@ impl PyBasket {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.constituents)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basket", "Basket.expense_ratio")]
-    #[getter]
-    fn expense_ratio(&self) -> f64 {
-        self.inner.expense_ratio
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basket", "Basket.expense")]
     #[getter]
     fn expense<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.expense)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basket", "Basket.reporting_currency")]
-    #[getter]
-    fn reporting_currency(&self) -> String {
-        self.inner.reporting_currency.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basket", "Basket.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basket", "Basket.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basket", "Basket.pricing_config")]
@@ -103,6 +79,20 @@ impl PyBasket {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.pricing_config)
     }
 }
+
+crate::bindings::macros::py_getters!(PyBasket |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basket", "Basket.expense_ratio")]
+    expense_ratio -> f64 = s.inner.expense_ratio;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basket", "Basket.reporting_currency")]
+    reporting_currency -> String = s.inner.reporting_currency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basket", "Basket.notional")]
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basket", "Basket.discount_curve_id")]
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basket", "BasketBuilder")]
 #[pyclass(
@@ -200,3 +190,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyBasketBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["Basket", "BasketBuilder"];

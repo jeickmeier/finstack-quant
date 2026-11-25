@@ -115,9 +115,48 @@ pub(crate) mod get {
 pub(crate) mod arg {
     use super::*;
     pub(crate) use crate::utils::input::{
-        from_js_json, js_bool, js_f64, js_int, js_string, js_uint,
+        from_js_json, js_bool, js_currency, js_f64, js_int, js_string, js_uint,
     };
-    pub(crate) use crate::utils::wire::{js_date, js_wire};
+    pub(crate) use crate::utils::wire::{js_date, js_parse, js_wire};
+
+    /// An optional JavaScript number; `null` and `undefined` yield `None`.
+    pub(crate) fn opt_f64(value: &JsValue, label: &str) -> Result<Option<f64>, JsValue> {
+        crate::utils::input::js_opt_f64(Some(value), label)
+    }
+
+    /// An optional JavaScript boolean; `null` and `undefined` yield `None`.
+    pub(crate) fn opt_bool(value: &JsValue, label: &str) -> Result<Option<bool>, JsValue> {
+        crate::utils::input::js_opt_bool(Some(value), label)
+    }
+
+    /// An optional signed whole number; `null` and `undefined` yield `None`.
+    pub(crate) fn opt_int<T: TryFrom<i64>>(
+        value: &JsValue,
+        label: &str,
+    ) -> Result<Option<T>, JsValue> {
+        crate::utils::input::js_opt_int(Some(value), label)
+    }
+
+    /// An optional non-negative whole number; `null` and `undefined` yield `None`.
+    pub(crate) fn opt_uint<T: TryFrom<u64>>(
+        value: &JsValue,
+        label: &str,
+    ) -> Result<Option<T>, JsValue> {
+        crate::utils::input::js_opt_uint(Some(value), label)
+    }
+
+    /// An optional ISO-8601 date string; `null` and `undefined` yield `None`.
+    pub(crate) fn opt_date(value: &JsValue, label: &str) -> Result<Option<Date>, JsValue> {
+        crate::utils::wire::js_opt_date(Some(value), label)
+    }
+
+    /// An optional wire value; `null` and `undefined` yield `None`.
+    pub(crate) fn opt_wire<T: serde::de::DeserializeOwned>(
+        value: &JsValue,
+        label: &str,
+    ) -> Result<Option<T>, JsValue> {
+        crate::utils::wire::js_opt_wire(Some(value), label)
+    }
 
     /// A string identifier (instrument, curve, calendar or price id).
     pub(crate) fn id<T: From<String>>(value: &JsValue, label: &str) -> Result<T, JsValue> {

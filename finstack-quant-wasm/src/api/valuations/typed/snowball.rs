@@ -67,16 +67,16 @@ getters!(JsSnowball, "Snowball", |i| {
     payment_dates as paymentDates: "generated.valuations.Snowball['payment_dates']" => dates(i.payment_dates),
     /// Read the contract's forward curve id.
     /// @returns Rates forward curve that projects the floating index (also the fixing-series key).
-    forward_curve_id as forwardCurveId: "string" => json(i.forward_curve_id),
+    forward_curve_id as forwardCurveId: "string" => text(i.forward_curve_id),
     /// Read the contract's index tenor.
     /// @returns Contractual tenor of the observed floating index (must match the forward curve tenor).
     index_tenor as indexTenor: "generated.valuations.Snowball['index_tenor']" => json(i.index_tenor),
     /// Read the contract's discount curve id.
     /// @returns Discount curve ID.
-    discount_curve_id as discountCurveId: "string" => json(i.discount_curve_id),
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
     /// Read the contract's vol surface id.
     /// @returns Optional normal-vol surface used to infer HW1F short-rate σ for stress scenarios.
-    vol_surface_id as volSurfaceId: "string | null" => json(i.vol_surface_id),
+    vol_surface_id as volSurfaceId: "string | null" => opt_text(i.vol_surface_id),
     /// Read the contract's call provision.
     /// @returns Optional Bermudan call provision.
     call_provision as callProvision: "NonNullable<generated.valuations.Snowball['call_provision']> | null" => json(i.call_provision),
@@ -103,17 +103,11 @@ builder_class!(
     JsSnowballBuilder, "SnowballBuilder", SnowballBuilder, JsSnowball, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = Snowball)]
-impl JsSnowball {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsSnowballBuilder {
-        JsSnowballBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsSnowball, "Snowball", JsSnowballBuilder
+);
 
 setters!(JsSnowballBuilder, "SnowballBuilder", {
     /// Set the stable contract identifier.
@@ -130,7 +124,7 @@ setters!(JsSnowballBuilder, "SnowballBuilder", {
     /// @param value - Initial coupon for snowball (c_0); ignored for inverse floater.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    initial_coupon as initialCoupon: "number" => js_wire,
+    initial_coupon as initialCoupon: "number" => js_f64,
     /// Set the contract's fixed rate.
     /// @param value - Fixed rate component as a decimal annual rate (0.05 = 5%).
     /// @returns The active builder.
@@ -140,17 +134,17 @@ setters!(JsSnowballBuilder, "SnowballBuilder", {
     /// @param value - Multiplier on the floating fixing (1.0 for snowball, variable for inverse floater).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    gearing as gearing: "number" => js_wire,
+    gearing as gearing: "number" => js_f64,
     /// Set the contract's coupon floor.
     /// @param value - Floor on each period coupon (typically 0.0).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    coupon_floor as couponFloor: "number" => js_wire,
+    coupon_floor as couponFloor: "number" => js_f64,
     /// Set the contract's coupon cap.
     /// @param value - Optional cap on each period coupon.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    coupon_cap as couponCap: "number | null" => js_wire via coupon_cap_opt,
+    coupon_cap as couponCap: "number | null" => opt_f64 via coupon_cap_opt,
     /// Set the contract's start date.
     /// @param value - Accrual start of the first coupon period; also the first in-advance fixing date.
     /// @returns The active builder.
@@ -185,7 +179,7 @@ setters!(JsSnowballBuilder, "SnowballBuilder", {
     /// @param value - Optional Bermudan call provision.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    call_provision as callProvision: "NonNullable<generated.valuations.Snowball['call_provision']> | null" => js_wire via call_provision_opt,
+    call_provision as callProvision: "NonNullable<generated.valuations.Snowball['call_provision']> | null" => opt_wire via call_provision_opt,
 });
 common_setters!(JsSnowballBuilder, "SnowballBuilder");
 

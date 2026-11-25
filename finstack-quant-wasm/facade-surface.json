@@ -5424,12 +5424,20 @@
     "getters": [
       "attributes",
       "defaultModel",
+      "discountCurveId",
+      "discreteDividends",
+      "divYieldId",
       "expiry",
       "id",
       "instrumentPricingOverrides",
       "metricPricingOverrides",
+      "quanto",
       "scenarioPricingOverrides",
-      "terms"
+      "spotId",
+      "terms",
+      "underlyingCurrency",
+      "underlyingTicker",
+      "volSurfaceId"
     ]
   },
   "valuations.instruments.EquityFutureBuilder": {
@@ -5509,7 +5517,8 @@
       "instrumentPricingOverrides",
       "metricPricingOverrides",
       "scenarioPricingOverrides",
-      "terms"
+      "terms",
+      "volIndexCurveId"
     ]
   },
   "valuations.instruments.VolatilityIndexFutureBuilder": {
@@ -5995,6 +6004,7 @@
       "marketDependencies",
       "metric",
       "price",
+      "toBuilder",
       "toDict",
       "toJson"
     ],

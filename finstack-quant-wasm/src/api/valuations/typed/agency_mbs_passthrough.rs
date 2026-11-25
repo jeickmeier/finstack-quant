@@ -148,27 +148,27 @@ setters!(JsAgencyMbsPassthroughBuilder, "AgencyMbsPassthroughBuilder", {
     /// @param value - Weighted average coupon (gross rate on underlying mortgages).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    wac as wac: "number" => js_wire,
+    wac as wac: "number" => js_f64,
     /// Set the contract's coupon.
     /// @param value - Net pass-through coupon paid to the investor, as an annual decimal (0.04 = 4%): wac less the servicing and guarantee fees.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    coupon as coupon: "number" => js_wire,
+    coupon as coupon: "number" => js_f64,
     /// Set the contract's servicing fee bp.
     /// @param value - Annual servicing fee in basis points (25.0 = 0.25%). Defaults to 0.0 when omitted.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    servicing_fee_bp as servicingFeeBp: "number" => js_wire,
+    servicing_fee_bp as servicingFeeBp: "number" => js_f64,
     /// Set the contract's guarantee fee bp.
     /// @param value - Annual agency guarantee fee (g-fee) in basis points (25.0 = 0.25%). Defaults to 0.0 when omitted.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    guarantee_fee_bp as guaranteeFeeBp: "number" => js_wire,
+    guarantee_fee_bp as guaranteeFeeBp: "number" => js_f64,
     /// Set the contract's wam months.
     /// @param value - Remaining weighted average maturity in months as of the valuation date (current WAM, not the original term). Pool age (WALA) for seasoning ramps is derived separately from issue_date.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    wam_months as wamMonths: "number" => js_wire,
+    wam_months as wamMonths: "number" => js_uint,
     /// Set the contract's issue date.
     /// @param value - Issue date of the pool.
     /// @returns The active builder.
@@ -178,7 +178,7 @@ setters!(JsAgencyMbsPassthroughBuilder, "AgencyMbsPassthroughBuilder", {
     /// @param value - End date of the latest accrual period whose delayed P&I payment has settled and is already reflected in current_face. When omitted, pricing infers the latest paid period from the agency payment-delay rule and as_of.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    last_paid_accrual_end as lastPaidAccrualEnd: "string | null" => js_wire via last_paid_accrual_end_opt,
+    last_paid_accrual_end as lastPaidAccrualEnd: "string | null" => opt_date via last_paid_accrual_end_opt,
     /// Set the contract's maturity.
     /// @param value - Legal maturity date.
     /// @returns The active builder.
@@ -188,7 +188,7 @@ setters!(JsAgencyMbsPassthroughBuilder, "AgencyMbsPassthroughBuilder", {
     /// @param value - Optional custom stated payment delay in days (overrides the agency rule). A delay D pays on day D − 30k of the month k = (D − 1)/30 months after the accrual month, rolled Following on the usny calendar (55 → 25th of the next month, 75 → 15th two months later). Must be at least 1.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    stated_delay_days as statedDelayDays: "number | null" => js_wire via stated_delay_days_opt,
+    stated_delay_days as statedDelayDays: "number | null" => opt_uint via stated_delay_days_opt,
     /// Set the contract's prepayment spec.
     /// @param value - Prepayment model specification.
     /// @returns The active builder.

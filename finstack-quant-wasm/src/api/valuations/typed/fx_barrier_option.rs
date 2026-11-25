@@ -247,22 +247,22 @@ setters!(JsFxBarrierOptionBuilder, "FxBarrierOptionBuilder", {
     /// @param value - Strike exchange rate (quote per base, dimensionless)
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    strike as strike: "number" => js_wire,
+    strike as strike: "number" => js_f64,
     /// Set the contract's barrier.
     /// @param value - Barrier level (exchange rate that triggers knock-in/out, dimensionless)
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    barrier as barrier: "number" => js_wire,
+    barrier as barrier: "number" => js_f64,
     /// Set the contract's rebate.
     /// @param value - Total contractual trade rebate, paid in the quote (settlement) currency and independent of notional. Knock-outs pay on a hit according to rebate_timing; knock-ins pay at expiry only if no hit occurred.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    rebate as rebate: "NonNullable<generated.valuations.FxBarrierOption['rebate']> | null" => js_wire via rebate_opt,
+    rebate as rebate: "NonNullable<generated.valuations.FxBarrierOption['rebate']> | null" => opt_wire via rebate_opt,
     /// Set the contract's rebate timing.
     /// @param value - Payment timing of the rebate. Required exactly when rebate is set. For a knock-out, at_hit pays the rebate at the first qualifying hit and at_expiry defers it to expiry. A knock-in (no-hit) rebate is only determined at expiry, so it must be at_expiry; at_hit is rejected. The analytical pricer values at-hit knock-out rebates via the discounted first-passage closed form; Monte Carlo applies at-hit timing via with_rebate_at_hit.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    rebate_timing as rebateTiming: "NonNullable<generated.valuations.FxBarrierOption['rebate_timing']> | null" => js_wire via rebate_timing_opt,
+    rebate_timing as rebateTiming: "NonNullable<generated.valuations.FxBarrierOption['rebate_timing']> | null" => opt_wire via rebate_timing_opt,
     /// Set the contract's option type.
     /// @param value - Option type (call or put on foreign currency)
     /// @returns The active builder.
@@ -282,12 +282,12 @@ setters!(JsFxBarrierOptionBuilder, "FxBarrierOptionBuilder", {
     /// @param value - First date on which barrier monitoring is active. When set, a live valuation after this date requires observed_barrier_breached.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    monitoring_start_date as monitoringStartDate: "string | null" => js_wire via monitoring_start_date_opt,
+    monitoring_start_date as monitoringStartDate: "string | null" => opt_date via monitoring_start_date_opt,
     /// Set the contract's observed barrier breached.
     /// @param value - Processed barrier-monitoring state through the valuation date. Some(true) records a breach whose at-hit rebate has already settled, including a hit processed on the valuation date. That rebate is not a remaining claim at expiry. An at-expiry rebate remains due on expiry. Some(false) records no breach in the processed monitoring history. Historical monitoring must be supplied explicitly for seasoned and expired contracts. Same-day unpaid at-hit claims require a separate cash receivable; this boolean does not represent pending settlement.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    observed_barrier_breached as observedBarrierBreached: "boolean | null" => js_wire via observed_barrier_breached_opt,
+    observed_barrier_breached as observedBarrierBreached: "boolean | null" => opt_bool via observed_barrier_breached_opt,
     /// Set the contract's monitoring.
     /// @param value - Contractual barrier-monitoring convention. Continuous monitoring uses the analytical Reiner-Rubinstein pricer by default. Discrete monitoring requires explicit observation dates and uses Monte Carlo without interpolating barrier hits between those dates.
     /// @returns The active builder.

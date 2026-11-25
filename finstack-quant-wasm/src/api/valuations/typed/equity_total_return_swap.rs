@@ -134,7 +134,7 @@ setters!(JsEquityTotalReturnSwapBuilder, "EquityTotalReturnSwapBuilder", {
     /// @param value - Optional first-period start level. Pricing uses this only when the first period is in progress and no matching entry exists in past_fixings. Future periods use live spot.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    initial_level as initialLevel: "number | null" => js_wire via initial_level_opt,
+    initial_level as initialLevel: "number | null" => opt_f64 via initial_level_opt,
     /// Set the contract's past fixings.
     /// @param value - Observed underlying levels at contractual reset boundaries. Provide (reset_date, level) for each boundary on or before the valuation date that is needed by an unpaid return period. This includes the final period end when payment lag leaves its cashflow outstanding. The first boundary may use initial_level; a boundary equal to as_of may use live spot. Pricing errors when any other required fixing is unavailable.
     /// @returns The active builder.
@@ -144,12 +144,12 @@ setters!(JsEquityTotalReturnSwapBuilder, "EquityTotalReturnSwapBuilder", {
     /// @param value - Optional OTC margin specification for VM/IM. Equity TRS use SIMM equity bucket for margin calculation.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    margin_spec as marginSpec: "NonNullable<generated.valuations.EquityTotalReturnSwap['margin_spec']> | null" => js_wire via margin_spec_opt,
+    margin_spec as marginSpec: "NonNullable<generated.valuations.EquityTotalReturnSwap['margin_spec']> | null" => opt_wire via margin_spec_opt,
     /// Set the contract's dividend tax rate.
     /// @param value - Dividend withholding tax rate for net return calculation. Specifies the fraction of dividends withheld for tax (e.g., 0.15 for 15% withholding). When set to 0.0 (default), the TRS passes through 100% of dividends (gross return). When set to a positive value, the dividend return component is reduced: text net_dividend_return = gross_dividend_return × (1 - dividend_tax_rate) # Market Context Withholding tax varies by jurisdiction and investor domicile: - US qualified dividends: typically 0% for domestic investors - US non-qualified: up to 30% for foreign investors (varies by treaty) - European: varies by country (15-30% typical)
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    dividend_tax_rate as dividendTaxRate: "number" => js_wire,
+    dividend_tax_rate as dividendTaxRate: "number" => js_f64,
     /// Set the contract's dividend settlement.
     /// @param value - Settlement timing for explicit manufactured dividends. This field is mandatory because dividend-date and period-end settlement differ by the funding carry between the two dates.
     /// @returns The active builder.

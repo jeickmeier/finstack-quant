@@ -41,6 +41,9 @@ getters!(JsVolatilityIndexFuture, "VolatilityIndexFuture", |i| {
     /// Return the contract's position and lifecycle terms.
     /// @returns Independent copy of position, lifecycle dates and exchange marks.
     terms as terms: "generated.valuations.ListedFutureTerms" => json(i.terms),
+    /// Return the volatility index futures curve identifier.
+    /// @returns Market price-curve identifier for futures index levels expressed in index points.
+    vol_index_curve_id as volIndexCurveId: "string" => text(i.vol_index_curve_id),
 });
 common_getters!(JsVolatilityIndexFuture, "VolatilityIndexFuture");
 
@@ -61,17 +64,13 @@ builder_class!(
     JsVolatilityIndexFutureBuilder, "VolatilityIndexFutureBuilder", VolatilityIndexFutureBuilder, JsVolatilityIndexFuture, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = VolatilityIndexFuture)]
-impl JsVolatilityIndexFuture {
+to_builder_method!(
     /// Seed an independent builder from the complete listed contract.
     /// @returns Builder carrying settlement, exchange marks and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsVolatilityIndexFutureBuilder {
-        JsVolatilityIndexFutureBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsVolatilityIndexFuture,
+    "VolatilityIndexFuture",
+    JsVolatilityIndexFutureBuilder
+);
 
 setters!(JsVolatilityIndexFutureBuilder, "VolatilityIndexFutureBuilder", {
     /// Set the stable contract identifier.
@@ -88,7 +87,7 @@ setters!(JsVolatilityIndexFutureBuilder, "VolatilityIndexFutureBuilder", {
     /// @param value - Market price-curve identifier for futures index levels expressed in index points.
     /// @returns The active builder.
     /// @throws FinstackError for invalid inputs or an inactive builder.
-    vol_index_curve_id as volIndexCurveId: "string" => js_wire,
+    vol_index_curve_id as volIndexCurveId: "string" => id,
 });
 common_setters!(
     JsVolatilityIndexFutureBuilder,

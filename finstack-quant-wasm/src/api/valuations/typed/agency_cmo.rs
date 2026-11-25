@@ -130,17 +130,17 @@ setters!(JsAgencyCmoBuilder, "AgencyCmoBuilder", {
     /// @param value - Collateral pool (optional - for detailed cashflow projection)
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    collateral as collateral: "NonNullable<generated.valuations.AgencyCmo['collateral']> | null" => js_wire via collateral_opt,
+    collateral as collateral: "NonNullable<generated.valuations.AgencyCmo['collateral']> | null" => opt_wire via collateral_opt,
     /// Set the contract's collateral wac.
     /// @param value - Collateral WAC (if no explicit collateral)
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    collateral_wac as collateralWac: "number | null" => js_wire via collateral_wac_opt,
+    collateral_wac as collateralWac: "number | null" => opt_f64 via collateral_wac_opt,
     /// Set the contract's collateral wam months.
     /// @param value - Remaining collateral WAM in months (if no explicit collateral).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    collateral_wam_months as collateralWamMonths: "number | null" => js_wire via collateral_wam_months_opt,
+    collateral_wam_months as collateralWamMonths: "number | null" => opt_uint via collateral_wam_months_opt,
     /// Set the contract's discount curve id.
     /// @param value - Discount curve identifier.
     /// @returns The active builder.

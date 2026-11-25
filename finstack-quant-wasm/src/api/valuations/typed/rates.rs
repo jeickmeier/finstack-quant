@@ -124,7 +124,7 @@ setters!(JsDepositBuilder, "DepositBuilder", {
     /// @param value - Explicit day-count convention as its wire label.
     /// @returns The builder for chaining.
     /// @throws Error - Throws for a mistyped value, an invalid wire label or a consumed builder.
-    day_count as dayCount: "generated.valuations.Deposit['day_count']" => js_wire,
+    day_count as dayCount: "generated.valuations.Deposit['day_count']" => js_parse,
     /// Set the deposit discount curve id.
     /// @param value - Discount curve identifier looked up at pricing time.
     /// @returns The builder for chaining.
@@ -294,7 +294,7 @@ setters!(JsForwardRateAgreementBuilder, "ForwardRateAgreementBuilder", {
     /// @param value - Explicit day-count convention as its wire label.
     /// @returns The builder for chaining.
     /// @throws Error - Throws for a mistyped value, an invalid wire label or a consumed builder.
-    day_count as dayCount: "generated.valuations.ForwardRateAgreement['day_count']" => js_wire,
+    day_count as dayCount: "generated.valuations.ForwardRateAgreement['day_count']" => js_parse,
     /// Set the forward rate agreement discount curve id.
     /// @param value - Discount curve identifier looked up at pricing time.
     /// @returns The builder for chaining.

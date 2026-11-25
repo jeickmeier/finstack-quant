@@ -39,7 +39,7 @@ getters!(JsAutocallable, "Autocallable", |i| {
     default_model as defaultModel: "string" => text(Instrument::default_model(i)),
     /// Read the contract's underlying ticker.
     /// @returns Underlying asset ticker symbol
-    underlying_ticker as underlyingTicker: "string" => json(i.underlying_ticker),
+    underlying_ticker as underlyingTicker: "string" => text(i.underlying_ticker),
     /// Read the contract's observation dates.
     /// @returns Observation dates for autocall and coupon checks. Barriers are monitored **discretely** at these exact dates only. The Monte Carlo time grid is constructed to include these dates precisely.
     observation_dates as observationDates: "generated.valuations.Autocallable['observation_dates']" => dates(i.observation_dates),
@@ -78,19 +78,19 @@ getters!(JsAutocallable, "Autocallable", |i| {
     day_count as dayCount: "DayCount" => day_count(i.day_count),
     /// Read the contract's discount curve id.
     /// @returns Discount curve ID for present value calculations
-    discount_curve_id as discountCurveId: "string" => json(i.discount_curve_id),
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
     /// Read the contract's spot id.
     /// @returns Spot price identifier for underlying asset
-    spot_id as spotId: "string" => json(i.spot_id),
+    spot_id as spotId: "string" => text(i.spot_id),
     /// Read the contract's vol surface id.
     /// @returns Volatility surface ID for option pricing
-    vol_surface_id as volSurfaceId: "string" => json(i.vol_surface_id),
+    vol_surface_id as volSurfaceId: "string" => text(i.vol_surface_id),
     /// Read the contract's path model.
     /// @returns Explicit path model selection. AtmTermGbm is an ATM-term-structure approximation and does not model equity strike skew; callers must opt into that limitation.
     path_model as pathModel: "generated.valuations.Autocallable['path_model']" => json(i.path_model),
     /// Read the contract's div yield id.
     /// @returns Optional dividend-yield scalar ID. Some(id): lookup MUST succeed (a missing or non-unitless scalar returns an error). None: no implicit default; treated as zero continuous dividend yield. Set explicitly for index underlyings.
-    div_yield_id as divYieldId: "string | null" => json(i.div_yield_id),
+    div_yield_id as divYieldId: "string | null" => opt_text(i.div_yield_id),
     /// Read the contract's initial level.
     /// @returns Initial (strike-set) underlying level S_0 used as the reference for barrier and payoff ratios. None (the default) uses the spot at the valuation date, which is only correct for a new trade priced on its strike-set date. **Required for seasoned trades** (any observation date on or before as_of): pricing errors if past observation dates exist without it.
     initial_level as initialLevel: "number | null" => json(i.initial_level),
@@ -117,17 +117,11 @@ builder_class!(
     JsAutocallableBuilder, "AutocallableBuilder", AutocallableBuilder, JsAutocallable, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = Autocallable)]
-impl JsAutocallable {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsAutocallableBuilder {
-        JsAutocallableBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsAutocallable, "Autocallable", JsAutocallableBuilder
+);
 
 setters!(JsAutocallableBuilder, "AutocallableBuilder", {
     /// Set the stable contract identifier.
@@ -174,12 +168,12 @@ setters!(JsAutocallableBuilder, "AutocallableBuilder", {
     /// @param value - Memory ("Phoenix") coupon feature. When enabled, a coupon whose coupon barrier is missed accrues until a later observation meets its coupon barrier. The current and all accrued coupons are then paid on that observation's payment date. Coupon eligibility remains independent of autocall eligibility.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    memory_coupons as memoryCoupons: "boolean" => js_wire,
+    memory_coupons as memoryCoupons: "boolean" => js_bool,
     /// Set the contract's final barrier.
     /// @param value - Final barrier level for final payoff determination
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    final_barrier as finalBarrier: "number" => js_wire,
+    final_barrier as finalBarrier: "number" => js_f64,
     /// Set the contract's final payoff type.
     /// @param value - Type of final payoff (capital protection, participation, knock-in put)
     /// @returns The active builder.
@@ -189,7 +183,7 @@ setters!(JsAutocallableBuilder, "AutocallableBuilder", {
     /// @param value - Cap level for final payoff (maximum return)
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    cap_level as capLevel: "number" => js_wire,
+    cap_level as capLevel: "number" => js_f64,
     /// Set the contract's discount curve id.
     /// @param value - Discount curve ID for present value calculations
     /// @returns The active builder.
@@ -219,7 +213,7 @@ setters!(JsAutocallableBuilder, "AutocallableBuilder", {
     /// @param value - Initial (strike-set) underlying level S_0 used as the reference for barrier and payoff ratios. None (the default) uses the spot at the valuation date, which is only correct for a new trade priced on its strike-set date. **Required for seasoned trades** (any observation date on or before as_of): pricing errors if past observation dates exist without it.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    initial_level as initialLevel: "number | null" => js_wire via initial_level_opt,
+    initial_level as initialLevel: "number | null" => opt_f64 via initial_level_opt,
     /// Set the contract's past fixings.
     /// @param value - Observed underlying fixings for seasoned trades (date, level pairs). For a mid-life autocallable, every observation date on or before the valuation date must have a matching fixing here; pricing errors otherwise. Past fixings are evaluated deterministically (autocall, missed memory coupons, discrete knock-in monitoring) and only the remaining future observation dates are simulated.
     /// @returns The active builder.

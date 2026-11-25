@@ -65,12 +65,6 @@ impl PyRealEstateAsset {
         instrument_expiry(py, &self.inner)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.currency")]
-    #[getter]
-    fn currency(&self) -> String {
-        self.inner.currency.to_string()
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.valuation_method")]
     #[getter]
     fn valuation_method<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -111,36 +105,6 @@ impl PyRealEstateAsset {
             .transpose()
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.discount_rate")]
-    #[getter]
-    fn discount_rate(&self) -> Option<f64> {
-        self.inner.discount_rate
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.cap_rate")]
-    #[getter]
-    fn cap_rate(&self) -> Option<f64> {
-        self.inner.cap_rate
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.stabilized_noi")]
-    #[getter]
-    fn stabilized_noi(&self) -> Option<f64> {
-        self.inner.stabilized_noi
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.terminal_cap_rate")]
-    #[getter]
-    fn terminal_cap_rate(&self) -> Option<f64> {
-        self.inner.terminal_cap_rate
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.terminal_growth_rate")]
-    #[getter]
-    fn terminal_growth_rate(&self) -> Option<f64> {
-        self.inner.terminal_growth_rate
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.sale_date")]
     #[getter]
     fn sale_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -149,59 +113,48 @@ impl PyRealEstateAsset {
             .map(|value| crate::bindings::date_utils::date_to_py(py, value))
             .transpose()
     }
+}
+
+crate::bindings::macros::py_getters!(PyRealEstateAsset |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.currency")]
+    currency -> String = s.inner.currency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.discount_rate")]
+    discount_rate -> Option<f64> = s.inner.discount_rate;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.cap_rate")]
+    cap_rate -> Option<f64> = s.inner.cap_rate;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.stabilized_noi")]
+    stabilized_noi -> Option<f64> = s.inner.stabilized_noi;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.terminal_cap_rate")]
+    terminal_cap_rate -> Option<f64> = s.inner.terminal_cap_rate;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.terminal_growth_rate")]
+    terminal_growth_rate -> Option<f64> = s.inner.terminal_growth_rate;
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.sale_price")]
-    #[getter]
-    fn sale_price(&self) -> Option<PyMoney> {
-        self.inner.sale_price.map(PyMoney::from_inner)
-    }
+    sale_price -> Option<PyMoney> = s.inner.sale_price.map(PyMoney::from_inner);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.purchase_price")]
-    #[getter]
-    fn purchase_price(&self) -> Option<PyMoney> {
-        self.inner.purchase_price.map(PyMoney::from_inner)
-    }
+    purchase_price -> Option<PyMoney> = s.inner.purchase_price.map(PyMoney::from_inner);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.acquisition_costs")]
-    #[getter]
-    fn acquisition_costs(&self) -> Vec<PyMoney> {
-        self.inner
-            .acquisition_costs
-            .iter()
-            .copied()
-            .map(PyMoney::from_inner)
-            .collect()
-    }
+    acquisition_costs -> Vec<PyMoney> = s.inner .acquisition_costs .iter() .copied() .map(PyMoney::from_inner) .collect();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.disposition_cost_decimal")]
-    #[getter]
-    fn disposition_cost_decimal(&self) -> Option<f64> {
-        self.inner.disposition_cost_decimal
-    }
+    disposition_cost_decimal -> Option<f64> = s.inner.disposition_cost_decimal;
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.disposition_costs")]
-    #[getter]
-    fn disposition_costs(&self) -> Vec<PyMoney> {
-        self.inner
-            .disposition_costs
-            .iter()
-            .copied()
-            .map(PyMoney::from_inner)
-            .collect()
-    }
+    disposition_costs -> Vec<PyMoney> = s.inner .disposition_costs .iter() .copied() .map(PyMoney::from_inner) .collect();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.appraisal_value")]
-    #[getter]
-    fn appraisal_value(&self) -> Option<PyMoney> {
-        self.inner.appraisal_value.map(PyMoney::from_inner)
-    }
+    appraisal_value -> Option<PyMoney> = s.inner.appraisal_value.map(PyMoney::from_inner);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.day_count")]
-    #[getter]
-    fn day_count(&self) -> crate::bindings::core::dates::daycount::PyDayCount {
-        crate::bindings::core::dates::daycount::PyDayCount::from_inner(self.inner.day_count)
-    }
-}
+    day_count -> crate::bindings::core::dates::daycount::PyDayCount = crate::bindings::core::dates::daycount::PyDayCount::from_inner(s.inner.day_count);
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAssetBuilder")]
 #[pyclass(
@@ -411,3 +364,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyRealEstateAssetBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["RealEstateAsset", "RealEstateAssetBuilder"];

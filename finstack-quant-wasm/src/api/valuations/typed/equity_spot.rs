@@ -80,17 +80,11 @@ builder_class!(
     JsEquityBuilder, "EquityBuilder", EquityBuilder, JsEquity, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = Equity)]
-impl JsEquity {
+to_builder_method!(
     /// Seed an independent builder from the complete equity holding.
     /// @returns Builder carrying the share count, pricing inputs and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsEquityBuilder {
-        JsEquityBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsEquity, "Equity", JsEquityBuilder
+);
 
 setters!(JsEquityBuilder, "EquityBuilder", {
     /// Set the stable contract identifier.
@@ -102,32 +96,32 @@ setters!(JsEquityBuilder, "EquityBuilder", {
     /// @param value - Ticker identifying the underlying issuer or index.
     /// @returns The active builder.
     /// @throws FinstackError if the input cannot be converted or the builder has been consumed.
-    ticker as ticker: "string" => js_wire,
+    ticker as ticker: "string" => js_string,
     /// Set the equity holding's currency.
     /// @param value - ISO currency of the quoted price per share.
     /// @returns The active builder.
     /// @throws FinstackError if the input cannot be converted or the builder has been consumed.
-    currency as currency: "string" => js_wire,
+    currency as currency: "string" => js_currency,
     /// Set the equity holding's quantity.
     /// @param value - Signed number of shares held. Omit for one share.
     /// @returns The active builder.
     /// @throws FinstackError if the input cannot be converted or the builder has been consumed.
-    quantity as quantity: "number | null" => js_wire via quantity_opt,
+    quantity as quantity: "number | null" => opt_f64 via quantity_opt,
     /// Set the equity holding's quoted spot.
     /// @param value - Nonnegative price per share in the quote currency. This price takes precedence over the spot quote identifier.
     /// @returns The active builder.
     /// @throws FinstackError if the input cannot be converted or the builder has been consumed.
-    quoted_spot as quotedSpot: "number | null" => js_wire via quoted_spot_opt,
+    quoted_spot as quotedSpot: "number | null" => opt_f64 via quoted_spot_opt,
     /// Set the equity holding's spot id.
     /// @param value - Market quote identifier for the price per share.
     /// @returns The active builder.
     /// @throws FinstackError if the input cannot be converted or the builder has been consumed.
-    spot_id as spotId: "string | null" => js_wire via spot_id_opt,
+    spot_id as spotId: "string | null" => optional_id via spot_id_opt,
     /// Set the equity holding's div yield id.
     /// @param value - Market quote identifier for the continuously compounded decimal dividend yield.
     /// @returns The active builder.
     /// @throws FinstackError if the input cannot be converted or the builder has been consumed.
-    div_yield_id as divYieldId: "string | null" => js_wire via div_yield_id_opt,
+    div_yield_id as divYieldId: "string | null" => optional_id via div_yield_id_opt,
     /// Set the equity holding's discrete dividends.
     /// @param value - Cash dividend ex-date and amount per share in the quote currency.
     /// @returns The active builder.
@@ -137,6 +131,6 @@ setters!(JsEquityBuilder, "EquityBuilder", {
     /// @param value - Identifier of the curve used to discount equity cash flows in the quote currency.
     /// @returns The active builder.
     /// @throws FinstackError if the input cannot be converted or the builder has been consumed.
-    discount_curve_id as discountCurveId: "string" => js_wire,
+    discount_curve_id as discountCurveId: "string" => id,
 });
 common_setters!(JsEquityBuilder, "EquityBuilder");

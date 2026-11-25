@@ -62,16 +62,16 @@ getters!(JsCommoditySwaption, "CommoditySwaption", |i| {
     quantity as quantity: "number" => json(i.quantity),
     /// Read the contract's forward curve id.
     /// @returns Forward/futures curve ID for commodity price interpolation.
-    forward_curve_id as forwardCurveId: "string" => json(i.forward_curve_id),
+    forward_curve_id as forwardCurveId: "string" => text(i.forward_curve_id),
     /// Read the contract's discount curve id.
     /// @returns Discount curve ID for present value.
-    discount_curve_id as discountCurveId: "string" => json(i.discount_curve_id),
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
     /// Read the contract's vol surface id.
     /// @returns Volatility surface ID for implied vol.
-    vol_surface_id as volSurfaceId: "string" => json(i.vol_surface_id),
+    vol_surface_id as volSurfaceId: "string" => text(i.vol_surface_id),
     /// Read the contract's calendar id.
     /// @returns Optional calendar ID for date adjustments.
-    calendar_id as calendarId: "string | null" => json(i.calendar_id),
+    calendar_id as calendarId: "string | null" => opt_text(i.calendar_id),
     /// Read the contract's business day convention.
     /// @returns Business day convention for date adjustments.
     business_day_convention as businessDayConvention: "generated.valuations.CommoditySwaption['business_day_convention']" => json(i.business_day_convention),
@@ -98,17 +98,11 @@ builder_class!(
     JsCommoditySwaptionBuilder, "CommoditySwaptionBuilder", CommoditySwaptionBuilder, JsCommoditySwaption, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = CommoditySwaption)]
-impl JsCommoditySwaption {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsCommoditySwaptionBuilder {
-        JsCommoditySwaptionBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsCommoditySwaption, "CommoditySwaption", JsCommoditySwaptionBuilder
+);
 
 setters!(JsCommoditySwaptionBuilder, "CommoditySwaptionBuilder", {
     /// Set the stable contract identifier.
@@ -150,12 +144,12 @@ setters!(JsCommoditySwaptionBuilder, "CommoditySwaptionBuilder", {
     /// @param value - Fixed price (strike) of the underlying swap.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    fixed_price as fixedPrice: "number" => js_wire,
+    fixed_price as fixedPrice: "number" => js_f64,
     /// Set the contract's quantity.
     /// @param value - Notional quantity per period.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    quantity as quantity: "number" => js_wire,
+    quantity as quantity: "number" => js_f64,
     /// Set the contract's forward curve id.
     /// @param value - Forward/futures curve ID for commodity price interpolation.
     /// @returns The active builder.

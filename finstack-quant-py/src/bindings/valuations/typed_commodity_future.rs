@@ -62,32 +62,23 @@ impl PyCommodityFuture {
         instrument_expiry(py, &self.inner)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_future", "CommodityFuture.underlying_ticker")]
-    #[getter]
-    fn underlying_ticker(&self) -> String {
-        self.inner.underlying_ticker.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_future", "CommodityFuture.terms")]
-    #[getter]
-    fn terms(&self) -> super::typed_listed::PyListedFutureTerms {
-        super::typed_listed::PyListedFutureTerms {
-            inner: self.inner.terms.clone(),
-        }
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_future", "CommodityFuture.forward_curve_id")]
-    #[getter]
-    fn forward_curve_id(&self) -> String {
-        self.inner.forward_curve_id.to_string()
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_future", "CommodityFuture.fixing")]
     #[getter]
     fn fixing<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.fixing)
     }
 }
+
+crate::bindings::macros::py_getters!(PyCommodityFuture |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_future", "CommodityFuture.underlying_ticker")]
+    underlying_ticker -> String = s.inner.underlying_ticker.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_future", "CommodityFuture.terms")]
+    terms -> super::typed_listed::PyListedFutureTerms = super::typed_listed::PyListedFutureTerms { inner: s.inner.terms.clone(), };
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_future", "CommodityFuture.forward_curve_id")]
+    forward_curve_id -> String = s.inner.forward_curve_id.to_string();
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_future", "CommodityFutureBuilder")]
 #[pyclass(
@@ -159,3 +150,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyCommodityFutureBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["CommodityFuture", "CommodityFutureBuilder"];

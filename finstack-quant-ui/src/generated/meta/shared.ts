@@ -28417,7 +28417,7 @@ export default [
   {
     "path": "#/$defs/Snowball",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Snowball",
-    "description": "Snowball structured note.\n\nThe coupon in each period depends on the previous period's coupon,\ncreating a path-dependent \"snowball\" accumulation:\n\n```text\nc_i = max(c_{i-1} + fixed_rate - L_i, 0)\n```\n\nwhere L_i is the floating rate and c_0 = initial_coupon.\n\nIf the floating rate stays low, coupons ratchet up over time.\nIf rates spike, the coupon floors at zero and must rebuild.\n\n# Variants\n\n- **Snowball**: Coupon depends on previous coupon (path-dependent)\n- **Inverse Floater**: Coupon = fixed_rate - gearing * floating_rate\n  (simpler, not path-dependent, but often combined with callability)\n\n# References\n\n- Brigo, D., & Mercurio, F. (2006). *Interest Rate Models*. Chapter 14. `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models`"
+    "description": "Snowball structured note.\n\nThe coupon in each period depends on the previous period's coupon,\ncreating a path-dependent \"snowball\" accumulation:\n\n```text\nc_i = max(c_{i-1} + fixed_rate - gearing * L_i, coupon_floor)\n```\n\nwhere L_i is the floating rate and c_0 = initial_coupon.\n\nIf the floating rate stays low, coupons ratchet up over time.\nIf rates spike, the coupon floors at zero and must rebuild.\n\n# Variants\n\n- **Snowball**: Coupon depends on previous coupon (path-dependent)\n- **Inverse Floater**: Coupon = fixed_rate - gearing * floating_rate\n  (simpler, not path-dependent, but often combined with callability)\n\n# References\n\n- Brigo, D., & Mercurio, F. (2006). *Interest Rate Models*. Chapter 14. `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models`"
   },
   {
     "path": "#/$defs/Snowball/properties/attributes",
@@ -28484,7 +28484,7 @@ export default [
   {
     "path": "#/$defs/Snowball/properties/gearing",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Snowball/properties/gearing",
-    "description": "Multiplier on the floating fixing (1.0 for snowball, variable for inverse floater).",
+    "description": "Multiplier on the floating fixing applied in both `Snowball` and `InverseFloater` variants.",
     "format": "double"
   },
   {
@@ -28584,13 +28584,13 @@ export default [
     "path": "#/$defs/SnowballVariant/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SnowballVariant/oneOf/0",
     "const": "snowball",
-    "description": "Path-dependent snowball: c_i = max(c_{i-1} + fixed - floating, 0)."
+    "description": "Path-dependent snowball: c_i = max(c_{i-1} + fixed - gearing * floating, floor)."
   },
   {
     "path": "#/$defs/SnowballVariant/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SnowballVariant/oneOf/1",
     "const": "inverse_floater",
-    "description": "Inverse floater: c_i = max(fixed - gearing * floating, 0)."
+    "description": "Inverse floater: c_i = max(fixed - gearing * floating, floor)."
   },
   {
     "path": "#/$defs/SpecialServicingSpec",

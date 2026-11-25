@@ -92,21 +92,21 @@ setters!(JsFxFutureBuilder, "FxFutureBuilder", {
     /// @param value - ISO currency in the denominator of quote currency per unit of base currency.
     /// @returns The active builder.
     /// @throws FinstackError for invalid inputs or an inactive builder.
-    base_currency as baseCurrency: "string" => js_wire,
+    base_currency as baseCurrency: "string" => js_currency,
     /// Set the contract's domestic discount curve id.
     /// @param value - Market identifier of the quote-currency discount curve.
     /// @returns The active builder.
     /// @throws FinstackError for invalid inputs or an inactive builder.
-    domestic_discount_curve_id as domesticDiscountCurveId: "string" => js_wire,
+    domestic_discount_curve_id as domesticDiscountCurveId: "string" => id,
     /// Set the contract's foreign discount curve id.
     /// @param value - Market identifier of the base-currency discount curve.
     /// @returns The active builder.
     /// @throws FinstackError for invalid inputs or an inactive builder.
-    foreign_discount_curve_id as foreignDiscountCurveId: "string" => js_wire,
+    foreign_discount_curve_id as foreignDiscountCurveId: "string" => id,
     /// Set the contract's quoted spot.
     /// @param value - Optional positive spot override in quote currency per unit of base currency. Pass null to clear it.
     /// @returns The active builder.
     /// @throws FinstackError for invalid inputs or an inactive builder.
-    quoted_spot as quotedSpot: "number | null" => js_wire via quoted_spot_opt,
+    quoted_spot as quotedSpot: "number | null" => opt_f64 via quoted_spot_opt,
 });
 common_setters!(JsFxFutureBuilder, "FxFutureBuilder");

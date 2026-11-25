@@ -49,7 +49,7 @@ getters!(JsCommoditySwap, "CommoditySwap", |i| {
     fixed_price as fixedPrice: "number" => json(i.fixed_price),
     /// Read the contract's forward curve id.
     /// @returns Commodity forward PriceCurve that projects the floating-leg price observations.
-    forward_curve_id as forwardCurveId: "string" => json(i.forward_curve_id),
+    forward_curve_id as forwardCurveId: "string" => text(i.forward_curve_id),
     /// Read the contract's side.
     /// @returns Direction of the swap: Pay means paying the fixed price leg, Receive means receiving the fixed price leg.
     side as side: "generated.valuations.CommoditySwap['side']" => json(i.side),
@@ -64,13 +64,13 @@ getters!(JsCommoditySwap, "CommoditySwap", |i| {
     frequency as frequency: "generated.valuations.CommoditySwap['frequency']" => json(i.frequency),
     /// Read the contract's calendar id.
     /// @returns Optional calendar ID for date adjustments.
-    calendar_id as calendarId: "string | null" => json(i.calendar_id),
+    calendar_id as calendarId: "string | null" => opt_text(i.calendar_id),
     /// Read the contract's business day convention.
     /// @returns Business day convention for payment-schedule date adjustments. Only applied when calendar_id is set and resolves to a registered holiday calendar; without a calendar the schedule dates are left unadjusted.
     business_day_convention as businessDayConvention: "generated.valuations.CommoditySwap['business_day_convention']" => json(i.business_day_convention),
     /// Read the contract's discount curve id.
     /// @returns Discount curve ID.
-    discount_curve_id as discountCurveId: "string" => json(i.discount_curve_id),
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
     /// Read the contract's index lag days.
     /// @returns Optional index lag in **calendar days**: the floating-leg averaging window is shifted back by exactly this many calendar days (no business-day adjustment of the shifted window endpoints).
     index_lag_days as indexLagDays: "number | null" => json(i.index_lag_days),
@@ -97,17 +97,11 @@ builder_class!(
     JsCommoditySwapBuilder, "CommoditySwapBuilder", CommoditySwapBuilder, JsCommoditySwap, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = CommoditySwap)]
-impl JsCommoditySwap {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsCommoditySwapBuilder {
-        JsCommoditySwapBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsCommoditySwap, "CommoditySwap", JsCommoditySwapBuilder
+);
 
 setters!(JsCommoditySwapBuilder, "CommoditySwapBuilder", {
     /// Set the stable contract identifier.
@@ -124,12 +118,12 @@ setters!(JsCommoditySwapBuilder, "CommoditySwapBuilder", {
     /// @param value - Notional quantity per period.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    quantity as quantity: "number" => js_wire,
+    quantity as quantity: "number" => js_f64,
     /// Set the contract's fixed price.
     /// @param value - Fixed price per commodity unit, in the notional currency (finite).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    fixed_price as fixedPrice: "number" => js_wire,
+    fixed_price as fixedPrice: "number" => js_f64,
     /// Set the contract's forward curve id.
     /// @param value - Commodity forward PriceCurve that projects the floating-leg price observations.
     /// @returns The active builder.
@@ -174,7 +168,7 @@ setters!(JsCommoditySwapBuilder, "CommoditySwapBuilder", {
     /// @param value - Optional index lag in **calendar days**: the floating-leg averaging window is shifted back by exactly this many calendar days (no business-day adjustment of the shifted window endpoints).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    index_lag_days as indexLagDays: "number | null" => js_wire via index_lag_days_opt,
+    index_lag_days as indexLagDays: "number | null" => opt_int via index_lag_days_opt,
     /// Set the contract's past fixings.
     /// @param value - Realized floating-index fixings as (date, price) pairs. Floating-leg observations with date strictly before the valuation date read from this store; a missing past fixing is an error — no silent substitution of today's spot . Observations on or after the valuation date project from the price curve.
     /// @returns The active builder.

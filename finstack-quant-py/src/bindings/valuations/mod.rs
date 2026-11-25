@@ -23,6 +23,7 @@ pub(crate) mod typed_fx_future;
 pub(crate) mod typed_fx_future_option;
 pub(crate) mod typed_interest_rate_future;
 pub(crate) mod typed_interest_rate_future_option;
+pub(crate) mod typed_macros;
 pub(crate) mod typed_volatility_index_future;
 pub(crate) mod typed_volatility_index_future_option;
 
@@ -72,7 +73,6 @@ mod typed_legs;
 pub(crate) mod typed_levered_real_estate_equity;
 pub(crate) mod typed_listed;
 pub(crate) mod typed_lookback_option;
-pub(crate) mod typed_macros;
 pub(crate) mod typed_ndf;
 pub(crate) mod typed_private_markets_fund;
 pub(crate) mod typed_quanto_option;
@@ -248,48 +248,36 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
         "BondFutureBuilder",
         "InterestRateFuture",
         "InterestRateFutureBuilder",
-        "EquityFuture",
-        "EquityFutureBuilder",
-        "VolatilityIndexFuture",
-        "VolatilityIndexFutureBuilder",
         "ListedFutureTerms",
         "FutureOptionTerms",
-        "InterestRateFutureOption",
-        "InterestRateFutureOptionBuilder",
-        "EquityFutureOption",
-        "EquityFutureOptionBuilder",
-        "VolatilityIndexFutureOption",
-        "VolatilityIndexFutureOptionBuilder",
         "ForwardRateAgreement",
         "ForwardRateAgreementBuilder",
     ]);
+    exports.extend_from_slice(typed_equity_future::EXPORTS);
+    exports.extend_from_slice(typed_volatility_index_future::EXPORTS);
+    exports.extend_from_slice(typed_interest_rate_future_option::EXPORTS);
+    exports.extend_from_slice(typed_equity_future_option::EXPORTS);
+    exports.extend_from_slice(typed_volatility_index_future_option::EXPORTS);
     exports.extend_from_slice(typed_fx_future::EXPORTS);
     exports.extend_from_slice(typed_fx_future_option::EXPORTS);
     exports.extend_from_slice(typed_credit::EXPORTS);
     exports.extend_from_slice(typed_convertible::EXPORTS);
     exports.extend_from_slice(convertible_spot_ladder::EXPORTS);
     exports.extend_from_slice(typed_equity::EXPORTS);
+    exports.extend_from_slice(typed_autocallable::EXPORTS);
+    exports.extend_from_slice(typed_cliquet_option::EXPORTS);
+    exports.extend_from_slice(typed_private_markets_fund::EXPORTS);
+    exports.extend_from_slice(typed_asian_option::EXPORTS);
+    exports.extend_from_slice(typed_barrier_option::EXPORTS);
+    exports.extend_from_slice(typed_lookback_option::EXPORTS);
+    exports.extend_from_slice(typed_range_accrual::EXPORTS);
+    exports.extend_from_slice(typed_tarn::EXPORTS);
+    exports.extend_from_slice(typed_snowball::EXPORTS);
+    exports.extend_from_slice(typed_callable_range_accrual::EXPORTS);
+    exports.extend_from_slice(typed_basket::EXPORTS);
+    exports.extend_from_slice(typed_real_estate_asset::EXPORTS);
+    exports.extend_from_slice(typed_levered_real_estate_equity::EXPORTS);
     exports.extend_from_slice(&[
-        "Autocallable",
-        "AutocallableBuilder",
-        "CliquetOption",
-        "CliquetOptionBuilder",
-        "PrivateMarketsFund",
-        "PrivateMarketsFundBuilder",
-        "AsianOption",
-        "AsianOptionBuilder",
-        "BarrierOption",
-        "BarrierOptionBuilder",
-        "LookbackOption",
-        "LookbackOptionBuilder",
-        "RangeAccrual",
-        "RangeAccrualBuilder",
-        "Tarn",
-        "TarnBuilder",
-        "Snowball",
-        "SnowballBuilder",
-        "CallableRangeAccrual",
-        "CallableRangeAccrualBuilder",
         "AgencyTba",
         "AgencyTbaBuilder",
         "AgencyMbsPassthrough",
@@ -298,12 +286,6 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
         "DollarRollBuilder",
         "AgencyCmo",
         "AgencyCmoBuilder",
-        "Basket",
-        "BasketBuilder",
-        "RealEstateAsset",
-        "RealEstateAssetBuilder",
-        "LeveredRealEstateEquity",
-        "LeveredRealEstateEquityBuilder",
     ]);
     exports.extend_from_slice(&[
         "BasisSwap",
@@ -325,24 +307,17 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
         "BermudanSwaption",
         "BermudanSwaptionBuilder",
     ]);
-    exports.extend_from_slice(&["CommodityFutureOption", "CommodityFutureOptionBuilder"]);
+    exports.extend_from_slice(typed_commodity_future_option::EXPORTS);
+    exports.extend_from_slice(typed_commodity_forward::EXPORTS);
+    exports.extend_from_slice(typed_commodity_future::EXPORTS);
+    exports.extend_from_slice(typed_commodity_asian_option::EXPORTS);
+    exports.extend_from_slice(typed_commodity_spot_option::EXPORTS);
+    exports.extend_from_slice(typed_commodity_spread_option::EXPORTS);
+    exports.extend_from_slice(typed_commodity_swap::EXPORTS);
+    exports.extend_from_slice(typed_commodity_swaption::EXPORTS);
+    exports.extend_from_slice(typed_variance_swap::EXPORTS);
+    exports.extend_from_slice(typed_equity_spot::EXPORTS);
     exports.extend_from_slice(&[
-        "CommodityForward",
-        "CommodityForwardBuilder",
-        "CommodityFuture",
-        "CommodityFutureBuilder",
-        "CommodityAsianOption",
-        "CommodityAsianOptionBuilder",
-        "CommoditySpotOption",
-        "CommoditySpotOptionBuilder",
-        "CommoditySpreadOption",
-        "CommoditySpreadOptionBuilder",
-        "CommoditySwap",
-        "CommoditySwapBuilder",
-        "CommoditySwaption",
-        "CommoditySwaptionBuilder",
-        "VarianceSwap",
-        "VarianceSwapBuilder",
         "EquityTotalReturnSwap",
         "EquityTotalReturnSwapBuilder",
         "EquityTotalReturnFuture",
@@ -350,7 +325,6 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
         "FiIndexTotalReturnSwap",
         "FiIndexTotalReturnSwapBuilder",
     ]);
-    exports.extend_from_slice(&["Equity", "EquityBuilder"]);
     exports.extend_from_slice(&["Repo", "RepoBuilder"]);
     exports.extend_from_slice(typed_fx_spot::EXPORTS);
     exports.extend_from_slice(typed_fx_swap::EXPORTS);

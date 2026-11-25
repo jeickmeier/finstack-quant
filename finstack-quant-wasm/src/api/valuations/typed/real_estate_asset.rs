@@ -113,17 +113,11 @@ builder_class!(
     JsRealEstateAssetBuilder, "RealEstateAssetBuilder", RealEstateAssetBuilder, JsRealEstateAsset, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = RealEstateAsset)]
-impl JsRealEstateAsset {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsRealEstateAssetBuilder {
-        JsRealEstateAssetBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsRealEstateAsset, "RealEstateAsset", JsRealEstateAssetBuilder
+);
 
 setters!(JsRealEstateAssetBuilder, "RealEstateAssetBuilder", {
     /// Set the stable contract identifier.
@@ -135,7 +129,7 @@ setters!(JsRealEstateAssetBuilder, "RealEstateAssetBuilder", {
     /// @param value - Currency for valuation.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    currency as currency: "string" => js_wire,
+    currency as currency: "string" => js_currency,
     /// Set the contract's valuation method.
     /// @param value - Valuation method (DCF or DirectCap).
     /// @returns The active builder.
@@ -145,7 +139,7 @@ setters!(JsRealEstateAssetBuilder, "RealEstateAssetBuilder", {
     /// @param value - Optional property type classification (for reporting).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    property_type as propertyType: "NonNullable<generated.valuations.RealEstateAsset['property_type']> | null" => js_wire via property_type_opt,
+    property_type as propertyType: "NonNullable<generated.valuations.RealEstateAsset['property_type']> | null" => opt_wire via property_type_opt,
     /// Set the contract's noi schedule.
     /// @param value - Net operating income schedule (date, amount). Entries must be **annual** NOI amounts: cap-rate formulas (direct cap, exit-cap terminal value, going-in cap rate) apply a quoted annual cap rate to a single schedule entry, so a monthly or quarterly schedule would understate those values by 12x/4x. Flows dated exactly on the valuation as_of are included in PV undiscounted (t = 0).
     /// @returns The active builder.
@@ -155,47 +149,47 @@ setters!(JsRealEstateAssetBuilder, "RealEstateAssetBuilder", {
     /// @param value - Capital expenditure schedule (date, amount). Values are treated as **positive outflows**. When present, cashflows are valued as NOI - CapEx (unlevered net cash flow).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    capex_schedule as capexSchedule: "NonNullable<generated.valuations.RealEstateAsset['capex_schedule']> | null" => js_wire via capex_schedule_opt,
+    capex_schedule as capexSchedule: "NonNullable<generated.valuations.RealEstateAsset['capex_schedule']> | null" => opt_wire via capex_schedule_opt,
     /// Set the contract's discount rate.
     /// @param value - Discount rate for DCF (annualized).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    discount_rate as discountRate: "number | null" => js_wire via discount_rate_opt,
+    discount_rate as discountRate: "number | null" => opt_f64 via discount_rate_opt,
     /// Set the contract's cap rate.
     /// @param value - Capitalization rate for direct cap (annualized).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    cap_rate as capRate: "number | null" => js_wire via cap_rate_opt,
+    cap_rate as capRate: "number | null" => opt_f64 via cap_rate_opt,
     /// Set the contract's stabilized noi.
     /// @param value - Optional stabilized NOI override for direct cap.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    stabilized_noi as stabilizedNoi: "number | null" => js_wire via stabilized_noi_opt,
+    stabilized_noi as stabilizedNoi: "number | null" => opt_f64 via stabilized_noi_opt,
     /// Set the contract's terminal cap rate.
     /// @param value - Optional terminal cap rate for DCF (uses last NOI).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    terminal_cap_rate as terminalCapRate: "number | null" => js_wire via terminal_cap_rate_opt,
+    terminal_cap_rate as terminalCapRate: "number | null" => opt_f64 via terminal_cap_rate_opt,
     /// Set the contract's terminal growth rate.
     /// @param value - Optional terminal growth rate used to project NOI_{N+1} for exit valuation. Market convention for exit-cap terminal value is (TV = NOI_{N+1} / cap_rate_exit). When not provided, defaults to 0 (uses last NOI as-is, i.e. a trailing-NOI terminal value). Exactly **one** period of growth is applied to the last NOI on/before the exit date — it is not compounded over any gap between the last scheduled NOI and a later sale_date. Validation range is ([-100%, 20%]) to guard against configuration errors.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    terminal_growth_rate as terminalGrowthRate: "number | null" => js_wire via terminal_growth_rate_opt,
+    terminal_growth_rate as terminalGrowthRate: "number | null" => opt_f64 via terminal_growth_rate_opt,
     /// Set the contract's sale date.
     /// @param value - Optional sale/exit date that truncates the DCF horizon. When set, DCF only values unlevered flows up to and including sale_date. Terminal proceeds (if configured) are realized on sale_date.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    sale_date as saleDate: "string | null" => js_wire via sale_date_opt,
+    sale_date as saleDate: "string | null" => opt_date via sale_date_opt,
     /// Set the contract's sale price.
     /// @param value - Optional explicit gross sale price (terminal proceeds), before disposition costs. When set, this takes precedence over terminal_cap_rate for terminal proceeds.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    sale_price as salePrice: "NonNullable<generated.valuations.RealEstateAsset['sale_price']> | null" => js_wire via sale_price_opt,
+    sale_price as salePrice: "NonNullable<generated.valuations.RealEstateAsset['sale_price']> | null" => opt_wire via sale_price_opt,
     /// Set the contract's purchase price.
     /// @param value - Optional purchase price (useful for IRR / cap rate metrics).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    purchase_price as purchasePrice: "NonNullable<generated.valuations.RealEstateAsset['purchase_price']> | null" => js_wire via purchase_price_opt,
+    purchase_price as purchasePrice: "NonNullable<generated.valuations.RealEstateAsset['purchase_price']> | null" => opt_wire via purchase_price_opt,
     /// Set the contract's acquisition costs.
     /// @param value - Acquisition (closing) cost line items in instrument currency, as positive outflow magnitudes deducted at as_of in DCF valuation.
     /// @returns The active builder.
@@ -205,7 +199,7 @@ setters!(JsRealEstateAssetBuilder, "RealEstateAssetBuilder", {
     /// @param value - Optional disposition cost percentage applied to terminal value. A value of 0.02 represents 2% selling costs. Must be in ([0, 1)).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    disposition_cost_decimal as dispositionCostDecimal: "number | null" => js_wire via disposition_cost_decimal_opt,
+    disposition_cost_decimal as dispositionCostDecimal: "number | null" => opt_f64 via disposition_cost_decimal_opt,
     /// Set the contract's disposition costs.
     /// @param value - Optional detailed disposition cost line items (positive outflows) deducted from terminal proceeds.
     /// @returns The active builder.
@@ -215,7 +209,7 @@ setters!(JsRealEstateAssetBuilder, "RealEstateAssetBuilder", {
     /// @param value - Optional appraisal override value.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    appraisal_value as appraisalValue: "NonNullable<generated.valuations.RealEstateAsset['appraisal_value']> | null" => js_wire via appraisal_value_opt,
+    appraisal_value as appraisalValue: "NonNullable<generated.valuations.RealEstateAsset['appraisal_value']> | null" => opt_wire via appraisal_value_opt,
 });
 common_setters!(JsRealEstateAssetBuilder, "RealEstateAssetBuilder");
 

@@ -63,12 +63,6 @@ impl PyPrivateMarketsFund {
         instrument_expiry(py, &self.inner)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_private_markets_fund", "PrivateMarketsFund.currency")]
-    #[getter]
-    fn currency(&self) -> String {
-        self.inner.currency.to_string()
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_private_markets_fund", "PrivateMarketsFund.waterfall_spec")]
     #[getter]
     fn waterfall_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -80,22 +74,18 @@ impl PyPrivateMarketsFund {
     fn events<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.events)
     }
+}
+
+crate::bindings::macros::py_getters!(PyPrivateMarketsFund |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_private_markets_fund", "PrivateMarketsFund.currency")]
+    currency -> String = s.inner.currency.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_private_markets_fund", "PrivateMarketsFund.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> Option<String> {
-        self.inner
-            .discount_curve_id
-            .as_ref()
-            .map(ToString::to_string)
-    }
+    discount_curve_id -> Option<String> = s.inner .discount_curve_id .as_ref() .map(ToString::to_string);
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_private_markets_fund", "PrivateMarketsFund.unrealized_nav")]
-    #[getter]
-    fn unrealized_nav(&self) -> Option<PyMoney> {
-        self.inner.unrealized_nav.map(PyMoney::from_inner)
-    }
-}
+    unrealized_nav -> Option<PyMoney> = s.inner.unrealized_nav.map(PyMoney::from_inner);
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_private_markets_fund", "PrivateMarketsFundBuilder")]
 #[pyclass(
@@ -178,3 +168,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyPrivateMarketsFundBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["PrivateMarketsFund", "PrivateMarketsFundBuilder"];

@@ -306,7 +306,7 @@ export interface DE71A70936D11Bb04Ba43 {
  * creating a path-dependent "snowball" accumulation:
  *
  * ```text
- * c_i = max(c_{i-1} + fixed_rate - L_i, 0)
+ * c_i = max(c_{i-1} + fixed_rate - gearing * L_i, coupon_floor)
  * ```
  *
  * where L_i is the floating rate and c_0 = initial_coupon.
@@ -343,7 +343,7 @@ export interface D_34C7523897E1E79A3D8C {
   fixed_rate: Decimal;
   forward_curve_id: Id1;
   /**
-   * Multiplier on the floating fixing (1.0 for snowball, variable for inverse floater).
+   * Multiplier on the floating fixing applied in both `Snowball` and `InverseFloater` variants.
    */
   gearing: number;
   id: Id2;

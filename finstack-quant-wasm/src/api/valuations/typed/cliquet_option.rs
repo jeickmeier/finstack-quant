@@ -39,7 +39,7 @@ getters!(JsCliquetOption, "CliquetOption", |i| {
     default_model as defaultModel: "string" => text(Instrument::default_model(i)),
     /// Read the contract's underlying ticker.
     /// @returns Underlying asset ticker symbol
-    underlying_ticker as underlyingTicker: "string" => json(i.underlying_ticker),
+    underlying_ticker as underlyingTicker: "string" => text(i.underlying_ticker),
     /// Read the contract's reset dates.
     /// @returns Reset dates for periodic return locking
     reset_dates as resetDates: "generated.valuations.CliquetOption['reset_dates']" => dates(i.reset_dates),
@@ -66,19 +66,19 @@ getters!(JsCliquetOption, "CliquetOption", |i| {
     day_count as dayCount: "DayCount" => day_count(i.day_count),
     /// Read the contract's discount curve id.
     /// @returns Discount curve ID for present value calculations
-    discount_curve_id as discountCurveId: "string" => json(i.discount_curve_id),
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
     /// Read the contract's spot id.
     /// @returns Spot price identifier
-    spot_id as spotId: "string" => json(i.spot_id),
+    spot_id as spotId: "string" => text(i.spot_id),
     /// Read the contract's vol surface id.
     /// @returns Volatility surface ID
-    vol_surface_id as volSurfaceId: "string" => json(i.vol_surface_id),
+    vol_surface_id as volSurfaceId: "string" => text(i.vol_surface_id),
     /// Read the contract's path model.
     /// @returns Explicit path model selection. AtmTermGbm is an ATM-term-structure approximation and does not model equity strike skew; callers must opt into that limitation.
     path_model as pathModel: "generated.valuations.CliquetOption['path_model']" => json(i.path_model),
     /// Read the contract's div yield id.
     /// @returns Optional dividend-yield scalar ID. Some(id): lookup MUST succeed (a missing or non-unitless scalar returns an error). None: no implicit default; treated as zero continuous dividend yield. Set explicitly for index underlyings.
-    div_yield_id as divYieldId: "string | null" => json(i.div_yield_id),
+    div_yield_id as divYieldId: "string | null" => opt_text(i.div_yield_id),
     /// Read the contract's initial level.
     /// @returns Strike-set underlying level anchoring the first period's return. None (the default) uses the spot at the valuation date, which is only correct for a new trade priced on its strike-set date. **Required for seasoned trades** (any reset date strictly before as_of): pricing errors otherwise. Do not duplicate the strike-set date inside reset_dates when providing this — reset dates are period-end observations.
     initial_level as initialLevel: "number | null" => json(i.initial_level),
@@ -108,17 +108,11 @@ builder_class!(
     JsCliquetOptionBuilder, "CliquetOptionBuilder", CliquetOptionBuilder, JsCliquetOption, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = CliquetOption)]
-impl JsCliquetOption {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsCliquetOptionBuilder {
-        JsCliquetOptionBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsCliquetOption, "CliquetOption", JsCliquetOptionBuilder
+);
 
 setters!(JsCliquetOptionBuilder, "CliquetOptionBuilder", {
     /// Set the stable contract identifier.
@@ -145,22 +139,22 @@ setters!(JsCliquetOptionBuilder, "CliquetOptionBuilder", {
     /// @param value - Local cap on individual period returns
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    local_cap as localCap: "number" => js_wire,
+    local_cap as localCap: "number" => js_f64,
     /// Set the contract's local floor.
     /// @param value - Local floor on individual period returns (default 0.0)
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    local_floor as localFloor: "number" => js_wire,
+    local_floor as localFloor: "number" => js_f64,
     /// Set the contract's global cap.
     /// @param value - Global cap on sum of all period returns
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    global_cap as globalCap: "number" => js_wire,
+    global_cap as globalCap: "number" => js_f64,
     /// Set the contract's global floor.
     /// @param value - Global floor on sum of all period returns (default 0.0)
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    global_floor as globalFloor: "number" => js_wire,
+    global_floor as globalFloor: "number" => js_f64,
     /// Set the contract's discount curve id.
     /// @param value - Discount curve ID for present value calculations
     /// @returns The active builder.
@@ -190,7 +184,7 @@ setters!(JsCliquetOptionBuilder, "CliquetOptionBuilder", {
     /// @param value - Strike-set underlying level anchoring the first period's return. None (the default) uses the spot at the valuation date, which is only correct for a new trade priced on its strike-set date. **Required for seasoned trades** (any reset date strictly before as_of): pricing errors otherwise. Do not duplicate the strike-set date inside reset_dates when providing this — reset dates are period-end observations.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    initial_level as initialLevel: "number | null" => js_wire via initial_level_opt,
+    initial_level as initialLevel: "number | null" => opt_f64 via initial_level_opt,
     /// Set the contract's past fixings.
     /// @param value - Observed underlying fixings for seasoned trades (date, level pairs). Every reset date strictly before the valuation date must have a matching fixing here; pricing errors otherwise. Locked-in period returns are computed deterministically from these fixings (with local cap/floor applied) and only the remaining future periods are simulated.
     /// @returns The active builder.

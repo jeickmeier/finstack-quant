@@ -61,17 +61,11 @@ builder_class!(
     JsRangeAccrualBuilder, "RangeAccrualBuilder", RangeAccrualBuilder, JsRangeAccrual, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = RangeAccrual)]
-impl JsRangeAccrual {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsRangeAccrualBuilder {
-        JsRangeAccrualBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsRangeAccrual, "RangeAccrual", JsRangeAccrualBuilder
+);
 
 setters!(JsRangeAccrualBuilder, "RangeAccrualBuilder", {
     /// Set the stable contract identifier.

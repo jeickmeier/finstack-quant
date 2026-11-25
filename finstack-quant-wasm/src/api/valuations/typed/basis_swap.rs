@@ -104,12 +104,12 @@ setters!(JsBasisSwapBuilder, "BasisSwapBuilder", {
     /// @param value - Allow calendar-day fallback when the calendar cannot be resolved. When false (default), missing calendars are treated as an input error to avoid silently misaligning schedule and payment-lag conventions.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    allow_calendar_fallback as allowCalendarFallback: "boolean" => js_wire,
+    allow_calendar_fallback as allowCalendarFallback: "boolean" => js_bool,
     /// Set the contract's allow same curve.
     /// @param value - Allow both legs to reference the same forward curve. When false (default), having identical forward curves on both legs produces a validation error, as this is almost always a configuration mistake (NPV would equal spread × annuity by construction). Set to true only for testing or deliberate same-index spread trades.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    allow_same_curve as allowSameCurve: "boolean" => js_wire,
+    allow_same_curve as allowSameCurve: "boolean" => js_bool,
 });
 common_setters!(JsBasisSwapBuilder, "BasisSwapBuilder");
 

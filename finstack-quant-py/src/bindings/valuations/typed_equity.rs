@@ -48,6 +48,14 @@ instrument_pricing_methods!(
 
 #[pymethods]
 impl PyEquityOption {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.to_builder")]
+    fn to_builder(&self) -> PyEquityOptionBuilder {
+        PyEquityOptionBuilder {
+            inner: Some(self.inner.to_builder()),
+            fields: Vec::new(),
+        }
+    }
+
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]

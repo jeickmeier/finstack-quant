@@ -57,12 +57,6 @@ impl PyAutocallable {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.underlying_ticker")]
-    #[getter]
-    fn underlying_ticker(&self) -> String {
-        self.inner.underlying_ticker.to_string()
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.observation_dates")]
     #[getter]
     fn observation_dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
@@ -93,94 +87,16 @@ impl PyAutocallable {
         crate::bindings::date_utils::date_to_py(py, self.inner.expiry)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.autocall_barriers")]
-    #[getter]
-    fn autocall_barriers(&self) -> Vec<f64> {
-        self.inner.autocall_barriers.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.coupon_barriers")]
-    #[getter]
-    fn coupon_barriers(&self) -> Vec<f64> {
-        self.inner.coupon_barriers.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.coupons")]
-    #[getter]
-    fn coupons(&self) -> Vec<f64> {
-        self.inner.coupons.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.memory_coupons")]
-    #[getter]
-    fn memory_coupons(&self) -> bool {
-        self.inner.memory_coupons
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.final_barrier")]
-    #[getter]
-    fn final_barrier(&self) -> f64 {
-        self.inner.final_barrier
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.final_payoff_type")]
     #[getter]
     fn final_payoff_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.final_payoff_type)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.cap_level")]
-    #[getter]
-    fn cap_level(&self) -> f64 {
-        self.inner.cap_level
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.day_count")]
-    #[getter]
-    fn day_count(&self) -> crate::bindings::core::dates::daycount::PyDayCount {
-        crate::bindings::core::dates::daycount::PyDayCount::from_inner(self.inner.day_count)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.spot_id")]
-    #[getter]
-    fn spot_id(&self) -> String {
-        self.inner.spot_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.vol_surface_id")]
-    #[getter]
-    fn vol_surface_id(&self) -> String {
-        self.inner.vol_surface_id.to_string()
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.path_model")]
     #[getter]
     fn path_model<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.path_model)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.div_yield_id")]
-    #[getter]
-    fn div_yield_id(&self) -> Option<String> {
-        self.inner.div_yield_id.as_ref().map(ToString::to_string)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.initial_level")]
-    #[getter]
-    fn initial_level(&self) -> Option<f64> {
-        self.inner.initial_level
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.past_fixings")]
@@ -193,6 +109,50 @@ impl PyAutocallable {
             .collect()
     }
 }
+
+crate::bindings::macros::py_getters!(PyAutocallable |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.underlying_ticker")]
+    underlying_ticker -> String = s.inner.underlying_ticker.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.autocall_barriers")]
+    autocall_barriers -> Vec<f64> = s.inner.autocall_barriers.clone();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.coupon_barriers")]
+    coupon_barriers -> Vec<f64> = s.inner.coupon_barriers.clone();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.coupons")]
+    coupons -> Vec<f64> = s.inner.coupons.clone();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.memory_coupons")]
+    memory_coupons -> bool = s.inner.memory_coupons;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.final_barrier")]
+    final_barrier -> f64 = s.inner.final_barrier;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.cap_level")]
+    cap_level -> f64 = s.inner.cap_level;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.notional")]
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.day_count")]
+    day_count -> crate::bindings::core::dates::daycount::PyDayCount = crate::bindings::core::dates::daycount::PyDayCount::from_inner(s.inner.day_count);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.discount_curve_id")]
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.spot_id")]
+    spot_id -> String = s.inner.spot_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.vol_surface_id")]
+    vol_surface_id -> String = s.inner.vol_surface_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.div_yield_id")]
+    div_yield_id -> Option<String> = s.inner.div_yield_id.as_ref().map(ToString::to_string);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.initial_level")]
+    initial_level -> Option<f64> = s.inner.initial_level;
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "AutocallableBuilder")]
 #[pyclass(
@@ -410,3 +370,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyAutocallableBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["Autocallable", "AutocallableBuilder"];

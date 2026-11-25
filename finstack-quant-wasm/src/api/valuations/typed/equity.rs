@@ -161,7 +161,7 @@ setters!(JsEquityOptionBuilder, "EquityOptionBuilder", {
         /// @param value - ISO-4217 currency code of the strike and the payoff, e.g. `"USD"`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        currency as currency: "generated.valuations.EquityOption['currency']" => js_wire,
+        currency as currency: "generated.valuations.EquityOption['currency']" => js_currency,
         /// Set the discount curve identifier for present value calculations.
         /// @param value - Discount curve identifier.
         /// @returns The builder, for chaining.
@@ -198,6 +198,16 @@ handle_setters!(JsEquityOptionBuilder, "EquityOptionBuilder", {
         /// @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
         day_count as dayCount => JsDayCount,
 });
+
+to_builder_method!(
+    /// Seed an independent builder from the complete option contract.
+    /// @returns Builder carrying strike, exercise style, dividend schedule and market inputs.
+    JsEquityOption,
+    "EquityOption",
+    JsEquityOptionBuilder
+);
+
+option_greeks_bundle!(JsEquityOption, "EquityOption");
 
 #[wasm_bindgen(js_class = EquityOption)]
 impl JsEquityOption {
@@ -261,37 +271,6 @@ impl JsEquityOption {
         self.inner
             .implied_vol(&market, as_of, target_price)
             .map_err(to_js_err)
-    }
-
-    /// Compute every Greek that applies to this option as a plain object.
-    /// @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
-    /// @param asOf - ISO-8601 valuation date.
-    /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-    /// @param extras - Optional pricing configuration and overrides accepted by `price`.
-    /// @returns Map of Greek name to value, with keys in the Rust `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`).
-    /// @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed, and kind `computation` if pricing fails or a Greek is non-finite.
-    #[wasm_bindgen(unchecked_return_type = "Record<string, number>")]
-    pub fn greeks(
-        &self,
-        #[wasm_bindgen(js_name = "marketJson", unchecked_param_type = "JsonInput")]
-        market_json: JsValue,
-        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
-        #[wasm_bindgen(unchecked_optional_param_type = "string | null")] model: Option<JsValue>,
-        #[wasm_bindgen(
-            unchecked_optional_param_type = "generated.valuations.PriceExtras | JsonInput | null"
-        )]
-        extras: Option<JsValue>,
-    ) -> Result<JsValue, JsValue> {
-        let market_json = crate::utils::input::json_text(&market_json, "marketJson")?;
-        let as_of = js_string(&as_of, "asOf")?;
-        let model = crate::utils::input::js_opt_string(model.as_ref(), "model")?;
-        super::option_greeks(
-            Box::new(self.inner.clone()),
-            &market_json,
-            &as_of,
-            model.as_deref(),
-            extras.as_ref(),
-        )
     }
 }
 

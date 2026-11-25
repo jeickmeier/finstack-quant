@@ -109,27 +109,27 @@ setters!(JsFxSpotBuilder, "FxSpotBuilder", {
     /// @param value - Base currency (the currency being priced)
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    base_currency as baseCurrency: "string" => js_wire,
+    base_currency as baseCurrency: "string" => js_currency,
     /// Set the contract's quote currency.
     /// @param value - Quote currency (the currency used for pricing)
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    quote_currency as quoteCurrency: "string" => js_wire,
+    quote_currency as quoteCurrency: "string" => js_currency,
     /// Set the contract's settlement date.
     /// @param value - Actual settlement (value) date, used as given; when set, settlement_days is ignored.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    settlement_date as settlementDate: "string | null" => js_wire via settlement_date_opt,
+    settlement_date as settlementDate: "string | null" => opt_date via settlement_date_opt,
     /// Set the contract's settlement days.
     /// @param value - Contractual spot lag in business days on the joint calendar, required when settlement_date is not provided.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    settlement_days as settlementDays: "number | null" => js_wire via settlement_days_opt,
+    settlement_days as settlementDays: "number | null" => opt_uint via settlement_days_opt,
     /// Set the contract's quoted spot.
     /// @param value - Optional quoted FX spot rate (quote per base); None reads the FxMatrix.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    quoted_spot as quotedSpot: "number | null" => js_wire via quoted_spot_opt,
+    quoted_spot as quotedSpot: "number | null" => opt_f64 via quoted_spot_opt,
     /// Set the contract's domestic discount curve id.
     /// @param value - Optional quote-currency discount curve for PV-ing the settlement cashflow. When absent the settlement amount is reported undiscounted (a 1–2 day effect for standard spot lags).
     /// @returns The active builder.

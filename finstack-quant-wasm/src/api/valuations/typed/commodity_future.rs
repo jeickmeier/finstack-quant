@@ -40,13 +40,13 @@ getters!(JsCommodityFuture, "CommodityFuture", |i| {
     default_model as defaultModel: "string" => text(Instrument::default_model(i)),
     /// Read the contract's underlying ticker.
     /// @returns Exchange symbol or underlying label.
-    underlying_ticker as underlyingTicker: "string" => json(i.underlying_ticker),
+    underlying_ticker as underlyingTicker: "string" => text(i.underlying_ticker),
     /// Read the contract's terms.
     /// @returns Standard listed position and lifecycle terms.
     terms as terms: "generated.valuations.CommodityFuture['terms']" => json(i.terms),
     /// Read the contract's forward curve id.
     /// @returns Commodity forward PriceCurve used for projected observations.
-    forward_curve_id as forwardCurveId: "string" => json(i.forward_curve_id),
+    forward_curve_id as forwardCurveId: "string" => text(i.forward_curve_id),
     /// Read the contract's fixing.
     /// @returns Final-settlement price fixing rule (single observation or average).
     fixing as fixing: "generated.valuations.CommodityFuture['fixing']" => json(i.fixing),
@@ -70,17 +70,11 @@ builder_class!(
     JsCommodityFutureBuilder, "CommodityFutureBuilder", CommodityFutureBuilder, JsCommodityFuture, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = CommodityFuture)]
-impl JsCommodityFuture {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsCommodityFutureBuilder {
-        JsCommodityFutureBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsCommodityFuture, "CommodityFuture", JsCommodityFutureBuilder
+);
 
 setters!(JsCommodityFutureBuilder, "CommodityFutureBuilder", {
     /// Set the stable contract identifier.

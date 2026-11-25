@@ -643,3 +643,112 @@ test('typed rates and inflation builders preserve the canonical trade when chang
     assert.notEqual(trade.id, newId, name);
   }
 });
+
+test('typed WASM setters accept JS numbers, integers, booleans, dates, nulls, currencies, and bracket/brace IDs', () => {
+  const {
+    AgencyTba,
+    AsianOption,
+    Autocallable,
+    BarrierOption,
+    CommodityForward,
+    CommodityFutureOption,
+    CommoditySwap,
+    EquityFuture,
+    EquityFutureOption,
+    EquityOption,
+    FxFutureOption,
+    InterestRateFutureOption,
+    LookbackOption,
+    QuantoOption,
+    VarianceSwap,
+    VolatilityIndexFuture,
+    VolatilityIndexFutureOption,
+  } = valuations.instruments;
+
+  const asian = AsianOption.example().toBuilder().strike(105.5).currency('EUR').build();
+  assert.equal(asian.strike, 105.5);
+  assert.equal(asian.currency, 'EUR');
+
+  const quanto = QuantoOption.example()
+    .toBuilder()
+    .correlation(0.25)
+    .quantity(null)
+    .payoffFxRate(null)
+    .build();
+  assert.equal(quanto.correlation, 0.25);
+  assert.equal(quanto.quantity, null);
+  assert.equal(quanto.payoffFxRate, null);
+
+  const swap = CommoditySwap.example().toBuilder().indexLagDays(2).build();
+  assert.equal(swap.indexLagDays, 2);
+
+  const fwd = CommodityForward.example().toBuilder().settlementDays(2).build();
+  assert.equal(fwd.settlementDays, 2);
+  assert.throws(
+    () => CommodityForward.example().toBuilder().settlementDays(-1),
+    (e) => e instanceof TypeError
+  );
+
+  const tba = AgencyTba.example().toBuilder().settlementYear(2026).settlementMonth(6).build();
+  assert.equal(tba.settlementYear, 2026);
+  assert.equal(tba.settlementMonth, 6);
+
+  const autocall = Autocallable.example().toBuilder().memoryCoupons(true).build();
+  assert.equal(autocall.memoryCoupons, true);
+
+  const barrier = BarrierOption.example()
+    .toBuilder()
+    .observedBarrierBreached(null)
+    .rebate(null)
+    .rebateTiming(null)
+    .build();
+  assert.equal(barrier.observedBarrierBreached, null);
+  assert.equal(barrier.rebate, null);
+  assert.equal(barrier.rebateTiming, null);
+
+  const lookback = LookbackOption.example()
+    .toBuilder()
+    .lookbackType('floating_strike')
+    .strike(null)
+    .build();
+  assert.equal(lookback.strike, null);
+
+  const vs = VarianceSwap.example().toBuilder().settlementDate('2026-06-30').build();
+  assert.equal(vs.settlementDate, '2026-06-30');
+  const vsCleared = vs.toBuilder().settlementDate(null).build();
+  assert.equal(vsCleared.settlementDate, null);
+
+  const ef = EquityFuture.example()
+    .toBuilder()
+    .underlyingTicker('[TICKER-1]')
+    .discountCurveId('{USD-OIS}')
+    .spotId('[SPX-SPOT]')
+    .underlyingCurrency('USD')
+    .divYieldId(null)
+    .quanto(null)
+    .build();
+  assert.equal(ef.underlyingTicker, '[TICKER-1]');
+  assert.equal(ef.discountCurveId, '{USD-OIS}');
+  assert.equal(ef.spotId, '[SPX-SPOT]');
+  assert.equal(ef.underlyingCurrency, 'USD');
+  assert.equal(ef.divYieldId, null);
+  assert.equal(ef.quanto, null);
+
+  const vif = VolatilityIndexFuture.example();
+  assert.equal(typeof vif.volIndexCurveId, 'string');
+  assert.ok(vif.volIndexCurveId.length > 0);
+
+  const eqOptEdited = EquityOption.example().toBuilder().strike(4600).build();
+  assert.equal(eqOptEdited.strike, 4600);
+
+  for (const Cls of [
+    CommodityFutureOption,
+    EquityFutureOption,
+    FxFutureOption,
+    InterestRateFutureOption,
+    VolatilityIndexFutureOption,
+  ]) {
+    const edited = Cls.example().toBuilder().id('FO-EDIT').build();
+    assert.equal(edited.id, 'FO-EDIT');
+  }
+});

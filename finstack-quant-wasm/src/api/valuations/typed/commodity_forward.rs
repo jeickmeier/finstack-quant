@@ -64,19 +64,19 @@ getters!(JsCommodityForward, "CommodityForward", |i| {
     quoted_forward as quotedForward: "number | null" => json(i.quoted_forward),
     /// Read the contract's forward curve id.
     /// @returns Forward/futures price curve ID for price interpolation. Should reference a PriceCurve in the MarketContext.
-    forward_curve_id as forwardCurveId: "string" => json(i.forward_curve_id),
+    forward_curve_id as forwardCurveId: "string" => text(i.forward_curve_id),
     /// Read the contract's spot id.
     /// @returns Optional observed spot identifier. At maturity the scalar is the delivery observation. After maturity use the exact delivery observation in the corresponding FIXING:{spot_id} series. Before maturity an explicitly identified spot can supply the cost-of-carry input if the forward curve is absent.
-    spot_id as spotId: "string | null" => json(i.spot_id),
+    spot_id as spotId: "string | null" => opt_text(i.spot_id),
     /// Read the contract's discount curve id.
     /// @returns Discount curve ID.
-    discount_curve_id as discountCurveId: "string" => json(i.discount_curve_id),
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
     /// Read the contract's exchange.
     /// @returns Optional exchange identifier (e.g., "NYMEX", "ICE").
-    exchange as exchange: "string | null" => json(i.exchange),
+    exchange as exchange: "string | null" => opt_text(i.exchange),
     /// Read the contract's contract month.
     /// @returns Optional contract month (e.g., "2025M03" for March 2025).
-    contract_month as contractMonth: "string | null" => json(i.contract_month),
+    contract_month as contractMonth: "string | null" => opt_text(i.contract_month),
     /// Read the contract's convention.
     /// @returns Optional market convention for this commodity. When set, provides default settlement days and calendar if not explicitly specified. See CommodityConvention for available options.
     convention as convention: "NonNullable<generated.valuations.CommodityForward['convention']> | null" => json(i.convention),
@@ -85,7 +85,7 @@ getters!(JsCommodityForward, "CommodityForward", |i| {
     settlement_days as settlementDays: "number | null" => json(i.settlement_days),
     /// Read the contract's settlement calendar id.
     /// @returns The contract's settlement calendar ID. Required whenever the settlement (payment) date is calculated: no calendar is inferred from convention or defaulted to weekends only. nerc is a power-market label calendar, not a settlement calendar, and is rejected.
-    settlement_calendar_id as settlementCalendarId: "string | null" => json(i.settlement_calendar_id),
+    settlement_calendar_id as settlementCalendarId: "string | null" => opt_text(i.settlement_calendar_id),
     /// Read the contract's settlement business day convention.
     /// @returns Business day convention for settlement date adjustment. Defaults to Following for energy commodities, ModifiedFollowing for precious metals.
     settlement_business_day_convention as settlementBusinessDayConvention: "NonNullable<generated.valuations.CommodityForward['settlement_business_day_convention']> | null" => json(i.settlement_business_day_convention),
@@ -109,17 +109,11 @@ builder_class!(
     JsCommodityForwardBuilder, "CommodityForwardBuilder", CommodityForwardBuilder, JsCommodityForward, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = CommodityForward)]
-impl JsCommodityForward {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsCommodityForwardBuilder {
-        JsCommodityForwardBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsCommodityForward, "CommodityForward", JsCommodityForwardBuilder
+);
 
 setters!(JsCommodityForwardBuilder, "CommodityForwardBuilder", {
     /// Set the stable contract identifier.
@@ -136,12 +130,12 @@ setters!(JsCommodityForwardBuilder, "CommodityForwardBuilder", {
     /// @param value - Contract quantity in units.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    quantity as quantity: "number" => js_wire,
+    quantity as quantity: "number" => js_f64,
     /// Set the contract's multiplier.
     /// @param value - Contract multiplier (typically 1.0 for OTC forwards, defaults to 1.0).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    multiplier as multiplier: "number" => js_wire,
+    multiplier as multiplier: "number" => js_f64,
     /// Set the contract's maturity.
     /// @param value - Settlement/delivery date.
     /// @returns The active builder.
@@ -161,12 +155,12 @@ setters!(JsCommodityForwardBuilder, "CommodityForwardBuilder", {
     /// @param value - Contract price (entry/trade price K). If None, the forward is treated as **at-market** (K = F), meaning NPV ≈ 0 at inception (like a newly opened futures position). If Some(K), the forward is **off-market** and NPV reflects the mark-to-market difference: sign × (F - K) × Q × M × DF.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    contract_price as contractPrice: "number | null" => js_wire via contract_price_opt,
+    contract_price as contractPrice: "number | null" => opt_f64 via contract_price_opt,
     /// Set the contract's quoted forward.
     /// @param value - Optional quoted forward price (overrides curve lookup for F). This is a market price override, not the contract entry price. Use contract_price for the trade entry price K.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    quoted_forward as quotedForward: "number | null" => js_wire via quoted_forward_opt,
+    quoted_forward as quotedForward: "number | null" => opt_f64 via quoted_forward_opt,
     /// Set the contract's forward curve id.
     /// @param value - Forward/futures price curve ID for price interpolation. Should reference a PriceCurve in the MarketContext.
     /// @returns The active builder.
@@ -196,12 +190,12 @@ setters!(JsCommodityForwardBuilder, "CommodityForwardBuilder", {
     /// @param value - Optional market convention for this commodity. When set, provides default settlement days and calendar if not explicitly specified. See CommodityConvention for available options.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    convention as convention: "NonNullable<generated.valuations.CommodityForward['convention']> | null" => js_wire via convention_opt,
+    convention as convention: "NonNullable<generated.valuations.CommodityForward['convention']> | null" => opt_wire via convention_opt,
     /// Set the contract's settlement days.
     /// @param value - Settlement lag in business days (T+N). Defaults to 2 for most commodity markets (T+2). If convention is set, uses the convention's default unless explicitly overridden here. # Market Standards | Market | Settlement | |--------|------------| | Energy (WTI, Brent, NG) | T+2 | | Precious metals | T+2 | | Base metals (LME) | T+2 | | Power | T+1 |
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    settlement_days as settlementDays: "number | null" => js_wire via settlement_days_opt,
+    settlement_days as settlementDays: "number | null" => opt_uint via settlement_days_opt,
     /// Set the contract's settlement calendar id.
     /// @param value - The contract's settlement calendar ID. Required whenever the settlement (payment) date is calculated: no calendar is inferred from convention or defaulted to weekends only. nerc is a power-market label calendar, not a settlement calendar, and is rejected.
     /// @returns The active builder.
@@ -211,6 +205,6 @@ setters!(JsCommodityForwardBuilder, "CommodityForwardBuilder", {
     /// @param value - Business day convention for settlement date adjustment. Defaults to Following for energy commodities, ModifiedFollowing for precious metals.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    settlement_business_day_convention as settlementBusinessDayConvention: "NonNullable<generated.valuations.CommodityForward['settlement_business_day_convention']> | null" => js_wire via settlement_business_day_convention_opt,
+    settlement_business_day_convention as settlementBusinessDayConvention: "NonNullable<generated.valuations.CommodityForward['settlement_business_day_convention']> | null" => opt_wire via settlement_business_day_convention_opt,
 });
 common_setters!(JsCommodityForwardBuilder, "CommodityForwardBuilder");

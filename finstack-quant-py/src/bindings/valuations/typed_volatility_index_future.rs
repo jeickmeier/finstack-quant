@@ -62,15 +62,17 @@ impl PyVolatilityIndexFuture {
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         instrument_expiry(py, &self.inner)
     }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_volatility_index_future", "VolatilityIndexFuture.terms")]
-    #[getter]
-    fn terms(&self) -> PyListedFutureTerms {
-        PyListedFutureTerms {
-            inner: self.inner.terms.clone(),
-        }
-    }
 }
+
+crate::bindings::macros::py_getters!(PyVolatilityIndexFuture |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_volatility_index_future", "VolatilityIndexFuture.terms")]
+    terms -> PyListedFutureTerms = PyListedFutureTerms {
+        inner: s.inner.terms.clone(),
+    };
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_volatility_index_future", "VolatilityIndexFuture.vol_index_curve_id")]
+    vol_index_curve_id -> String = s.inner.vol_index_curve_id.to_string();
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_volatility_index_future", "VolatilityIndexFutureBuilder")]
 #[pyclass(
@@ -119,9 +121,12 @@ impl PyVolatilityIndexFutureBuilder {
     }
 }
 
-/// Register the bond future and its builder.
+/// Register the volatility-index future and its builder.
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyVolatilityIndexFuture>()?;
     module.add_class::<PyVolatilityIndexFutureBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["VolatilityIndexFuture", "VolatilityIndexFutureBuilder"];

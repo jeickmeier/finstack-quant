@@ -125,7 +125,7 @@ setters!(JsFiIndexTotalReturnSwapBuilder, "FiIndexTotalReturnSwapBuilder", {
     /// @param value - Index level at the first contractual reset, in the index's own units. Used only at inception when no fixing series is supplied; the realized return to date is index_level / initial_level. Subsequent resets require fixing_series_id. Must be positive and finite when set.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    initial_level as initialLevel: "number | null" => js_wire via initial_level_opt,
+    initial_level as initialLevel: "number | null" => opt_f64 via initial_level_opt,
     /// Set the contract's fixing series id.
     /// @param value - Market time-series identifier containing positive total-return index levels on contractual reset dates, including the final accrual boundary. Historical endpoints require exact observations; no yield-based history is inferred.
     /// @returns The active builder.
@@ -135,7 +135,7 @@ setters!(JsFiIndexTotalReturnSwapBuilder, "FiIndexTotalReturnSwapBuilder", {
     /// @param value - Optional OTC margin specification for VM/IM. Fixed income index TRS use duration-based margin calculations.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    margin_spec as marginSpec: "NonNullable<generated.valuations.FiIndexTotalReturnSwap['margin_spec']> | null" => js_wire via margin_spec_opt,
+    margin_spec as marginSpec: "NonNullable<generated.valuations.FiIndexTotalReturnSwap['margin_spec']> | null" => opt_wire via margin_spec_opt,
 });
 common_setters!(
     JsFiIndexTotalReturnSwapBuilder,

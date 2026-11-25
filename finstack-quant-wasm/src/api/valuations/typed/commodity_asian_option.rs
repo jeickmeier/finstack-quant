@@ -62,13 +62,13 @@ getters!(JsCommodityAsianOption, "CommodityAsianOption", |i| {
     expiry as expiry: "string" => date(i.expiry),
     /// Read the contract's forward curve id.
     /// @returns Forward/futures price curve ID.
-    forward_curve_id as forwardCurveId: "string" => json(i.forward_curve_id),
+    forward_curve_id as forwardCurveId: "string" => text(i.forward_curve_id),
     /// Read the contract's discount curve id.
     /// @returns Discount curve ID for present value calculations.
-    discount_curve_id as discountCurveId: "string" => json(i.discount_curve_id),
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
     /// Read the contract's vol surface id.
     /// @returns Volatility surface ID for implied vol.
-    vol_surface_id as volSurfaceId: "string" => json(i.vol_surface_id),
+    vol_surface_id as volSurfaceId: "string" => text(i.vol_surface_id),
     /// Read the contract's day count.
     /// @returns Day count convention.
     day_count as dayCount: "DayCount" => day_count(i.day_count),
@@ -92,17 +92,11 @@ builder_class!(
     JsCommodityAsianOptionBuilder, "CommodityAsianOptionBuilder", CommodityAsianOptionBuilder, JsCommodityAsianOption, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = CommodityAsianOption)]
-impl JsCommodityAsianOption {
+to_builder_method!(
     /// Seed an independent builder from the complete contract.
     /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsCommodityAsianOptionBuilder {
-        JsCommodityAsianOptionBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsCommodityAsianOption, "CommodityAsianOption", JsCommodityAsianOptionBuilder
+);
 
 setters!(JsCommodityAsianOptionBuilder, "CommodityAsianOptionBuilder", {
     /// Set the stable contract identifier.
@@ -119,7 +113,7 @@ setters!(JsCommodityAsianOptionBuilder, "CommodityAsianOptionBuilder", {
     /// @param value - Strike price per unit.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    strike as strike: "number" => js_wire,
+    strike as strike: "number" => js_f64,
     /// Set the contract's option type.
     /// @param value - Option type (call or put).
     /// @returns The active builder.
@@ -144,7 +138,7 @@ setters!(JsCommodityAsianOptionBuilder, "CommodityAsianOptionBuilder", {
     /// @param value - Contract quantity in commodity units.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    quantity as quantity: "number" => js_wire,
+    quantity as quantity: "number" => js_f64,
     /// Set the contract's expiry.
     /// @param value - Option expiry/settlement date for the payoff.
     /// @returns The active builder.

@@ -60,6 +60,22 @@ class EquityOption:
         True
         """
         ...
+    def to_builder(self) -> EquityOptionBuilder:
+        """
+        Copy this equity option into an editable fluent builder.
+
+        Returns
+        -------
+        EquityOptionBuilder
+            Builder initialized with the current option terms, dividend schedule
+            and pricing overrides.
+
+        Notes
+        -----
+        This method does not raise.
+        """
+        ...
+
     @classmethod
     def from_json(cls, json: str) -> EquityOption:
         """
