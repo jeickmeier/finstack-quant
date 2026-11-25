@@ -30,6 +30,9 @@ import { visualHarness } from "../tests/install/harness.mjs";
 import { sourceString } from "./source-string.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url)),
   repo = path.resolve(root, "..");
+const { overrides = {} } = JSON.parse(
+  await readFile(path.join(root, "package.json"), "utf8"),
+);
 const registry = await loadRegistry({ cwd: root }),
   graph = checkGraph(registry.items);
 const roles = await workerRoles(root, registry.items, graph);
@@ -41,7 +44,7 @@ const registryPackages = new Set(
 );
 // The fresh consumer's own runtime packages, beside the closure's declared ones.
 const scaffold = {
-  next: "16.3.4",
+  next: "16.4.6",
   react: "19.2.8",
   "react-dom": "19.2.8",
   "@base-ui/react": "1.8.0",
@@ -128,6 +131,7 @@ const installerKey = async () =>
     process.version,
     process.platform,
     JSON.stringify(scaffold),
+    JSON.stringify(overrides),
     ...(await Promise.all(
       [
         "scripts/install-matrix.mjs",
@@ -209,6 +213,7 @@ async function buildTemplate(needsWasm) {
     name: "installed-template",
     private: true,
     type: "module",
+    overrides,
     dependencies: {
       ...scaffold,
       ...(needsWasm ? { "finstack-quant-wasm": `file:${transport.wasm}` } : {}),

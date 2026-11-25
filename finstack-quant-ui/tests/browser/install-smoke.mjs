@@ -6,6 +6,9 @@ import path from "node:path";
 import { installProbe } from "./install-probe.mjs";
 const repo = path.resolve(import.meta.dirname, "../../..");
 const ui = path.join(repo, "finstack-quant-ui");
+const { overrides } = JSON.parse(
+  await readFile(path.join(ui, "package.json"), "utf8"),
+);
 const external = await mkdtemp(path.join(tmpdir(), "finstack-next-installed-"));
 const evidence =
   process.env.REGISTRY_SMOKE_DIR ??
@@ -37,8 +40,9 @@ await writeFile(
       name: "finstack-installed-consumer",
       private: true,
       type: "module",
+      overrides,
       dependencies: {
-        next: "16.3.4",
+        next: "16.4.6",
         react: "19.2.8",
         "react-dom": "19.2.8",
         "finstack-quant-wasm": `file:${path.join(repo, "finstack-quant-wasm")}`,
