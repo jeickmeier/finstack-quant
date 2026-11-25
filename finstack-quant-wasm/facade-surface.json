@@ -4910,6 +4910,7 @@
       "minXirr",
       "price",
       "priceMertonMc",
+      "toBuilder",
       "toDict",
       "toJson",
       "withStub"
@@ -4944,7 +4945,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "exampleCallable", "exampleFloatingWithDdtl", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "amortization",
       "attributes",
@@ -4988,6 +4989,7 @@
       "metric",
       "price",
       "priceWithPaths",
+      "toBuilder",
       "toDict",
       "toJson"
     ],
@@ -5213,11 +5215,18 @@
     "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
+      "contractSpecs",
+      "ctdBond",
+      "ctdBondId",
       "defaultModel",
+      "deliverableBasket",
+      "deliveryStart",
+      "discountCurveId",
       "expiry",
       "id",
       "instrumentPricingOverrides",
       "metricPricingOverrides",
+      "repoCurveId",
       "scenarioPricingOverrides",
       "terms"
     ]
@@ -5380,13 +5389,24 @@
     "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
+      "compounding",
+      "contractSpecs",
+      "dayCount",
       "defaultModel",
+      "discountCurveId",
       "expiry",
+      "fixingCalendarId",
+      "fixingDate",
+      "forwardCurveId",
       "id",
+      "indexId",
       "instrumentPricingOverrides",
       "metricPricingOverrides",
+      "periodEnd",
+      "periodStart",
       "scenarioPricingOverrides",
-      "terms"
+      "terms",
+      "volSurfaceId"
     ]
   },
   "valuations.instruments.InterestRateFutureBuilder": {
@@ -5680,7 +5700,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromConventions", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "adjustFixedAccrualDates",
       "adjustFloatAccrualDates",
@@ -5711,6 +5731,7 @@
       "marketDependencies",
       "metric",
       "price",
+      "toBuilder",
       "toDict",
       "toJson"
     ],
@@ -5737,7 +5758,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "businessDayConvention",
@@ -5917,6 +5938,7 @@
       "metric",
       "parity",
       "price",
+      "toBuilder",
       "toDict",
       "toJson"
     ],

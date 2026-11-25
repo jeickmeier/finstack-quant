@@ -3,7 +3,7 @@
 use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
-use finstack_quant_core::types::InstrumentId;
+use finstack_quant_core::types::{DealId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::cmo::{AgencyCmo, AgencyCmoBuilder};
 use pyo3::prelude::*;
 
@@ -60,12 +60,6 @@ impl PyAgencyCmo {
         instrument_expiry(py, &self.inner)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_cmo", "AgencyCmo.deal_name")]
-    #[getter]
-    fn deal_name<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::json_bridge::serde_to_py(py, &self.inner.deal_name)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_cmo", "AgencyCmo.agency")]
     #[getter]
     fn agency<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -84,36 +78,29 @@ impl PyAgencyCmo {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.waterfall)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_cmo", "AgencyCmo.reference_tranche_id")]
-    #[getter]
-    fn reference_tranche_id(&self) -> String {
-        self.inner.reference_tranche_id.to_string()
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_cmo", "AgencyCmo.collateral")]
     #[getter]
     fn collateral<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.collateral)
     }
+}
+
+crate::bindings::macros::py_getters!(PyAgencyCmo |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_cmo", "AgencyCmo.deal_name")]
+    deal_name -> String = s.inner.deal_name.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_cmo", "AgencyCmo.reference_tranche_id")]
+    reference_tranche_id -> String = s.inner.reference_tranche_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_cmo", "AgencyCmo.collateral_wac")]
-    #[getter]
-    fn collateral_wac(&self) -> Option<f64> {
-        self.inner.collateral_wac
-    }
+    collateral_wac -> Option<f64> = s.inner.collateral_wac;
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_cmo", "AgencyCmo.collateral_wam_months")]
-    #[getter]
-    fn collateral_wam_months(&self) -> Option<u32> {
-        self.inner.collateral_wam_months
-    }
+    collateral_wam_months -> Option<u32> = s.inner.collateral_wam_months;
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_cmo", "AgencyCmo.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-}
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_cmo", "AgencyCmoBuilder")]
 #[pyclass(
@@ -134,11 +121,8 @@ impl PyAgencyCmoBuilder {
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_cmo", "AgencyCmoBuilder.deal_name")]
-    fn deal_name<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        value: &Bound<'_, PyAny>,
-    ) -> PyResult<PyRefMut<'py, Self>> {
-        let value = py_to_serde(value.py(), value, "deal_name")?;
+    fn deal_name<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
+        let value = DealId::new(value);
         builder_set!(slf, |b: AgencyCmoBuilder| b.deal_name(value))
     }
 
@@ -229,3 +213,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyAgencyCmoBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["AgencyCmo", "AgencyCmoBuilder"];

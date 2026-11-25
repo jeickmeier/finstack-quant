@@ -38,7 +38,7 @@ getters!(JsAgencyCmo, "AgencyCmo", |i| {
     default_model as defaultModel: "string" => text(Instrument::default_model(i)),
     /// Read the contract's deal name.
     /// @returns Deal name (e.g., "FNR 2024-1")
-    deal_name as dealName: "generated.valuations.AgencyCmo['deal_name']" => json(i.deal_name),
+    deal_name as dealName: "string" => text(i.deal_name),
     /// Read the contract's agency.
     /// @returns Agency program
     agency as agency: "generated.valuations.AgencyCmo['agency']" => json(i.agency),
@@ -50,7 +50,7 @@ getters!(JsAgencyCmo, "AgencyCmo", |i| {
     waterfall as waterfall: "generated.valuations.AgencyCmo['waterfall']" => json(i.waterfall),
     /// Read the contract's reference tranche id.
     /// @returns Reference tranche ID for pricing (which tranche to value)
-    reference_tranche_id as referenceTrancheId: "string" => json(i.reference_tranche_id),
+    reference_tranche_id as referenceTrancheId: "string" => text(i.reference_tranche_id),
     /// Read the contract's collateral.
     /// @returns Collateral pool (optional - for detailed cashflow projection)
     collateral as collateral: "NonNullable<generated.valuations.AgencyCmo['collateral']> | null" => json(i.collateral),
@@ -62,9 +62,16 @@ getters!(JsAgencyCmo, "AgencyCmo", |i| {
     collateral_wam_months as collateralWamMonths: "number | null" => json(i.collateral_wam_months),
     /// Read the contract's discount curve id.
     /// @returns Discount curve identifier.
-    discount_curve_id as discountCurveId: "string" => json(i.discount_curve_id),
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
 });
 common_getters!(JsAgencyCmo, "AgencyCmo");
+to_builder_method!(
+    /// Seed an independent builder from the complete contract.
+    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
+    JsAgencyCmo,
+    "AgencyCmo",
+    JsAgencyCmoBuilder
+);
 
 builder_class!(
     /// Builder for an instrument.
@@ -83,18 +90,6 @@ builder_class!(
     JsAgencyCmoBuilder, "AgencyCmoBuilder", AgencyCmoBuilder, JsAgencyCmo, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = AgencyCmo)]
-impl JsAgencyCmo {
-    /// Seed an independent builder from the complete contract.
-    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsAgencyCmoBuilder {
-        JsAgencyCmoBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
-
 setters!(JsAgencyCmoBuilder, "AgencyCmoBuilder", {
     /// Set the stable contract identifier.
     /// @param value - Identifier used for scenario selection and metrics.
@@ -105,7 +100,7 @@ setters!(JsAgencyCmoBuilder, "AgencyCmoBuilder", {
     /// @param value - Deal name (e.g., "FNR 2024-1")
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    deal_name as dealName: "generated.valuations.AgencyCmo['deal_name']" => js_wire,
+    deal_name as dealName: "string" => id,
     /// Set the contract's agency.
     /// @param value - Agency program
     /// @returns The active builder.

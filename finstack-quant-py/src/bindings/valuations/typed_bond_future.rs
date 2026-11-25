@@ -65,14 +65,45 @@ impl PyBondFuture {
         instrument_expiry(py, &self.inner)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_bond_future", "BondFuture.terms")]
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_bond_future", "BondFuture.delivery_start")]
     #[getter]
-    fn terms(&self) -> PyListedFutureTerms {
-        PyListedFutureTerms {
-            inner: self.inner.terms.clone(),
-        }
+    fn delivery_start<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::date_utils::date_to_py(py, self.inner.delivery_start)
+    }
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_bond_future", "BondFuture.contract_specs")]
+    #[getter]
+    fn contract_specs<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.contract_specs)
+    }
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_bond_future", "BondFuture.deliverable_basket")]
+    #[getter]
+    fn deliverable_basket<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.deliverable_basket)
     }
 }
+
+crate::bindings::macros::py_getters!(PyBondFuture |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_bond_future", "BondFuture.terms")]
+    terms -> PyListedFutureTerms = PyListedFutureTerms {
+        inner: s.inner.terms.clone(),
+    };
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_bond_future", "BondFuture.ctd_bond_id")]
+    ctd_bond_id -> Option<String> = s.inner.ctd_bond_id.as_ref().map(|id| id.to_string());
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_bond_future", "BondFuture.ctd_bond")]
+    ctd_bond -> Option<PyBond> = s.inner.ctd_bond.as_ref().map(|bond| PyBond {
+        inner: bond.clone(),
+    });
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_bond_future", "BondFuture.discount_curve_id")]
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_bond_future", "BondFuture.repo_curve_id")]
+    repo_curve_id -> Option<String> = s.inner.repo_curve_id.as_ref().map(|id| id.to_string());
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_bond_future", "BondFutureBuilder")]
 #[pyclass(
@@ -179,3 +210,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyBondFutureBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["BondFuture", "BondFutureBuilder"];

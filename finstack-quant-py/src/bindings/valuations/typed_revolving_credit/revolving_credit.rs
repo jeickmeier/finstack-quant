@@ -179,6 +179,14 @@ impl PyRevolvingCredit {
         instrument_expiry(py, &self.inner)
     }
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.to_builder")]
+    fn to_builder(&self) -> PyRevolvingCreditBuilder {
+        PyRevolvingCreditBuilder {
+            inner: Some(self.inner.to_builder()),
+            fields: Vec::new(),
+        }
+    }
+
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(

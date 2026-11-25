@@ -4,7 +4,7 @@ use crate::bindings::core::money::PyMoney;
 use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
-use finstack_quant_core::types::InstrumentId;
+use finstack_quant_core::types::{InstrumentId, PoolId};
 use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::{
     AgencyMbsPassthrough, AgencyMbsPassthroughBuilder,
 };
@@ -63,12 +63,6 @@ impl PyAgencyMbsPassthrough {
         instrument_expiry(py, &self.inner)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.pool_id")]
-    #[getter]
-    fn pool_id<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::json_bridge::serde_to_py(py, &self.inner.pool_id)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.agency")]
     #[getter]
     fn agency<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -79,48 +73,6 @@ impl PyAgencyMbsPassthrough {
     #[getter]
     fn pool_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.pool_type)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.original_face")]
-    #[getter]
-    fn original_face(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.original_face)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.current_face")]
-    #[getter]
-    fn current_face(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.current_face)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.wac")]
-    #[getter]
-    fn wac(&self) -> f64 {
-        self.inner.wac
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.coupon")]
-    #[getter]
-    fn coupon(&self) -> f64 {
-        self.inner.coupon
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.servicing_fee_bp")]
-    #[getter]
-    fn servicing_fee_bp(&self) -> f64 {
-        self.inner.servicing_fee_bp
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.guarantee_fee_bp")]
-    #[getter]
-    fn guarantee_fee_bp(&self) -> f64 {
-        self.inner.guarantee_fee_bp
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.wam_months")]
-    #[getter]
-    fn wam_months(&self) -> u32 {
-        self.inner.wam_months
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.issue_date")]
@@ -144,30 +96,48 @@ impl PyAgencyMbsPassthrough {
         crate::bindings::date_utils::date_to_py(py, self.inner.maturity)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.stated_delay_days")]
-    #[getter]
-    fn stated_delay_days(&self) -> Option<u32> {
-        self.inner.stated_delay_days
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.prepayment_spec")]
     #[getter]
     fn prepayment_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.prepayment_spec)
     }
+}
+
+crate::bindings::macros::py_getters!(PyAgencyMbsPassthrough |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.pool_id")]
+    pool_id -> String = s.inner.pool_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.original_face")]
+    original_face -> PyMoney = PyMoney::from_inner(s.inner.original_face);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.current_face")]
+    current_face -> PyMoney = PyMoney::from_inner(s.inner.current_face);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.wac")]
+    wac -> f64 = s.inner.wac;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.coupon")]
+    coupon -> f64 = s.inner.coupon;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.servicing_fee_bp")]
+    servicing_fee_bp -> f64 = s.inner.servicing_fee_bp;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.guarantee_fee_bp")]
+    guarantee_fee_bp -> f64 = s.inner.guarantee_fee_bp;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.wam_months")]
+    wam_months -> u32 = s.inner.wam_months;
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.stated_delay_days")]
+    stated_delay_days -> Option<u32> = s.inner.stated_delay_days;
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.day_count")]
-    #[getter]
-    fn day_count(&self) -> crate::bindings::core::dates::daycount::PyDayCount {
-        crate::bindings::core::dates::daycount::PyDayCount::from_inner(self.inner.day_count)
-    }
-}
+    day_count -> crate::bindings::core::dates::daycount::PyDayCount =
+        crate::bindings::core::dates::daycount::PyDayCount::from_inner(s.inner.day_count);
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthroughBuilder")]
 #[pyclass(
@@ -188,11 +158,8 @@ impl PyAgencyMbsPassthroughBuilder {
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthroughBuilder.pool_id")]
-    fn pool_id<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        value: &Bound<'_, PyAny>,
-    ) -> PyResult<PyRefMut<'py, Self>> {
-        let value = py_to_serde(value.py(), value, "pool_id")?;
+    fn pool_id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
+        let value = PoolId::new(value);
         builder_set!(slf, |b: AgencyMbsPassthroughBuilder| b.pool_id(value))
     }
 
@@ -349,3 +316,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyAgencyMbsPassthroughBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["AgencyMbsPassthrough", "AgencyMbsPassthroughBuilder"];

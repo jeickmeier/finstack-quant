@@ -63,14 +63,72 @@ impl PyInterestRateFuture {
         instrument_expiry(py, &self.inner)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_interest_rate_future", "InterestRateFuture.terms")]
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_interest_rate_future", "InterestRateFuture.fixing_date")]
     #[getter]
-    fn terms(&self) -> PyListedFutureTerms {
-        PyListedFutureTerms {
-            inner: self.inner.terms.clone(),
-        }
+    fn fixing_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .fixing_date
+            .map(|d| crate::bindings::date_utils::date_to_py(py, d))
+            .transpose()
+    }
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_interest_rate_future", "InterestRateFuture.period_start")]
+    #[getter]
+    fn period_start<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .period_start
+            .map(|d| crate::bindings::date_utils::date_to_py(py, d))
+            .transpose()
+    }
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_interest_rate_future", "InterestRateFuture.period_end")]
+    #[getter]
+    fn period_end<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .period_end
+            .map(|d| crate::bindings::date_utils::date_to_py(py, d))
+            .transpose()
+    }
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_interest_rate_future", "InterestRateFuture.contract_specs")]
+    #[getter]
+    fn contract_specs<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.contract_specs)
+    }
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_interest_rate_future", "InterestRateFuture.compounding")]
+    #[getter]
+    fn compounding<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.compounding)
     }
 }
+
+crate::bindings::macros::py_getters!(PyInterestRateFuture |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_interest_rate_future", "InterestRateFuture.terms")]
+    terms -> PyListedFutureTerms = PyListedFutureTerms {
+        inner: s.inner.terms.clone(),
+    };
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_interest_rate_future", "InterestRateFuture.day_count")]
+    day_count -> crate::bindings::core::dates::daycount::PyDayCount =
+        crate::bindings::core::dates::daycount::PyDayCount::from_inner(s.inner.day_count);
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_interest_rate_future", "InterestRateFuture.discount_curve_id")]
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_interest_rate_future", "InterestRateFuture.forward_curve_id")]
+    forward_curve_id -> String = s.inner.forward_curve_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_interest_rate_future", "InterestRateFuture.index_id")]
+    index_id -> Option<String> = s.inner.index_id.as_ref().map(|id| id.to_string());
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_interest_rate_future", "InterestRateFuture.fixing_calendar_id")]
+    fixing_calendar_id -> Option<String> =
+        s.inner.fixing_calendar_id.as_ref().map(|id| id.to_string());
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_interest_rate_future", "InterestRateFuture.vol_surface_id")]
+    vol_surface_id -> Option<String> = s.inner.vol_surface_id.as_ref().map(|id| id.to_string());
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_interest_rate_future", "InterestRateFutureBuilder")]
 #[pyclass(
@@ -219,3 +277,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyInterestRateFutureBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["InterestRateFuture", "InterestRateFutureBuilder"];

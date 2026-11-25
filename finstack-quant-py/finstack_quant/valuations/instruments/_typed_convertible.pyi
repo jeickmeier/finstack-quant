@@ -123,6 +123,27 @@ class ConvertibleBond:
             If the value cannot be serialized to JSON.
         """
         ...
+    def to_builder(self) -> ConvertibleBondBuilder:
+        """
+        Convert this convertible bond into an editable :class:`ConvertibleBondBuilder`.
+
+        Returns
+        -------
+        ConvertibleBondBuilder
+            Builder pre-populated with this bond's fields for incremental editing.
+
+        Notes
+        -----
+        This method does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import ConvertibleBond
+        >>> cb = ConvertibleBond.example().to_builder().id("CB-EDIT").build()
+        >>> cb.id
+        'CB-EDIT'
+        """
+        ...
     def price(
         self,
         market: MarketContext | str,

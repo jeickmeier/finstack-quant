@@ -63,12 +63,6 @@ impl PyFiIndexTotalReturnSwap {
         instrument_expiry(py, &self.inner)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fi_index_total_return_swap", "FiIndexTotalReturnSwap.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fi_index_total_return_swap", "FiIndexTotalReturnSwap.underlying")]
     #[getter]
     fn underlying<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -93,27 +87,21 @@ impl PyFiIndexTotalReturnSwap {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.side)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fi_index_total_return_swap", "FiIndexTotalReturnSwap.initial_level")]
-    #[getter]
-    fn initial_level(&self) -> Option<f64> {
-        self.inner.initial_level
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fi_index_total_return_swap", "FiIndexTotalReturnSwap.fixing_series_id")]
-    #[getter]
-    fn fixing_series_id(&self) -> Option<String> {
-        self.inner
-            .fixing_series_id
-            .as_ref()
-            .map(ToString::to_string)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fi_index_total_return_swap", "FiIndexTotalReturnSwap.margin_spec")]
     #[getter]
     fn margin_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.margin_spec)
     }
 }
+
+crate::bindings::macros::py_getters!(PyFiIndexTotalReturnSwap |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fi_index_total_return_swap", "FiIndexTotalReturnSwap.notional")]
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fi_index_total_return_swap", "FiIndexTotalReturnSwap.initial_level")]
+    initial_level -> Option<f64> = s.inner.initial_level;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fi_index_total_return_swap", "FiIndexTotalReturnSwap.fixing_series_id")]
+    fixing_series_id -> Option<String> = s.inner.fixing_series_id.as_ref().map(ToString::to_string);
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fi_index_total_return_swap", "FiIndexTotalReturnSwapBuilder")]
 #[pyclass(
@@ -224,3 +212,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyFiIndexTotalReturnSwapBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["FiIndexTotalReturnSwap", "FiIndexTotalReturnSwapBuilder"];

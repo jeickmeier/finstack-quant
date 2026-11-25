@@ -63,12 +63,6 @@ impl PyInflationSwap {
         instrument_expiry(py, &self.inner)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_swap", "InflationSwap.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_swap", "InflationSwap.start_date")]
     #[getter]
     fn start_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -85,24 +79,6 @@ impl PyInflationSwap {
     #[getter]
     fn fixed_rate<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::core::money::decimal_to_py(py, self.inner.fixed_rate)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_swap", "InflationSwap.inflation_index_id")]
-    #[getter]
-    fn inflation_index_id(&self) -> String {
-        self.inner.inflation_index_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_swap", "InflationSwap.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_swap", "InflationSwap.day_count")]
-    #[getter]
-    fn day_count(&self) -> crate::bindings::core::dates::daycount::PyDayCount {
-        crate::bindings::core::dates::daycount::PyDayCount::from_inner(self.inner.day_count)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_swap", "InflationSwap.side")]
@@ -123,24 +99,27 @@ impl PyInflationSwap {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.interpolation)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_swap", "InflationSwap.base_cpi")]
-    #[getter]
-    fn base_cpi(&self) -> Option<f64> {
-        self.inner.base_cpi
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_swap", "InflationSwap.business_day_convention")]
     #[getter]
     fn business_day_convention(&self) -> PyResult<String> {
         super::convert::enum_to_py_string(&self.inner.business_day_convention)
     }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_swap", "InflationSwap.calendar_id")]
-    #[getter]
-    fn calendar_id(&self) -> Option<String> {
-        self.inner.calendar_id.as_ref().map(ToString::to_string)
-    }
 }
+
+crate::bindings::macros::py_getters!(PyInflationSwap |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_swap", "InflationSwap.notional")]
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_swap", "InflationSwap.inflation_index_id")]
+    inflation_index_id -> String = s.inner.inflation_index_id.to_string();
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_swap", "InflationSwap.discount_curve_id")]
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_swap", "InflationSwap.day_count")]
+    day_count -> crate::bindings::core::dates::daycount::PyDayCount = crate::bindings::core::dates::daycount::PyDayCount::from_inner(s.inner.day_count);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_swap", "InflationSwap.base_cpi")]
+    base_cpi -> Option<f64> = s.inner.base_cpi;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_swap", "InflationSwap.calendar_id")]
+    calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_swap", "InflationSwapBuilder")]
 #[pyclass(
@@ -293,3 +272,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyInflationSwapBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["InflationSwap", "InflationSwapBuilder"];

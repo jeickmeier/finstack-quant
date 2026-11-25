@@ -59,37 +59,20 @@ impl PyBasisSwap {
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         instrument_expiry(py, &self.inner)
     }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basis_swap", "BasisSwap.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basis_swap", "BasisSwap.primary_leg")]
-    #[getter]
-    fn primary_leg(&self) -> super::typed_legs::PyFloatLegSpec {
-        super::typed_legs::PyFloatLegSpec::from_inner(self.inner.primary_leg.clone())
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basis_swap", "BasisSwap.reference_leg")]
-    #[getter]
-    fn reference_leg(&self) -> super::typed_legs::PyFloatLegSpec {
-        super::typed_legs::PyFloatLegSpec::from_inner(self.inner.reference_leg.clone())
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basis_swap", "BasisSwap.allow_calendar_fallback")]
-    #[getter]
-    fn allow_calendar_fallback(&self) -> bool {
-        self.inner.allow_calendar_fallback
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basis_swap", "BasisSwap.allow_same_curve")]
-    #[getter]
-    fn allow_same_curve(&self) -> bool {
-        self.inner.allow_same_curve
-    }
 }
+
+crate::bindings::macros::py_getters!(PyBasisSwap |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basis_swap", "BasisSwap.notional")]
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basis_swap", "BasisSwap.primary_leg")]
+    primary_leg -> super::typed_legs::PyFloatLegSpec = super::typed_legs::PyFloatLegSpec::from_inner(s.inner.primary_leg.clone());
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basis_swap", "BasisSwap.reference_leg")]
+    reference_leg -> super::typed_legs::PyFloatLegSpec = super::typed_legs::PyFloatLegSpec::from_inner(s.inner.reference_leg.clone());
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basis_swap", "BasisSwap.allow_calendar_fallback")]
+    allow_calendar_fallback -> bool = s.inner.allow_calendar_fallback;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basis_swap", "BasisSwap.allow_same_curve")]
+    allow_same_curve -> bool = s.inner.allow_same_curve;
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basis_swap", "BasisSwapBuilder")]
 #[pyclass(
@@ -168,3 +151,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyBasisSwapBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["BasisSwap", "BasisSwapBuilder"];

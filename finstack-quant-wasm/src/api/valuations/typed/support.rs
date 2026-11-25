@@ -158,6 +158,14 @@ pub(crate) mod arg {
         crate::utils::wire::js_opt_wire(Some(value), label)
     }
 
+    /// An optional structured input defaulting on `null` or `undefined`.
+    pub(crate) fn opt_or_default<T: serde::de::DeserializeOwned + Default>(
+        value: &JsValue,
+        label: &str,
+    ) -> Result<T, JsValue> {
+        Ok(crate::utils::input::opt_from_js_json(Some(value), label)?.unwrap_or_default())
+    }
+
     /// A string identifier (instrument, curve, calendar or price id).
     pub(crate) fn id<T: From<String>>(value: &JsValue, label: &str) -> Result<T, JsValue> {
         js_string(value, label).map(T::from)

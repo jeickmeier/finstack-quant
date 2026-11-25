@@ -64,10 +64,10 @@ getters!(JsCmsOption, "CmsOption", |i| {
     day_count as dayCount: "DayCount" => day_count(i.day_count),
     /// Read the contract's index id.
     /// @returns Rate-index convention-registry key of the underlying swap (e.g. USD-SOFR-OIS). When set, provides default values for swap_fixed_frequency, swap_float_frequency, swap_fixed_day_count, and swap_float_day_count. Individual fields still override the convention when explicitly set. Required for USD CMS.
-    index_id as indexId: "NonNullable<generated.valuations.CmsOption['index_id']> | null" => json(i.index_id),
+    index_id as indexId: "string | null" => opt_text(i.index_id),
     /// Read the contract's cms fixing index id.
     /// @returns Explicit CMS benchmark fixing identifier used for historical fixings (FIXING:<cms_fixing_index_id>), distinct from forward_curve_id and index_id.
-    cms_fixing_index_id as cmsFixingIndexId: "NonNullable<generated.valuations.CmsOption['cms_fixing_index_id']> | null" => json(i.cms_fixing_index_id),
+    cms_fixing_index_id as cmsFixingIndexId: "string | null" => opt_text(i.cms_fixing_index_id),
     /// Read the contract's swap fixed frequency.
     /// @returns Fixed leg frequency of the underlying swap (overrides convention if set)
     swap_fixed_frequency as swapFixedFrequency: "NonNullable<generated.valuations.CmsOption['swap_fixed_frequency']> | null" => json(i.swap_fixed_frequency),
@@ -82,15 +82,22 @@ getters!(JsCmsOption, "CmsOption", |i| {
     swap_float_day_count as swapFloatDayCount: "NonNullable<generated.valuations.CmsOption['swap_float_day_count']> | null" => json(i.swap_float_day_count),
     /// Read the contract's discount curve id.
     /// @returns Discount curve ID for present value calculations
-    discount_curve_id as discountCurveId: "string" => json(i.discount_curve_id),
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
     /// Read the contract's forward curve id.
     /// @returns Forward/projection curve ID for CMS rate projection
-    forward_curve_id as forwardCurveId: "string" => json(i.forward_curve_id),
+    forward_curve_id as forwardCurveId: "string" => text(i.forward_curve_id),
     /// Read the contract's vol surface id.
     /// @returns Volatility surface ID for CMS rates
-    vol_surface_id as volSurfaceId: "string" => json(i.vol_surface_id),
+    vol_surface_id as volSurfaceId: "string" => text(i.vol_surface_id),
 });
 common_getters!(JsCmsOption, "CmsOption");
+to_builder_method!(
+    /// Seed an independent builder from the complete contract.
+    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
+    JsCmsOption,
+    "CmsOption",
+    JsCmsOptionBuilder
+);
 
 builder_class!(
     /// Builder for an instrument.
@@ -108,18 +115,6 @@ builder_class!(
     /// ```
     JsCmsOptionBuilder, "CmsOptionBuilder", CmsOptionBuilder, JsCmsOption, |b| b.build()
 );
-
-#[wasm_bindgen(js_class = CmsOption)]
-impl JsCmsOption {
-    /// Seed an independent builder from the complete contract.
-    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsCmsOptionBuilder {
-        JsCmsOptionBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
 
 setters!(JsCmsOptionBuilder, "CmsOptionBuilder", {
     /// Set the stable contract identifier.

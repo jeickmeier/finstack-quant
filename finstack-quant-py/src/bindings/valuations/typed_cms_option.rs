@@ -109,33 +109,6 @@ impl PyCmsOption {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.option_type)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.day_count")]
-    #[getter]
-    fn day_count(&self) -> crate::bindings::core::dates::daycount::PyDayCount {
-        crate::bindings::core::dates::daycount::PyDayCount::from_inner(self.inner.day_count)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.index_id")]
-    #[getter]
-    fn index_id(&self) -> Option<String> {
-        self.inner.index_id.as_ref().map(ToString::to_string)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.cms_fixing_index_id")]
-    #[getter]
-    fn cms_fixing_index_id(&self) -> Option<String> {
-        self.inner
-            .cms_fixing_index_id
-            .as_ref()
-            .map(ToString::to_string)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.swap_fixed_frequency")]
     #[getter]
     fn swap_fixed_frequency<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -147,41 +120,28 @@ impl PyCmsOption {
     fn swap_float_frequency<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.swap_float_frequency)
     }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.swap_fixed_day_count")]
-    #[getter]
-    fn swap_fixed_day_count(&self) -> Option<crate::bindings::core::dates::daycount::PyDayCount> {
-        self.inner
-            .swap_fixed_day_count
-            .map(crate::bindings::core::dates::daycount::PyDayCount::from_inner)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.swap_float_day_count")]
-    #[getter]
-    fn swap_float_day_count(&self) -> Option<crate::bindings::core::dates::daycount::PyDayCount> {
-        self.inner
-            .swap_float_day_count
-            .map(crate::bindings::core::dates::daycount::PyDayCount::from_inner)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.forward_curve_id")]
-    #[getter]
-    fn forward_curve_id(&self) -> String {
-        self.inner.forward_curve_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.vol_surface_id")]
-    #[getter]
-    fn vol_surface_id(&self) -> String {
-        self.inner.vol_surface_id.to_string()
-    }
 }
+
+crate::bindings::macros::py_getters!(PyCmsOption |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.notional")]
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.day_count")]
+    day_count -> crate::bindings::core::dates::daycount::PyDayCount = crate::bindings::core::dates::daycount::PyDayCount::from_inner(s.inner.day_count);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.index_id")]
+    index_id -> Option<String> = s.inner.index_id.as_ref().map(ToString::to_string);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.cms_fixing_index_id")]
+    cms_fixing_index_id -> Option<String> = s.inner.cms_fixing_index_id.as_ref().map(ToString::to_string);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.swap_fixed_day_count")]
+    swap_fixed_day_count -> Option<crate::bindings::core::dates::daycount::PyDayCount> = s.inner.swap_fixed_day_count.map(crate::bindings::core::dates::daycount::PyDayCount::from_inner);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.swap_float_day_count")]
+    swap_float_day_count -> Option<crate::bindings::core::dates::daycount::PyDayCount> = s.inner.swap_float_day_count.map(crate::bindings::core::dates::daycount::PyDayCount::from_inner);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.discount_curve_id")]
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.forward_curve_id")]
+    forward_curve_id -> String = s.inner.forward_curve_id.to_string();
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.vol_surface_id")]
+    vol_surface_id -> String = s.inner.vol_surface_id.to_string();
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOptionBuilder")]
 #[pyclass(
@@ -386,3 +346,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyCmsOptionBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["CmsOption", "CmsOptionBuilder"];

@@ -1090,7 +1090,7 @@
       "vega": 1137.9032722197344,
       "theta": -92.18984525499833,
       "rho": 11.089415789779041,
-      "vanna": -0.3752528382226785,
+      "vanna": -0.37525283822267974,
       "volga": 3.780472385966277
     },
     "delta": 62.71508985333142,
@@ -7748,7 +7748,7 @@
           "discount_margin": null,
           "oas": 0.003833346661695333,
           "asw_par": 0.0020661335138041775,
-          "asw_market": 0.003864352677829938,
+          "asw_market": 0.0038823498343194154,
           "i_spread": 0.0039400348301742855,
           "japanese_simple_yield": 0.044669216784072145,
           "moosmuller_ytm": 0.04437373909838954
@@ -7769,7 +7769,7 @@
           "discount_margin": null,
           "oas": 0.009322914389509827,
           "asw_par": 0.0020661335138041775,
-          "asw_market": 0.009188386316039097,
+          "asw_market": 0.009206383472528576,
           "i_spread": 0.009566133513580856,
           "japanese_simple_yield": 0.05134252221032698,
           "moosmuller_ytm": 0.04999979300323584
@@ -7811,7 +7811,7 @@
           "discount_margin": null,
           "oas": 0.009999999999999681,
           "asw_par": 0.009565920458001767,
-          "asw_market": 0.013642422756739851,
+          "asw_market": 0.013651426822033118,
           "i_spread": 0.013946725694234031,
           "japanese_simple_yield": 0.055188536057893,
           "moosmuller_ytm": 0.05438023363856899
@@ -7867,8 +7867,8 @@
       },
       "TermLoan": {
         "json": "{\"schema\": \"finstack_quant.instrument/1\", \"instrument\": {\"type\": \"term_loan\", \"spec\": {\"id\": \"TERM-LOAN-USD-5Y\", \"currency\": \"USD\", \"notional_limit\": {\"amount\": \"10000000\", \"currency\": \"USD\"}, \"issue_date\": \"2024-01-01\", \"maturity\": \"2029-01-01\", \"rate\": {\"fixed\": {\"rate\": 0.06}}, \"frequency\": {\"count\": 3, \"unit\": \"months\"}, \"quote_compounding\": {\"periodic\": 4}, \"day_count\": \"act_360\", \"yield_basis\": \"act_360\", \"business_day_convention\": \"modified_following\", \"calendar_id\": null, \"stub\": \"none\", \"discount_curve_id\": \"USD-OIS\", \"credit_curve_id\": \"HY-CREDIT\", \"amortization\": {\"percent_of_remaining_per_period\": {\"pct\": 0.025}}, \"coupon_type\": \"cash\", \"upfront_fee\": null, \"ddtl\": null, \"covenants\": null, \"oid_eir\": null, \"call_schedule\": null, \"settlement_days\": 2, \"attributes\": {}}}}",
-        "recovery01": 6903.527543696569,
-        "jump_to_default": -6313217.238207128
+        "recovery01": 6903.527543692844,
+        "jump_to_default": -6313759.330809809
       },
       "RevolvingCredit": {
         "json": "{\"schema\": \"finstack_quant.instrument/1\", \"instrument\": {\"type\": \"revolving_credit\", \"spec\": {\"id\": \"RCF-USD-3Y\", \"commitment\": {\"amount\": \"50000000\", \"currency\": \"USD\"}, \"commitment_steps\": [], \"margin_steps\": [], \"lc\": null, \"scheduled_fees\": [], \"oid_eir\": null, \"drawn\": {\"amount\": \"10000000\", \"currency\": \"USD\"}, \"issue_date\": \"2024-01-01\", \"maturity\": \"2027-01-01\", \"rate\": {\"fixed\": {\"rate\": 0.05}}, \"day_count\": \"act_360\", \"yield_basis\": \"act_360\", \"frequency\": {\"count\": 3, \"unit\": \"months\"}, \"quote_compounding\": {\"periodic\": 4}, \"fees\": {\"upfront_fee\": null, \"commitment_fee_tiers\": [{\"threshold\": \"0\", \"bp\": \"25\"}], \"usage_fee_tiers\": [{\"threshold\": \"0\", \"bp\": \"10\"}], \"facility_fee_bp\": 5.0, \"steps\": []}, \"draw_repay_spec\": {\"deterministic\": [{\"date\": \"2024-03-01\", \"amount\": {\"amount\": \"5000000\", \"currency\": \"USD\"}, \"is_draw\": true}, {\"date\": \"2025-06-01\", \"amount\": {\"amount\": \"3000000\", \"currency\": \"USD\"}, \"is_draw\": false}]}, \"discount_curve_id\": \"USD-OIS\", \"credit_curve_id\": \"HY-CREDIT\", \"recovery_rate\": 0.0, \"leq\": 0.0, \"stub\": \"short_front\", \"business_day_convention\": \"modified_following\", \"calendar_id\": \"usny\", \"payment_lag_days\": 0, \"settlement_days\": 0, \"attributes\": {}}}}",

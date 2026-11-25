@@ -321,6 +321,14 @@ impl PyConvertibleBond {
             .transpose()
     }
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.to_builder")]
+    fn to_builder(&self) -> PyConvertibleBondBuilder {
+        PyConvertibleBondBuilder {
+            inner: Some(self.inner.to_builder()),
+            fields: Vec::new(),
+        }
+    }
+
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(

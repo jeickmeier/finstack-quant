@@ -77,19 +77,14 @@ impl PyXccySwap {
     fn notional_exchange<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.notional_exchange)
     }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_xccy_swap", "XccySwap.reporting_currency")]
-    #[getter]
-    fn reporting_currency(&self) -> String {
-        self.inner.reporting_currency.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_xccy_swap", "XccySwap.allow_calendar_fallback")]
-    #[getter]
-    fn allow_calendar_fallback(&self) -> bool {
-        self.inner.allow_calendar_fallback
-    }
 }
+
+crate::bindings::macros::py_getters!(PyXccySwap |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_xccy_swap", "XccySwap.reporting_currency")]
+    reporting_currency -> String = s.inner.reporting_currency.to_string();
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_xccy_swap", "XccySwap.allow_calendar_fallback")]
+    allow_calendar_fallback -> bool = s.inner.allow_calendar_fallback;
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_xccy_swap", "XccySwapBuilder")]
 #[pyclass(
@@ -169,3 +164,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyXccySwapBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["XccySwap", "XccySwapBuilder"];

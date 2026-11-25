@@ -144,6 +144,27 @@ class CapFloor:
             If the value cannot be serialized to JSON.
         """
         ...
+    def to_builder(self) -> CapFloorBuilder:
+        """
+        Convert this cap or floor into an editable :class:`CapFloorBuilder`.
+
+        Returns
+        -------
+        CapFloorBuilder
+            Builder pre-populated with this cap/floor's fields for incremental editing.
+
+        Notes
+        -----
+        This method does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import CapFloor
+        >>> cf = CapFloor.example().to_builder().id("CF-EDIT").build()
+        >>> cf.id
+        'CF-EDIT'
+        """
+        ...
     def price(
         self,
         market: MarketContext | str,

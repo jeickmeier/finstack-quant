@@ -142,6 +142,27 @@ class RevolvingCredit:
             If the value cannot be serialized.
         """
         ...
+    def to_builder(self) -> RevolvingCreditBuilder:
+        """
+        Convert this revolving credit facility into an editable :class:`RevolvingCreditBuilder`.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            Builder pre-populated with this facility's fields for incremental editing.
+
+        Notes
+        -----
+        This method does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import RevolvingCredit
+        >>> rc = RevolvingCredit.example().to_builder().id("RC-EDIT").build()
+        >>> rc.id
+        'RC-EDIT'
+        """
+        ...
     def __reduce__(self) -> tuple[Any, tuple[str]]:
         """
         Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.

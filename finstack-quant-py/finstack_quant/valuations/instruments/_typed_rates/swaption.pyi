@@ -142,6 +142,27 @@ class Swaption:
             If the value cannot be serialized to JSON.
         """
         ...
+    def to_builder(self) -> SwaptionBuilder:
+        """
+        Convert this swaption into an editable :class:`SwaptionBuilder`.
+
+        Returns
+        -------
+        SwaptionBuilder
+            Builder pre-populated with this swaption's fields for incremental editing.
+
+        Notes
+        -----
+        This method does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import Swaption
+        >>> sw = Swaption.example().to_builder().id("SW-EDIT").build()
+        >>> sw.id
+        'SW-EDIT'
+        """
+        ...
     def price(
         self,
         market: MarketContext | str,

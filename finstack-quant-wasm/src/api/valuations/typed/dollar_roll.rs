@@ -86,12 +86,19 @@ getters!(JsDollarRoll, "DollarRoll", |i| {
     prepayment_spec as prepaymentSpec: "NonNullable<generated.valuations.DollarRoll['prepayment_spec']> | null" => json(i.prepayment_spec),
     /// Read the contract's discount curve id.
     /// @returns Discount curve identifier.
-    discount_curve_id as discountCurveId: "string" => json(i.discount_curve_id),
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
     /// Read the contract's repo curve id.
     /// @returns Optional repo/financing curve identifier (carry-only). Discount curve used by roll specialness to calculate the simple financing rate (DF(front)/DF(back) − 1)/τ over the front/back settlement interval, with τ on ACT/360. The implied financing rate itself is determined by prices and carry. See the carry calculations (see crate::dollar_roll::carry module). Does **not** affect the mark-to-market PV, which always discounts both legs at discount_curve_id. When None, the discount curve rate is used as the reference financing rate for carry analytics.
-    repo_curve_id as repoCurveId: "string | null" => json(i.repo_curve_id),
+    repo_curve_id as repoCurveId: "string | null" => opt_text(i.repo_curve_id),
 });
 common_getters!(JsDollarRoll, "DollarRoll");
+to_builder_method!(
+    /// Seed an independent builder from the complete contract.
+    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
+    JsDollarRoll,
+    "DollarRoll",
+    JsDollarRollBuilder
+);
 
 builder_class!(
     /// Builder for an instrument.
@@ -109,18 +116,6 @@ builder_class!(
     /// ```
     JsDollarRollBuilder, "DollarRollBuilder", DollarRollBuilder, JsDollarRoll, |b| b.build()
 );
-
-#[wasm_bindgen(js_class = DollarRoll)]
-impl JsDollarRoll {
-    /// Seed an independent builder from the complete contract.
-    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsDollarRollBuilder {
-        JsDollarRollBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
 
 setters!(JsDollarRollBuilder, "DollarRollBuilder", {
     /// Set the stable contract identifier.

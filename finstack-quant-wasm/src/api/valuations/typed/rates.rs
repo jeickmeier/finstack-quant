@@ -72,18 +72,13 @@ getters!(JsDeposit, "Deposit", |i| {
     default_model as defaultModel: "string" => text(Instrument::default_model(i)),
 });
 common_getters!(JsDeposit, "Deposit");
-
-#[wasm_bindgen(js_class = Deposit)]
-impl JsDeposit {
+to_builder_method!(
     /// Copy the deposit into a new editable builder.
     /// @returns A builder retaining exact rates, dates, conventions, attributes and pricing overrides.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsDepositBuilder {
-        JsDepositBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsDeposit,
+    "Deposit",
+    JsDepositBuilder
+);
 
 builder_class!(
     /// Fluent authoring of money-market deposit terms.
@@ -140,6 +135,11 @@ setters!(JsDepositBuilder, "DepositBuilder", {
     /// @returns The builder for chaining.
     /// @throws Error - Throws for a mistyped value, an invalid wire label or a consumed builder.
     calendar_id as calendarId: "string" => id,
+    /// Set the exact annualized simple rate.
+    /// @param value - Decimal string, such as "0.045" for 4.5 percent. Cash flow generation requires a rate.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped or invalid decimal or a consumed builder.
+    fixed_rate as fixedRate: "string" => exact_decimal,
 });
 common_setters!(JsDepositBuilder, "DepositBuilder");
 handle_setters!(JsDepositBuilder, "DepositBuilder", {
@@ -149,23 +149,6 @@ handle_setters!(JsDepositBuilder, "DepositBuilder", {
     /// @throws Error - Throws if the builder has already been consumed.
     notional as notional => JsMoney,
 });
-
-#[wasm_bindgen(js_class = DepositBuilder)]
-impl JsDepositBuilder {
-    /// Set the exact annualized simple rate.
-    /// @param value - Decimal string, such as "0.045" for 4.5 percent. Cash flow generation requires a rate.
-    /// @returns The builder for chaining.
-    /// @throws Error - Throws for a mistyped or invalid decimal or a consumed builder.
-    #[wasm_bindgen(js_name = fixedRate)]
-    pub fn fixed_rate(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "string")] value: JsValue,
-    ) -> Result<JsDepositBuilder, JsValue> {
-        let rate = crate::utils::wire::js_decimal(&value, "value")?.0;
-        let inner = self.inner.apply(|builder| builder.fixed_rate(rate))?;
-        Ok(Self { inner })
-    }
-}
 
 instrument_class!(
     /// Forward rate agreement with explicit fixing and interest accrual conventions.
@@ -242,18 +225,13 @@ getters!(JsForwardRateAgreement, "ForwardRateAgreement", |i| {
     side as side: "generated.valuations.ForwardRateAgreement['side']" => json(i.side),
 });
 common_getters!(JsForwardRateAgreement, "ForwardRateAgreement");
-
-#[wasm_bindgen(js_class = ForwardRateAgreement)]
-impl JsForwardRateAgreement {
+to_builder_method!(
     /// Copy the forward rate agreement into a new editable builder.
     /// @returns A builder retaining exact rates, dates, conventions, attributes and pricing overrides.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsForwardRateAgreementBuilder {
-        JsForwardRateAgreementBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsForwardRateAgreement,
+    "ForwardRateAgreement",
+    JsForwardRateAgreementBuilder
+);
 
 builder_class!(
     /// Fluent authoring of forward rate agreement terms.
@@ -335,6 +313,11 @@ setters!(JsForwardRateAgreementBuilder, "ForwardRateAgreementBuilder", {
     /// @returns The builder for chaining.
     /// @throws Error - Throws for a mistyped value or a consumed builder.
     side as side: "generated.valuations.ForwardRateAgreement['side']" => js_wire,
+    /// Set the exact annualized simple rate.
+    /// @param value - Decimal string, such as "0.045" for 4.5 percent. The contractual rate is required.
+    /// @returns The builder for chaining.
+    /// @throws Error - Throws for a mistyped or invalid decimal or a consumed builder.
+    fixed_rate as fixedRate: "string" => exact_decimal,
 });
 common_setters!(JsForwardRateAgreementBuilder, "ForwardRateAgreementBuilder");
 handle_setters!(JsForwardRateAgreementBuilder, "ForwardRateAgreementBuilder", {
@@ -344,23 +327,6 @@ handle_setters!(JsForwardRateAgreementBuilder, "ForwardRateAgreementBuilder", {
     /// @throws Error - Throws if the builder has already been consumed.
     notional as notional => JsMoney,
 });
-
-#[wasm_bindgen(js_class = ForwardRateAgreementBuilder)]
-impl JsForwardRateAgreementBuilder {
-    /// Set the exact annualized simple rate.
-    /// @param value - Decimal string, such as "0.045" for 4.5 percent. The contractual rate is required.
-    /// @returns The builder for chaining.
-    /// @throws Error - Throws for a mistyped or invalid decimal or a consumed builder.
-    #[wasm_bindgen(js_name = fixedRate)]
-    pub fn fixed_rate(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "string")] value: JsValue,
-    ) -> Result<JsForwardRateAgreementBuilder, JsValue> {
-        let rate = crate::utils::wire::js_decimal(&value, "value")?.0;
-        let inner = self.inner.apply(|builder| builder.fixed_rate(rate))?;
-        Ok(Self { inner })
-    }
-}
 
 instrument_class!(
     /// Typed wrapper for the Rust `InterestRateSwap` instrument (fixed-for-floating swap).
@@ -416,6 +382,13 @@ getters!(JsInterestRateSwap, "InterestRateSwap", |i| {
 });
 
 common_getters!(JsInterestRateSwap, "InterestRateSwap");
+to_builder_method!(
+    /// Seed an independent builder from the complete swap contract.
+    /// @returns Builder carrying notional, swap legs, margin spec and overrides.
+    JsInterestRateSwap,
+    "InterestRateSwap",
+    JsInterestRateSwapBuilder
+);
 
 factories!(JsInterestRateSwap, "InterestRateSwap", finstack_quant_valuations::instruments::rates::irs::InterestRateSwap, {
         /// Canonical 5-year USD pay-fixed swap (mirrors Rust `InterestRateSwap::example`): semi-annual 30/360 fixed vs quarterly ACT/360 `USD-SOFR-3M`, T-2 reset lag, `usny` calendar.
@@ -553,6 +526,13 @@ getters!(JsSwaption, "Swaption", |i| {
 });
 
 common_getters!(JsSwaption, "Swaption");
+to_builder_method!(
+    /// Seed an independent builder from the complete swaption contract.
+    /// @returns Builder carrying option exercise, underlying swap legs, vol inputs and overrides.
+    JsSwaption,
+    "Swaption",
+    JsSwaptionBuilder
+);
 
 accessors!(JsSwaption, "Swaption", |i| {
         /// Fixed strike of the underlying swap (mirrors Rust `get_strike`).
@@ -759,6 +739,13 @@ getters!(JsCapFloor, "CapFloor", |i| {
 });
 
 common_getters!(JsCapFloor, "CapFloor");
+to_builder_method!(
+    /// Seed an independent builder from the complete cap/floor contract.
+    /// @returns Builder carrying strikes, schedule conventions, curves and overrides.
+    JsCapFloor,
+    "CapFloor",
+    JsCapFloorBuilder
+);
 
 factories!(JsCapFloor, "CapFloor", finstack_quant_valuations::instruments::rates::cap_floor::CapFloor, {
         /// Canonical 5-year USD 3% cap (mirrors Rust `CapFloor::example`): quarterly ACT/360 on `USD-SOFR-3M` discounted on `USD-OIS` with vol surface `USD-CAPFLOOR-VOL`.

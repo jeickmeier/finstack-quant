@@ -2,8 +2,6 @@
 
 use crate::api::core::dates::JsTenor;
 use crate::api::core::money::JsMoney;
-use crate::utils::{input::js_string, to_js_err};
-use finstack_quant_core::market_data::scalars::InflationLag;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond::{
     InflationLinkedBond, InflationLinkedBondBuilder,
@@ -95,18 +93,13 @@ getters!(JsInflationLinkedBond, "InflationLinkedBond", |i| {
     inflation_index_id as inflationIndexId: "string" => text(i.inflation_index_id),
 });
 common_getters!(JsInflationLinkedBond, "InflationLinkedBond");
-
-#[wasm_bindgen(js_class = InflationLinkedBond)]
-impl JsInflationLinkedBond {
+to_builder_method!(
     /// Copy the native terms into an editable builder.
     /// @returns A builder retaining the exact coupon, terms, and overrides.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsInflationLinkedBondBuilder {
-        JsInflationLinkedBondBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
+    JsInflationLinkedBond,
+    "InflationLinkedBond",
+    JsInflationLinkedBondBuilder
+);
 
 builder_class!(
     /// Fluent authoring of inflation-linked bond terms.
@@ -192,6 +185,16 @@ setters!(JsInflationLinkedBondBuilder, "InflationLinkedBondBuilder", {
     /// @returns The same builder for chaining.
     /// @throws TypeError for a mistyped value or FinstackError for invalid input or a consumed builder.
     inflation_index_id as inflationIndexId: "string" => id,
+    /// Set the exact annual real coupon.
+    /// @param value - Decimal string in rate units. Use "0.025" for 2.5 percent.
+    /// @returns The builder for chaining.
+    /// @throws TypeError for a mistyped value or FinstackError for invalid decimal text or a consumed builder.
+    real_coupon as realCoupon: "string" => exact_decimal,
+    /// Set the contractual reference CPI observation shift.
+    /// @param value - Observation lag label, such as "3M", "90D" or "none".
+    /// @returns The builder for chaining.
+    /// @throws TypeError for a mistyped value or FinstackError for invalid lag text or a consumed builder.
+    lag as lag: "string" => js_parse,
 });
 common_setters!(JsInflationLinkedBondBuilder, "InflationLinkedBondBuilder");
 handle_setters!(JsInflationLinkedBondBuilder, "InflationLinkedBondBuilder", {
@@ -206,36 +209,3 @@ handle_setters!(JsInflationLinkedBondBuilder, "InflationLinkedBondBuilder", {
     /// @throws FinstackError for a consumed builder.
     frequency as frequency => JsTenor,
 });
-
-#[wasm_bindgen(js_class = InflationLinkedBondBuilder)]
-impl JsInflationLinkedBondBuilder {
-    /// Set the exact annual real coupon.
-    /// @param value - Decimal string in rate units. Use "0.025" for 2.5 percent.
-    /// @returns The builder for chaining.
-    /// @throws TypeError for a mistyped value or FinstackError for invalid decimal text or a consumed builder.
-    #[wasm_bindgen(js_name = realCoupon)]
-    pub fn real_coupon(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "string")] value: JsValue,
-    ) -> Result<JsInflationLinkedBondBuilder, JsValue> {
-        let rate = crate::utils::wire::js_decimal(&value, "value")?.0;
-        let inner = self.inner.apply(|builder| builder.real_coupon(rate))?;
-        Ok(Self { inner })
-    }
-
-    /// Set the contractual reference CPI observation shift.
-    /// @param value - Observation lag label, such as "3M", "90D" or "none".
-    /// @returns The builder for chaining.
-    /// @throws TypeError for a mistyped value or FinstackError for invalid lag text or a consumed builder.
-    #[wasm_bindgen(js_name = lag)]
-    pub fn lag(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "string")] value: JsValue,
-    ) -> Result<JsInflationLinkedBondBuilder, JsValue> {
-        let lag = js_string(&value, "value")?
-            .parse::<InflationLag>()
-            .map_err(to_js_err)?;
-        let inner = self.inner.apply(|builder| builder.lag(lag))?;
-        Ok(Self { inner })
-    }
-}

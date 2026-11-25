@@ -69,46 +69,10 @@ impl PyDollarRoll {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.agency)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.coupon")]
-    #[getter]
-    fn coupon(&self) -> f64 {
-        self.inner.coupon
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.term")]
     #[getter]
     fn term<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.term)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.front_settlement_year")]
-    #[getter]
-    fn front_settlement_year(&self) -> i32 {
-        self.inner.front_settlement_year
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.front_settlement_month")]
-    #[getter]
-    fn front_settlement_month(&self) -> u8 {
-        self.inner.front_settlement_month
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.back_settlement_year")]
-    #[getter]
-    fn back_settlement_year(&self) -> i32 {
-        self.inner.back_settlement_year
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.back_settlement_month")]
-    #[getter]
-    fn back_settlement_month(&self) -> u8 {
-        self.inner.back_settlement_month
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.settlement_class")]
@@ -135,18 +99,6 @@ impl PyDollarRoll {
             .transpose()
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.front_price")]
-    #[getter]
-    fn front_price(&self) -> f64 {
-        self.inner.front_price
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.back_price")]
-    #[getter]
-    fn back_price(&self) -> f64 {
-        self.inner.back_price
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.trade_date")]
     #[getter]
     fn trade_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -161,19 +113,30 @@ impl PyDollarRoll {
     fn prepayment_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.prepayment_spec)
     }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.repo_curve_id")]
-    #[getter]
-    fn repo_curve_id(&self) -> Option<String> {
-        self.inner.repo_curve_id.as_ref().map(ToString::to_string)
-    }
 }
+
+crate::bindings::macros::py_getters!(PyDollarRoll |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.coupon")]
+    coupon -> f64 = s.inner.coupon;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.notional")]
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.front_settlement_year")]
+    front_settlement_year -> i32 = s.inner.front_settlement_year;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.front_settlement_month")]
+    front_settlement_month -> u8 = s.inner.front_settlement_month;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.back_settlement_year")]
+    back_settlement_year -> i32 = s.inner.back_settlement_year;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.back_settlement_month")]
+    back_settlement_month -> u8 = s.inner.back_settlement_month;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.front_price")]
+    front_price -> f64 = s.inner.front_price;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.back_price")]
+    back_price -> f64 = s.inner.back_price;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.discount_curve_id")]
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.repo_curve_id")]
+    repo_curve_id -> Option<String> = s.inner.repo_curve_id.as_ref().map(ToString::to_string);
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRollBuilder")]
 #[pyclass(
@@ -354,3 +317,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyDollarRollBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["DollarRoll", "DollarRollBuilder"];

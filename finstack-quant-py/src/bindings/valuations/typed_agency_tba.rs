@@ -67,28 +67,10 @@ impl PyAgencyTba {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.agency)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.coupon")]
-    #[getter]
-    fn coupon(&self) -> f64 {
-        self.inner.coupon
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.term")]
     #[getter]
     fn term<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.term)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.settlement_year")]
-    #[getter]
-    fn settlement_year(&self) -> i32 {
-        self.inner.settlement_year
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.settlement_month")]
-    #[getter]
-    fn settlement_month(&self) -> u8 {
-        self.inner.settlement_month
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.settlement_class")]
@@ -106,18 +88,6 @@ impl PyAgencyTba {
             .transpose()
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.trade_price")]
-    #[getter]
-    fn trade_price(&self) -> f64 {
-        self.inner.trade_price
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.trade_date")]
     #[getter]
     fn trade_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -125,12 +95,6 @@ impl PyAgencyTba {
             .trade_date
             .map(|value| crate::bindings::date_utils::date_to_py(py, value))
             .transpose()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.pool_factor")]
-    #[getter]
-    fn pool_factor(&self) -> Option<f64> {
-        self.inner.pool_factor
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.assumed_pool")]
@@ -144,13 +108,24 @@ impl PyAgencyTba {
     fn prepayment_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.prepayment_spec)
     }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
 }
+
+crate::bindings::macros::py_getters!(PyAgencyTba |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.coupon")]
+    coupon -> f64 = s.inner.coupon;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.settlement_year")]
+    settlement_year -> i32 = s.inner.settlement_year;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.settlement_month")]
+    settlement_month -> u8 = s.inner.settlement_month;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.notional")]
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.trade_price")]
+    trade_price -> f64 = s.inner.trade_price;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.pool_factor")]
+    pool_factor -> Option<f64> = s.inner.pool_factor;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.discount_curve_id")]
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTbaBuilder")]
 #[pyclass(
@@ -305,3 +280,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyAgencyTbaBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["AgencyTba", "AgencyTbaBuilder"];

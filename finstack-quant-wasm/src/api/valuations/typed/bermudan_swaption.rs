@@ -50,7 +50,7 @@ getters!(JsBermudanSwaption, "BermudanSwaption", |i| {
     settlement as settlement: "generated.valuations.BermudanSwaption['settlement']" => json(i.settlement),
     /// Read the contract's vol surface id.
     /// @returns Volatility surface ID for calibration
-    vol_surface_id as volSurfaceId: "string" => json(i.vol_surface_id),
+    vol_surface_id as volSurfaceId: "string" => text(i.vol_surface_id),
     /// Read the contract's exercise schedule.
     /// @returns Bermudan exercise schedule
     exercise_schedule as exerciseSchedule: "generated.valuations.BermudanSwaption['exercise_schedule']" => json(i.exercise_schedule),
@@ -65,6 +65,13 @@ getters!(JsBermudanSwaption, "BermudanSwaption", |i| {
     underlying_float_leg as underlyingFloatLeg: "generated.valuations.BermudanSwaption['underlying_float_leg']" => json(i.underlying_float_leg),
 });
 common_getters!(JsBermudanSwaption, "BermudanSwaption");
+to_builder_method!(
+    /// Seed an independent builder from the complete contract.
+    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
+    JsBermudanSwaption,
+    "BermudanSwaption",
+    JsBermudanSwaptionBuilder
+);
 
 builder_class!(
     /// Builder for an instrument.
@@ -82,18 +89,6 @@ builder_class!(
     /// ```
     JsBermudanSwaptionBuilder, "BermudanSwaptionBuilder", BermudanSwaptionBuilder, JsBermudanSwaption, |b| b.build()
 );
-
-#[wasm_bindgen(js_class = BermudanSwaption)]
-impl JsBermudanSwaption {
-    /// Seed an independent builder from the complete contract.
-    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsBermudanSwaptionBuilder {
-        JsBermudanSwaptionBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
 
 setters!(JsBermudanSwaptionBuilder, "BermudanSwaptionBuilder", {
     /// Set the stable contract identifier.

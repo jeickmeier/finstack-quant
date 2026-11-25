@@ -215,6 +215,27 @@ class InterestRateSwap:
             If the value cannot be serialized to JSON.
         """
         ...
+    def to_builder(self) -> InterestRateSwapBuilder:
+        """
+        Convert this swap into an editable :class:`InterestRateSwapBuilder`.
+
+        Returns
+        -------
+        InterestRateSwapBuilder
+            Builder pre-populated with this swap's fields for incremental editing.
+
+        Notes
+        -----
+        This method does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import InterestRateSwap
+        >>> irs = InterestRateSwap.example().to_builder().id("IRS-EDIT").build()
+        >>> irs.id
+        'IRS-EDIT'
+        """
+        ...
     def price(
         self,
         market: MarketContext | str,

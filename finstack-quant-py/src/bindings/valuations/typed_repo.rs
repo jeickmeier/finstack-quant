@@ -62,12 +62,6 @@ impl PyRepo {
         instrument_expiry(py, &self.inner)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_repo", "Repo.cash_amount")]
-    #[getter]
-    fn cash_amount(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.cash_amount)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_repo", "Repo.collateral")]
     #[getter]
     fn collateral<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -92,28 +86,10 @@ impl PyRepo {
         crate::bindings::date_utils::date_to_py(py, self.inner.maturity)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_repo", "Repo.haircut")]
-    #[getter]
-    fn haircut(&self) -> f64 {
-        self.inner.haircut
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_repo", "Repo.repo_type")]
     #[getter]
     fn repo_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.repo_type)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_repo", "Repo.triparty")]
-    #[getter]
-    fn triparty(&self) -> bool {
-        self.inner.triparty
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_repo", "Repo.day_count")]
-    #[getter]
-    fn day_count(&self) -> PyDayCount {
-        PyDayCount::from_inner(self.inner.day_count)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_repo", "Repo.business_day_convention")]
@@ -122,24 +98,27 @@ impl PyRepo {
         super::convert::enum_to_py_string(&self.inner.business_day_convention)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_repo", "Repo.calendar_id")]
-    #[getter]
-    fn calendar_id(&self) -> Option<String> {
-        self.inner.calendar_id.as_ref().map(ToString::to_string)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_repo", "Repo.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_repo", "Repo.margin_spec")]
     #[getter]
     fn margin_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.margin_spec)
     }
 }
+
+crate::bindings::macros::py_getters!(PyRepo |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_repo", "Repo.cash_amount")]
+    cash_amount -> PyMoney = PyMoney::from_inner(s.inner.cash_amount);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_repo", "Repo.haircut")]
+    haircut -> f64 = s.inner.haircut;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_repo", "Repo.triparty")]
+    triparty -> bool = s.inner.triparty;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_repo", "Repo.day_count")]
+    day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_repo", "Repo.calendar_id")]
+    calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_repo", "Repo.discount_curve_id")]
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_repo", "RepoBuilder")]
 #[pyclass(
@@ -284,3 +263,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyRepoBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["Repo", "RepoBuilder"];

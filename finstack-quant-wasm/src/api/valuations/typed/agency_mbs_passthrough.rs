@@ -42,7 +42,7 @@ getters!(JsAgencyMbsPassthrough, "AgencyMbsPassthrough", |i| {
     default_model as defaultModel: "string" => text(Instrument::default_model(i)),
     /// Read the contract's pool id.
     /// @returns Pool identifier (CUSIP or internal pool ID).
-    pool_id as poolId: "generated.valuations.AgencyMbsPassthrough['pool_id']" => json(i.pool_id),
+    pool_id as poolId: "string" => text(i.pool_id),
     /// Read the contract's agency.
     /// @returns Agency program (FNMA, FHLMC, GNMA).
     agency as agency: "generated.valuations.AgencyMbsPassthrough['agency']" => json(i.agency),
@@ -87,12 +87,19 @@ getters!(JsAgencyMbsPassthrough, "AgencyMbsPassthrough", |i| {
     prepayment_spec as prepaymentSpec: "generated.valuations.AgencyMbsPassthrough['prepayment_spec']" => json(i.prepayment_spec),
     /// Read the contract's discount curve id.
     /// @returns Discount curve identifier for pricing.
-    discount_curve_id as discountCurveId: "string" => json(i.discount_curve_id),
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
     /// Read the contract's day count.
     /// @returns Day count convention for accrual.
     day_count as dayCount: "DayCount" => day_count(i.day_count),
 });
 common_getters!(JsAgencyMbsPassthrough, "AgencyMbsPassthrough");
+to_builder_method!(
+    /// Seed an independent builder from the complete contract.
+    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
+    JsAgencyMbsPassthrough,
+    "AgencyMbsPassthrough",
+    JsAgencyMbsPassthroughBuilder
+);
 
 builder_class!(
     /// Builder for an instrument.
@@ -111,18 +118,6 @@ builder_class!(
     JsAgencyMbsPassthroughBuilder, "AgencyMbsPassthroughBuilder", AgencyMbsPassthroughBuilder, JsAgencyMbsPassthrough, |b| b.build()
 );
 
-#[wasm_bindgen(js_class = AgencyMbsPassthrough)]
-impl JsAgencyMbsPassthrough {
-    /// Seed an independent builder from the complete contract.
-    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsAgencyMbsPassthroughBuilder {
-        JsAgencyMbsPassthroughBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
-
 setters!(JsAgencyMbsPassthroughBuilder, "AgencyMbsPassthroughBuilder", {
     /// Set the stable contract identifier.
     /// @param value - Identifier used for scenario selection and metrics.
@@ -133,7 +128,7 @@ setters!(JsAgencyMbsPassthroughBuilder, "AgencyMbsPassthroughBuilder", {
     /// @param value - Pool identifier (CUSIP or internal pool ID).
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
-    pool_id as poolId: "generated.valuations.AgencyMbsPassthrough['pool_id']" => js_wire,
+    pool_id as poolId: "string" => id,
     /// Set the contract's agency.
     /// @param value - Agency program (FNMA, FHLMC, GNMA).
     /// @returns The active builder.

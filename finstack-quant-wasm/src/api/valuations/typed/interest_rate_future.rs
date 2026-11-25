@@ -41,8 +41,48 @@ getters!(JsInterestRateFuture, "InterestRateFuture", |i| {
     /// Return the contract's position and lifecycle terms.
     /// @returns Independent copy of position, lifecycle dates and exchange marks.
     terms as terms: "generated.valuations.ListedFutureTerms" => json(i.terms),
+    /// Underlying reference rate fixing date, or `null` to default from `terms.last_trading_date`.
+    /// @returns ISO-8601 fixing date, or `null`.
+    fixing_date as fixingDate: "string | null" => opt_date(i.fixing_date),
+    /// Start date of the reference rate accrual period, or `null` when derived automatically.
+    /// @returns ISO-8601 period start date, or `null`.
+    period_start as periodStart: "string | null" => opt_date(i.period_start),
+    /// End date of the reference rate accrual period, or `null` when derived automatically.
+    /// @returns ISO-8601 period end date, or `null`.
+    period_end as periodEnd: "string | null" => opt_date(i.period_end),
+    /// Accrual and convexity clock day-count convention.
+    /// @returns The day-count convention handle.
+    day_count as dayCount: "DayCount" => day_count(i.day_count),
+    /// Exchange contract specifications (face value, tick size, delivery months, convexity adjustment).
+    /// @returns Contract specifications plain object.
+    contract_specs as contractSpecs: "generated.valuations.FutureContractSpecs" => json(i.contract_specs),
+    /// Market identifier of the futures settlement discount curve.
+    /// @returns Discount curve identifier.
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
+    /// Market identifier of the quoted reference-rate projection curve.
+    /// @returns Forward curve identifier.
+    forward_curve_id as forwardCurveId: "string" => text(i.forward_curve_id),
+    /// Calculation convention for the rate period, including overnight averaging or compounding.
+    /// @returns The `FloatingLegCompounding` wire value.
+    compounding as compounding: "generated.valuations.InterestRateFuture['compounding']" => json(i.compounding),
+    /// Optional fixing-series identifier for observed resets.
+    /// @returns Index identifier, or `null`.
+    index_id as indexId: "string | null" => opt_text(i.index_id),
+    /// Optional overnight fixing calendar identifier.
+    /// @returns Calendar identifier, or `null`.
+    fixing_calendar_id as fixingCalendarId: "string | null" => opt_text(i.fixing_calendar_id),
+    /// Optional surface supplying normal-rate convexity volatility.
+    /// @returns Volatility surface identifier, or `null`.
+    vol_surface_id as volSurfaceId: "string | null" => opt_text(i.vol_surface_id),
 });
 common_getters!(JsInterestRateFuture, "InterestRateFuture");
+to_builder_method!(
+    /// Seed an independent builder from the complete listed contract.
+    /// @returns Builder carrying settlement, exchange marks and market identifiers.
+    JsInterestRateFuture,
+    "InterestRateFuture",
+    JsInterestRateFutureBuilder
+);
 
 builder_class!(
     /// Builder for an exchange-listed future.
@@ -60,18 +100,6 @@ builder_class!(
     /// ```
     JsInterestRateFutureBuilder, "InterestRateFutureBuilder", InterestRateFutureBuilder, JsInterestRateFuture, |b| b.build()
 );
-
-#[wasm_bindgen(js_class = InterestRateFuture)]
-impl JsInterestRateFuture {
-    /// Seed an independent builder from the complete listed contract.
-    /// @returns Builder carrying settlement, exchange marks and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsInterestRateFutureBuilder {
-        JsInterestRateFutureBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
 
 setters!(JsInterestRateFutureBuilder, "InterestRateFutureBuilder", {
     /// Set the stable contract identifier.
@@ -123,7 +151,7 @@ setters!(JsInterestRateFutureBuilder, "InterestRateFutureBuilder", {
     /// @param value - Calculation convention for the rate period, including overnight averaging or compounding.
     /// @returns The active builder.
     /// @throws FinstackError for invalid inputs or an inactive builder.
-    compounding as compounding: "string" => js_wire,
+    compounding as compounding: "generated.valuations.InterestRateFuture['compounding']" => js_wire,
     /// Set the contract's index id.
     /// @param value - Optional fixing-series identifier for observed resets. Pass null to clear it.
     /// @returns The active builder.

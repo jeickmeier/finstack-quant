@@ -69,22 +69,10 @@ impl PyBermudanSwaption {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.option_type)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_bermudan_swaption", "BermudanSwaption.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_bermudan_swaption", "BermudanSwaption.settlement")]
     #[getter]
     fn settlement<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.settlement)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_bermudan_swaption", "BermudanSwaption.vol_surface_id")]
-    #[getter]
-    fn vol_surface_id(&self) -> String {
-        self.inner.vol_surface_id.to_string()
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_bermudan_swaption", "BermudanSwaption.exercise_schedule")]
@@ -98,19 +86,18 @@ impl PyBermudanSwaption {
     fn bermudan_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.bermudan_type)
     }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_bermudan_swaption", "BermudanSwaption.underlying_fixed_leg")]
-    #[getter]
-    fn underlying_fixed_leg(&self) -> super::typed_legs::PyFixedLegSpec {
-        super::typed_legs::PyFixedLegSpec::from_inner(self.inner.underlying_fixed_leg.clone())
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_bermudan_swaption", "BermudanSwaption.underlying_float_leg")]
-    #[getter]
-    fn underlying_float_leg(&self) -> super::typed_legs::PyFloatLegSpec {
-        super::typed_legs::PyFloatLegSpec::from_inner(self.inner.underlying_float_leg.clone())
-    }
 }
+
+crate::bindings::macros::py_getters!(PyBermudanSwaption |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_bermudan_swaption", "BermudanSwaption.notional")]
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_bermudan_swaption", "BermudanSwaption.vol_surface_id")]
+    vol_surface_id -> String = s.inner.vol_surface_id.to_string();
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_bermudan_swaption", "BermudanSwaption.underlying_fixed_leg")]
+    underlying_fixed_leg -> super::typed_legs::PyFixedLegSpec = super::typed_legs::PyFixedLegSpec::from_inner(s.inner.underlying_fixed_leg.clone());
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_bermudan_swaption", "BermudanSwaption.underlying_float_leg")]
+    underlying_float_leg -> super::typed_legs::PyFloatLegSpec = super::typed_legs::PyFloatLegSpec::from_inner(s.inner.underlying_float_leg.clone());
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_bermudan_swaption", "BermudanSwaptionBuilder")]
 #[pyclass(
@@ -220,3 +207,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyBermudanSwaptionBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["BermudanSwaption", "BermudanSwaptionBuilder"];

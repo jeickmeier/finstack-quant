@@ -68,12 +68,6 @@ impl PyInflationLinkedBond {
         instrument_expiry(py, &self.inner)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.issue_date")]
     #[getter]
     fn issue_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -92,28 +86,10 @@ impl PyInflationLinkedBond {
         decimal_to_py(py, self.inner.real_coupon)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.frequency")]
-    #[getter]
-    fn frequency(&self) -> PyTenor {
-        PyTenor::from_inner(self.inner.frequency)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.day_count")]
-    #[getter]
-    fn day_count(&self) -> PyDayCount {
-        PyDayCount::from_inner(self.inner.day_count)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.base_date")]
     #[getter]
     fn base_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.base_date)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.base_cpi")]
-    #[getter]
-    fn base_cpi(&self) -> f64 {
-        self.inner.base_cpi
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.indexation_method")]
@@ -122,25 +98,10 @@ impl PyInflationLinkedBond {
         enum_to_py_string(&self.inner.indexation_method)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.lag")]
-    #[getter]
-    fn lag(&self) -> String {
-        self.inner.lag.to_string()
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.deflation_protection")]
     #[getter]
     fn deflation_protection(&self) -> PyResult<String> {
         enum_to_py_string(&self.inner.deflation_protection)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.floor_vol_surface_id")]
-    #[getter]
-    fn floor_vol_surface_id(&self) -> Option<&str> {
-        self.inner
-            .floor_vol_surface_id
-            .as_ref()
-            .map(CurveId::as_str)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.business_day_convention")]
@@ -154,25 +115,28 @@ impl PyInflationLinkedBond {
     fn stub(&self) -> PyResult<String> {
         enum_to_py_string(&self.inner.stub)
     }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.calendar_id")]
-    #[getter]
-    fn calendar_id(&self) -> Option<&str> {
-        self.inner.calendar_id.as_ref().map(CalendarId::as_str)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> &str {
-        self.inner.discount_curve_id.as_str()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.inflation_index_id")]
-    #[getter]
-    fn inflation_index_id(&self) -> &str {
-        self.inner.inflation_index_id.as_str()
-    }
 }
+
+crate::bindings::macros::py_getters!(PyInflationLinkedBond |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.notional")]
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.frequency")]
+    frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.day_count")]
+    day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.base_cpi")]
+    base_cpi -> f64 = s.inner.base_cpi;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.lag")]
+    lag -> String = s.inner.lag.to_string();
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.floor_vol_surface_id")]
+    floor_vol_surface_id -> Option<String> = s.inner.floor_vol_surface_id.as_ref().map(ToString::to_string);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.calendar_id")]
+    calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.discount_curve_id")]
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond.inflation_index_id")]
+    inflation_index_id -> String = s.inner.inflation_index_id.to_string();
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBondBuilder")]
 #[pyclass(
@@ -357,3 +321,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyInflationLinkedBondBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["InflationLinkedBond", "InflationLinkedBondBuilder"];

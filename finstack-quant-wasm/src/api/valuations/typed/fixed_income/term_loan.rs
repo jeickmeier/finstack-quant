@@ -124,6 +124,14 @@ getters!(JsTermLoan, "TermLoan", |i| {
 
 common_getters!(JsTermLoan, "TermLoan");
 
+to_builder_method!(
+    /// Seed an independent builder from the complete term loan contract.
+    /// @returns Builder carrying contractual terms, schedules, fees and overrides.
+    JsTermLoan,
+    "TermLoan",
+    JsTermLoanBuilder
+);
+
 builder_class!(
     /// Fluent builder for `TermLoan`; one setter per Rust `FinancialBuilder` setter.
     ///
@@ -150,7 +158,7 @@ setters!(JsTermLoanBuilder, "TermLoanBuilder", {
         /// @param value - `Compounding` wire value: `"continuous"`, `"simple"` or `{ periodic: n }`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        quote_compounding as quoteCompounding: "generated.valuations.TermLoan['quote_compounding']" => from_js_json,
+        quote_compounding as quoteCompounding: "generated.valuations.TermLoan['quote_compounding']" => js_wire,
         /// Set the instrument identifier.
         /// @param value - Instrument identifier.
         /// @returns The builder, for chaining.
@@ -160,7 +168,7 @@ setters!(JsTermLoanBuilder, "TermLoanBuilder", {
         /// @param value - ISO-4217 currency code of the loan, e.g. `"USD"`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        currency as currency: "generated.valuations.TermLoan['currency']" => js_wire,
+        currency as currency: "generated.valuations.TermLoan['currency']" => js_currency,
         /// Set the required contractual issue / funding date.
         /// @param value - Required contractual issue / funding date as an ISO-8601 string. `build()` throws when it is not set.
         /// @returns The builder, for chaining.

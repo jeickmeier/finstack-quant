@@ -64,7 +64,7 @@ impl JsBond {
     ) -> Result<JsBond, JsValue> {
         let id = js_string(&id, "id")?;
         let quote_compounding =
-            crate::utils::input::from_js_json(&quote_compounding, "quoteCompounding")?;
+            crate::utils::wire::js_wire(&quote_compounding, "quoteCompounding")?;
         let discount_curve_id = js_string(&discount_curve_id, "discountCurveId")?;
         let quoted_clean_price_pct = crate::utils::input::js_opt_f64(
             quoted_clean_price_pct.as_ref(),
@@ -306,7 +306,7 @@ impl JsBond {
             notional.inner,
             js_date(&issue_date, "issueDate")?,
             js_date(&maturity, "maturity")?,
-            crate::utils::input::from_js_json(&quote_compounding, "quoteCompounding")?,
+            crate::utils::wire::js_wire(&quote_compounding, "quoteCompounding")?,
             js_string(&discount_curve_id, "discountCurveId")?,
         )
         .map_err(to_js_err)?;
@@ -427,6 +427,14 @@ getters!(JsBond, "Bond", |i| {
 
 common_getters!(JsBond, "Bond");
 
+to_builder_method!(
+    /// Seed an independent builder from the complete bond contract.
+    /// @returns Builder carrying contractual dates, cashflow terms, curves and overrides.
+    JsBond,
+    "Bond",
+    JsBondBuilder
+);
+
 builder_class!(
     /// Fluent builder for `Bond`; one setter per Rust `FinancialBuilder` setter.
     ///
@@ -453,7 +461,7 @@ setters!(JsBondBuilder, "BondBuilder", {
         /// @param value - `Compounding` wire value: `"continuous"`, `"simple"` or `{ periodic: n }`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        quote_compounding as quoteCompounding: "generated.valuations.Bond['quote_compounding']" => from_js_json,
+        quote_compounding as quoteCompounding: "generated.valuations.Bond['quote_compounding']" => js_wire,
         /// Set the instrument identifier.
         /// @param value - Instrument identifier.
         /// @returns The builder, for chaining.

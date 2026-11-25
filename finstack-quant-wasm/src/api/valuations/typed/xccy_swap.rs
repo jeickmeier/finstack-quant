@@ -53,6 +53,13 @@ getters!(JsXccySwap, "XccySwap", |i| {
     allow_calendar_fallback as allowCalendarFallback: "boolean" => json(i.allow_calendar_fallback),
 });
 common_getters!(JsXccySwap, "XccySwap");
+to_builder_method!(
+    /// Seed an independent builder from the complete contract.
+    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
+    JsXccySwap,
+    "XccySwap",
+    JsXccySwapBuilder
+);
 
 builder_class!(
     /// Builder for an instrument.
@@ -70,18 +77,6 @@ builder_class!(
     /// ```
     JsXccySwapBuilder, "XccySwapBuilder", XccySwapBuilder, JsXccySwap, |b| b.build()
 );
-
-#[wasm_bindgen(js_class = XccySwap)]
-impl JsXccySwap {
-    /// Seed an independent builder from the complete contract.
-    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsXccySwapBuilder {
-        JsXccySwapBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
 
 setters!(JsXccySwapBuilder, "XccySwapBuilder", {
     /// Set the stable contract identifier.

@@ -1,4 +1,4 @@
-"""Optional surface supplying absolute normal-rate convexity volatility. Pass null to clear it.."""
+"""Typed interest-rate future declarations."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import datetime
 from datetime import date
 from typing import Any
 import pandas as pd
+from finstack_quant.core.dates import DayCount
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.types import Attributes
 from finstack_quant.valuations import ValuationResult
@@ -14,7 +15,7 @@ from finstack_quant.valuations.instruments._pricing import PriceExtras, MetricPr
 from finstack_quant.valuations.instruments._typed_listed import ListedFutureTerms
 
 class InterestRateFuture:
-    """Optional surface supplying absolute normal-rate convexity volatility. Pass null to clear it..
+    """Listed short-term interest-rate (STIR) future valued off forward and convexity conventions.
 
     Examples
     --------
@@ -407,6 +408,171 @@ class InterestRateFuture:
         """
         ...
 
+    @property
+    def fixing_date(self) -> date | None:
+        """Return the optional observation date for term-rate settlement.
+
+        Returns
+        -------
+        date or None
+            Observation date when specified.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def period_start(self) -> date | None:
+        """Return the optional start date of the reference rate accrual period.
+
+        Returns
+        -------
+        date or None
+            Reference rate accrual start date when specified.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def period_end(self) -> date | None:
+        """Return the optional end date of the reference rate accrual period.
+
+        Returns
+        -------
+        date or None
+            Reference rate accrual end date when specified.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def day_count(self) -> DayCount:
+        """Return the accrual and convexity clock day-count convention.
+
+        Returns
+        -------
+        DayCount
+            Day-count convention used by the contract.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def contract_specs(self) -> dict[str, object]:
+        """Return the exchange contract specifications for the future.
+
+        Returns
+        -------
+        dict[str, object]
+            Exchange face, price tick, cycle months, and optional convexity adjustment.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def discount_curve_id(self) -> str:
+        """Return the market identifier of the futures settlement discount curve.
+
+        Returns
+        -------
+        str
+            Discount curve identifier.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def forward_curve_id(self) -> str:
+        """Return the market identifier of the quoted reference-rate projection curve.
+
+        Returns
+        -------
+        str
+            Forward projection curve identifier.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def compounding(self) -> dict[str, Any] | str:
+        """Return the calculation convention for the underlying rate period.
+
+        Returns
+        -------
+        dict[str, Any] or str
+            Serde form of the overnight averaging or compounding convention.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def index_id(self) -> str | None:
+        """Return the optional fixing-series identifier for observed resets.
+
+        Returns
+        -------
+        str or None
+            Fixing-index identifier when configured.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def fixing_calendar_id(self) -> str | None:
+        """Return the optional business-day calendar identifier for historical fixings.
+
+        Returns
+        -------
+        str or None
+            Fixing calendar identifier when configured.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def vol_surface_id(self) -> str | None:
+        """Return the optional volatility surface identifier for convexity adjustment.
+
+        Returns
+        -------
+        str or None
+            Normal-rate volatility surface identifier when configured.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
 class InterestRateFutureBuilder:
     """Fluent builder for listed contracts with explicit lifecycle terms.
 
@@ -618,12 +784,12 @@ class InterestRateFutureBuilder:
         """
         ...
 
-    def compounding(self, value: str) -> InterestRateFutureBuilder:
+    def compounding(self, value: dict[str, Any] | str) -> InterestRateFutureBuilder:
         """Set the contract's compounding.
 
         Parameters
         ----------
-        value : str
+        value : dict[str, Any] or str
             Calculation convention for the rate period, including overnight averaging or compounding.
 
         Returns

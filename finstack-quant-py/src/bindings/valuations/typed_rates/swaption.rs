@@ -105,6 +105,14 @@ impl PySwaption {
         opt_serde_to_py(py, self.inner.sabr_params.as_ref())
     }
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates.swaption", "Swaption.to_builder")]
+    fn to_builder(&self) -> PySwaptionBuilder {
+        PySwaptionBuilder {
+            inner: Some(self.inner.to_builder()),
+            fields: Vec::new(),
+        }
+    }
+
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(

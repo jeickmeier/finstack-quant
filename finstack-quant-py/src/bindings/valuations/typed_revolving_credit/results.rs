@@ -3,9 +3,7 @@
 use pyo3::prelude::*;
 
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::valuations::convert::money_to_py;
-use crate::errors::{display_to_py, serde_json_to_py};
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::EnhancedMonteCarloResult;
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.results", "EnhancedMonteCarloResult")]
@@ -21,35 +19,16 @@ pub struct PyEnhancedMonteCarloResult {
     pub(crate) inner: EnhancedMonteCarloResult,
 }
 
+crate::bindings::macros::wire_methods!(
+    PyEnhancedMonteCarloResult,
+    EnhancedMonteCarloResult,
+    "EnhancedMonteCarloResult",
+    module = "finstack_quant.valuations.instruments._typed_revolving_credit.results",
+    to_dict
+);
+
 #[pymethods]
 impl PyEnhancedMonteCarloResult {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.results", "EnhancedMonteCarloResult.from_json")]
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|err| serde_json_to_py(err, "invalid EnhancedMonteCarloResult JSON"))?;
-        Ok(Self { inner })
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.results", "EnhancedMonteCarloResult.to_json")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.results", "EnhancedMonteCarloResult.to_dict")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner)
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.results", "EnhancedMonteCarloResult.__reduce__")]
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.results", "EnhancedMonteCarloResult.pv_ci_95")]
     #[getter]
     fn pv_ci_95(&self) -> (PyMoney, PyMoney) {
