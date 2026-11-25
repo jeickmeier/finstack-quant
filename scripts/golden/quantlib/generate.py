@@ -45,12 +45,14 @@ from .fx_exotics import (
 )
 from .fx_touch import build_fx_no_touch, build_fx_one_touch_at_expiry, build_fx_one_touch_at_hit
 from .inflation import (
+    build_inflation_linked_bond,
     build_yoy_inflation_cap_black,
     build_yoy_inflation_floor_normal,
     build_yoy_inflation_swap,
     build_zero_coupon_inflation_swap,
 )
 from .linear import LINEAR_BUILDERS
+from .loans import LOAN_BUILDERS
 from .monte_carlo import MONTE_CARLO_BUILDERS
 from .ndf import build_ndf
 from .options import (
@@ -62,6 +64,7 @@ from .options import (
     build_floating_lookback_option,
     build_geometric_asian_option,
 )
+from .pde import PDE_BUILDERS
 from .rate_options import (
     build_bachelier_floorlet,
     build_bachelier_swaption,
@@ -295,6 +298,12 @@ PRODUCTS: dict[str, tuple[str, Callable[[], dict[str, Any]]]] = {
     **LINEAR_BUILDERS,
     **FUTURE_OPTION_BUILDERS,
     **MONTE_CARLO_BUILDERS,
+    **PDE_BUILDERS,
+    "inflation_linked_bond": (
+        "inflation_linked_bond/usd_inflation_linked_bond_5y_quantlib.json",
+        build_inflation_linked_bond,
+    ),
+    **LOAN_BUILDERS,
 }
 DEFERRED_PRODUCTS: dict[str, tuple[str, Callable[[], dict[str, Any]]]] = {
     "irs": ("irs/usd_sofr_5y_quantlib.json", build_irs),

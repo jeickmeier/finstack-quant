@@ -1,0 +1,125 @@
+{
+  "expected": {
+    "dv01": -2373.4817748647183,
+    "npv": 10594198.860293228
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "amortization": {
+          "percent_of_remaining_per_period": {
+            "pct": 0.025
+          }
+        },
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "business_day_convention": "unadjusted",
+        "calendar_id": null,
+        "call_schedule": null,
+        "coupon_type": "cash",
+        "covenants": null,
+        "credit_curve_id": null,
+        "currency": "USD",
+        "day_count": "act_360",
+        "ddtl": null,
+        "discount_curve_id": "USD-OIS",
+        "frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "id": "USD-FIXED-AMORTIZING-TERM-LOAN-3Y-QUANTLIB",
+        "issue_date": "2026-02-15",
+        "maturity": "2029-02-15",
+        "notional_limit": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "oid_eir": null,
+        "quote_compounding": {
+          "periodic": 4
+        },
+        "rate": {
+          "fixed": {
+            "rate": 0.06
+          }
+        },
+        "settlement_days": 0,
+        "stub": "none",
+        "upfront_fee": null,
+        "yield_basis": "act_360"
+      },
+      "type": "term_loan"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {},
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-07-11",
+    "description": "Seasoned three-year fixed-rate term loan repaying 2.5% of the balance each quarter.",
+    "domain": "fixed_income.term_loan",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-07-11",
+    "name": "usd_fixed_amortizing_term_loan_3y_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product amortizing_term_loan",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43 AmortizingFixedRateBond on the declining balances, flows after the valuation date discounted on a flat continuous curve with CashFlows.npv; DV01 is a central difference of one basis point in the curve rate.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "dv01": {
+      "rel": 0.001,
+      "tolerance_reason": "Matched schedule, balances, day count and curve: value within 0.0001 per 100 of the limit and DV01 within 0.1%."
+    },
+    "npv": {
+      "abs": 10.0,
+      "tolerance_reason": "Matched schedule, balances, day count and curve: value within 0.0001 per 100 of the limit and DV01 within 0.1%."
+    }
+  }
+}

@@ -22,6 +22,7 @@ fn is_pricing_domain(domain: &str) -> bool {
             | "fixed_income.term_loan"
             | "fixed_income.structured_credit"
             | "equity.equity_option"
+            | "equity.cliquet_option"
             | "listed.equity_future"
             | "credit.cds"
             | "credit.cds_option"

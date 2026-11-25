@@ -1,0 +1,130 @@
+{
+  "expected": {
+    "npv": 873.9487911610385
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "currency": "USD",
+        "discount_curve_id": "USD-OIS",
+        "div_yield_id": "SPX-DIVYIELD",
+        "expiry": "2027-04-30",
+        "id": "SPX-ATM-CALL-1Y-PDE-QUANTLIB",
+        "option_type": "call",
+        "quantity": 100.0,
+        "spot_id": "SPX-SPOT",
+        "strike": 100.0,
+        "underlying_ticker": "SPX",
+        "vol_surface_id": "SPX-VOL-QL"
+      },
+      "type": "equity_option"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {
+        "SPX-DIVYIELD": {
+          "unitless": 0.02
+        },
+        "SPX-SPOT": {
+          "price": {
+            "amount": "100.0",
+            "currency": "USD"
+          }
+        }
+      },
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [
+        {
+          "expiries": [
+            0.25,
+            1.0,
+            2.0
+          ],
+          "id": "SPX-VOL-QL",
+          "interpolation_mode": "vol",
+          "quote_type": "black_lognormal",
+          "secondary_axis": "strike",
+          "secondary_values": [
+            0.5,
+            1.0,
+            2.0
+          ],
+          "vols_row_major": [
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2
+          ]
+        }
+      ],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-25",
+    "description": "One-year European equity call priced by the 1D Crank-Nicolson PDE against Black-Scholes.",
+    "domain": "equity.equity_option",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-25",
+    "name": "spx_atm_call_1y_pde_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product equity_option_pde",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43; deterministic flat-curve native instrument benchmark. Reference value 873.9487911610385. Finstack grid refinement (200 space points, 100 time steps): 873.954521237558 on the production grid, 873.95012720954 with every dimension doubled.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "pde_crank_nicolson_1d",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "npv": {
+      "abs": 0.008788056035882619,
+      "tolerance_reason": "Twice the change in Finstack's own price when every grid dimension is doubled; a second-order scheme's production-grid error is about 4/3 of that change."
+    }
+  }
+}

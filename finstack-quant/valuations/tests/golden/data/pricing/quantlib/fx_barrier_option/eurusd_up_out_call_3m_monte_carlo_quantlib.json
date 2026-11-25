@@ -1,0 +1,169 @@
+{
+  "expected": {
+    "npv": 22059.77344291721
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "barrier": 1.25,
+        "barrier_type": "up_and_out",
+        "base_currency": "EUR",
+        "day_count": "act_365f",
+        "domestic_discount_curve_id": "USD-OIS",
+        "expiry": "2026-07-30",
+        "foreign_discount_curve_id": "EUR-OIS",
+        "id": "EURUSD-UP-OUT-CALL-3M-MONTE-CARLO-QUANTLIB",
+        "instrument_pricing_overrides": {
+          "model_config": {
+            "mc_paths": 100000
+          }
+        },
+        "monitoring": {
+          "type": "continuous"
+        },
+        "monitoring_start_date": "2026-04-30",
+        "notional": {
+          "amount": "1000000",
+          "currency": "EUR"
+        },
+        "option_type": "call",
+        "quote_currency": "USD",
+        "rebate": null,
+        "strike": 1.1,
+        "vol_surface_id": "EURUSD-BARRIER-VOL-QL"
+      },
+      "type": "fx_barrier_option"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        },
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "EUR-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.4723665527410147
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        }
+      ],
+      "dividends": [],
+      "fx": {
+        "config": {
+          "cache_capacity": 256,
+          "pivot_currency": "USD"
+        },
+        "pinned_quotes": [],
+        "provider_pinned_quotes": [],
+        "provider_quotes": [],
+        "quotes": [
+          [
+            "EUR",
+            "USD",
+            1.1
+          ]
+        ]
+      },
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {},
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [
+        {
+          "expiries": [
+            0.25,
+            1.0,
+            2.0
+          ],
+          "id": "EURUSD-BARRIER-VOL-QL",
+          "interpolation_mode": "vol",
+          "quote_type": "black_lognormal",
+          "secondary_axis": "strike",
+          "secondary_values": [
+            0.8,
+            1.1,
+            1.4
+          ],
+          "vols_row_major": [
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1
+          ]
+        }
+      ],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-24",
+    "description": "Three-month continuous EUR/USD up-and-out call priced by Monte Carlo against the closed form.",
+    "domain": "fx.fx_barrier_option",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-24",
+    "name": "eurusd_up_out_call_3m_monte_carlo_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product fx_barrier_option_monte_carlo",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43; deterministic flat-curve native instrument benchmark. Reference value 22059.77344291721. Discounted payoff standard deviation per unit at most 0.04167672440879367: the knock-out payoff never exceeds the vanilla call payoff, whose root second moment is closed form.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "monte_carlo_gbm",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "npv": {
+      "abs": 395.38012364076724,
+      "tolerance_reason": "Three standard errors of a plain 100000-path estimator from the payoff's own dispersion. Monitoring between simulation dates is sampled exactly, so there is no discretisation term."
+    }
+  }
+}

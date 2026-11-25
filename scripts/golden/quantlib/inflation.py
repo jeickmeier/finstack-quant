@@ -523,3 +523,94 @@ def build_yoy_inflation_floor_normal() -> dict[str, Any]:
         volatility=0.015,
         normal=True,
     )
+
+
+def build_inflation_linked_bond() -> dict[str, Any]:
+    """Build a native QuantLib seasoned capital-indexed bond fixture without a deflation floor."""
+    issue, maturity = "2025-11-18", "2030-11-18"
+    real_coupon = 0.0125
+    base_cpi = 297.0
+    schedule = ql.Schedule(
+        ql_date(issue),
+        ql_date(maturity),
+        ql.Period(6, ql.Months),
+        ql.NullCalendar(),
+        ql.Unadjusted,
+        ql.Unadjusted,
+        ql.DateGeneration.Backward,
+        False,
+    )
+
+    def npv(rate_shift: float = 0.0) -> float:
+        bond = ql.CPIBond(
+            0,
+            NOTIONAL,
+            False,
+            base_cpi,
+            LAG,
+            _cpi_index(),
+            ql.CPI.Linear,
+            schedule,
+            [real_coupon],
+            ql.ActualActual(ql.ActualActual.ISMA, schedule),
+            ql.Unadjusted,
+            ql_date(issue),
+        )
+        evaluation_date = _evaluation_date()
+        return ql.CashFlows.npv(bond.cashflows(), _discount_curve(rate_shift), False, evaluation_date, evaluation_date)
+
+    expected = {"dv01": central_difference(npv, 0.0, RATE_BUMP), "npv": npv()}
+    reason = (
+        "QuantLib native CPIBond and Finstack discount the same indexed coupons and redemption off identical "
+        "monthly CPI levels; tolerance allows only cross-engine floating-point residual."
+    )
+    name = "usd_inflation_linked_bond_5y_quantlib"
+    return {
+        "schema": SCHEMA,
+        "metadata": _captured(
+            metadata(
+                name=name,
+                domain="fixed_income.inflation_linked_bond",
+                description="QuantLib native seasoned five-year capital-indexed bond with no deflation floor.",
+                product="inflation_linked_bond",
+                source_detail=(
+                    f"QuantLib {ql.__version__} CPIBond (growthOnly false, base CPI {base_cpi}, three-month lag, "
+                    "CPI.Linear interpolation, ActualActual ISMA coupons on unadjusted dates); cash flows after "
+                    "the valuation date discounted with CashFlows.npv on a flat Act/365F continuous nominal "
+                    "curve. The Finstack inflation curve knots are QuantLib's projected monthly index fixings. "
+                    "DV01 is a central one-basis-point difference in the nominal zero rate."
+                ),
+            )
+        ),
+        "kind": "pricing",
+        "model": "discounting",
+        "market": _market([date for date in schedule if date > ql_date(VALUATION_DATE)]),
+        "instrument": {
+            "schema": "finstack_quant.instrument/1",
+            "instrument": {
+                "type": "inflation_linked_bond",
+                "spec": {
+                    "id": name.upper().replace("_", "-"),
+                    "notional": {"amount": "10000000", "currency": "USD"},
+                    "real_coupon": str(real_coupon),
+                    "frequency": {"count": 6, "unit": "months"},
+                    "day_count": "act_act_isma",
+                    "issue_date": issue,
+                    "maturity": maturity,
+                    "base_cpi": base_cpi,
+                    "base_date": issue,
+                    "indexation_method": "tips",
+                    "lag": {"months": 3},
+                    "deflation_protection": "none",
+                    "business_day_convention": "unadjusted",
+                    "stub": "none",
+                    "calendar_id": None,
+                    "discount_curve_id": DISCOUNT_ID,
+                    "inflation_index_id": INDEX_ID,
+                    "attributes": {"tags": ["golden", "quantlib"], "meta": {}},
+                },
+            },
+        },
+        "expected": expected,
+        "tolerances": _tolerances(expected, ARITHMETIC_REL, reason),
+    }

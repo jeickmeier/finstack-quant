@@ -1,0 +1,150 @@
+{
+  "expected": {
+    "npv": 168729.38182515223
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "day_count": "act_365f",
+        "discount_curve_id": "USD-OIS",
+        "div_yield_id": "SPX-DIVYIELD",
+        "expiry": "2027-04-30",
+        "global_cap": 100.0,
+        "global_floor": 0.0,
+        "id": "SPX-ADDITIVE-CLIQUET-1Y-QUANTLIB",
+        "initial_level": null,
+        "instrument_pricing_overrides": {
+          "model_config": {
+            "mc_paths": 100000
+          }
+        },
+        "local_cap": 10.0,
+        "local_floor": 0.0,
+        "notional": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "past_fixings": [],
+        "path_model": "atm_term_gbm",
+        "payoff_type": "additive",
+        "reset_dates": [
+          "2026-07-30",
+          "2026-10-30",
+          "2027-01-30",
+          "2027-04-30"
+        ],
+        "spot_id": "SPX-SPOT",
+        "underlying_ticker": "SPX",
+        "vol_surface_id": "SPX-CLIQUET-VOL-QL"
+      },
+      "type": "cliquet_option"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {
+        "SPX-DIVYIELD": {
+          "unitless": 0.01
+        },
+        "SPX-SPOT": {
+          "price": {
+            "amount": "100.0",
+            "currency": "USD"
+          }
+        }
+      },
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [
+        {
+          "expiries": [
+            0.25,
+            1.0,
+            2.0
+          ],
+          "id": "SPX-CLIQUET-VOL-QL",
+          "interpolation_mode": "vol",
+          "quote_type": "black_lognormal",
+          "secondary_axis": "strike",
+          "secondary_values": [
+            50.0,
+            100.0,
+            150.0
+          ],
+          "vols_row_major": [
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2
+          ]
+        }
+      ],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-07-11",
+    "description": "One-year quarterly additive cliquet with a zero local floor and caps that never bind.",
+    "domain": "equity.cliquet_option",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-07-11",
+    "name": "spx_additive_cliquet_1y_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product cliquet_option",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43 blackFormula per reset period on the forward ratio with unit strike, summed and discounted from expiry: 168729.38182515223. Discounted payoff standard deviation per unit notional 0.12472031170969756.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "monte_carlo_gbm",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "npv": {
+      "abs": 1183.20076646644,
+      "tolerance_reason": "Three standard errors of a plain 100000-path estimator, from the closed-form variance of the independent period payoffs; Finstack's antithetic sampling can only reduce the error."
+    }
+  }
+}

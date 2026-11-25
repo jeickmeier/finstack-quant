@@ -118,6 +118,7 @@ _DOMAIN_RUNNERS = {
     "credit.cds_option": "pricing_common",
     "credit.cds_tranche": "pricing_common",
     "equity.equity_option": "pricing_common",
+    "equity.cliquet_option": "pricing_common",
     "listed.equity_future": "pricing_common",
     "exotics.asian_option": "pricing_common",
     "exotics.barrier_option": "pricing_common",
