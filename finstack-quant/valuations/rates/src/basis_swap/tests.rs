@@ -1261,3 +1261,68 @@ fn validate_rejects_simple_compounding_on_overnight_index() {
         "expected overnight/Simple rejection, got {err}"
     );
 }
+
+#[test]
+fn basis_swap_single_curve_ois_discount_projection_works() {
+    use finstack_quant_cashflows::builder::FloatingLegCompounding;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+
+    let start = date(2025, 1, 2);
+    let end = date(2026, 1, 2);
+    let ois_disc = DiscountCurve::builder("USD-OIS")
+        .base_date(start)
+        .knots([(0.0, 1.0), (2.0, (-0.04_f64 * 2.0).exp())])
+        .day_count(DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+        .build()
+        .expect("disc");
+    let fwd_3m = finstack_quant_core::market_data::term_structures::ForwardCurve::flat(
+        "USD-SOFR-3M",
+        start,
+        0.042,
+        DayCount::Act360,
+    )
+    .expect("fwd");
+    let market = MarketContext::new()
+        .try_insert(ois_disc)
+        .expect("insert")
+        .try_insert(fwd_3m)
+        .expect("insert");
+    let primary = FloatLegSpec {
+        index_id: "USD-SOFR-OIS".into(),
+        forward_curve_id: CurveId::new("USD-OIS"),
+        discount_curve_id: CurveId::new("USD-OIS"),
+        start,
+        end,
+        frequency: Tenor::quarterly(),
+        day_count: DayCount::Act360,
+        business_day_convention: BusinessDayConvention::ModifiedFollowing,
+        calendar_id: Some("usny".into()),
+        stub: StubKind::ShortFront,
+        spread_bp: Decimal::from(5),
+        payment_lag_days: 0,
+        reset_lag_days: 0,
+        fixing_calendar_id: None,
+        end_of_month: false,
+        compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+    };
+    let reference = FloatLegSpec {
+        index_id: "USD-SOFR-3M".into(),
+        forward_curve_id: CurveId::new("USD-SOFR-3M"),
+        spread_bp: Decimal::ZERO,
+        compounding: FloatingLegCompounding::Simple,
+        ..primary.clone()
+    };
+    let swap = BasisSwap::new(
+        "OIS-VS-3M",
+        Money::from((1_000_000_i64, Currency::USD)),
+        primary,
+        reference,
+    )
+    .expect("swap");
+    let pv = swap
+        .value(&market, start)
+        .expect("single-curve OIS basis swap PV");
+    assert!(pv.amount().is_finite());
+}

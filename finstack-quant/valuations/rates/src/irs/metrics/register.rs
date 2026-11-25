@@ -18,7 +18,7 @@ pub(crate) fn register_irs_metrics(
             (Annuity, super::annuity::AnnuityCalculator),
             (ParRate, ParRateCalculator),
 
-            (Dv01, super::dv01::IrsDv01Calculator),
+            (Dv01, crate::rate_bucketed_dv01::RateDv01(false)),
 
             // PV01 per-curve: bump each rate curve individually, store as pv01::{curve}
             (Pv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_per_curve()

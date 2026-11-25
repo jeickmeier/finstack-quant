@@ -78,7 +78,7 @@ pub(crate) struct RateFutureProjection {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 #[builder(validate = InterestRateFuture::validate)]
 pub struct InterestRateFuture {
     /// Unique identifier
@@ -170,6 +170,8 @@ pub struct InterestRateFuture {
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(InterestRateFuture);
 
 /// Contract specifications for interest rate futures.
 ///
@@ -429,12 +431,16 @@ impl InterestRateFuture {
             get_fixing_series, require_fixing_value_exact,
         };
         use finstack_quant_valuations_core::instruments::pricing::overnight::{
-            OvernightCouponProjectionInput, OvernightProjectionCurve, project_overnight_coupon,
+            OvernightCouponProjectionInput, project_overnight_coupon,
             resolve_overnight_fixing_calendar,
         };
 
         let (fixing_date, period_start, period_end) = self.resolve_dates()?;
-        let fwd = context.get_forward(&self.forward_curve_id)?;
+        let fwd = crate::swap_legs::ResolvedProjectionCurve::resolve(
+            context,
+            &self.forward_curve_id,
+            &self.discount_curve_id,
+        )?;
         let fixing_id = self.resolved_index_id();
         let fixings_required = match self.compounding {
             FloatingLegCompounding::Simple => fixing_date < as_of,
@@ -455,7 +461,7 @@ impl InterestRateFuture {
                     })
                 } else {
                     Ok(RateFutureProjection {
-                        rate: fwd.as_ref().rate_between_dates(
+                        rate: fwd.rate_between_dates(
                             period_start,
                             period_end,
                             self.day_count.year_fraction(
@@ -476,7 +482,7 @@ impl InterestRateFuture {
                 )?;
                 let projection =
                     project_arithmetic_overnight_rate(OvernightArithmeticProjectionInput {
-                        curve: OvernightProjectionCurve::Forward(fwd.as_ref()),
+                        curve: fwd.as_overnight(),
                         fixings,
                         fixing_id,
                         as_of,
@@ -498,7 +504,7 @@ impl InterestRateFuture {
                     &format!("IR future '{}'", self.id),
                 )?;
                 let projection = project_overnight_coupon(OvernightCouponProjectionInput {
-                    curve: OvernightProjectionCurve::Forward(fwd.as_ref()),
+                    curve: fwd.as_overnight(),
                     fixings,
                     fixing_id,
                     as_of,
@@ -581,9 +587,12 @@ impl InterestRateFuture {
         as_of: Date,
         projected_rate: f64,
     ) -> finstack_quant_core::Result<f64> {
+        use crate::overnight::{
+            OvernightArithmeticProjectionInput, project_arithmetic_overnight_rate,
+        };
         use finstack_quant_models::rates::hull_white::{HullWhiteParams, hw_b};
         use finstack_quant_valuations_core::instruments::pricing::overnight::{
-            OvernightCouponProjectionInput, OvernightProjectionCurve, project_overnight_coupon,
+            OvernightCouponProjectionInput, project_overnight_coupon,
             resolve_overnight_fixing_calendar,
         };
         let config = &self.instrument_pricing_overrides.model_config;
@@ -597,39 +606,62 @@ impl InterestRateFuture {
         let tau = self
             .day_count
             .year_fraction(start, end, DayCountContext::default())?;
-        let forward = context.get_forward(&self.forward_curve_id)?;
+        let forward = crate::swap_legs::ResolvedProjectionCurve::resolve(
+            context,
+            &self.forward_curve_id,
+            &self.discount_curve_id,
+        )?;
         let calendar = resolve_overnight_fixing_calendar(
             self.fixing_calendar_id.as_deref(),
             self.terms.currency,
             "IR future",
         )?;
-        let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
-            context,
-            self.resolved_index_id(),
-        )
-        .ok();
-        let compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
-        let coupon = project_overnight_coupon(OvernightCouponProjectionInput {
-            curve: OvernightProjectionCurve::Forward(forward.as_ref()),
-            fixings,
-            fixing_id: self.resolved_index_id(),
-            as_of,
-            accrual_start: start,
-            accrual_end: end,
-            end_is_termination_date: None,
-            day_count: self.day_count,
-            coupon_frequency: None,
-            coupon_period: (start, end),
-            compounding: &compounding,
-            fixing_calendar: calendar,
-            compounded_spread: 0.0,
-            need_observation_exposures: true,
-        })?;
+        let fixings = crate::swap_legs::optional_fixing_series(context, self.resolved_index_id())?;
+        let observation_exposures = match self.compounding {
+            FloatingLegCompounding::SimpleAverage => {
+                project_arithmetic_overnight_rate(OvernightArithmeticProjectionInput {
+                    curve: forward.as_overnight(),
+                    fixings,
+                    fixing_id: self.resolved_index_id(),
+                    as_of,
+                    accrual_start: start,
+                    accrual_end: end,
+                    end_is_termination_date: None,
+                    day_count: self.day_count,
+                    fixing_calendar: calendar,
+                })?
+                .observation_exposures
+            }
+            compounding @ FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 } => {
+                project_overnight_coupon(OvernightCouponProjectionInput {
+                    curve: forward.as_overnight(),
+                    fixings,
+                    fixing_id: self.resolved_index_id(),
+                    as_of,
+                    accrual_start: start,
+                    accrual_end: end,
+                    end_is_termination_date: None,
+                    day_count: self.day_count,
+                    coupon_frequency: None,
+                    coupon_period: (start, end),
+                    compounding: &compounding,
+                    fixing_calendar: calendar,
+                    compounded_spread: 0.0,
+                    need_observation_exposures: true,
+                })?
+                .observation_exposures
+            }
+            ref other => {
+                return Err(unsupported_future_compounding(
+                    &format!("IR future '{}'", self.id.as_str()),
+                    other,
+                ));
+            }
+        };
         let mut log_moment = 0.0;
         let mut previous = Vec::<(f64, f64)>::new();
         let mut arithmetic_adjustment = 0.0;
-        for observation in coupon
-            .observation_exposures
+        for observation in observation_exposures
             .iter()
             .filter(|o| o.observation_start >= as_of)
         {
@@ -858,12 +890,21 @@ impl InterestRateFuture {
     }
 
     /// `true` when the model can price the future without a quote: a fixed
-    /// convexity adjustment or a vol surface is supplied, or the compounded
-    /// (overnight) contract needs neither.
+    /// convexity adjustment or a vol surface is supplied for term futures, or
+    /// explicit HW1F parameters are configured for overnight futures.
     pub(crate) fn can_price_from_model(&self) -> bool {
-        self.contract_specs.convexity_adjustment.is_some()
-            || self.vol_surface_id.is_some()
-            || !matches!(self.compounding, FloatingLegCompounding::Simple)
+        if self.contract_specs.convexity_adjustment.is_some() {
+            return true;
+        }
+        match self.compounding {
+            FloatingLegCompounding::Simple => self.vol_surface_id.is_some(),
+            _ => {
+                let cfg = &self.instrument_pricing_overrides.model_config;
+                cfg.hw1f_mean_reversion.is_some()
+                    && cfg.hw1f_sigma.is_some()
+                    && cfg.hw1f_sigma_schedule.is_none()
+            }
+        }
     }
 }
 
@@ -899,7 +940,11 @@ impl finstack_quant_valuations_core::instruments::Instrument for InterestRateFut
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
         let mut deps = MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
-        deps.add_forward_curve(self.forward_curve_id.clone());
+        if self.compounding == FloatingLegCompounding::Simple
+            || self.forward_curve_id != self.discount_curve_id
+        {
+            deps.add_forward_curve(self.forward_curve_id.clone());
+        }
         if let Some(vol_surface_id) = &self.vol_surface_id {
             deps.add_volatility_dependency(
                 finstack_quant_valuations_core::instruments::VolatilityDependency::new(
@@ -1495,5 +1540,44 @@ mod tests {
             .model_settlement_rate(&market, date!(2025 - 02 - 01))
             .expect_err("pre-base futures period must not be clamped");
         assert!(error.to_string().contains("fixing series"));
+    }
+
+    #[test]
+    fn quoted_overnight_future_without_hw1f_computes_dv01_without_crashing() {
+        use finstack_quant_core::market_data::term_structures::DiscountCurve;
+        use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
+        use finstack_quant_valuations_core::metrics::MetricId;
+
+        let as_of = date!(2025 - 01 - 02);
+        let mut future = InterestRateFuture::builder()
+            .id(InstrumentId::new("SR3-QUOTED"))
+            .terms(listed_terms(date!(2025 - 06 - 18), 95.5))
+            .fixing_date_opt(Some(date!(2025 - 06 - 18)))
+            .period_start_opt(Some(date!(2025 - 03 - 19)))
+            .period_end_opt(Some(date!(2025 - 06 - 18)))
+            .day_count(DayCount::Act360)
+            .contract_specs(FutureContractSpecs::CME_SR3)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .forward_curve_id(CurveId::new("USD-OIS"))
+            .compounding(FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 })
+            .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
+            .attributes(Attributes::new())
+            .build()
+            .expect("quoted overnight future");
+        future.terms.quoted_price = Some(95.5);
+        assert!(!future.can_price_from_model());
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (1.0, 0.96)])
+            .day_count(DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+            .build()
+            .expect("disc");
+        let market = MarketContext::new().try_insert(disc).expect("insert");
+        let res = future
+            .price_with_metrics(&market, as_of, &[MetricId::Dv01], PricingOptions::default())
+            .expect("DV01 on quoted overnight future without HW1F must succeed");
+        assert!(res.measures[&MetricId::Dv01].is_finite());
     }
 }

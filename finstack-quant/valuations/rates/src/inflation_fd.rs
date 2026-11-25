@@ -65,13 +65,12 @@ impl<I> Inflation01Calculator<I> {
 
 impl<I: InflationIndexed + 'static> MetricCalculator for Inflation01Calculator<I> {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let instrument: &I = context.instrument_as()?;
+        let id = context.instrument_as::<I>()?.inflation_index_id().clone();
         let as_of = context.as_of;
-        let id = instrument.inflation_index_id();
-        let curves_up = bumped_inflation_market(context, id, INFLATION_BUMP_PCT)?;
-        let pv_up = instrument.value(&curves_up, as_of)?.amount();
-        let curves_down = bumped_inflation_market(context, id, -INFLATION_BUMP_PCT)?;
-        let pv_down = instrument.value(&curves_down, as_of)?.amount();
+        let curves_up = bumped_inflation_market(context, &id, INFLATION_BUMP_PCT)?;
+        let pv_up = context.reprice_raw(&curves_up, as_of)?;
+        let curves_down = bumped_inflation_market(context, &id, -INFLATION_BUMP_PCT)?;
+        let pv_down = context.reprice_raw(&curves_down, as_of)?;
         Ok((pv_up - pv_down) / 2.0)
     }
 }

@@ -46,7 +46,6 @@
 //! ```
 
 pub(crate) mod annuity;
-pub(crate) mod dv01;
 pub(crate) mod ir_convexity;
 mod register;
 

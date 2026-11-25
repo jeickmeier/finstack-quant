@@ -254,3 +254,106 @@ fn test_funding_risk_sign() {
     // payment, so ΔPV must be positive for a cash lender.
     assert!(fr >= 0.0);
 }
+
+#[test]
+fn test_cross_currency_collateral_coverage_and_expired_repo_zero() {
+    use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
+    use finstack_quant_valuations_core::metrics::MetricId;
+    use std::sync::Arc;
+
+    struct FixedFx(f64);
+    impl FxProvider for FixedFx {
+        fn rate(
+            &self,
+            from: Currency,
+            to: Currency,
+            _on: Date,
+            _policy: FxConversionPolicy,
+        ) -> finstack_quant_core::Result<f64> {
+            match (from, to) {
+                (Currency::EUR, Currency::USD) => Ok(self.0),
+                _ => Err(finstack_quant_core::Error::Validation(
+                    "unsupported pair".into(),
+                )),
+            }
+        }
+    }
+
+    let mut repo = create_test_repo();
+    repo.maturity = test_date(2025, 1, 18); // Saturday -> adjusts to Monday 2025-01-20
+    let (_, adj_maturity) = repo.adjusted_dates().expect("adjusted dates");
+    assert_eq!(repo.expiry(), Some(adj_maturity));
+
+    // Collateral priced in EUR (10_000 units * EUR 100 = EUR 1_000_000) vs USD cash.
+    let base_ctx = create_test_context().insert_price(
+        "BOND_ABC_PRICE",
+        finstack_quant_core::market_data::scalars::MarketScalar::price(
+            Money::new(100.0, Currency::EUR).expect("price"),
+        ),
+    );
+    let as_of = test_date(2025, 1, 10);
+    let pv = repo.value(&base_ctx, as_of).expect("pv");
+    let reg = crate::RATES.metrics();
+
+    // Missing FX fails loudly instead of dividing EUR by USD.
+    let mut no_fx_ctx = finstack_quant_valuations_core::metrics::MetricContext::new(
+        Arc::new(repo.clone()),
+        Arc::new(base_ctx.clone()),
+        as_of,
+        pv,
+        MetricContext::default_config(),
+    );
+    assert!(
+        reg.compute(&[MetricId::CollateralCoverage], &mut no_fx_ctx)
+            .is_err()
+    );
+
+    // With EURUSD = 1.10 FX, coverage converts EUR 1M -> USD 1.1M cleanly.
+    let ctx_fx = base_ctx.insert_fx(FxMatrix::new(Arc::new(FixedFx(1.10)), None));
+    let mut fx_mctx = finstack_quant_valuations_core::metrics::MetricContext::new(
+        Arc::new(repo.clone()),
+        Arc::new(ctx_fx.clone()),
+        as_of,
+        pv,
+        MetricContext::default_config(),
+    );
+    let res = reg
+        .compute(
+            &[
+                MetricId::CollateralCoverage,
+                MetricId::ImpliedCollateralReturn,
+            ],
+            &mut fx_mctx,
+        )
+        .expect("fx coverage");
+    let req = repo.required_collateral_value().expect("req").amount();
+    // Collateral: 1,000 units * EUR 100 * 1.10 = USD 110,000.
+    let expected_cov = (100_000.0 * 1.10) / req;
+    assert!((res[&MetricId::CollateralCoverage] - expected_cov).abs() < 1e-9);
+    assert!(res[&MetricId::ImpliedCollateralReturn].is_finite());
+
+    // Expired repo returns 0.0 for TimeToMaturity & ImpliedCollateralReturn instead of DateRange error,
+    // and simm_sensitivities honors adjusted maturity (still live between raw 18th and adj 20th).
+    let between = test_date(2025, 1, 19);
+    let simm_live = finstack_quant_margin::Marginable::simm_sensitivities(&repo, &ctx_fx, between)
+        .expect("simm live");
+    assert!(!simm_live.ir_delta.is_empty());
+
+    let after = test_date(2025, 1, 25);
+    let pv_after = repo.value(&ctx_fx, after).expect("expired pv");
+    let mut after_ctx = finstack_quant_valuations_core::metrics::MetricContext::new(
+        Arc::new(repo),
+        Arc::new(ctx_fx),
+        after,
+        pv_after,
+        MetricContext::default_config(),
+    );
+    let expired_res = reg
+        .compute(
+            &[MetricId::TimeToMaturity, MetricId::ImpliedCollateralReturn],
+            &mut after_ctx,
+        )
+        .expect("expired metrics");
+    assert_eq!(expired_res[&MetricId::TimeToMaturity], 0.0);
+    assert_eq!(expired_res[&MetricId::ImpliedCollateralReturn], 0.0);
+}

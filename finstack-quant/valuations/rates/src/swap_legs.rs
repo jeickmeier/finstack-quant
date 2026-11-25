@@ -1,9 +1,160 @@
 //! Fixed and floating swap leg specifications shared across rate derivatives.
 
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor};
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::types::CurveId;
+use finstack_quant_core::{ErrorKind, Result};
+use finstack_quant_valuations_core::instruments::pricing::overnight::{
+    OvernightCouponProjection, OvernightCouponProjectionInput, OvernightProjectionCurve,
+    adjust_overnight_accrual_boundaries, project_overnight_coupon,
+};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+
+use std::sync::Arc;
+
+/// Projection curve resolved from [`MarketContext`]: either an explicit
+/// forward curve or a single-curve OIS discount curve fallback.
+#[derive(Clone)]
+pub(crate) enum ResolvedProjectionCurve {
+    /// Explicit forward curve.
+    Forward(Arc<ForwardCurve>),
+    /// Single-curve OIS discount curve used for projection.
+    Discount(Arc<DiscountCurve>),
+}
+
+impl ResolvedProjectionCurve {
+    /// Resolve `forward_curve_id` from `market`, falling back to a discount
+    /// curve under `forward_curve_id` (or `discount_curve_id` when identical)
+    /// if no separate forward curve is registered.
+    pub(crate) fn resolve(
+        market: &MarketContext,
+        forward_curve_id: &CurveId,
+        discount_curve_id: &CurveId,
+    ) -> Result<Self> {
+        match market.get_forward(forward_curve_id) {
+            Ok(fwd) => Ok(Self::Forward(fwd)),
+            Err(err)
+                if err.kind() == ErrorKind::NotFound
+                    || matches!(
+                        err,
+                        finstack_quant_core::Error::Input(
+                            finstack_quant_core::InputError::WrongCurveType { .. }
+                        )
+                    ) =>
+            {
+                if let Ok(disc) = market.get_discount(forward_curve_id) {
+                    Ok(Self::Discount(disc))
+                } else if forward_curve_id == discount_curve_id {
+                    Ok(Self::Discount(market.get_discount(discount_curve_id)?))
+                } else {
+                    Err(err)
+                }
+            }
+            Err(err) => Err(err),
+        }
+    }
+
+    /// Adapt to an [`OvernightProjectionCurve`] for overnight compounding or averaging.
+    pub(crate) fn as_overnight(&self) -> OvernightProjectionCurve<'_> {
+        match self {
+            Self::Forward(fwd) => OvernightProjectionCurve::Forward(fwd.as_ref()),
+            Self::Discount(disc) => OvernightProjectionCurve::Discount(disc.as_ref()),
+        }
+    }
+
+    /// Compute the simple annualized forward rate over `[start, end)` with accrual `tau`.
+    pub(crate) fn rate_between_dates(&self, start: Date, end: Date, tau: f64) -> Result<f64> {
+        match self {
+            Self::Forward(fwd) => fwd.rate_between_dates(start, end, tau),
+            Self::Discount(disc) => {
+                if !tau.is_finite() || tau <= 0.0 {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "Forward rate projection requires positive accrual tau for {start} -> {end}, got {tau}"
+                    )));
+                }
+                let df = disc.df_between_dates(start, end)?;
+                Ok((1.0 / df - 1.0) / tau)
+            }
+        }
+    }
+}
+
+/// Look up an optional historical fixing series for `index_id`.
+///
+/// Returns `Ok(None)` only when the series is absent (`ErrorKind::NotFound`);
+/// propagates validation or corrupt-series errors instead of swallowing them.
+pub(crate) fn optional_fixing_series<'a>(
+    market: &'a MarketContext,
+    index_id: &str,
+) -> Result<Option<&'a ScalarTimeSeries>> {
+    let series_id = finstack_quant_core::market_data::fixings::fixing_series_id(index_id);
+    match market.get_series(&series_id) {
+        Ok(series) => Ok(Some(series)),
+        Err(err) if err.kind() == ErrorKind::NotFound => Ok(None),
+        Err(err) => Err(err),
+    }
+}
+
+/// Options controlling a single overnight floating-leg period projection.
+#[derive(Clone, Copy)]
+pub(crate) struct OvernightPeriodParams<'a> {
+    /// Holiday calendar used to step overnight fixing observations.
+    pub(crate) fixing_calendar: &'a dyn finstack_quant_core::dates::HolidayCalendar,
+    /// Whether `period.accrual_end` coincides with the leg's termination date.
+    pub(crate) end_is_termination_date: bool,
+    /// Whether per-observation forward sensitivities/fixings must be emitted.
+    pub(crate) need_observation_exposures: bool,
+}
+
+/// Shared overnight-leg period projector for `BasisSwap` and `XccySwap`.
+///
+/// Adjusts the accrual window to business days, passes contractual
+/// `end_is_termination_date` and unadjusted `Act365L` coupon periods, and
+/// returns `Ok(None)` when the adjusted window collapses to empty.
+pub(crate) fn project_float_leg_overnight(
+    leg: &FloatLegSpec,
+    period: &finstack_quant_cashflows::builder::SchedulePeriod,
+    projection_curve: &ResolvedProjectionCurve,
+    fixings: Option<&ScalarTimeSeries>,
+    as_of: Date,
+    params: OvernightPeriodParams<'_>,
+) -> Result<Option<OvernightCouponProjection>> {
+    let (accrual_start, accrual_end) = adjust_overnight_accrual_boundaries(
+        period.accrual_start,
+        period.accrual_end,
+        leg.business_day_convention,
+        params.fixing_calendar,
+    )?;
+    if accrual_end <= accrual_start {
+        return Ok(None);
+    }
+    let coupon_period = if leg.day_count == DayCount::Act365L {
+        (period.unadjusted_start, period.unadjusted_end)
+    } else {
+        (accrual_start, accrual_end)
+    };
+    project_overnight_coupon(OvernightCouponProjectionInput {
+        curve: projection_curve.as_overnight(),
+        fixings,
+        fixing_id: leg.index_id.as_str(),
+        as_of,
+        accrual_start,
+        accrual_end,
+        end_is_termination_date: Some(params.end_is_termination_date),
+        day_count: leg.day_count,
+        coupon_frequency: Some(leg.frequency),
+        coupon_period,
+        compounding: &leg.compounding,
+        fixing_calendar: params.fixing_calendar,
+        compounded_spread: 0.0,
+        need_observation_exposures: params.need_observation_exposures,
+    })
+    .map(Some)
+}
 
 /// Add a business-day payment delay to `date`, using `calendar_id` or `weekends_only`.
 ///

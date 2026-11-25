@@ -425,12 +425,7 @@ pub(crate) fn float_leg_schedule_with_curves_as_of(
         let index_id = finstack_quant_core::market_data::fixings::validate_fixing_index_id(
             float.index_id.as_str(),
         )?;
-        let series_id = finstack_quant_core::market_data::fixings::fixing_series_id(index_id);
-        let fixings = match market.get_series(&series_id) {
-            Ok(series) => Some(series),
-            Err(err) if err.kind() == finstack_quant_core::ErrorKind::NotFound => None,
-            Err(err) => return Err(err),
-        };
+        let fixings = crate::swap_legs::optional_fixing_series(market, index_id)?;
         let valuation_date = as_of.unwrap_or_else(|| {
             proj.as_ref()
                 .map(|c| c.base_date())

@@ -29,7 +29,7 @@ use rust_decimal::Decimal;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct YoYInflationSwap {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -104,6 +104,8 @@ pub struct YoYInflationSwap {
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(YoYInflationSwap);
 
 impl YoYInflationSwap {
     /// Create a canonical example USD 5Y YoY inflation swap (US-CPI, annual payments).
@@ -335,9 +337,11 @@ impl YoYInflationSwap {
             sum_annuity += df * accrual;
         }
 
-        if sum_annuity.abs() < 1e-15 {
-            // Degenerate case: no accrual periods
-            return Ok(0.0);
+        if !sum_annuity.is_finite() || sum_annuity.abs() < 1e-15 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "YoYInflationSwap '{}' par_rate requires positive remaining annuity, got {sum_annuity}",
+                self.id
+            )));
         }
 
         Ok(sum_infl_pv / sum_annuity)
@@ -353,12 +357,18 @@ impl YoYInflationSwap {
         let fixed_rate = self.fixed_rate.as_f64();
 
         for (start, end, pay) in self.schedule()? {
-            if pay < as_of {
+            if pay <= as_of {
                 continue;
             }
             let accrual = self
                 .day_count
                 .year_fraction(start, end, DayCountContext::default())?;
+            if !accrual.is_finite() || accrual <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "YoYInflationSwap '{}' period {start}->{end} has non-positive accrual {accrual}",
+                    self.id
+                )));
+            }
             let cpi_start = self.cpi_value(curves, as_of, start)?;
             if cpi_start <= 0.0 {
                 return Err(finstack_quant_core::InputError::NonPositiveValue.into());
@@ -434,6 +444,19 @@ impl finstack_quant_valuations_core::instruments::Instrument for YoYInflationSwa
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()
+    }
+
+    fn validate_for_pricing(&self) -> finstack_quant_core::Result<()> {
+        self.validate()?;
+        validation::require_with(self.lag.is_some(), || {
+            "YoYInflationSwap requires an explicit lag".to_string()
+        })?;
+        validation::require_with(self.interpolation.is_some(), || {
+            "YoYInflationSwap requires explicit reference interpolation".to_string()
+        })?;
+        self.instrument_pricing_overrides.validate()?;
+        self.metric_pricing_overrides.validate()?;
+        self.scenario_pricing_overrides.validate()
     }
 
     fn market_dependencies(

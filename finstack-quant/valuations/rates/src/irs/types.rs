@@ -135,7 +135,7 @@ impl IrsLegConventions {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct InterestRateSwap {
     /// Unique identifier for the swap.
     pub id: InstrumentId,
@@ -193,6 +193,8 @@ pub struct InterestRateSwap {
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(InterestRateSwap);
 
 /// Parameters for constructing a vanilla IRS from market conventions.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

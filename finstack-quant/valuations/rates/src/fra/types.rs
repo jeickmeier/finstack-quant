@@ -61,7 +61,7 @@ const MAX_REASONABLE_RATE: f64 = 0.50;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct ForwardRateAgreement {
     /// Unique identifier
     pub id: InstrumentId,
@@ -142,6 +142,8 @@ pub struct ForwardRateAgreement {
     pub attributes: Attributes,
 }
 
+finstack_quant_valuations_core::validate_on_deserialize!(ForwardRateAgreement);
+
 fn default_fra_side() -> PayReceive {
     PayReceive::Pay
 }
@@ -165,8 +167,14 @@ impl ForwardRateAgreement {
             validation::validate_f64_finite(observed, "FRA observed_fixing")?;
         }
 
-        // Guard against unit mistakes (e.g., passing years as days).
-        validation::require_with(self.reset_lag_days.unsigned_abs() <= 31, || {
+        // Guard against negative lags and unit mistakes (e.g., passing years as days).
+        validation::require_with(self.reset_lag_days >= 0, || {
+            format!(
+                "FRA '{}' reset_lag_days must be non-negative, got {}",
+                self.id, self.reset_lag_days
+            )
+        })?;
+        validation::require_with(self.reset_lag_days <= 31, || {
             "FRA reset_lag_days has an unexpectedly large magnitude (expected business days)"
                 .to_string()
         })?;
@@ -280,22 +288,19 @@ impl ForwardRateAgreement {
         let forward_rate = if fixing_date < as_of {
             if let Some(obs) = self.observed_fixing {
                 obs
-            } else {
-                let series_id = finstack_quant_core::market_data::fixings::fixing_series_id(
+            } else if let Some(series) =
+                crate::swap_legs::optional_fixing_series(context, self.forward_curve_id.as_str())?
+            {
+                finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+                    Some(series),
                     self.forward_curve_id.as_str(),
-                );
-                if let Ok(series) = context.get_series(&series_id) {
-                    finstack_quant_core::market_data::fixings::require_fixing_value_exact(
-                        Some(series),
-                        self.forward_curve_id.as_str(),
-                        fixing_date,
-                    )?
-                } else {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "FRA '{}': fixing date {} has passed (as_of={}) but no observed_fixing provided",
-                        self.id, fixing_date, as_of
-                    )));
-                }
+                    fixing_date,
+                )?
+            } else {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "FRA '{}': fixing date {} has passed (as_of={}) but no observed_fixing provided",
+                    self.id, fixing_date, as_of
+                )));
             }
         } else if let Ok(fwd) = context.get_forward(&self.forward_curve_id) {
             fwd.as_ref()
@@ -344,8 +349,8 @@ impl ForwardRateAgreement {
         let rate_diff = forward_rate - fixed_rate;
         let denom = 1.0_f64 + forward_rate * tau;
 
-        // Denominator near zero indicates pathological forward rate (F ≈ -1/τ)
-        if denom.abs() <= MIN_SETTLEMENT_DENOM {
+        // Non-positive or near-zero denominator indicates pathological forward rate (F <= -1/τ)
+        if denom <= MIN_SETTLEMENT_DENOM {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "FRA '{}': settlement denominator near zero (forward_rate={}, tau={}); \
                  forward rate implies F ≈ {:.2}% which is pathological",
@@ -416,8 +421,9 @@ impl finstack_quant_valuations_core::instruments::Instrument for ForwardRateAgre
     {
         let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
+        // A FRA with fixing_date >= as_of still reads the forward curve even if observed_fixing is populated.
+        deps.add_forward_curve(self.forward_curve_id.clone());
         if self.observed_fixing.is_none() {
-            deps.add_forward_curve(self.forward_curve_id.clone());
             deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
                 self.forward_curve_id.as_str(),
             ));
@@ -467,6 +473,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ForwardRateAgreement {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
+        self.validate()?;
         // Settlement at start of accrual period; if already settled, no flows
         if self.start_date <= as_of {
             return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
@@ -764,5 +771,44 @@ mod serde_tests {
         let fra: ForwardRateAgreement = serde_json::from_value(json).expect("deserialize FRA");
         assert_eq!(fra.side, PayReceive::Pay);
         assert_eq!(fra.notional.currency(), Currency::USD);
+    }
+
+    #[test]
+    fn fra_h1_h3_validation_and_dependencies() {
+        use finstack_quant_cashflows::CashflowScheduleSource;
+        use finstack_quant_valuations_core::instruments::Instrument;
+
+        let mut fra = ForwardRateAgreement::example().expect("example fra");
+        fra.observed_fixing = Some(0.05);
+        let deps = fra.market_dependencies().expect("deps");
+        assert!(
+            deps.curves
+                .all_with_kind()
+                .any(|(id, _)| id.as_str() == "USD-SOFR-3M")
+        );
+
+        // Negative reset lag rejected
+        let mut bad_lag = ForwardRateAgreement::example().expect("example fra");
+        bad_lag.reset_lag_days = -1;
+        assert!(bad_lag.validate().is_err());
+
+        // Serde rejects invalid FRA
+        let mut invalid_json = serde_json::to_value(&bad_lag).expect("serialize");
+        invalid_json["reset_lag_days"] = serde_json::json!(-2);
+        assert!(serde_json::from_value::<ForwardRateAgreement>(invalid_json).is_err());
+
+        // raw_cashflow_schedule validates even when as_of >= start_date
+        assert!(
+            bad_lag
+                .raw_cashflow_schedule(&MarketContext::new(), date!(2026 - 01 - 01))
+                .is_err()
+        );
+
+        // Negative settlement denominator rejected (F <= -1/tau)
+        let as_of = date!(2024 - 01 - 02);
+        let mut neg_denom_fra = ForwardRateAgreement::example().expect("example fra");
+        neg_denom_fra.fixing_date = Some(date!(2024 - 01 - 01)); // < as_of
+        neg_denom_fra.observed_fixing = Some(-5.0); // 1 + (-5) * 0.25 = -0.25 <= 0
+        assert!(neg_denom_fra.npv_raw(&MarketContext::new(), as_of).is_err());
     }
 }

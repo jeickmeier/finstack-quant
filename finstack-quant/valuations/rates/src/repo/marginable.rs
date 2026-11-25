@@ -41,13 +41,14 @@ impl Marginable for Repo {
     ) -> Result<SimmSensitivities> {
         let currency = self.cash_amount.currency();
         let mut sens = SimmSensitivities::new(currency);
-        if as_of >= self.maturity {
+        let (_, adj_maturity) = self.adjusted_dates()?;
+        if as_of >= adj_maturity {
             return Ok(sens);
         }
 
         // Repos have limited rate sensitivity - mainly to the repo rate
         // Short-term IR sensitivity
-        let days_to_maturity = (self.maturity - as_of).whole_days().max(1) as f64;
+        let days_to_maturity = (adj_maturity - as_of).whole_days().max(1) as f64;
         let years_to_maturity = days_to_maturity / CALENDAR_DAYS_PER_YEAR;
 
         // DV01 approximation for short-term lending (higher discount rates reduce repayment PV)

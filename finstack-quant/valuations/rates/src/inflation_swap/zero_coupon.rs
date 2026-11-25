@@ -45,7 +45,7 @@ use rust_decimal::Decimal;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct InflationSwap {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -121,6 +121,8 @@ pub struct InflationSwap {
     pub attributes: Attributes,
 }
 
+finstack_quant_valuations_core::validate_on_deserialize!(InflationSwap);
+
 impl InflationSwap {
     /// Create a canonical example zero-coupon inflation swap (US CPI, 5Y).
     ///
@@ -165,7 +167,7 @@ impl InflationSwap {
         )?;
         if let Some(base) = self.base_cpi {
             validation::require_or(
-                base > 0.0,
+                base.is_finite() && base > 0.0,
                 finstack_quant_core::InputError::NonPositiveValue,
             )?;
         }
@@ -406,8 +408,11 @@ impl InflationSwap {
         }
 
         let tau = self.fixed_accrual()?;
-        if tau <= 0.0 {
-            return Ok(0.0);
+        if !tau.is_finite() || tau <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "InflationSwap '{}' par_rate requires positive accrual factor, got {tau}",
+                self.id
+            )));
         }
 
         Ok(index_ratio.powf(1.0 / tau) - 1.0)
@@ -449,6 +454,19 @@ impl finstack_quant_valuations_core::instruments::Instrument for InflationSwap {
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         InflationSwap::validate(self)
+    }
+
+    fn validate_for_pricing(&self) -> finstack_quant_core::Result<()> {
+        self.validate()?;
+        validation::require_with(self.lag.is_some(), || {
+            "InflationSwap requires an explicit lag".to_string()
+        })?;
+        validation::require_with(self.interpolation.is_some(), || {
+            "InflationSwap requires explicit reference interpolation".to_string()
+        })?;
+        self.instrument_pricing_overrides.validate()?;
+        self.metric_pricing_overrides.validate()?;
+        self.scenario_pricing_overrides.validate()
     }
 
     fn market_dependencies(

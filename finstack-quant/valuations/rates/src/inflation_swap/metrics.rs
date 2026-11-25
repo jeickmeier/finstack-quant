@@ -46,9 +46,11 @@ pub(crate) fn register_inflation_swap_metrics(
         registry: registry,
         instrument: InstrumentType::YoYInflationSwap,
         metrics: [
+            (ParRate, YoYParRateCalculator),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             (Inflation01, Inflation01Calculator::<YoYInflationSwap>::new()),
+            (InflationConvexity, InflationGammaCalculator::<YoYInflationSwap>::new()),
         ]
     }
     Ok(())
@@ -82,6 +84,16 @@ pub(crate) struct ParRateCalculator;
 impl MetricCalculator for ParRateCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let swap: &InflationSwap = context.instrument_as()?;
+        swap.par_rate(context.curves.as_ref(), context.as_of)
+    }
+}
+
+/// Calculates the par fixed rate for a YoY inflation swap.
+pub(crate) struct YoYParRateCalculator;
+
+impl MetricCalculator for YoYParRateCalculator {
+    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let swap: &YoYInflationSwap = context.instrument_as()?;
         swap.par_rate(context.curves.as_ref(), context.as_of)
     }
 }
