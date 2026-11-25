@@ -15,6 +15,7 @@ mod friction_cost;
 mod helpers_tests;
 mod integration;
 mod merton_mc_convergence;
+mod merton_mc_reference;
 mod metrics;
 mod pricing;
 mod test_bond_pricing;

@@ -16,6 +16,19 @@
 //!   European prices from [`merton_jump_cos_price`] against QuantLib's Bates
 //!   engine in the near-degenerate limit, QuantLib's own jump-diffusion test
 //!   table, and Merton's Poisson series.
+//! - `cds_par_spread`: [`MertonModel::cds_par_spread`] against QuantLib
+//!   `MidPointCdsEngine` on a survival curve whose quarterly nodes are the
+//!   model's survival function.
+//! - `cds_calibration`: [`MertonModel::from_cds_spread`] must return the asset
+//!   volatility a QuantLib par spread was generated from.
+//! - `hazard_curve`: [`MertonModel::to_hazard_curve`] survival at its pillars
+//!   against the closed-form survival, and between pillars against QuantLib
+//!   `HazardRateCurve`.
+//! - `report`: [`merton_report`] fields against the references above.
+//! - `mc_bond`: the Merton Monte Carlo bond engine against the closed-form
+//!   risky bond. That engine lives in the fixed-income crate, which depends on
+//!   this one, so the cases are only counted here and are priced by
+//!   `valuations/fixed-income/tests/bond/merton_mc_reference.rs`.
 //!
 //! # Convention mapping
 //!
@@ -28,13 +41,24 @@
 //! - The QuantLib table uses Haug's inputs (total volatility and jump share of
 //!   variance, zero mean jump). The fixture stores the mapped `sigma`,
 //!   `mu_jump` and `sigma_jump`.
+//! - A null `barrier_growth_rate` is the terminal barrier; a number is the
+//!   first-passage barrier growing at that rate.
+//! - The CDS par spread uses a quarterly premium grid in year fractions, a
+//!   flat continuously compounded discount rate and an ACT/360 premium on an
+//!   ACT/365F time axis. QuantLib runs on Actual/360 with 90-day quarters and
+//!   its par spread is divided by 365/360.
+//! - `merton_report` grades are not checked: the master scale has no external
+//!   reference in this suite.
 //!
 //! # Tolerances
 //!
 //! Each tolerance is set by the precision of its source, recorded per case and
 //! explained in the fixture's `meta.extra.tolerances`. The MATLAB values use
 //! half a unit of the last printed digit, the QuantLib table uses QuantLib's
-//! own 1e-2, and computed values use the accuracy of their reference.
+//! own 1e-2, and computed values use the accuracy of their reference. The
+//! model-level sections propagate the 5e-9 default-probability tolerance of
+//! `black_cox` through each formula; the generator computes that bound per
+//! case from the reference values.
 //!
 //! Only the zero-payout structural cases are externally anchored. The payout
 //! cases of `equity_inversion` follow this crate's documented payout
@@ -52,7 +76,11 @@
 //! - Merton, R. (1976). "Option pricing when underlying stock returns are
 //!   discontinuous." *Journal of Financial Economics*, 3.
 
-use finstack_quant_models::credit::{AssetDynamics, MertonBarrierType, MertonModel};
+use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_models::credit::{
+    AssetDynamics, MertonBarrierType, MertonModel, MertonReport, MertonReportMeasure,
+    MertonReportRequest, MertonReportSource, merton_report,
+};
 use finstack_quant_models::fourier::cos::merton_jump_cos_price;
 use finstack_quant_models::types::{OptionContractParams, OptionType};
 use finstack_quant_test_utils::golden::{GoldenSuite, load_suite_from_path};
@@ -119,6 +147,88 @@ struct JumpCase {
     expected: JumpExpected,
 }
 
+/// Structural model inputs shared by the model-level sections.
+#[derive(Debug, Deserialize)]
+struct ModelInputs {
+    asset_value: f64,
+    asset_vol: f64,
+    debt_barrier: f64,
+    rate: f64,
+    payout_rate: f64,
+    /// `None` is the terminal barrier.
+    barrier_growth_rate: Option<f64>,
+}
+
+impl ModelInputs {
+    fn build(&self) -> MertonModel {
+        let barrier = match self.barrier_growth_rate {
+            Some(barrier_growth_rate) => MertonBarrierType::FirstPassage {
+                barrier_growth_rate,
+            },
+            None => MertonBarrierType::Terminal,
+        };
+        MertonModel::new_with_dynamics(
+            self.asset_value,
+            self.asset_vol,
+            self.debt_barrier,
+            self.rate,
+            self.payout_rate,
+            barrier,
+            AssetDynamics::GeometricBrownian,
+        )
+        .expect("valid reference model")
+    }
+}
+
+/// CDS par spread, decimal per annum.
+#[derive(Debug, Deserialize)]
+struct CdsExpected {
+    par_spread: f64,
+    tolerance_abs: f64,
+}
+
+/// Asset volatility a CDS quote was generated from.
+#[derive(Debug, Deserialize)]
+struct CalibrationExpected {
+    asset_vol: f64,
+    tolerance_abs: f64,
+}
+
+/// Survival probabilities at and between the hazard-curve pillars.
+#[derive(Debug, Deserialize)]
+struct HazardExpected {
+    pillar_survival: Vec<f64>,
+    pillar_tolerance_abs: f64,
+    off_pillar_survival: Vec<f64>,
+    off_pillar_tolerance_abs: f64,
+}
+
+/// Where a report case takes its model from.
+#[derive(Debug, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum ReportSource {
+    Model(ModelInputs),
+    Equity {
+        equity_value: f64,
+        equity_vol: f64,
+        short_term_debt: f64,
+        long_term_debt: f64,
+        rate: f64,
+        payout_rate: f64,
+        maturity: f64,
+    },
+}
+
+/// One `MertonReport` field compared with its reference.
+#[derive(Debug, Deserialize)]
+struct ReportCheck {
+    field: String,
+    index: Option<usize>,
+    value: f64,
+    tolerance: f64,
+    relative: bool,
+}
+
 /// One reference case, tagged by section.
 #[derive(Debug, Deserialize)]
 #[serde(tag = "model", rename_all = "snake_case")]
@@ -157,6 +267,92 @@ enum MertonCase {
     JumpBatesLimit(JumpCase),
     JumpQuantlibTable(JumpCase),
     JumpSeries(JumpCase),
+    CdsParSpread {
+        id: String,
+        #[serde(flatten)]
+        firm: ModelInputs,
+        maturity: f64,
+        recovery: f64,
+        expected: CdsExpected,
+    },
+    CdsCalibration {
+        id: String,
+        cds_spread_bp: f64,
+        recovery: f64,
+        debt_barrier: f64,
+        rate: f64,
+        maturity: f64,
+        asset_value: f64,
+        payout_rate: f64,
+        expected: CalibrationExpected,
+    },
+    HazardCurve {
+        id: String,
+        #[serde(flatten)]
+        firm: ModelInputs,
+        tenors: Vec<f64>,
+        recovery: f64,
+        off_pillar_times: Vec<f64>,
+        expected: HazardExpected,
+    },
+    /// Priced by the fixed-income crate's `merton_mc_reference` test.
+    McBond {},
+    Report {
+        id: String,
+        source: ReportSource,
+        horizons: Vec<f64>,
+        maturity: f64,
+        recovery: f64,
+        checks: Vec<ReportCheck>,
+        rejected: Vec<String>,
+    },
+}
+
+/// The value of a report field named by a fixture check, or why it is absent.
+fn report_value(report: &MertonReport, field: &str, index: Option<usize>) -> Result<f64, String> {
+    let at = |values: &[f64]| {
+        index
+            .and_then(|i| values.get(i).copied())
+            .ok_or_else(|| format!("no element {index:?}"))
+    };
+    let measure = |values: &Option<Vec<f64>>, measure: MertonReportMeasure| match values {
+        Some(values) => at(values),
+        None => Err(format!("rejected: {:?}", report.errors.get(&measure))),
+    };
+    match field {
+        "default_point" => report
+            .default_point
+            .ok_or_else(|| "no default point".into()),
+        "model.debt_barrier" => Ok(report.model.debt_barrier()),
+        "model.asset_value" => Ok(report.model.asset_value()),
+        "model.asset_vol" => Ok(report.model.asset_vol()),
+        "default_probabilities" => at(&report.default_probabilities),
+        "distance_to_default" => at(&report.distance_to_default),
+        "implied_spread" => measure(&report.implied_spread, MertonReportMeasure::ImpliedSpread),
+        "debt_spread" => measure(&report.debt_spread, MertonReportMeasure::DebtSpread),
+        "cds_par_spread" => report.cds_par_spread.ok_or_else(|| {
+            format!(
+                "rejected: {:?}",
+                report.errors.get(&MertonReportMeasure::CdsParSpread)
+            )
+        }),
+        "implied_equity.value" | "implied_equity.vol" => report
+            .implied_equity
+            .map(|equity| {
+                if field.ends_with("value") {
+                    equity.value
+                } else {
+                    equity.vol
+                }
+            })
+            .ok_or_else(|| {
+                format!(
+                    "rejected: {:?}",
+                    report.errors.get(&MertonReportMeasure::ImpliedEquity)
+                )
+            }),
+        other => Err(format!("unknown report field {other}")),
+    }
 }
 
 /// Records a failure when `actual` misses `expected` by more than the
@@ -413,17 +609,205 @@ fn merton_models_match_external_references() {
                 *counts.entry("jump_series").or_default() += 1;
                 check_jump(&mut failures, jump);
             }
+            MertonCase::CdsParSpread {
+                id,
+                firm,
+                maturity,
+                recovery,
+                expected,
+            } => {
+                *counts.entry("cds_par_spread").or_default() += 1;
+                match firm.build().cds_par_spread(*maturity, *recovery) {
+                    Ok(spread) => check(
+                        &mut failures,
+                        id,
+                        "par_spread",
+                        spread,
+                        expected.par_spread,
+                        expected.tolerance_abs,
+                        false,
+                    ),
+                    Err(error) => failures.push(format!("[{id}] cds_par_spread: {error}")),
+                }
+            }
+            MertonCase::CdsCalibration {
+                id,
+                cds_spread_bp,
+                recovery,
+                debt_barrier,
+                rate,
+                maturity,
+                asset_value,
+                payout_rate,
+                expected,
+            } => {
+                *counts.entry("cds_calibration").or_default() += 1;
+                match MertonModel::from_cds_spread(
+                    *cds_spread_bp,
+                    *recovery,
+                    *debt_barrier,
+                    *rate,
+                    *maturity,
+                    *asset_value,
+                    *payout_rate,
+                ) {
+                    Ok(model) => check(
+                        &mut failures,
+                        id,
+                        "asset_vol",
+                        model.asset_vol(),
+                        expected.asset_vol,
+                        expected.tolerance_abs,
+                        false,
+                    ),
+                    Err(error) => failures.push(format!("[{id}] from_cds_spread: {error}")),
+                }
+            }
+            MertonCase::HazardCurve {
+                id,
+                firm,
+                tenors,
+                recovery,
+                off_pillar_times,
+                expected,
+            } => {
+                *counts.entry("hazard_curve").or_default() += 1;
+                // Survival is queried by year fraction, so the anchor is immaterial.
+                let base =
+                    Date::from_calendar_date(2026, time::Month::January, 15).expect("valid date");
+                let curve = match firm.build().to_hazard_curve(
+                    "MERTON-REFERENCE",
+                    base,
+                    tenors,
+                    *recovery,
+                    DayCount::Act365F,
+                ) {
+                    Ok(curve) => curve,
+                    Err(error) => {
+                        failures.push(format!("[{id}] to_hazard_curve: {error}"));
+                        continue;
+                    }
+                };
+                assert_eq!(tenors.len(), expected.pillar_survival.len(), "[{id}]");
+                assert_eq!(
+                    off_pillar_times.len(),
+                    expected.off_pillar_survival.len(),
+                    "[{id}]"
+                );
+                let points = tenors
+                    .iter()
+                    .zip(&expected.pillar_survival)
+                    .map(|(t, s)| (t, s, expected.pillar_tolerance_abs, "pillar"))
+                    .chain(
+                        off_pillar_times
+                            .iter()
+                            .zip(&expected.off_pillar_survival)
+                            .map(|(t, s)| (t, s, expected.off_pillar_tolerance_abs, "off-pillar")),
+                    );
+                for (t, survival, tolerance, kind) in points {
+                    check(
+                        &mut failures,
+                        id,
+                        &format!("{kind} survival at {t}y"),
+                        curve.sp(*t).expect("finite positive time"),
+                        *survival,
+                        tolerance,
+                        false,
+                    );
+                }
+            }
+            MertonCase::McBond {} => {
+                *counts.entry("mc_bond").or_default() += 1;
+            }
+            MertonCase::Report {
+                id,
+                source,
+                horizons,
+                maturity,
+                recovery,
+                checks,
+                rejected,
+            } => {
+                *counts.entry("report").or_default() += 1;
+                let source = match source {
+                    ReportSource::Model(model) => MertonReportSource::Model {
+                        model: model.build(),
+                    },
+                    ReportSource::Equity {
+                        equity_value,
+                        equity_vol,
+                        short_term_debt,
+                        long_term_debt,
+                        rate,
+                        payout_rate,
+                        maturity,
+                    } => MertonReportSource::Equity {
+                        equity_value: *equity_value,
+                        equity_vol: *equity_vol,
+                        short_term_debt: *short_term_debt,
+                        long_term_debt: *long_term_debt,
+                        risk_free_rate: *rate,
+                        payout_rate: *payout_rate,
+                        maturity: *maturity,
+                    },
+                };
+                let report = match merton_report(&MertonReportRequest {
+                    source,
+                    horizons: horizons.clone(),
+                    maturity: *maturity,
+                    recovery: *recovery,
+                }) {
+                    Ok(report) => report,
+                    Err(error) => {
+                        failures.push(format!("[{id}] merton_report: {error}"));
+                        continue;
+                    }
+                };
+                for item in checks {
+                    let label = match item.index {
+                        Some(index) => format!("{}[{index}]", item.field),
+                        None => item.field.clone(),
+                    };
+                    match report_value(&report, &item.field, item.index) {
+                        Ok(actual) => check(
+                            &mut failures,
+                            id,
+                            &label,
+                            actual,
+                            item.value,
+                            item.tolerance,
+                            item.relative,
+                        ),
+                        Err(reason) => failures.push(format!("[{id}] {label}: {reason}")),
+                    }
+                }
+                // The rejected measures, and only those, carry an error.
+                let reported: Vec<&str> = report.errors.keys().map(|m| m.as_str()).collect();
+                let mut wanted: Vec<&str> = rejected.iter().map(String::as_str).collect();
+                wanted.sort_unstable();
+                if reported != wanted {
+                    failures.push(format!(
+                        "[{id}] rejected measures: expected {wanted:?}, got {:?}",
+                        report.errors
+                    ));
+                }
+            }
         }
     }
 
     // A section that silently stops deserializing must not pass as "no failures".
     let expected_counts = BTreeMap::from([
         ("black_cox", 8),
+        ("cds_calibration", 2),
+        ("cds_par_spread", 6),
         ("equity_inversion", 4),
+        ("hazard_curve", 3),
         ("jump_bates_limit", 9),
         ("jump_quantlib_table", 27),
         ("jump_series", 8),
         ("kmv_published", 5),
+        ("mc_bond", 4),
+        ("report", 3),
     ]);
     assert_eq!(
         counts, expected_counts,
