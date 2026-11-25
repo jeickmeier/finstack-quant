@@ -191,6 +191,101 @@ pub fn smoothed_min(values: &mut [f64], alternatives: &[f64]) {
     }
 }
 
+/// Corrections that turn the indicator `difference > 0`, sampled at each node,
+/// into the fraction of the node's cell on which the difference is positive.
+///
+/// A node's cell is the half spacing on either side of it. The difference is
+/// taken as linear between nodes, and beyond the first and last node it is
+/// continued with the slope of the edge segment, so the fraction moves
+/// continuously while a crossing enters or leaves the level. A crossing
+/// `θ` of the way along a segment makes the sampled sum miss the positive
+/// length by `1/2 - θ` node weights, which averages to zero over `θ`.
+fn step_corrections(differences: &[f64]) -> Vec<f64> {
+    let mut corrections: Vec<f64> = differences
+        .iter()
+        .map(|difference| if difference.is_nan() { f64::NAN } else { 0.0 })
+        .collect();
+    for lower in 0..differences.len().saturating_sub(1) {
+        let (left, right) = (differences[lower], differences[lower + 1]);
+        let crosses = (left > 0.0 && right <= 0.0) || (left <= 0.0 && right > 0.0);
+        if !crosses {
+            continue;
+        }
+        let theta = left.abs() / (left.abs() + right.abs());
+        let (positive, other, from_other) = if right > 0.0 {
+            (lower + 1, lower, theta)
+        } else {
+            (lower, lower + 1, 1.0 - theta)
+        };
+        if from_other < 0.5 {
+            corrections[other] += 0.5 - from_other;
+        } else {
+            corrections[positive] -= from_other - 0.5;
+        }
+    }
+    let last = differences.len().saturating_sub(1);
+    if last > 0 {
+        for (edge, inner) in [(0, 1), (last, last - 1)] {
+            let (at_edge, outward) = (differences[edge], differences[edge] - differences[inner]);
+            // Distance beyond the edge node at which the continued difference
+            // changes sign, when it does so inside the node's own cell.
+            let beyond = -at_edge / outward;
+            if beyond.is_finite() && (0.0..0.5).contains(&beyond) {
+                if at_edge > 0.0 {
+                    corrections[edge] -= 0.5 - beyond;
+                } else if outward > 0.0 {
+                    corrections[edge] += 0.5 - beyond;
+                }
+            }
+        }
+    }
+    corrections
+}
+
+/// Replace each value by the corrected value of a claim an issuer can call.
+///
+/// The issuer redeems at `price` once the hold value exceeds
+/// `price + friction`, so the claim is worth the hold value up to that
+/// threshold and `price` beyond it. That is a cap at the threshold, which has
+/// a kink and is corrected as in [`smoothed_min`], less a drop of `friction`
+/// beyond the threshold, which is a jump. The jump is sampled as the fraction
+/// of each node's cell that lies beyond the threshold instead of all or
+/// nothing at the node, so the value moves continuously as the threshold
+/// passes between nodes. With zero friction the result is that of
+/// [`smoothed_min`], bit for bit.
+///
+/// # Arguments
+///
+/// * `values` - Hold values per node, in the lattice's value units, ordered by
+///   state on a uniformly spaced level. Overwritten in place with the
+///   corrected called-or-held value.
+/// * `prices` - Redemption price at each node, in the same units and order.
+///   Must have the same length as `values`; only the common prefix is
+///   corrected otherwise.
+/// * `frictions` - Non-negative amount at each node by which the hold value
+///   must exceed the price before the issuer calls, in the same units.
+pub fn smoothed_call(values: &mut [f64], prices: &[f64], frictions: &[f64]) {
+    debug_assert_eq!(values.len(), prices.len());
+    debug_assert_eq!(values.len(), frictions.len());
+    let len = values.len().min(prices.len()).min(frictions.len());
+    let thresholds: Vec<f64> = (0..len).map(|i| prices[i] + frictions[i]).collect();
+    let differences: Vec<f64> = (0..len)
+        .map(|i| difference(values[i], thresholds[i]))
+        .collect();
+    let kinks = kink_corrections(&differences);
+    if frictions[..len].iter().all(|friction| *friction == 0.0) {
+        for i in 0..len {
+            values[i] = values[i].min(thresholds[i]) - kinks[i];
+        }
+        return;
+    }
+    let steps = step_corrections(&differences);
+    for i in 0..len {
+        let called = if differences[i] > 0.0 { 1.0 } else { 0.0 };
+        values[i] = values[i].min(thresholds[i]) - kinks[i] - frictions[i] * (called + steps[i]);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -342,6 +437,86 @@ mod tests {
         assert!((capped[2] - (-0.3 + 0.325 * 0.25 / 24.0)).abs() < 1e-15);
         assert_eq!(capped[0].to_bits(), 0.0_f64.to_bits());
         assert_eq!(capped[3].to_bits(), (-0.9_f64).to_bits());
+    }
+
+    #[test]
+    fn a_call_without_friction_is_the_smoothed_minimum_bit_for_bit() {
+        let hold = [0.4_f64, 0.1, -0.3, -0.9, 0.2];
+        let price = [0.0_f64, 0.05, -0.1, 0.0, 0.1];
+        let mut capped = hold;
+        smoothed_min(&mut capped, &price);
+        let mut called = hold;
+        smoothed_call(&mut called, &price, &[0.0; 5]);
+        for (a, b) in capped.iter().zip(called) {
+            assert_eq!(a.to_bits(), b.to_bits());
+        }
+    }
+
+    /// Hold values `100 + 2 (x - root)` on the nodes x = -2..=2, called at 100
+    /// with the given friction once they exceed `100 + friction`.
+    fn called_level(root: f64, friction: f64) -> [f64; 5] {
+        let mut values = [-2.0_f64, -1.0, 0.0, 1.0, 2.0].map(|x| 100.0 + 2.0 * (x - root));
+        smoothed_call(&mut values, &[100.0; 5], &[friction; 5]);
+        values
+    }
+
+    #[test]
+    fn friction_drops_the_value_over_the_part_of_each_cell_beyond_the_threshold() {
+        let friction = 3.0;
+        // The threshold 100 + friction is crossed at x = root + friction / 2.
+        for step in 0..=1200 {
+            let root = -4.5 + f64::from(step) / 200.0;
+            let crossing = root + friction / 2.0;
+            // The same level capped at the threshold, without the drop.
+            let mut capped = [-2.0_f64, -1.0, 0.0, 1.0, 2.0].map(|x| 100.0 + 2.0 * (x - root));
+            smoothed_min(&mut capped, &[100.0 + friction; 5]);
+            let dropped: f64 = called_level(root, friction)
+                .iter()
+                .zip(capped)
+                .map(|(called, capped)| capped - called)
+                .sum();
+            // Length of the cells [-2.5, 2.5] beyond the crossing.
+            let beyond = (2.5 - crossing).clamp(0.0, 5.0);
+            assert!(
+                (dropped - friction * beyond).abs() < 1e-11,
+                "root {root}: dropped {dropped} vs {}",
+                friction * beyond
+            );
+        }
+    }
+
+    #[test]
+    fn a_call_with_friction_moves_continuously_as_the_threshold_crosses_the_level() {
+        let friction = 3.0;
+        let mut previous = called_level(-4.5, friction);
+        for step in 1..=2400 {
+            let root = -4.5 + f64::from(step) / 400.0;
+            let current = called_level(root, friction);
+            for (now, before) in current.iter().zip(previous) {
+                // Hold values move by 0.005 per sample; the jump would be 3.
+                assert!(
+                    (now - before).abs() < 0.02,
+                    "root {root}: {before} -> {now}"
+                );
+            }
+            previous = current;
+        }
+    }
+
+    #[test]
+    fn a_hold_value_that_only_touches_the_threshold_is_not_called() {
+        let mut values = [102.0_f64, 103.0 + 1e-9, 102.0];
+        smoothed_call(&mut values, &[100.0; 3], &[3.0; 3]);
+        for (value, hold) in values.iter().zip([102.0, 103.0, 102.0]) {
+            assert!((value - hold).abs() < 1e-8, "{value} vs {hold}");
+        }
+
+        // Round-off around a tie with the threshold decides nothing.
+        let mut tied = [103.0_f64 + 4.5e-13, 103.0 - 4.5e-13, 103.0];
+        smoothed_call(&mut tied, &[100.0; 3], &[3.0; 3]);
+        for value in tied {
+            assert!((value - 103.0).abs() < 1e-11, "{value}");
+        }
     }
 
     #[test]

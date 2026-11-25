@@ -51,7 +51,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::trees::short_rate_tree::{ShortRateTree, ShortRateTreeConfig};
-use finstack_quant_models::trees::tree_framework::{NodeState, TreeValuator};
+use finstack_quant_models::trees::tree_framework::{CallCap, NodeClaim, NodeState, TreeValuator};
 use finstack_quant_models::trees::two_factor_rates_credit::{NodeCoupon, RatesCreditTree};
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
@@ -680,25 +680,6 @@ impl TermLoanValuator {
             .copied()
             .unwrap_or_else(|| self.outstanding_at(step))
     }
-
-    /// Replace risky continuation after scheduled principal with dirty call
-    /// proceeds when the borrower exercises. Friction raises only the
-    /// exercise threshold.
-    #[inline]
-    fn apply_call(&self, step: usize, hold_principal: f64, oas_rate: f64) -> f64 {
-        let Some(call_price) = self.call_at(step, oas_rate) else {
-            return hold_principal;
-        };
-        let outstanding = self
-            .call_outstanding_at(step)
-            .unwrap_or_else(|| self.outstanding_at(step));
-        let friction_amount = outstanding * (self.call_friction_cents / 10_000.0);
-        if hold_principal > call_price + friction_amount {
-            call_price
-        } else {
-            hold_principal
-        }
-    }
 }
 
 impl TreeValuator for TermLoanValuator {
@@ -709,6 +690,15 @@ impl TreeValuator for TermLoanValuator {
     }
 
     fn value_at_node(&self, state: &NodeState, continuation_value: f64, dt: f64) -> Result<f64> {
+        Ok(self.claim_at_node(state, continuation_value, dt)?.value())
+    }
+
+    fn claim_at_node(
+        &self,
+        state: &NodeState,
+        continuation_value: f64,
+        dt: f64,
+    ) -> Result<NodeClaim> {
         let step = state.step;
         let oas_rate = state.oas_bp / 10_000.0;
         let coupon_fee = self.coupon_fee_at(step, oas_rate);
@@ -735,7 +725,21 @@ impl TreeValuator for TermLoanValuator {
             continuation_value
         };
 
-        Ok(coupon_fee + principal_cf + self.apply_call(step, risky_continuation, oas_rate))
+        // The borrower's call is left unresolved so the lattice can take the
+        // decision across the whole level. Friction raises only the exercise
+        // threshold; the lender still receives the call price.
+        Ok(NodeClaim {
+            hold: risky_continuation,
+            floor: None,
+            cap: self.call_at(step, oas_rate).map(|price| CallCap {
+                price,
+                friction: self
+                    .call_outstanding_at(step)
+                    .unwrap_or_else(|| self.outstanding_at(step))
+                    * (self.call_friction_cents / 10_000.0),
+            }),
+            cashflow: coupon_fee + principal_cf,
+        })
     }
 }
 

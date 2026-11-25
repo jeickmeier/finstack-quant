@@ -5,7 +5,7 @@ use crate::rates_credit::continuous_frp_weight;
 use finstack_quant_core::Result;
 use finstack_quant_core::math::Compounding;
 use finstack_quant_models::trees::hull_white_tree::HullWhiteTree;
-use finstack_quant_models::trees::kink_smoothing::{smoothed_max, smoothed_min};
+use finstack_quant_models::trees::kink_smoothing::{smoothed_call, smoothed_max};
 use finstack_quant_models::trees::tree_framework::{
     CallCap, NodeClaim, NodeState, TreeDiscounting, TreeValuator,
 };
@@ -35,10 +35,9 @@ impl BondValuator {
     /// values exclude current contractual payments.
     ///
     /// This is the level-wide form of [`Self::apply_exercise`]: the put floor
-    /// and a frictionless call cap are kink-smoothed across neighbouring
-    /// nodes, so the model price does not ripple with the rate level at the
-    /// node spacing. A call with friction is a jump in value at the exercise
-    /// threshold rather than a kink, and keeps the node-by-node rule.
+    /// and the call (its cap and, with friction, the drop in value at the
+    /// exercise threshold) are corrected across neighbouring nodes, so the
+    /// model price does not ripple with the rate level at the node spacing.
     fn apply_exercise_level(&self, step: usize, values: &mut [f64]) {
         if let Some(put_price) = self.put_at(step) {
             smoothed_max(values, &vec![put_price; values.len()]);
@@ -46,15 +45,11 @@ impl BondValuator {
         if let Some(call_price) = self.call_at(step) {
             let friction_amount =
                 self.outstanding_principal_at(step) * (self.call_friction_cents / 10_000.0);
-            if friction_amount == 0.0 {
-                smoothed_min(values, &vec![call_price; values.len()]);
-            } else {
-                for value in values.iter_mut() {
-                    if *value > call_price + friction_amount {
-                        *value = call_price;
-                    }
-                }
-            }
+            smoothed_call(
+                values,
+                &vec![call_price; values.len()],
+                &vec![friction_amount; values.len()],
+            );
         }
     }
 

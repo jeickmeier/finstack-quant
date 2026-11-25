@@ -16,7 +16,7 @@
 //! [`TreeDiscounting`] holds the per-node discount-factor conventions shared
 //! by the short-rate and Hull-White lattices.
 
-use crate::trees::kink_smoothing::{smoothed_max, smoothed_min};
+use crate::trees::kink_smoothing::{smoothed_call, smoothed_max};
 use finstack_quant_core::Result;
 use finstack_quant_core::math::Compounding;
 
@@ -134,13 +134,12 @@ impl NodeClaim {
 /// Resolve the exercise decisions of one lattice level.
 ///
 /// When every node of the level carries a put floor, or every node carries a
-/// frictionless call cap, the decision is taken with
-/// [`smoothed_max`] or [`smoothed_min`], which correct
-/// the exercise kink between adjacent nodes. A call with friction is a jump in
-/// value at its threshold rather than a kink, and a level whose nodes do not
-/// share the right has no boundary to locate; both keep each node's own
-/// [`NodeClaim::value`] rule. A level with no exercise right resolves to
-/// `hold + cashflow` at every node.
+/// call cap, the decision is taken with [`smoothed_max`] or
+/// [`smoothed_call`], which correct the exercise kink between adjacent nodes
+/// and, for a call with friction, the jump in value at its threshold. A level
+/// whose nodes do not share the right has no boundary to locate and keeps
+/// each node's own [`NodeClaim::value`] rule. A level with no exercise right
+/// resolves to `hold + cashflow` at every node.
 ///
 /// # Arguments
 ///
@@ -164,17 +163,13 @@ pub fn resolve_level(claims: &[NodeClaim], values: &mut [f64]) {
             }
         }
     }
-    let caps: Option<Vec<f64>> = claims
-        .iter()
-        .map(|claim| {
-            claim
-                .cap
-                .filter(|cap| cap.friction == 0.0)
-                .map(|cap| cap.price)
-        })
-        .collect();
+    let caps: Option<Vec<CallCap>> = claims.iter().map(|claim| claim.cap).collect();
     match caps {
-        Some(caps) if !caps.is_empty() => smoothed_min(values, &caps),
+        Some(caps) if !caps.is_empty() => {
+            let prices: Vec<f64> = caps.iter().map(|cap| cap.price).collect();
+            let frictions: Vec<f64> = caps.iter().map(|cap| cap.friction).collect();
+            smoothed_call(values, &prices, &frictions);
+        }
         _ => {
             for (value, claim) in values.iter_mut().zip(claims) {
                 if let Some(cap) = claim.cap
@@ -612,7 +607,8 @@ mod tests {
     }
 
     #[test]
-    fn resolve_level_keeps_the_node_rule_for_friction_and_for_mixed_rights() {
+    fn resolve_level_spreads_a_friction_call_over_the_cell_and_keeps_the_node_rule_for_mixed_rights()
+     {
         let frictional = Some(CallCap {
             price: 100.0,
             friction: 0.5,
@@ -623,7 +619,12 @@ mod tests {
             .collect();
         let mut values = vec![0.0; 3];
         resolve_level(&with_friction, &mut values);
-        assert_eq!(values, [101.0, 101.4, 100.0]);
+        // The threshold 100.5 is crossed just before node 1, so nearly half
+        // of that node's cell is called: its value falls from the node rule's
+        // 101.4 towards the called 101.0. Node 0 is called and node 2 held.
+        assert!((values[0] - 101.0).abs() < 0.01, "{}", values[0]);
+        assert!(values[1] > 100.9 && values[1] < 101.2, "{}", values[1]);
+        assert_eq!(values[2], 100.0);
 
         let mixed = [
             claim(95.0, Some(98.0), None, 0.0),
