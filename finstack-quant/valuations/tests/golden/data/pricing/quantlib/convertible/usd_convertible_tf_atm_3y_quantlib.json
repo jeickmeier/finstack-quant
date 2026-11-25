@@ -1,7 +1,7 @@
 {
   "expected": {
     "dv01": -116.64234925954369,
-    "npv": 1074210.5553642991
+    "npv": 1074075.6323065502
   },
   "instrument": {
     "instrument": {
@@ -154,13 +154,13 @@
     "description": "QuantLib Tsiveriotis-Fernandes three-year zero-coupon convertible, at the money, 2% credit spread.",
     "domain": "fixed_income.convertible",
     "last_reviewed_by": "finstack-quant",
-    "last_reviewed_on": "2026-11-24",
+    "last_reviewed_on": "2026-11-25",
     "name": "usd_convertible_tf_atm_3y_quantlib",
     "regen_command": "uv run python -m scripts.golden.quantlib.generate --product tf_convertible_at_the_money",
     "review_interval_months": 6,
     "screenshots": [],
     "source": "quantlib",
-    "source_detail": "Canonical Tsiveriotis-Fernandes (1998) two-component (total U, cash V) binomial lattice on 1096 CRR steps (equity U-V discounted at r_f, cash V discounted at r_f + s; spot 100.0, vol 0.3, q 0.03, r 0.04, s 0.02). Re-blessed 2026-11-24 after replacing the blended-rate (V, p) QuantLib approximation (1071424.15) with exact TF98 two-component backward induction (unsmoothed Python TF98 1096-step reference 1074398.01; Finstack 1074210.56 with terminal-cell smoothing for finite-difference Greeks).",
+    "source_detail": "Canonical Tsiveriotis-Fernandes (1998) two-component (total U, cash V) binomial lattice on 1096 CRR steps (equity U-V discounted at r_f, cash V discounted at r_f + s; spot 100.0, vol 0.3, q 0.03, r 0.04, s 0.02). Re-blessed 2026-11-24 after replacing the blended-rate (V, p) QuantLib approximation (1071424.15) with exact TF98 two-component backward induction (unsmoothed Python TF98 1096-step reference 1074398.01; Finstack 1074210.56 with terminal-cell smoothing for finite-difference Greeks). Re-set 2026-11-25 to 1074075.63 after the exercise-kink correction reached this lattice; the corrected lattice gives 1074069.82 at 2192 steps, 1074065.33 at 4384 and 1074060.63 at 17536.",
     "valuation_date": "2026-04-30"
   },
   "model": "tsiveriotis_fernandes",
@@ -172,7 +172,7 @@
     },
     "npv": {
       "rel": 0.0001,
-      "tolerance_reason": "Canonical Tsiveriotis-Fernandes (1998) two-component (U, V) regression target verified against an independent 1096-step Python TF98 reference (1074398.01, within 0.02% terminal-cell smoothing difference; QuantLib 1.43 BinomialCRRConvertibleEngine blended-rate (V, p) yields 1071424.15). Tight 1e-4 relative band locks exact TF98 regression."
+      "tolerance_reason": "Canonical Tsiveriotis-Fernandes (1998) two-component (U, V) regression target verified against an independent 1096-step Python TF98 reference (1074398.01, within 0.02% terminal-cell smoothing difference; QuantLib 1.43 BinomialCRRConvertibleEngine blended-rate (V, p) yields 1071424.15). Tight 1e-4 relative band locks exact TF98 regression. The expected value is this lattice's own 1096-step price, within 1.4e-5 of its 17536-step price."
     }
   }
 }
