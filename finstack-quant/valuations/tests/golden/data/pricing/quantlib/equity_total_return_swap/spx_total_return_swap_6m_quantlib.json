@@ -1,0 +1,152 @@
+{
+  "expected": {
+    "npv": -31865.740017436983
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "dividend_settlement": "on_dividend_date",
+        "dividend_tax_rate": 0.15,
+        "financing_leg": {
+          "compounding": "simple",
+          "day_count": "act_360",
+          "discount_curve_id": "USD-OIS",
+          "forward_curve_id": "USD-SOFR-3M",
+          "spread_bp": "75"
+        },
+        "id": "SPX-TOTAL-RETURN-SWAP-6M-QUANTLIB",
+        "initial_level": null,
+        "notional": {
+          "amount": "5000000",
+          "currency": "USD"
+        },
+        "schedule": {
+          "end": "2026-10-30",
+          "params": {
+            "business_day_convention": "following",
+            "calendar_id": "weekends_only",
+            "day_count": "act_365f",
+            "end_of_month": false,
+            "frequency": {
+              "count": 3,
+              "unit": "months"
+            },
+            "payment_lag_days": 0,
+            "stub": "none"
+          },
+          "start": "2026-04-30"
+        },
+        "side": "receive",
+        "underlying": {
+          "currency": "USD",
+          "div_yield_id": "SPX-DIVYIELD",
+          "spot_id": "SPX-SPOT",
+          "ticker": "SPX"
+        }
+      },
+      "type": "trs_equity"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        },
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-SOFR-3M",
+          "index_tenor": {
+            "count": 3,
+            "unit": "months"
+          },
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.2752707830897524
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "forward"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {
+        "SPX-DIVYIELD": {
+          "unitless": 0.015
+        },
+        "SPX-SPOT": {
+          "price": {
+            "amount": "5300.0",
+            "currency": "USD"
+          }
+        }
+      },
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-24",
+    "description": "Spot-starting six-month quarterly equity total return swap, receiving the total return.",
+    "domain": "equity.equity_total_return_swap",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-24",
+    "name": "spx_total_return_swap_6m_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product equity_total_return_swap",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43 flat Act/365F continuous discount (0.04) and projection (0.043) curves. Per period: total return = forward ratio less one plus the dividends the 0.015 yield removes from the forward, net of 0.15 withholding tax; financing = simple projection-curve forward plus 75.0 bp on Actual/360. Both paid at period end; value is the total-return leg less the financing leg.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "npv": {
+      "rel": 1e-09,
+      "tolerance_reason": "Both sides evaluate the same carry and simple-forward formulas on the same flat curves; only floating-point evaluation order differs."
+    }
+  }
+}

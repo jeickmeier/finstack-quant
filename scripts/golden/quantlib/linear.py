@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from itertools import pairwise
+import math
 from typing import Any
 
 import QuantLib as ql  # type: ignore[import-not-found]  # noqa: N813
@@ -18,6 +19,7 @@ from .common import (
     VALUATION_DATE,
     central_difference,
     flat_discount_curve,
+    flat_forward_curve,
     market_snapshot,
     metadata,
     ql_date,
@@ -536,7 +538,98 @@ def build_volatility_index_future() -> dict[str, Any]:
     )
 
 
+def build_equity_total_return_swap() -> dict[str, Any]:
+    """Build a spot-starting equity total return swap fixture.
+
+    Each quarter the receiver gets the index's total return and pays a simple
+    floating rate plus a spread. With a continuous dividend yield the price
+    return over a future period is the forward ratio less one, and the
+    dividends paid in the period, net of withholding tax, are what the yield
+    takes out of the forward.
+    """
+    notional, spot, dividend_yield, tax_rate = 5_000_000.0, 5300.0, 0.015, 0.15
+    discount_rate, projection_rate, spread_bp = 0.04, 0.043, 75.0
+    dates = ["2026-04-30", "2026-07-30", "2026-10-30"]
+    evaluation_date = ql_date(VALUATION_DATE)
+    ql.Settings.instance().evaluationDate = evaluation_date
+    projection = ql.FlatForward(evaluation_date, projection_rate, ql.Actual365Fixed(), ql.Continuous)
+    total_return_leg = 0.0
+    financing_leg = 0.0
+    for start, end in pairwise(dates):
+        growth = _discount(discount_rate, start) / _discount(discount_rate, end)
+        carry = math.exp(-dividend_yield * (_year_fraction(end) - _year_fraction(start)))
+        period_return = growth * carry - 1.0 + growth * (1.0 - carry) * (1.0 - tax_rate)
+        total_return_leg += notional * period_return * _discount(discount_rate, end)
+        accrual = ql.Actual360().yearFraction(ql_date(start), ql_date(end))
+        compound = projection.discount(ql_date(start)) / projection.discount(ql_date(end))
+        financing_leg += notional * (compound - 1.0 + spread_bp * 1e-4 * accrual) * _discount(discount_rate, end)
+    return _fixture(
+        name="spx_total_return_swap_6m_quantlib",
+        domain="equity.equity_total_return_swap",
+        description="Spot-starting six-month quarterly equity total return swap, receiving the total return.",
+        product="equity_total_return_swap",
+        source_detail=(
+            f"QuantLib {ql.__version__} flat Act/365F continuous discount ({discount_rate}) and projection "
+            f"({projection_rate}) curves. Per period: total return = forward ratio less one plus the dividends "
+            f"the {dividend_yield} yield removes from the forward, net of {tax_rate} withholding tax; financing = "
+            f"simple projection-curve forward plus {spread_bp} bp on Actual/360. Both paid at period end; value "
+            "is the total-return leg less the financing leg."
+        ),
+        market=market_snapshot(
+            [flat_discount_curve("USD-OIS", discount_rate), flat_forward_curve("USD-SOFR-3M", projection_rate)],
+            prices={
+                "SPX-DIVYIELD": {"unitless": dividend_yield},
+                "SPX-SPOT": {"price": {"amount": str(spot), "currency": "USD"}},
+            },
+        ),
+        instrument_type="trs_equity",
+        spec={
+            "id": "SPX-TOTAL-RETURN-SWAP-6M-QUANTLIB",
+            "notional": {"amount": str(int(notional)), "currency": "USD"},
+            "underlying": {
+                "ticker": "SPX",
+                "spot_id": "SPX-SPOT",
+                "div_yield_id": "SPX-DIVYIELD",
+                "currency": "USD",
+            },
+            "financing_leg": {
+                "discount_curve_id": "USD-OIS",
+                "forward_curve_id": "USD-SOFR-3M",
+                "spread_bp": str(int(spread_bp)),
+                "day_count": "act_360",
+                "compounding": "simple",
+            },
+            "schedule": {
+                "start": dates[0],
+                "end": dates[-1],
+                "params": {
+                    "frequency": {"count": 3, "unit": "months"},
+                    "day_count": "act_365f",
+                    "business_day_convention": "following",
+                    "calendar_id": "weekends_only",
+                    "stub": "none",
+                    "end_of_month": False,
+                    "payment_lag_days": 0,
+                },
+            },
+            "side": "receive",
+            "initial_level": None,
+            "dividend_tax_rate": tax_rate,
+            "dividend_settlement": "on_dividend_date",
+        },
+        expected={"npv": total_return_leg - financing_leg},
+        reason=(
+            "Both sides evaluate the same carry and simple-forward formulas on the same flat curves; only "
+            "floating-point evaluation order differs."
+        ),
+    )
+
+
 LINEAR_BUILDERS: dict[str, tuple[str, Callable[[], dict[str, Any]]]] = {
+    "equity_total_return_swap": (
+        "equity_total_return_swap/spx_total_return_swap_6m_quantlib.json",
+        build_equity_total_return_swap,
+    ),
     "commodity_forward": ("commodity_forward/wti_forward_6m_quantlib.json", build_commodity_forward),
     "commodity_future": ("commodity_future/iron_ore_average_future_quantlib.json", build_commodity_future),
     "commodity_swap": ("commodity_swap/natgas_swap_3m_quantlib.json", build_commodity_swap),

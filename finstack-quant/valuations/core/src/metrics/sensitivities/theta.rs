@@ -47,7 +47,8 @@
 //!   continuously monitored equity barrier needs no recorded state: its
 //!   pricer reads a breach from the held spot.
 //! - Scheduled fixings inside the roll (Asian averaging dates, autocallable
-//!   observations, cliquet resets) record the `as_of` spot, and a trade struck
+//!   observations, cliquet resets, equity total return swap resets) record
+//!   the `as_of` spot, and a trade struck
 //!   at `as_of` records that spot as its strike-set level.
 //! - A commodity Asian or commodity swap records, for each averaging date
 //!   inside the roll, the `as_of` price curve's price for that date: the curve

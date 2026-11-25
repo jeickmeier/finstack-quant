@@ -442,6 +442,43 @@ impl finstack_quant_valuations_core::instruments::Instrument for EquityTotalRetu
         Some(self.schedule.end)
     }
 
+    /// A reset the roll passes is observed at the spot theta holds fixed, so
+    /// the rolled trade has the period-start level a seasoned trade needs.
+    fn theta_observed_state(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        rolled_date: Date,
+    ) -> Result<Option<Box<dyn finstack_quant_valuations_core::instruments::Instrument>>> {
+        let rolled_resets: Vec<Date> = self
+            .schedule
+            .period_schedule()?
+            .get_dates()
+            .iter()
+            .copied()
+            .filter(|date| {
+                *date >= as_of
+                    && *date < rolled_date
+                    && crate::past_fixings::fixing_on(&self.past_fixings, *date).is_none()
+                    && !(*date <= self.schedule.start && self.initial_level.is_some())
+            })
+            .collect();
+        if rolled_resets.is_empty() {
+            return Ok(None);
+        }
+        let spot =
+            finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
+                market.get_price(&self.underlying.spot_id)?,
+                self.underlying.currency,
+            )?;
+        let mut observed = self.clone();
+        observed
+            .past_fixings
+            .extend(rolled_resets.into_iter().map(|date| (date, spot)));
+        observed.past_fixings.sort_by_key(|(date, _)| *date);
+        Ok(Some(Box::new(observed)))
+    }
+
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
