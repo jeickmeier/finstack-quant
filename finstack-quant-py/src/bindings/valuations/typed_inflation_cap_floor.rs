@@ -69,12 +69,6 @@ impl PyInflationCapFloor {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.rate_option_type)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.strike")]
     #[getter]
     fn strike<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -99,12 +93,6 @@ impl PyInflationCapFloor {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.frequency)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.day_count")]
-    #[getter]
-    fn day_count(&self) -> crate::bindings::core::dates::daycount::PyDayCount {
-        crate::bindings::core::dates::daycount::PyDayCount::from_inner(self.inner.day_count)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.stub")]
     #[getter]
     fn stub<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -115,30 +103,6 @@ impl PyInflationCapFloor {
     #[getter]
     fn business_day_convention(&self) -> PyResult<String> {
         super::convert::enum_to_py_string(&self.inner.business_day_convention)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.calendar_id")]
-    #[getter]
-    fn calendar_id(&self) -> Option<String> {
-        self.inner.calendar_id.as_ref().map(ToString::to_string)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.inflation_index_id")]
-    #[getter]
-    fn inflation_index_id(&self) -> String {
-        self.inner.inflation_index_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.vol_surface_id")]
-    #[getter]
-    fn vol_surface_id(&self) -> String {
-        self.inner.vol_surface_id.to_string()
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.lag")]
@@ -159,6 +123,21 @@ impl PyInflationCapFloor {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.volatility_expiry)
     }
 }
+
+crate::bindings::macros::py_getters!(PyInflationCapFloor |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.notional")]
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.day_count")]
+    day_count -> crate::bindings::core::dates::daycount::PyDayCount = crate::bindings::core::dates::daycount::PyDayCount::from_inner(s.inner.day_count);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.calendar_id")]
+    calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.inflation_index_id")]
+    inflation_index_id -> String = s.inner.inflation_index_id.to_string();
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.discount_curve_id")]
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.vol_surface_id")]
+    vol_surface_id -> String = s.inner.vol_surface_id.to_string();
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloorBuilder")]
 #[pyclass(
@@ -343,3 +322,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyInflationCapFloorBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["InflationCapFloor", "InflationCapFloorBuilder"];

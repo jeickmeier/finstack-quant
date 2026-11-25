@@ -468,12 +468,8 @@ pub(crate) fn settlement_asw_components(
                 / bond.notional.amount();
         }
     }
-    if has_principal_flows {
-        let df_maturity = disc.df_on_date(bond.maturity)? / df_settlement;
-        coupon_pv += principal_pv - df_maturity;
-    }
-    // Forward curve for the asset-swap floating leg; `None` selects the
-    // discount-ratio fallback.
+    // Build the BDC-adjusted swap floating schedule first so any terminal
+    // bond principal exchange aligns with the adjusted maturity payment date.
     let forward = bond
         .instrument_pricing_overrides
         .model_config
@@ -500,6 +496,11 @@ pub(crate) fn settlement_asw_components(
         StubKind::ShortBack,
         Some((params.business_day_convention, calendar)),
     )?;
+    if has_principal_flows {
+        let maturity_payment = float_schedule.last().copied().unwrap_or(bond.maturity);
+        let df_maturity = disc.df_on_date(maturity_payment)? / df_settlement;
+        coupon_pv += principal_pv - df_maturity;
+    }
     let (float_pv, float_annuity) = if let Some(forward) = forward {
         floating_leg_pv_and_annuity(
             disc.as_ref(),
@@ -792,6 +793,66 @@ mod tests {
         assert!(
             shocked_par > base_par + 0.008,
             "shocked par rate must move with discount factors instead of reading stale swap quotes: base={base_par}, shocked={shocked_par}"
+        );
+    }
+
+    #[test]
+    fn settlement_asw_components_aligns_terminal_df_to_bdc_adjusted_maturity() {
+        use finstack_quant_core::currency::Currency;
+        use finstack_quant_core::money::Money;
+        // 2027-01-16 is a Saturday; Following shifts the final payment to Monday 2027-01-18.
+        let issue = date!(2025 - 01 - 16);
+        let maturity = date!(2027 - 01 - 16);
+        let adjusted_end = date!(2027 - 01 - 18);
+
+        let mut spec = crate::bond::CashflowSpec::fixed(0.04, Tenor::annual(), DayCount::Thirty360)
+            .expect("spec");
+        spec.schedule_mut().business_day_convention =
+            finstack_quant_core::dates::BusinessDayConvention::Following;
+        let bond = Bond::builder()
+            .id("ASW-WEEKEND".into())
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .issue_date(issue)
+            .maturity(maturity)
+            .cashflow_spec(spec)
+            .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+                std::num::NonZeroU32::MIN,
+            ))
+            .discount_curve_id("USD-OIS".into())
+            .build()
+            .expect("bond");
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(issue)
+            .day_count(DayCount::Act365F)
+            .knots([
+                (0.0, 1.0),
+                (1.0, 0.96),
+                (2.0, 0.92),
+                ((adjusted_end - issue).whole_days() as f64 / 365.0, 0.919),
+            ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+            .build()
+            .expect("disc");
+        let market = MarketContext::new().try_insert(disc).expect("market");
+
+        let (coupon_pv, _, _) =
+            settlement_asw_components(&bond, &market, issue).expect("settlement asw");
+        let sched = bond.full_cashflow_schedule(&market).expect("schedule");
+        let disc_ref = market.get_discount("USD-OIS").expect("disc");
+        let expected_coupon_pv: f64 = sched
+            .get_flows()
+            .iter()
+            .filter(|f| f.get_date() > issue && f.get_kind().is_coupon())
+            .map(|f| {
+                f.get_amount().amount() * disc_ref.df_on_date(f.get_date()).expect("df")
+                    / bond.notional.amount()
+            })
+            .sum();
+        // With par notional, principal_pv == df(adjusted_end) == df_maturity, so net principal cancels to 0.
+        assert!(
+            (coupon_pv - expected_coupon_pv).abs() < 1e-12,
+            "coupon_pv ({coupon_pv}) must match pure coupon PV ({expected_coupon_pv}) because df_maturity uses adjusted_end"
         );
     }
 }

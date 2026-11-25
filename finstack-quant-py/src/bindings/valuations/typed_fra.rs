@@ -69,24 +69,6 @@ impl PyForwardRateAgreement {
             .transpose()
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fra", "ForwardRateAgreement.reset_lag_days")]
-    #[getter]
-    fn reset_lag_days(&self) -> i32 {
-        self.inner.reset_lag_days
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fra", "ForwardRateAgreement.observed_fixing")]
-    #[getter]
-    fn observed_fixing(&self) -> Option<f64> {
-        self.inner.observed_fixing
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fra", "ForwardRateAgreement.forward_curve_id")]
-    #[getter]
-    fn forward_curve_id(&self) -> &str {
-        self.inner.forward_curve_id.as_str()
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fra", "ForwardRateAgreement.side")]
     #[getter]
     fn side(&self) -> PyResult<String> {
@@ -117,12 +99,6 @@ impl PyForwardRateAgreement {
         decimal_to_py(py, self.inner.fixed_rate)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fra", "ForwardRateAgreement.day_count")]
-    #[getter]
-    fn day_count(&self) -> PyDayCount {
-        PyDayCount::from_inner(self.inner.day_count)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fra", "ForwardRateAgreement.fixing_business_day_convention")]
     #[getter]
     fn fixing_business_day_convention(&self) -> PyResult<Option<String>> {
@@ -132,28 +108,24 @@ impl PyForwardRateAgreement {
             .map(enum_to_py_string)
             .transpose()
     }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fra", "ForwardRateAgreement.fixing_calendar_id")]
-    #[getter]
-    fn fixing_calendar_id(&self) -> Option<&str> {
-        self.inner
-            .fixing_calendar_id
-            .as_ref()
-            .map(CalendarId::as_str)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fra", "ForwardRateAgreement.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fra", "ForwardRateAgreement.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> &str {
-        self.inner.discount_curve_id.as_str()
-    }
 }
+
+crate::bindings::macros::py_getters!(PyForwardRateAgreement |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fra", "ForwardRateAgreement.reset_lag_days")]
+    reset_lag_days -> i32 = s.inner.reset_lag_days;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fra", "ForwardRateAgreement.observed_fixing")]
+    observed_fixing -> Option<f64> = s.inner.observed_fixing;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fra", "ForwardRateAgreement.forward_curve_id")]
+    forward_curve_id -> String = s.inner.forward_curve_id.to_string();
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fra", "ForwardRateAgreement.day_count")]
+    day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fra", "ForwardRateAgreement.fixing_calendar_id")]
+    fixing_calendar_id -> Option<String> = s.inner.fixing_calendar_id.as_ref().map(ToString::to_string);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fra", "ForwardRateAgreement.notional")]
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fra", "ForwardRateAgreement.discount_curve_id")]
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fra", "ForwardRateAgreementBuilder")]
 #[pyclass(
@@ -307,3 +279,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyForwardRateAgreementBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["ForwardRateAgreement", "ForwardRateAgreementBuilder"];

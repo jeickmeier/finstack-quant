@@ -693,3 +693,84 @@ fn step_up_frequency_and_day_count() {
     assert_eq!(spec.frequency(), Tenor::quarterly());
     assert_eq!(spec.day_count(), DayCount::Act360);
 }
+
+#[test]
+fn bond_stepup_merton_mc_uses_stepped_coupon_rates() {
+    use crate::MertonMcConfig;
+    use finstack_quant_models::credit::MertonModel;
+
+    let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid");
+    let step_date = Date::from_calendar_date(2026, Month::January, 1).expect("valid");
+    let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid");
+
+    let mut const_bond = Bond::builder()
+        .id("CONST-3PCT".into())
+        .notional(Money::from((1_000_000_i64, Currency::USD)))
+        .issue_date(issue)
+        .maturity(maturity)
+        .cashflow_spec(
+            CashflowSpec::fixed(0.03, Tenor::annual(), DayCount::Thirty360).expect("spec"),
+        )
+        .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+            std::num::NonZeroU32::MIN,
+        ))
+        .discount_curve_id("USD-OIS".into())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
+        .attributes(Attributes::new())
+        .build()
+        .expect("const bond builds");
+
+    let mut stepup_bond = Bond::builder()
+        .id("STEPUP-3TO8PCT".into())
+        .notional(Money::from((1_000_000_i64, Currency::USD)))
+        .issue_date(issue)
+        .maturity(maturity)
+        .cashflow_spec(
+            CashflowSpec::step_up(
+                0.03,
+                vec![(step_date, 0.08)],
+                Tenor::annual(),
+                DayCount::Thirty360,
+            )
+            .expect("stepup spec"),
+        )
+        .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+            std::num::NonZeroU32::MIN,
+        ))
+        .discount_curve_id("USD-OIS".into())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
+        .attributes(Attributes::new())
+        .build()
+        .expect("stepup bond builds");
+
+    const_bond
+        .instrument_pricing_overrides
+        .model_config
+        .mc_paths = Some(32);
+    stepup_bond
+        .instrument_pricing_overrides
+        .model_config
+        .mc_paths = Some(32);
+
+    let merton = MertonModel::new(500.0, 0.05, 100.0, 0.04).expect("valid");
+    let config = MertonMcConfig::new(merton, 0.40).expect("valid recovery");
+    let const_res = const_bond
+        .price_merton_mc(&config, 0.04, issue)
+        .expect("const merton mc");
+    let step_res = stepup_bond
+        .price_merton_mc(&config, 0.04, issue)
+        .expect("stepup merton mc");
+    assert!(
+        step_res.clean_price_pct > const_res.clean_price_pct + 10.0,
+        "step-up bond clean price ({}) must exceed constant 3% bond ({}) when stepping to 8%",
+        step_res.clean_price_pct,
+        const_res.clean_price_pct
+    );
+}
+
+#[test]
+fn bond_serde_rejects_invalid_dates() {
+    let mut val = serde_json::to_value(Bond::example().expect("example")).expect("serialize");
+    val["maturity"] = val["issue_date"].clone();
+    assert!(serde_json::from_value::<Bond>(val).is_err());
+}

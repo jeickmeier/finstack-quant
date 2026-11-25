@@ -213,7 +213,10 @@ impl HwSwaptionCashflows {
         let swap_rate = floating / annuity;
         let payoff_annuity = match self.payoff {
             PayoffAnnuity::ParYield { payments_per_year } => {
-                par_yield_annuity(self.fixed.len(), payments_per_year, swap_rate)
+                // Extreme short-rate tree states where 1 + S/m <= 0 have no
+                // finite par-yield compounding factor; fall back to 0.0 inside
+                // the infallible lattice induction.
+                par_yield_annuity(self.fixed.len(), payments_per_year, swap_rate).unwrap_or(0.0)
                     * bond(self.cash_settlement_time)?
             }
             PayoffAnnuity::ZeroCoupon => {
@@ -261,7 +264,11 @@ pub(crate) struct HwExerciseNode<'a> {
 /// * `periods` - Number of fixed-leg payment periods `n`.
 /// * `payments_per_year` - Fixed-leg payment frequency `m`.
 /// * `swap_rate` - Settlement swap rate `S` as a decimal.
-pub(crate) fn par_yield_annuity(periods: usize, payments_per_year: f64, swap_rate: f64) -> f64 {
+pub(crate) fn par_yield_annuity(
+    periods: usize,
+    payments_per_year: f64,
+    swap_rate: f64,
+) -> Result<f64> {
     crate::cms_common::par_annuity(
         swap_rate,
         periods as f64 / payments_per_year,

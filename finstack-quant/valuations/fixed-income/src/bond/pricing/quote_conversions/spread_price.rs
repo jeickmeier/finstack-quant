@@ -139,7 +139,16 @@ pub fn price_from_dm(
     dm: f64,
 ) -> finstack_quant_core::Result<f64> {
     let mut b = bond.clone();
+    let saved_clean_px = b
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct;
     clear_price_driving_overrides(&mut b);
+    // Preserve `quoted_clean_price_pct` so option-bearing FRNs can resolve their
+    // workout path without short-circuiting PV (Z-spread kernel solves flows only).
+    b.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct = saved_clean_px;
 
     // DM discounting semantics apply only to bonds with floating coupons
     // (plain FRNs and amortizing floaters).
@@ -322,6 +331,16 @@ impl BondZSpreadPricingKernel {
         } else {
             Vec::new()
         };
+        let icma_ref_period = if day_count != finstack_quant_core::dates::DayCount::Act365L {
+            finstack_quant_cashflows::builder::icma_reference_period(
+                day_count,
+                bond.cashflow_spec.frequency(),
+                spread_flows.iter().map(|(d, _)| *d),
+                quote_date,
+            )
+        } else {
+            None
+        };
         let cached_flows = spread_flows
             .iter()
             .filter(|(date, _)| *date > quote_date)
@@ -338,12 +357,7 @@ impl BondZSpreadPricingKernel {
                         finstack_quant_cashflows::builder::icma_year_fraction(
                             day_count,
                             Some(bond.cashflow_spec.frequency()),
-                            finstack_quant_cashflows::builder::icma_reference_period(
-                                day_count,
-                                bond.cashflow_spec.frequency(),
-                                spread_flows.iter().map(|(d, _)| *d),
-                                quote_date,
-                            ),
+                            icma_ref_period,
                             quote_date,
                             *date,
                         )?

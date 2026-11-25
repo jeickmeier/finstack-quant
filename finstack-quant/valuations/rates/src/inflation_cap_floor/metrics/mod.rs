@@ -12,7 +12,6 @@
 //! - **BucketedDv01**: Key-rate sensitivities to discount curve
 //! - **Theta**: Time decay (1-day roll)
 
-mod inflation01;
 mod register;
 
 pub(crate) use register::register_inflation_cap_floor_metrics;

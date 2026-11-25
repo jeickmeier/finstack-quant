@@ -6,11 +6,11 @@
     "description": "Synthetic 5Y inflation-linked bond on deterministic real and CPI curves.",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Finstack Quant canonical pricing calculation on deterministic synthetic market inputs Canonical typed market inputs are supplied directly; the pricing tolerance contract is preserved. Re-blessed 2026-06-16: expected outputs recaptured from the current canonical Python golden runner for this formula self-test after deterministic pricing output drift; no external benchmark source is asserted by this fixture. 2026-10-11 contractual-input remediation: explicit synthetic published monthly CPI follows the existing log-linear projection knots (300 before the base date), with assumed releases on the following month 15th. An explicit zero ratio-volatility surface selects this deterministic fixture. Nominal projected cashflows now use the existing nominal USD-OIS discount curve, rather than the real USD-TIPS curve. NPV and central 1 bp nominal DV01 independently verified by summing actual/365 coupon periods times monthly-interpolated lagged CPI and log-linear nominal discount factors; zero volatility makes the terminal floor deterministic. Yield-derived metrics remain internal regression anchors.",
+    "source_detail": "Finstack Quant canonical pricing calculation on deterministic synthetic market inputs Canonical typed market inputs are supplied directly; the pricing tolerance contract is preserved. Re-blessed 2026-11-24: Reference CPI lookups on ILB schedules now use contractual unadjusted coupon/maturity dates rather than BDC-adjusted payment dates per US TIPS / OATi / UKTI market convention (removing weekend-roll extra CPI days on BDC=Following periods, shifting expected NPV by -$2.370160 on $1M notional and DV01 by +5.223383e-4). Earlier notes (2026-10-11): explicit synthetic published monthly CPI follows the existing log-linear projection knots (300 before the base date), with assumed releases on the following month 15th; zero ratio-volatility surface; nominal USD-OIS discount curve.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-01",
     "last_reviewed_by": "jeickmeier",
-    "last_reviewed_on": "2026-06-16",
+    "last_reviewed_on": "2026-11-24",
     "review_interval_months": 6,
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
@@ -647,12 +647,12 @@
     }
   },
   "expected": {
-    "npv": 1007818.4104879099,
+    "npv": 1007816.0403275983,
     "real_yield": 0.009932285187926633,
     "breakeven_inflation": 0.030557382160386393,
     "index_ratio": 1.0416393040407212,
     "real_duration": 4.825167336952283,
-    "dv01": -488.19315078580985
+    "dv01": -488.192628447548
   },
   "tolerances": {
     "npv": {

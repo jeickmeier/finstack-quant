@@ -61,12 +61,6 @@ impl PyCmsSwap {
         instrument_expiry(py, &self.inner)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.side")]
     #[getter]
     fn side<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -109,43 +103,10 @@ impl PyCmsSwap {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.accrual_fractions)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.day_count")]
-    #[getter]
-    fn day_count(&self) -> crate::bindings::core::dates::daycount::PyDayCount {
-        crate::bindings::core::dates::daycount::PyDayCount::from_inner(self.inner.day_count)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.cms_spread_bp")]
     #[getter]
     fn cms_spread_bp<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::core::money::decimal_to_py(py, self.inner.cms_spread_bp)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.cms_cap")]
-    #[getter]
-    fn cms_cap(&self) -> Option<f64> {
-        self.inner.cms_cap
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.cms_floor")]
-    #[getter]
-    fn cms_floor(&self) -> Option<f64> {
-        self.inner.cms_floor
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.index_id")]
-    #[getter]
-    fn index_id(&self) -> Option<String> {
-        self.inner.index_id.as_ref().map(ToString::to_string)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.cms_fixing_index_id")]
-    #[getter]
-    fn cms_fixing_index_id(&self) -> Option<String> {
-        self.inner
-            .cms_fixing_index_id
-            .as_ref()
-            .map(ToString::to_string)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.swap_fixed_frequency")]
@@ -160,46 +121,37 @@ impl PyCmsSwap {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.swap_float_frequency)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.swap_fixed_day_count")]
-    #[getter]
-    fn swap_fixed_day_count(&self) -> Option<crate::bindings::core::dates::daycount::PyDayCount> {
-        self.inner
-            .swap_fixed_day_count
-            .map(crate::bindings::core::dates::daycount::PyDayCount::from_inner)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.swap_float_day_count")]
-    #[getter]
-    fn swap_float_day_count(&self) -> Option<crate::bindings::core::dates::daycount::PyDayCount> {
-        self.inner
-            .swap_float_day_count
-            .map(crate::bindings::core::dates::daycount::PyDayCount::from_inner)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.funding_leg")]
     #[getter]
     fn funding_leg<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.funding_leg)
     }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.forward_curve_id")]
-    #[getter]
-    fn forward_curve_id(&self) -> String {
-        self.inner.forward_curve_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.vol_surface_id")]
-    #[getter]
-    fn vol_surface_id(&self) -> String {
-        self.inner.vol_surface_id.to_string()
-    }
 }
+
+crate::bindings::macros::py_getters!(PyCmsSwap |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.notional")]
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.day_count")]
+    day_count -> crate::bindings::core::dates::daycount::PyDayCount = crate::bindings::core::dates::daycount::PyDayCount::from_inner(s.inner.day_count);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.cms_cap")]
+    cms_cap -> Option<f64> = s.inner.cms_cap;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.cms_floor")]
+    cms_floor -> Option<f64> = s.inner.cms_floor;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.index_id")]
+    index_id -> Option<String> = s.inner.index_id.as_ref().map(ToString::to_string);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.cms_fixing_index_id")]
+    cms_fixing_index_id -> Option<String> = s.inner.cms_fixing_index_id.as_ref().map(ToString::to_string);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.swap_fixed_day_count")]
+    swap_fixed_day_count -> Option<crate::bindings::core::dates::daycount::PyDayCount> = s.inner.swap_fixed_day_count.map(crate::bindings::core::dates::daycount::PyDayCount::from_inner);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.swap_float_day_count")]
+    swap_float_day_count -> Option<crate::bindings::core::dates::daycount::PyDayCount> = s.inner.swap_float_day_count.map(crate::bindings::core::dates::daycount::PyDayCount::from_inner);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.discount_curve_id")]
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.forward_curve_id")]
+    forward_curve_id -> String = s.inner.forward_curve_id.to_string();
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.vol_surface_id")]
+    vol_surface_id -> String = s.inner.vol_surface_id.to_string();
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwapBuilder")]
 #[pyclass(
@@ -429,3 +381,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyCmsSwapBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["CmsSwap", "CmsSwapBuilder"];

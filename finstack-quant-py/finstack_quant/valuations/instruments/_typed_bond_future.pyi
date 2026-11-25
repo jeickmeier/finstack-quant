@@ -53,7 +53,7 @@ class BondFuture:
 
     @staticmethod
     def builder() -> BondFutureBuilder:
-        """Start specifying an bond future.
+        """Start specifying a bond future.
 
         Returns
         -------
@@ -433,6 +433,111 @@ class BondFuture:
         Notes
         -----
         This method does not raise.
+        """
+        ...
+
+    @property
+    def delivery_start(self) -> datetime.date:
+        """Return the first eligible delivery date for the futures basket.
+
+        Returns
+        -------
+        datetime.date
+            First eligible delivery date.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def contract_specs(self) -> BondFutureSpecs:
+        """Return the conversion-factor and repo specifications of the contract.
+
+        Returns
+        -------
+        BondFutureSpecs
+            Standard coupon, maturity years, and repo day-count convention.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def deliverable_basket(self) -> list[DeliverableBond]:
+        """Return the eligible deliverable bonds and their conversion factors.
+
+        Returns
+        -------
+        list[DeliverableBond]
+            Ordered sequence of eligible bond identifiers and conversion factors.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def ctd_bond_id(self) -> str | None:
+        """Return the identifier of the cheapest-to-deliver bond, if set.
+
+        Returns
+        -------
+        str or None
+            Cheapest-to-deliver bond identifier when populated.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def ctd_bond(self) -> Bond | None:
+        """Return the cheapest-to-deliver bond instance, if embedded on the contract.
+
+        Returns
+        -------
+        Bond or None
+            Embedded cheapest-to-deliver :class:`Bond`, or ``None`` if only identified by ID.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def discount_curve_id(self) -> str:
+        """Return the market identifier of the futures settlement discount curve.
+
+        Returns
+        -------
+        str
+            Discount curve identifier.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def repo_curve_id(self) -> str | None:
+        """Return the optional repo curve identifier for futures basis pricing.
+
+        Returns
+        -------
+        str or None
+            Repo curve identifier when specified.
+
+        Notes
+        -----
+        This accessor does not raise.
         """
         ...
 

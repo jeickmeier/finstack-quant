@@ -85,36 +85,23 @@ impl PyDeposit {
             .transpose()
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_deposit", "Deposit.day_count")]
-    #[getter]
-    fn day_count(&self) -> PyDayCount {
-        PyDayCount::from_inner(self.inner.day_count)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_deposit", "Deposit.business_day_convention")]
     #[getter]
     fn business_day_convention(&self) -> PyResult<String> {
         enum_to_py_string(&self.inner.business_day_convention)
     }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_deposit", "Deposit.calendar_id")]
-    #[getter]
-    fn calendar_id(&self) -> Option<&str> {
-        self.inner.calendar_id.as_ref().map(CalendarId::as_str)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_deposit", "Deposit.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_deposit", "Deposit.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> &str {
-        self.inner.discount_curve_id.as_str()
-    }
 }
+
+crate::bindings::macros::py_getters!(PyDeposit |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_deposit", "Deposit.day_count")]
+    day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_deposit", "Deposit.calendar_id")]
+    calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_deposit", "Deposit.notional")]
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_deposit", "Deposit.discount_curve_id")]
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_deposit", "DepositBuilder")]
 #[pyclass(
@@ -222,3 +209,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyDepositBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["Deposit", "DepositBuilder"];

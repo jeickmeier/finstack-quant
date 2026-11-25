@@ -51,7 +51,7 @@ use finstack_quant_valuations_core::instruments::SettlementType;
     finstack_quant_valuations_macros::FinancialBuilder,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct Swaption {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -117,6 +117,8 @@ pub struct Swaption {
     #[builder(skip)]
     pub(super) theta_cube_source_date: Option<Date>,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(Swaption);
 
 pub(super) struct VanillaSwaptionUnderlier {
     pub strike: Decimal,
@@ -294,6 +296,13 @@ impl Swaption {
         {
             return Err(Error::Validation(
                 "swaption fixed and floating leg spans must match".to_string(),
+            ));
+        }
+        if self.underlying_fixed_leg.discount_curve_id
+            != self.underlying_float_leg.discount_curve_id
+        {
+            return Err(Error::Validation(
+                "swaption fixed and floating leg discount curves must match".to_string(),
             ));
         }
 
@@ -560,6 +569,9 @@ impl Swaption {
         volatility: f64,
         as_of: Date,
     ) -> Result<Money> {
+        if let Some(value) = self.terminal_value(market, as_of)? {
+            return Ok(value);
+        }
         let quote = self.black_quote(market, volatility, self.time_to_expiry(as_of)?)?;
         self.price_resolved_quote(market, quote, as_of)
     }
@@ -708,14 +720,15 @@ impl Swaption {
     ///
     /// # Errors
     ///
-    /// Returns an error when the fixed schedule cannot be built.
+    /// Returns an error when the fixed schedule cannot be built, the tenor
+    /// frequency is invalid, or `1 + forward_rate / m <= 0`.
     pub fn cash_annuity_par_yield(&self, forward_rate: f64) -> Result<f64> {
         let periods = self.fixed_schedule_periods()?;
-        Ok(crate::swaption::pricing::hw_cashflows::par_yield_annuity(
+        crate::swaption::pricing::hw_cashflows::par_yield_annuity(
             periods.len(),
             self.get_fixed_frequency().payments_per_year()?,
             forward_rate,
-        ))
+        )
     }
 
     /// Cash settlement annuity using zero coupon method.
@@ -1148,3 +1161,35 @@ finstack_quant_valuations_core::impl_empty_cashflow_provider!(
     Swaption,
     finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
 );
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+    use time::macros::date;
+
+    #[test]
+    fn price_black_returns_zero_post_expiry_and_serde_validates_discount_curves() {
+        let swaption = Swaption::example().expect("example");
+        let after_expiry = date!(2028 - 01 - 17);
+        let market = MarketContext::new()
+            .try_insert(
+                DiscountCurve::flat("USD-OIS", after_expiry, 0.03, DayCount::Act365F)
+                    .expect("disc"),
+            )
+            .expect("insert disc")
+            .try_insert(
+                ForwardCurve::flat("USD-SOFR-3M", after_expiry, 0.03, DayCount::Act360)
+                    .expect("fwd"),
+            )
+            .expect("insert fwd");
+        let pv = swaption
+            .price_black(&market, 0.25, after_expiry)
+            .expect("post-expiry price_black should settle to zero");
+        assert_eq!(pv.amount(), 0.0);
+
+        let mut mismatched = serde_json::to_value(&swaption).expect("serialize");
+        mismatched["underlying_float_leg"]["discount_curve_id"] = serde_json::json!("USD-OTHER");
+        assert!(serde_json::from_value::<Swaption>(mismatched).is_err());
+    }
+}

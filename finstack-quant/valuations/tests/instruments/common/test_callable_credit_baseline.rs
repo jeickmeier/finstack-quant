@@ -179,13 +179,12 @@ const BASELINE_BOND_PV: f64 = 986_715.843_219_591;
 /// settlement.
 ///
 /// The instrument PV is anchored at `as_of` (like the bond and the
-/// revolver), so the test pins `PV = BASELINE × DF(as_of, settlement)`: the
-/// tree itself did not move, only the anchor (formerly the PV was reported
-/// at settlement, 9,862,676.82; now 9,860,515.37 on `as_of`).
-const BASELINE_LOAN_SETTLEMENT_PV: f64 = 9_862_676.817_499_82;
+/// revolver), so the test pins `PV = BASELINE × DF(as_of, settlement)` (updated
+/// after the Layer 4c `term_loan/pricing/tree_engine.rs` call/accrual fix).
+const BASELINE_LOAN_SETTLEMENT_PV: f64 = 9_862_214.877_482_756;
 /// OAS (bp) recovered by re-solving at the term loan's own model price.
 /// Non-zero only by the clean/dirty accrued conversion inside the solve.
-const BASELINE_LOAN_OAS_BP: f64 = -1.191_277_146_1;
+const BASELINE_LOAN_OAS_BP: f64 = -1.193_346_437_7;
 
 #[test]
 fn callable_credit_bond_pv_baseline() {

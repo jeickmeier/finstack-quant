@@ -3,16 +3,10 @@
 use crate::cap_floor::CapFloor;
 use crate::cap_floor::hw_pricer::resolve_capfloor_hw1f_model_params;
 use finstack_quant_core::Result;
-use finstack_quant_core::market_data::surfaces::VolQuoteType;
-use finstack_quant_valuations_core::metrics::bump_surface_vol_absolute;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_valuations_core::pricer::ModelKey;
 
 use super::caplet::CapletInputs;
-
-/// Absolute normal-vol bump for the Hull-White market vega: 1bp of normal
-/// volatility (1e-4). Results are rescaled to per 0.01 of normal vol.
-const NORMAL_VOL_BUMP: f64 = 1e-4;
 
 /// Vega calculator (model-consistent vega per 1% vol, aggregated for caps/floors).
 ///
@@ -37,9 +31,9 @@ pub(crate) struct VegaCalculator;
 
 /// Direct Hull-White short-rate σ sensitivity per 0.01 absolute σ.
 ///
-/// This model-parameter sensitivity is intentionally separate from
-/// [`VegaCalculator`], whose Hull-White implementation bumps market normal-vol
-/// quotes and recalibrates σ.
+/// Use this metric under [`ModelKey::HullWhite1F`] instead of [`VegaCalculator`],
+/// because Hull-White cap/floor pricing consumes explicit short-rate parameters
+/// rather than the market cap/floor volatility surface.
 pub(crate) struct HwSigmaVegaCalculator;
 
 impl MetricCalculator for VegaCalculator {
@@ -49,7 +43,9 @@ impl MetricCalculator for VegaCalculator {
             context.clone_pricer_dispatch().model(),
             Some(ModelKey::HullWhite1F)
         ) {
-            return hull_white_surface_vega_per_pct(option, context);
+            return Err(finstack_quant_core::Error::Validation(
+                "HullWhite1F cap/floor pricing consumes explicit short-rate parameters; use hw_sigma_vega, not surface vega".into(),
+            ));
         }
         super::caplet::aggregate_over_caplets(option, context, |c: CapletInputs| caplet_vega(c))
     }
@@ -87,24 +83,15 @@ fn caplet_vega(c: CapletInputs) -> f64 {
     }
 }
 
-fn hull_white_surface_vega_per_pct(option: &CapFloor, context: &MetricContext) -> Result<f64> {
-    let bump = NORMAL_VOL_BUMP;
-    let market = context.curves.as_ref();
-    market
-        .get_surface(option.vol_surface_id.as_str())?
-        .require_quote_type(VolQuoteType::Normal)?;
-    let up_market = bump_surface_vol_absolute(market, option.vol_surface_id.as_str(), bump)?;
-    let pv_up = context.reprice_instrument_raw(option, &up_market, context.as_of)?;
-    let down_market = bump_surface_vol_absolute(market, option.vol_surface_id.as_str(), -bump)?;
-    let pv_down = context.reprice_instrument_raw(option, &down_market, context.as_of)?;
-    Ok((pv_up - pv_down) / (2.0 * bump) * 0.01)
-}
-
 fn hull_white_sigma_vega_per_pct(option: &CapFloor, context: &MetricContext) -> Result<f64> {
     let market = context.curves.as_ref();
     let bump = crate::HW_SIGMA_BUMP;
     let base = resolve_capfloor_hw1f_model_params(option, market, context.as_of)?;
-    let with_sigma = |shift: f64| -> Result<CapFloor> {
+    let use_central = base.get_values().iter().all(|sigma| *sigma > bump);
+    crate::vol_model::hw_sigma_vega_fd(bump, use_central, |shift| {
+        if shift == 0.0 {
+            return context.reprice_instrument_raw(option, market, context.as_of);
+        }
         let mut bumped = option.clone();
         bumped
             .instrument_pricing_overrides
@@ -130,18 +117,6 @@ fn hull_white_sigma_vega_per_pct(option: &CapFloor, context: &MetricContext) -> 
             bumped.instrument_pricing_overrides.model_config.hw1f_sigma =
                 Some(base.get_values()[0] + shift);
         }
-        Ok(bumped)
-    };
-
-    let up = with_sigma(bump)?;
-    let pv_up = context.reprice_instrument_raw(&up, market, context.as_of)?;
-
-    if base.get_values().iter().all(|sigma| *sigma > bump) {
-        let down = with_sigma(-bump)?;
-        let pv_down = context.reprice_instrument_raw(&down, market, context.as_of)?;
-        Ok((pv_up - pv_down) / (2.0 * bump) * 0.01)
-    } else {
-        let pv_base = context.reprice_instrument_raw(option, market, context.as_of)?;
-        Ok((pv_up - pv_base) / bump * 0.01)
-    }
+        context.reprice_instrument_raw(&bumped, market, context.as_of)
+    })
 }

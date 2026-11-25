@@ -41,27 +41,34 @@ getters!(JsEquityTotalReturnFuture, "EquityTotalReturnFuture", |i| {
     default_model as defaultModel: "string" => text(Instrument::default_model(i)),
     /// Read the contract's underlying ticker.
     /// @returns Equity or equity-index ticker.
-    underlying_ticker as underlyingTicker: "string" => json(i.underlying_ticker),
+    underlying_ticker as underlyingTicker: "string" => text(i.underlying_ticker),
     /// Read the contract's terms.
     /// @returns Standard listed position and lifecycle terms.
     terms as terms: "generated.valuations.EquityTotalReturnFuture['terms']" => json(i.terms),
     /// Read the contract's spot id.
     /// @returns Current underlying close or exchange-prescribed reference level.
-    spot_id as spotId: "string" => json(i.spot_id),
+    spot_id as spotId: "string" => text(i.spot_id),
     /// Read the contract's accrued distributions id.
     /// @returns Cumulative distribution points published by the exchange.
-    accrued_distributions_id as accruedDistributionsId: "string" => json(i.accrued_distributions_id),
+    accrued_distributions_id as accruedDistributionsId: "string" => text(i.accrued_distributions_id),
     /// Read the contract's accrued funding id.
     /// @returns Cumulative funding points published by the exchange.
-    accrued_funding_id as accruedFundingId: "string" => json(i.accrued_funding_id),
+    accrued_funding_id as accruedFundingId: "string" => text(i.accrued_funding_id),
     /// Read the contract's spread bp id.
     /// @returns Current annualized TRF spread scalar expressed in basis points.
-    spread_bp_id as spreadBpId: "string" => json(i.spread_bp_id),
+    spread_bp_id as spreadBpId: "string" => text(i.spread_bp_id),
     /// Read the contract's spread day count.
     /// @returns Day-count basis used to convert the annualized spread into index points.
     spread_day_count as spreadDayCount: "DayCount" => day_count(i.spread_day_count),
 });
 common_getters!(JsEquityTotalReturnFuture, "EquityTotalReturnFuture");
+to_builder_method!(
+    /// Seed an independent builder from the complete contract.
+    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
+    JsEquityTotalReturnFuture,
+    "EquityTotalReturnFuture",
+    JsEquityTotalReturnFutureBuilder
+);
 
 builder_class!(
     /// Builder for an instrument.
@@ -79,18 +86,6 @@ builder_class!(
     /// ```
     JsEquityTotalReturnFutureBuilder, "EquityTotalReturnFutureBuilder", EquityTotalReturnFutureBuilder, JsEquityTotalReturnFuture, |b| b.build()
 );
-
-#[wasm_bindgen(js_class = EquityTotalReturnFuture)]
-impl JsEquityTotalReturnFuture {
-    /// Seed an independent builder from the complete contract.
-    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsEquityTotalReturnFutureBuilder {
-        JsEquityTotalReturnFutureBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
 
 setters!(JsEquityTotalReturnFutureBuilder, "EquityTotalReturnFutureBuilder", {
     /// Set the stable contract identifier.

@@ -81,12 +81,6 @@ impl PyCmsSpreadOption {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.option_type)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.notional")]
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.notional)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -97,66 +91,6 @@ impl PyCmsSpreadOption {
     #[getter]
     fn payment_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::date_utils::date_to_py(py, self.inner.payment_date)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.long_vol_surface_id")]
-    #[getter]
-    fn long_vol_surface_id(&self) -> String {
-        self.inner.long_vol_surface_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.short_vol_surface_id")]
-    #[getter]
-    fn short_vol_surface_id(&self) -> String {
-        self.inner.short_vol_surface_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.discount_curve_id")]
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.forward_curve_id")]
-    #[getter]
-    fn forward_curve_id(&self) -> String {
-        self.inner.forward_curve_id.to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.correlation")]
-    #[getter]
-    fn correlation(&self) -> f64 {
-        self.inner.correlation
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.day_count")]
-    #[getter]
-    fn day_count(&self) -> crate::bindings::core::dates::daycount::PyDayCount {
-        crate::bindings::core::dates::daycount::PyDayCount::from_inner(self.inner.day_count)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.index_id")]
-    #[getter]
-    fn index_id(&self) -> Option<String> {
-        self.inner.index_id.as_ref().map(ToString::to_string)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.long_cms_fixing_index_id")]
-    #[getter]
-    fn long_cms_fixing_index_id(&self) -> Option<String> {
-        self.inner
-            .long_cms_fixing_index_id
-            .as_ref()
-            .map(ToString::to_string)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.short_cms_fixing_index_id")]
-    #[getter]
-    fn short_cms_fixing_index_id(&self) -> Option<String> {
-        self.inner
-            .short_cms_fixing_index_id
-            .as_ref()
-            .map(ToString::to_string)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.swap_fixed_frequency")]
@@ -170,23 +104,34 @@ impl PyCmsSpreadOption {
     fn swap_float_frequency<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.swap_float_frequency)
     }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.swap_fixed_day_count")]
-    #[getter]
-    fn swap_fixed_day_count(&self) -> Option<crate::bindings::core::dates::daycount::PyDayCount> {
-        self.inner
-            .swap_fixed_day_count
-            .map(crate::bindings::core::dates::daycount::PyDayCount::from_inner)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.swap_float_day_count")]
-    #[getter]
-    fn swap_float_day_count(&self) -> Option<crate::bindings::core::dates::daycount::PyDayCount> {
-        self.inner
-            .swap_float_day_count
-            .map(crate::bindings::core::dates::daycount::PyDayCount::from_inner)
-    }
 }
+
+crate::bindings::macros::py_getters!(PyCmsSpreadOption |s| {
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.notional")]
+    notional -> PyMoney = PyMoney::from_inner(s.inner.notional);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.long_vol_surface_id")]
+    long_vol_surface_id -> String = s.inner.long_vol_surface_id.to_string();
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.short_vol_surface_id")]
+    short_vol_surface_id -> String = s.inner.short_vol_surface_id.to_string();
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.discount_curve_id")]
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.forward_curve_id")]
+    forward_curve_id -> String = s.inner.forward_curve_id.to_string();
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.correlation")]
+    correlation -> f64 = s.inner.correlation;
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.day_count")]
+    day_count -> crate::bindings::core::dates::daycount::PyDayCount = crate::bindings::core::dates::daycount::PyDayCount::from_inner(s.inner.day_count);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.index_id")]
+    index_id -> Option<String> = s.inner.index_id.as_ref().map(ToString::to_string);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.long_cms_fixing_index_id")]
+    long_cms_fixing_index_id -> Option<String> = s.inner.long_cms_fixing_index_id.as_ref().map(ToString::to_string);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.short_cms_fixing_index_id")]
+    short_cms_fixing_index_id -> Option<String> = s.inner.short_cms_fixing_index_id.as_ref().map(ToString::to_string);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.swap_fixed_day_count")]
+    swap_fixed_day_count -> Option<crate::bindings::core::dates::daycount::PyDayCount> = s.inner.swap_fixed_day_count.map(crate::bindings::core::dates::daycount::PyDayCount::from_inner);
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.swap_float_day_count")]
+    swap_float_day_count -> Option<crate::bindings::core::dates::daycount::PyDayCount> = s.inner.swap_float_day_count.map(crate::bindings::core::dates::daycount::PyDayCount::from_inner);
+});
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOptionBuilder")]
 #[pyclass(
@@ -410,3 +355,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyCmsSpreadOptionBuilder>()?;
     Ok(())
 }
+
+/// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
+pub(crate) const EXPORTS: &[&str] = &["CmsSpreadOption", "CmsSpreadOptionBuilder"];

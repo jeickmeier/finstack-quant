@@ -93,6 +93,14 @@ getters!(JsConvertibleBond, "ConvertibleBond", |i| {
 
 common_getters!(JsConvertibleBond, "ConvertibleBond");
 
+to_builder_method!(
+    /// Seed an independent builder from the complete convertible bond contract.
+    /// @returns Builder carrying conversion terms, coupon spec, schedules and overrides.
+    JsConvertibleBond,
+    "ConvertibleBond",
+    JsConvertibleBondBuilder
+);
+
 /// Price, delta, parity, conversion premium, regime and bond floor of a convertible at a ladder of share prices (mirrors Rust `convertible_spot_ladder`).
 ///
 /// Each row reprices on the market with only the share price moved, on the lattice `model` selects; volatility, rates and credit stay as supplied.

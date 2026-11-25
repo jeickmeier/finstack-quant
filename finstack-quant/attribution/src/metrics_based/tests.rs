@@ -1322,11 +1322,27 @@ fn hw1f_cap_surface_shock_does_not_affect_explicit_parameter_pricing() {
         }])
         .expect("vol shock");
     let options = PricingOptions::default().with_model(ModelKey::HullWhite1F);
-    let metrics = [MetricId::Vega];
+    let err = cap
+        .price_with_metrics(&market_t0, as_of_t0, &[MetricId::Vega], options.clone())
+        .expect_err("HullWhite1F cap pricing must reject surface vega");
+    assert!(
+        err.to_string().contains("hw_sigma_vega"),
+        "expected hw_sigma_vega guidance, got: {err}"
+    );
 
+    let metrics: [MetricId; 0] = [];
     let val_t0 = cap
         .price_with_metrics(&market_t0, as_of_t0, &metrics, options.clone())
         .expect("t0 price");
+    let val_t0_shocked = cap
+        .price_with_metrics(&market_t1, as_of_t0, &metrics, options.clone())
+        .expect("t0 shocked price");
+    assert!(
+        (val_t0_shocked.value.amount() - val_t0.value.amount()).abs() < 1e-12,
+        "explicit-parameter HW1F PV must be invariant to surface shocks: {} vs {}",
+        val_t0.value.amount(),
+        val_t0_shocked.value.amount()
+    );
     let val_t1 = cap
         .price_with_metrics(&market_t1, as_of_t1, &metrics, options)
         .expect("t1 price");
@@ -1343,12 +1359,6 @@ fn hw1f_cap_surface_shock_does_not_affect_explicit_parameter_pricing() {
     )
     .expect("attribution");
 
-    let vega = val_t0.measures.get("vega").copied().unwrap_or(0.0);
-    assert!(
-        vega.abs() < 1e-12,
-        "explicit-parameter HW1F pricing must not sample the vol surface; got vega={vega}, measures={:?}",
-        val_t0.measures
-    );
     assert!(
         attribution.vol_pnl.amount().abs() < 1e-12,
         "a surface-only move must have zero HW1F vol P&L when parameters are explicit"

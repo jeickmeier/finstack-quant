@@ -208,6 +208,7 @@ impl CmsReplicationPricer {
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
+        inst.validate()?;
         let mut total_pv = 0.0;
 
         let strike = inst.strike_f64()?;

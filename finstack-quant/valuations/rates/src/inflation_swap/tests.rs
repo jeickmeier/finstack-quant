@@ -559,3 +559,55 @@ fn yoy_swap_cashflow_provider_emits_two_flows_per_period() {
             .all(|flow| flow.get_accrual().is_some())
     );
 }
+
+#[test]
+fn yoy_swap_registers_par_rate_and_convexity_and_rejects_degenerate_par_rate() {
+    use finstack_quant_valuations_core::metrics::MetricId;
+
+    let as_of = d(2025, Month::January, 1);
+    let market = MarketContext::new()
+        .try_insert(sample_discount_curve(as_of))
+        .expect("insert market curve")
+        .try_insert(sample_inflation_curve(as_of))
+        .expect("insert market curve")
+        .insert_inflation_index(flat_historical_index());
+    let mut swap = YoYInflationSwap::builder()
+        .id(InstrumentId::new("YOY-METRICS"))
+        .notional(Money::from((1_000_000_i64, Currency::USD)))
+        .start_date(as_of)
+        .maturity(d(2027, Month::January, 1))
+        .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))
+        .frequency(Tenor::annual())
+        .inflation_index_id(CurveId::new("US-CPI"))
+        .discount_curve_id(CurveId::new("USD-OIS"))
+        .day_count(DayCount::Act365F)
+        .side(PayReceive::Pay)
+        .lag(InflationLag::None)
+        .interpolation(SeriesInterpolation::Step)
+        .attributes(Attributes::new())
+        .build()
+        .expect("yoy swap");
+
+    let res = swap
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::ParRate, MetricId::InflationConvexity],
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
+        )
+        .expect("YoY ParRate and InflationConvexity should succeed");
+    assert!(res.measures[&MetricId::ParRate].is_finite());
+    assert!(res.measures[&MetricId::InflationConvexity].is_finite());
+
+    let expired = d(2028, Month::January, 1);
+    assert!(swap.par_rate(&market, expired).is_err());
+    assert!(
+        swap.cashflow_schedule(&market, d(2027, Month::January, 1))
+            .expect("schedule on maturity")
+            .get_flows()
+            .is_empty()
+    );
+
+    swap.base_cpi = Some(f64::NAN);
+    assert!(swap.validate().is_err());
+}

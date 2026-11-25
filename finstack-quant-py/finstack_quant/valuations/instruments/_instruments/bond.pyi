@@ -626,6 +626,27 @@ class Bond:
             If the value cannot be serialized to JSON.
         """
         ...
+    def to_builder(self) -> BondBuilder:
+        """
+        Convert this bond into an editable :class:`BondBuilder`.
+
+        Returns
+        -------
+        BondBuilder
+            Builder pre-populated with this bond's fields for incremental editing.
+
+        Notes
+        -----
+        This method does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import Bond
+        >>> b = Bond.example().to_builder().id("BOND-EDIT").build()
+        >>> b.id
+        'BOND-EDIT'
+        """
+        ...
     def price(
         self,
         market: MarketContext | str,

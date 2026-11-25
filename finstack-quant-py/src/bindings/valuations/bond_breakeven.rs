@@ -23,6 +23,25 @@ pub struct PyBondBreakevenRow {
     inner: BondBreakevenRow,
 }
 
+crate::bindings::macros::wire_methods!(
+    PyBondBreakevenRow,
+    BondBreakevenRow,
+    "BondBreakevenRow",
+    module = "finstack_quant.valuations.instruments._bond_breakeven",
+    to_dict
+);
+
+#[pymethods]
+impl PyBondBreakevenRow {
+    /// Return ``repr(self)``.
+    fn __repr__(&self) -> String {
+        format!(
+            "BondBreakevenRow(horizon={}, carry={}, sensitivity={}, breakeven_bp={})",
+            self.inner.horizon, self.inner.carry, self.inner.sensitivity, self.inner.breakeven_bp
+        )
+    }
+}
+
 crate::bindings::macros::py_getters!(PyBondBreakevenRow |row| {
     #[doc = pydoc!("finstack_quant.valuations.instruments._bond_breakeven", "BondBreakevenRow.horizon")]
     horizon -> PyTenor = PyTenor::from_inner(row.inner.horizon);
@@ -45,6 +64,14 @@ pub struct PyBondBreakevenLadder {
     inner: BondBreakevenLadder,
 }
 
+crate::bindings::macros::wire_methods!(
+    PyBondBreakevenLadder,
+    BondBreakevenLadder,
+    "BondBreakevenLadder",
+    module = "finstack_quant.valuations.instruments._bond_breakeven",
+    to_dict
+);
+
 crate::bindings::macros::py_getters!(PyBondBreakevenLadder |ladder| {
     #[doc = pydoc!("finstack_quant.valuations.instruments._bond_breakeven", "BondBreakevenLadder.instrument_id")]
     instrument_id -> String = ladder.inner.instrument_id.clone();
@@ -60,6 +87,23 @@ impl PyBondBreakevenLadder {
     #[getter]
     fn as_of<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.as_of)
+    }
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._bond_breakeven", "BondBreakevenLadder.config")]
+    #[getter]
+    fn config<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.config)
+    }
+
+    /// Return ``repr(self)``.
+    fn __repr__(&self) -> String {
+        format!(
+            "BondBreakevenLadder(instrument_id={:?}, as_of={}, currency={:?}, rows={})",
+            self.inner.instrument_id,
+            self.inner.as_of,
+            self.inner.currency.to_string(),
+            self.inner.rows.len()
+        )
     }
 }
 
@@ -91,7 +135,7 @@ fn bond_breakeven_ladder(
         .iter()
         .map(extract_tenor)
         .collect::<PyResult<Vec<_>>>()?;
-    let config = crate::bindings::module_utils::py_to_serde(py, config, "breakeven config")?;
+    let config = crate::bindings::module_utils::spec_from_py(py, config, "breakeven config")?;
     let bond = &bond.inner;
     let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
     py.detach(|| {

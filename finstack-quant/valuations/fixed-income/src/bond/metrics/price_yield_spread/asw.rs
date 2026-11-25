@@ -391,10 +391,24 @@ impl MetricCalculator for AssetSwapParCalculator {
         } else {
             None
         };
-        let ann = if let Some((_, _, float_ann)) = forward_components {
-            float_ann
+        let discount_par_and_annuity = if forward_components.is_none() {
+            Some(par_rate_and_annuity_from_discount(
+                disc.as_ref(),
+                dc_fixed,
+                Some(frequency),
+                &sched,
+            )?)
         } else {
-            par_rate_and_annuity_from_discount(disc.as_ref(), dc_fixed, Some(frequency), &sched)?.1
+            None
+        };
+        let ann = match (forward_components, discount_par_and_annuity) {
+            (Some((_, _, float_ann)), _) => float_ann,
+            (None, Some((_, ann))) => ann,
+            (None, None) => {
+                return Err(finstack_quant_core::Error::Internal(
+                    "missing ASW discount par-rate calculation".into(),
+                ));
+            }
         };
         if ann.abs() < 1e-12 {
             return Err(finstack_quant_core::Error::Validation(
@@ -409,14 +423,12 @@ impl MetricCalculator for AssetSwapParCalculator {
         })?;
         if let Some((float_pv, fixed_ann, float_ann)) = forward_components {
             Ok((coupon * fixed_ann - float_pv) / float_ann)
-        } else {
-            let (par_rate, _) = par_rate_and_annuity_from_discount(
-                disc.as_ref(),
-                dc_fixed,
-                Some(frequency),
-                &sched,
-            )?;
+        } else if let Some((par_rate, _)) = discount_par_and_annuity {
             Ok(coupon - par_rate)
+        } else {
+            Err(finstack_quant_core::Error::Internal(
+                "missing ASW discount par-rate calculation".into(),
+            ))
         }
     }
 }

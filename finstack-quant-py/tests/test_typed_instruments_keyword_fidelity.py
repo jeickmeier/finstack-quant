@@ -135,7 +135,7 @@ def test_capfloor_builder_setters_accept_keyword_value() -> None:
         .discount_curve_id(value="USD-OIS")
         .forward_curve_id(value="USD-SOFR-3M")
         .vol_surface_id(value="USD-CAP-VOL")
-        .vol_type(value="normal")
+        .vol_type(value="shifted_lognormal")
         .vol_shift(value=0.02)
         .build()
     )

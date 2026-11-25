@@ -223,7 +223,7 @@ pub struct OvernightCouponConvention {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct CapFloor {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -365,6 +365,8 @@ pub struct CapFloor {
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(CapFloor);
 
 /// Inputs of [`CapFloor::new`].
 ///
@@ -515,7 +517,7 @@ impl CapFloor {
             forward_curve_id,
             vol_surface_id,
         } = params;
-        Ok(Self {
+        let inst = Self {
             id,
             rate_option_type,
             notional,
@@ -542,7 +544,14 @@ impl CapFloor {
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
-        })
+        };
+        inst.validate()?;
+        Ok(inst)
+    }
+
+    /// Validate structural invariants of this cap/floor.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        finstack_quant_valuations_core::instruments::Instrument::validate_invariants(self)
     }
 
     pub(crate) fn resolved_schedule_calendar_id(&self) -> finstack_quant_core::Result<&str> {
@@ -756,6 +765,18 @@ impl finstack_quant_valuations_core::instruments::Instrument for CapFloor {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "CapFloor '{}' vol_shift must be finite and non-negative, got {}",
                 self.id, self.vol_shift
+            )));
+        }
+        if self.vol_shift > 0.0 && self.vol_type != CapFloorVolType::ShiftedLognormal {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CapFloor '{}' vol_shift ({}) requires CapFloorVolType::ShiftedLognormal",
+                self.id, self.vol_shift
+            )));
+        }
+        if self.frequency.count() == 0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CapFloor '{}' frequency count must be greater than zero",
+                self.id
             )));
         }
         self.resolved_schedule_calendar_id()?;
@@ -1611,5 +1632,49 @@ mod tests {
             .value(&market, as_of)
             .expect_err("premium currency mismatch must fail");
         assert!(error.to_string().contains("premium currency"));
+    }
+
+    #[test]
+    fn serde_and_constructor_enforce_capfloor_invariants() {
+        let valid = CapFloor::new(crate::cap_floor::CapFloorParams {
+            id: "CAP-VALID".into(),
+            rate_option_type: RateOptionType::Cap,
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            strike: 0.04,
+            start_date: date(2024, 3, 1),
+            maturity: date(2025, 3, 1),
+            frequency: Some(Tenor::quarterly()),
+            day_count: DayCount::Act360,
+            discount_curve_id: "TEST-DISC".into(),
+            forward_curve_id: "USD-SOFR-3M".into(),
+            vol_surface_id: "TEST-VOL".into(),
+        })
+        .expect("valid cap");
+
+        assert!(
+            CapFloor::new(crate::cap_floor::CapFloorParams {
+                id: "CAP-BAD-DATES".into(),
+                rate_option_type: RateOptionType::Cap,
+                notional: Money::from((1_000_000_i64, Currency::USD)),
+                strike: 0.04,
+                start_date: date(2025, 3, 1),
+                maturity: date(2024, 3, 1),
+                frequency: Some(Tenor::quarterly()),
+                day_count: DayCount::Act360,
+                discount_curve_id: "TEST-DISC".into(),
+                forward_curve_id: "USD-SOFR-3M".into(),
+                vol_surface_id: "TEST-VOL".into(),
+            })
+            .is_err()
+        );
+
+        let mut invalid_shift = serde_json::to_value(&valid).expect("serialize");
+        invalid_shift["vol_shift"] = serde_json::json!(0.01);
+        invalid_shift["vol_type"] = serde_json::json!("normal");
+        assert!(serde_json::from_value::<CapFloor>(invalid_shift).is_err());
+
+        let mut zero_freq = serde_json::to_value(&valid).expect("serialize");
+        zero_freq["frequency"] = serde_json::json!("0M");
+        assert!(serde_json::from_value::<CapFloor>(zero_freq).is_err());
     }
 }

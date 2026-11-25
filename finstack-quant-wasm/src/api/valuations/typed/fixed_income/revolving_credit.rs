@@ -201,6 +201,14 @@ getters!(JsRevolvingCredit, "RevolvingCredit", |i| {
 
 common_getters!(JsRevolvingCredit, "RevolvingCredit", overrides);
 
+to_builder_method!(
+    /// Seed an independent builder from the complete revolving credit facility.
+    /// @returns Builder carrying facility commitments, fees, draws, curves and overrides.
+    JsRevolvingCredit,
+    "RevolvingCredit",
+    JsRevolvingCreditBuilder
+);
+
 builder_class!(
     /// Fluent builder for `RevolvingCredit`; one setter per Rust `FinancialBuilder` setter.
     ///
@@ -227,7 +235,7 @@ setters!(JsRevolvingCreditBuilder, "RevolvingCreditBuilder", {
         /// @param value - `Compounding` wire value: `"continuous"`, `"simple"` or `{ periodic: n }`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        quote_compounding as quoteCompounding: "generated.valuations.RevolvingCredit['quote_compounding']" => from_js_json,
+        quote_compounding as quoteCompounding: "generated.valuations.RevolvingCredit['quote_compounding']" => js_wire,
         /// Set the instrument identifier.
         /// @param value - Unique identifier for the facility.
         /// @returns The builder, for chaining.
@@ -267,12 +275,12 @@ setters!(JsRevolvingCreditBuilder, "RevolvingCreditBuilder", {
         /// @param value - `{"include_fees": boolean}` as a plain object or JSON string; `null` (the default) includes fees in the effective yield.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        oid_eir as oidEir: "NonNullable<generated.valuations.RevolvingCredit['oid_eir']>" => from_js_json,
+        oid_eir as oidEir: "generated.valuations.RevolvingCredit['oid_eir'] | null" => opt_wire via oid_eir_opt,
         /// Set the letter-of-credit sub-facility.
         /// @param value - `LetterOfCreditSpec` as a plain object or JSON string with `sublimit` and `outstanding` (`Money` plain objects), `events` (rows of `{"date", "amount", "is_issue"}`), `fee_bp` (`null` accrues the floating margin), `fronting_fee_bp` and `leq` (the fraction of the LC face drawn at default). `null` removes the sublimit.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        lc as lc: "NonNullable<generated.valuations.RevolvingCredit['lc']>" => from_js_json,
+        lc as lc: "generated.valuations.RevolvingCredit['lc'] | null" => opt_wire via lc_opt,
         /// Set the dated margin steps.
         /// @param value - Rows of `{"date": "YYYY-MM-DD", "delta_bp": string}` (a decimal string in basis points; a array of plain objects or a JSON string); each delta shifts the floating spread or the fixed rate from its date, cumulatively. Dates must be strictly increasing and strictly inside the facility life.
         /// @returns The builder, for chaining.
@@ -292,7 +300,7 @@ setters!(JsRevolvingCreditBuilder, "RevolvingCreditBuilder", {
         /// @param value - Hazard curve id used for survival weighting; `null` prices without credit risk. A stochastic facility with a credit curve must use a market-anchored spread process on the same curve.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        credit_curve_id as creditCurveId: "string" => id,
+        credit_curve_id as creditCurveId: "string | null" => optional_id via credit_curve_id_opt,
         /// Set the recovery rate on default.
         /// @param value - Recovery fraction as a decimal in `[0, 1]`.
         /// @returns The builder, for chaining.
@@ -322,7 +330,7 @@ setters!(JsRevolvingCreditBuilder, "RevolvingCreditBuilder", {
         /// @param value - Calendar identifier such as `"usny"`; `null` (the default) adjusts for weekends only. An unknown identifier fails at `build()`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        calendar_id as calendarId: "string" => id,
+        calendar_id as calendarId: "string | null" => optional_id via calendar_id_opt,
         /// Set the payment lag in business days after each accrual end.
         /// @param value - Business days on the facility calendar; `0` (the default) pays on the adjusted accrual end.
         /// @returns The builder, for chaining.
@@ -337,7 +345,7 @@ setters!(JsRevolvingCreditBuilder, "RevolvingCreditBuilder", {
         /// @param value - Attribute map; `null` clears it.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        attributes as attributes: "generated.valuations.RevolvingCredit['attributes']" => from_js_json,
+        attributes as attributes: "generated.valuations.RevolvingCredit['attributes'] | null" => opt_or_default,
 });
 
 common_setters!(

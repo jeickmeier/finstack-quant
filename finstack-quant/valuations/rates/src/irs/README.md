@@ -32,7 +32,6 @@ irs/
 └── metrics/
     ├── mod.rs                  # registration + ParRate, leg PVs (PvFixed, PvFloat)
     ├── annuity.rs              # Annuity
-    ├── dv01.rs                 # IrsDv01Calculator
     ├── ir_convexity.rs         # IrConvexity, IrCrossGamma
 ```
 
@@ -176,7 +175,7 @@ Registered for `InstrumentType::Irs` in `metrics/mod.rs`:
 | `ParRate` | Fixed rate that zeroes the NPV |
 | `Annuity` | Fixed-leg annuity, `Σ τᵢ DF(Tᵢ)` |
 | `PvFixed`, `PvFloat` | Individual leg PVs |
-| `Dv01` | Parallel curve DV01 (`IrsDv01Calculator`) |
+| `Dv01` | Parallel curve DV01 (`RateDv01(false)`) |
 | `Pv01` | Per-curve parallel bump, stored as `pv01::{curve}` |
 | `BucketedDv01` | Triangular key-rate DV01 |
 | `IrConvexity` | Second-order parallel rate sensitivity |

@@ -175,42 +175,31 @@ pub(crate) struct BermudanVegaCalculator;
 impl MetricCalculator for BermudanVegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         use crate::HW_SIGMA_BUMP;
+        use finstack_quant_valuations_core::pricer::ModelKey;
+
+        if !matches!(
+            context.pricing_model(),
+            None | Some(ModelKey::HullWhite1F | ModelKey::MonteCarloHullWhite1F)
+        ) {
+            return Err(finstack_quant_core::Error::Validation(
+                "hw_sigma_vega requires HullWhite1F or MonteCarloHullWhite1F pricing".into(),
+            ));
+        }
 
         let swaption = context.instrument_as::<BermudanSwaption>()?;
         let hw = HwGreekParams::resolve(swaption, context)?;
 
         validate_hw_greek_params(hw.kappa, hw.sigma)?;
 
-        let with_sigma = |sigma: f64| {
+        crate::vol_model::hw_sigma_vega_fd(HW_SIGMA_BUMP, hw.sigma > HW_SIGMA_BUMP, |shift| {
             let mut bumped = swaption.clone();
             bumped
                 .instrument_pricing_overrides
                 .model_config
                 .hw1f_mean_reversion = Some(hw.kappa);
-            bumped.instrument_pricing_overrides.model_config.hw1f_sigma = Some(sigma);
-            bumped
-        };
-        let price_up = context.reprice_instrument_raw(
-            &with_sigma(hw.sigma + HW_SIGMA_BUMP),
-            &context.curves,
-            context.as_of,
-        )?;
-
-        if hw.sigma > HW_SIGMA_BUMP {
-            let price_down = context.reprice_instrument_raw(
-                &with_sigma(hw.sigma - HW_SIGMA_BUMP),
-                &context.curves,
-                context.as_of,
-            )?;
-            Ok((price_up - price_down) / (2.0 * HW_SIGMA_BUMP) * 0.01)
-        } else {
-            let price_base = context.reprice_instrument_raw(
-                &with_sigma(hw.sigma),
-                &context.curves,
-                context.as_of,
-            )?;
-            Ok((price_up - price_base) / HW_SIGMA_BUMP * 0.01)
-        }
+            bumped.instrument_pricing_overrides.model_config.hw1f_sigma = Some(hw.sigma + shift);
+            context.reprice_instrument_raw(&bumped, &context.curves, context.as_of)
+        })
     }
 }
 

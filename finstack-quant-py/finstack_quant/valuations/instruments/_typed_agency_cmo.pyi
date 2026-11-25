@@ -392,12 +392,12 @@ class AgencyCmo:
         ...
 
     @property
-    def deal_name(self) -> dict[str, object] | str:
+    def deal_name(self) -> str:
         """Read the contract's deal name.
 
         Returns
         -------
-        dict[str, object] | str
+        str
             Deal name (e.g., "FNR 2024-1")
 
         Notes
@@ -575,12 +575,12 @@ class AgencyCmoBuilder:
         """
         ...
 
-    def deal_name(self, value: dict[str, object] | str) -> AgencyCmoBuilder:
+    def deal_name(self, value: str) -> AgencyCmoBuilder:
         """Set the contract's deal name.
 
         Parameters
         ----------
-        value : dict[str, object] | str
+        value : str
             Deal name (e.g., "FNR 2024-1")
 
         Returns

@@ -130,7 +130,7 @@ impl XccySwapLeg {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct XccySwap {
     /// Unique identifier for this instrument.
     pub id: InstrumentId,
@@ -176,6 +176,17 @@ pub struct XccySwap {
         finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for instrument selection and tagging.
     pub attributes: finstack_quant_core::types::Attributes,
+}
+
+finstack_quant_valuations_core::validate_on_deserialize!(XccySwap);
+
+/// Options controlling one XCCY period projection.
+pub(crate) struct XccyPeriodProjectionArgs<'a> {
+    /// Whether `period.accrual_end` ends on the leg's termination date.
+    pub(crate) end_is_termination_date: bool,
+    /// Optional collector for projected rate observations.
+    pub(crate) projected_fixings:
+        Option<&'a mut Vec<finstack_quant_cashflows::fixings::ProjectedFixing>>,
 }
 
 impl XccySwap {
@@ -431,6 +442,14 @@ impl XccySwap {
     }
 
     fn validate_leg(&self, leg: &XccySwapLeg) -> Result<()> {
+        finstack_quant_core::validation::validate_date_range_strict(
+            leg.leg.start,
+            leg.leg.end,
+            &format!("XccySwap '{}' leg {}", self.id, leg.notional.currency()),
+        )?;
+        finstack_quant_core::market_data::fixings::validate_fixing_index_id(
+            leg.leg.index_id.as_str(),
+        )?;
         if leg.leg.compounding
             == finstack_quant_cashflows::builder::FloatingLegCompounding::SimpleAverage
         {
@@ -556,58 +575,49 @@ impl XccySwap {
     pub(crate) fn projected_leg_period(
         &self,
         leg: &XccySwapLeg,
-        fwd: &finstack_quant_core::market_data::term_structures::ForwardCurve,
+        fwd: &crate::swap_legs::ResolvedProjectionCurve,
         fixings: Option<&finstack_quant_core::market_data::scalars::ScalarTimeSeries>,
         period: &finstack_quant_cashflows::builder::SchedulePeriod,
         as_of: Date,
-        projected_fixings: Option<&mut Vec<finstack_quant_cashflows::fixings::ProjectedFixing>>,
+        args: XccyPeriodProjectionArgs<'_>,
     ) -> Result<ProjectedXccyPeriod> {
         use finstack_quant_cashflows::builder::FloatingLegCompounding;
-        use finstack_quant_valuations_core::instruments::pricing::overnight::{
-            OvernightCouponProjectionInput, OvernightProjectionCurve,
-            adjust_overnight_accrual_boundaries, project_overnight_coupon,
-        };
+
+        let XccyPeriodProjectionArgs {
+            end_is_termination_date,
+            projected_fixings,
+        } = args;
 
         let projected = if !matches!(leg.leg.compounding, FloatingLegCompounding::Simple) {
             let calendar = self.resolve_leg_calendar(leg)?;
-            let (accrual_start, accrual_end) = adjust_overnight_accrual_boundaries(
-                period.accrual_start,
-                period.accrual_end,
-                leg.leg.business_day_convention,
-                calendar,
-            )?;
-            if accrual_end <= accrual_start {
-                ProjectedXccyPeriod {
+            match crate::swap_legs::project_float_leg_overnight(
+                &leg.leg,
+                period,
+                fwd,
+                fixings,
+                as_of,
+                crate::swap_legs::OvernightPeriodParams {
+                    fixing_calendar: calendar,
+                    end_is_termination_date,
+                    need_observation_exposures: projected_fixings.is_some(),
+                },
+            )? {
+                None => ProjectedXccyPeriod {
                     rate: 0.0,
                     year_fraction: 0.0,
                     fixing_date: None,
                     compound_factor: 1.0,
-                }
-            } else {
-                let projection = project_overnight_coupon(OvernightCouponProjectionInput {
-                    curve: OvernightProjectionCurve::Forward(fwd),
-                    fixings,
-                    fixing_id: leg.leg.index_id.as_str(),
-                    as_of,
-                    accrual_start,
-                    accrual_end,
-                    end_is_termination_date: None,
-                    day_count: leg.leg.day_count,
-                    coupon_frequency: Some(leg.leg.frequency),
-                    coupon_period: (accrual_start, accrual_end),
-                    compounding: &leg.leg.compounding,
-                    fixing_calendar: calendar,
-                    compounded_spread: 0.0,
-                    need_observation_exposures: projected_fixings.is_some(),
-                })?;
-                if let Some(out) = projected_fixings {
-                    out.extend(projection.projected_fixings(leg.leg.index_id.as_str()));
-                }
-                ProjectedXccyPeriod {
-                    rate: projection.rate,
-                    year_fraction: projection.accrual_year_fraction,
-                    fixing_date: Some(projection.fixing_date),
-                    compound_factor: projection.compound_factor,
+                },
+                Some(projection) => {
+                    if let Some(out) = projected_fixings {
+                        out.extend(projection.projected_fixings(leg.leg.index_id.as_str()));
+                    }
+                    ProjectedXccyPeriod {
+                        rate: projection.rate,
+                        year_fraction: projection.accrual_year_fraction,
+                        fixing_date: Some(projection.fixing_date),
+                        compound_factor: projection.compound_factor,
+                    }
                 }
             }
         } else {
@@ -615,7 +625,7 @@ impl XccySwap {
             let forward_rate = if fixing_date < as_of {
                 finstack_quant_core::market_data::fixings::require_fixing_value_exact(
                     fixings,
-                    leg.leg.forward_curve_id.as_str(),
+                    leg.leg.index_id.as_str(),
                     fixing_date,
                 )?
             } else {
@@ -661,25 +671,31 @@ impl XccySwap {
     ) -> Result<CashFlowSchedule> {
         let calendar_id = self.resolve_leg_calendar_id(leg)?;
         let periods = self.leg_build_periods(leg, calendar_id)?;
-        let fwd = market.get_forward(&leg.leg.forward_curve_id)?;
-        let fixing_series_id =
-            finstack_quant_core::market_data::fixings::fixing_series_id(leg.leg.index_id.as_str());
-        let fixings = market.get_series(&fixing_series_id).ok();
+        let fwd = crate::swap_legs::ResolvedProjectionCurve::resolve(
+            market,
+            &leg.leg.forward_curve_id,
+            &leg.leg.discount_curve_id,
+        )?;
+        let fixings = crate::swap_legs::optional_fixing_series(market, leg.leg.index_id.as_str())?;
         let spread = leg.leg.spread_bp.as_f64() / 10_000.0;
 
         let mut flows = Vec::with_capacity(periods.len());
         let mut projected_fixings = Vec::new();
+        let final_period_end = periods.last().map(|period| period.accrual_end);
         for period in &periods {
             if period.payment_date <= as_of {
                 continue;
             }
             let projected = self.projected_leg_period(
                 leg,
-                fwd.as_ref(),
+                &fwd,
                 fixings,
                 period,
                 as_of,
-                Some(&mut projected_fixings),
+                XccyPeriodProjectionArgs {
+                    end_is_termination_date: Some(period.accrual_end) == final_period_end,
+                    projected_fixings: Some(&mut projected_fixings),
+                },
             )?;
             let all_in = projected.all_in_rate(spread);
             let amount = leg.side.sign() * projected.unsigned_coupon(leg.notional.amount(), spread);
@@ -801,10 +817,12 @@ impl XccySwap {
         }
 
         let disc = context.get_discount(&leg.leg.discount_curve_id)?;
-        let fwd = context.get_forward(&leg.leg.forward_curve_id)?;
-        let fixing_series_id =
-            finstack_quant_core::market_data::fixings::fixing_series_id(leg.leg.index_id.as_str());
-        let fixings = context.get_series(&fixing_series_id).ok();
+        let fwd = crate::swap_legs::ResolvedProjectionCurve::resolve(
+            context,
+            &leg.leg.forward_curve_id,
+            &leg.leg.discount_curve_id,
+        )?;
+        let fixings = crate::swap_legs::optional_fixing_series(context, leg.leg.index_id.as_str())?;
         let fx = context.fx();
 
         let mut pv = NeumaierAccumulator::new();
@@ -860,13 +878,23 @@ impl XccySwap {
         }
 
         // Floating coupons
+        let final_period_end = periods.last().map(|period| period.accrual_end);
         for period in periods {
             if period.payment_date <= as_of {
                 continue;
             }
 
-            let projected =
-                self.projected_leg_period(leg, fwd.as_ref(), fixings, &period, as_of, None)?;
+            let projected = self.projected_leg_period(
+                leg,
+                &fwd,
+                fixings,
+                &period,
+                as_of,
+                XccyPeriodProjectionArgs {
+                    end_is_termination_date: Some(period.accrual_end) == final_period_end,
+                    projected_fixings: None,
+                },
+            )?;
             // Warn about extremely negative forward rates which may indicate curve issues.
             // Even in negative rate environments (JPY/CHF/EUR), rates below -5% are unusual.
             if projected.rate < EXTREME_NEGATIVE_RATE_THRESHOLD {
@@ -958,8 +986,13 @@ impl finstack_quant_valuations_core::instruments::Instrument for XccySwap {
         let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.leg1.leg.discount_curve_id.clone());
         deps.add_discount_curve(self.leg2.leg.discount_curve_id.clone());
-        deps.add_forward_curve(self.leg1.leg.forward_curve_id.clone());
-        deps.add_forward_curve(self.leg2.leg.forward_curve_id.clone());
+        for leg in [&self.leg1.leg, &self.leg2.leg] {
+            if leg.compounding == finstack_quant_cashflows::builder::FloatingLegCompounding::Simple
+                || leg.forward_curve_id != leg.discount_curve_id
+            {
+                deps.add_forward_curve(leg.forward_curve_id.clone());
+            }
+        }
         if self.leg1.notional.currency() != self.reporting_currency {
             deps.add_fx_pair(self.leg1.notional.currency(), self.reporting_currency);
         }
@@ -995,6 +1028,10 @@ impl finstack_quant_valuations_core::instruments::Instrument for XccySwap {
         Money::from_model_value(pv, self.reporting_currency)
     }
 
+    fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
+        Some(self.leg1.leg.end.max(self.leg2.leg.end))
+    }
+
     fn base_value_raw(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -1003,6 +1040,11 @@ impl finstack_quant_valuations_core::instruments::Instrument for XccySwap {
         // One structural check shared with `validate_invariants`: leg
         // invariants, distinct leg currencies and MtM schedule alignment.
         self.validate()?;
+
+        // Short-circuit expired swaps before probing FX/curves (settled trades have 0 PV).
+        if !self.has_unsettled_flows(as_of)? {
+            return Ok(0.0);
+        }
 
         // Pre-flight FX reachability: fail loud with currency-pair context
         // BEFORE descending into per-cashflow conversion. Without this, missing
@@ -1029,14 +1071,58 @@ impl finstack_quant_valuations_core::instruments::Instrument for XccySwap {
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
+impl XccySwap {
+    /// Returns `true` if either leg still has an unsettled coupon or principal exchange after `as_of`.
+    pub(crate) fn has_unsettled_flows(&self, as_of: Date) -> Result<bool> {
+        for leg in [&self.leg1, &self.leg2] {
+            let periods = self.leg_build_periods(leg, self.resolve_leg_calendar_id(leg)?)?;
+            if periods.is_empty() {
+                return Err(finstack_quant_core::Error::Validation(
+                    "XccySwap leg schedule must contain at least 1 period".to_string(),
+                ));
+            }
+            let start_date = self.adjusted_leg_start(leg)?;
+            let end_date = self.adjusted_leg_end(leg)?;
+            let unsettled_coupon = periods.iter().any(|p| p.payment_date > as_of);
+            let unsettled_initial = matches!(
+                self.notional_exchange,
+                NotionalExchange::InitialAndFinal | NotionalExchange::MtmResetting { .. }
+            ) && start_date > as_of;
+            let unsettled_final = matches!(
+                self.notional_exchange,
+                NotionalExchange::Final
+                    | NotionalExchange::InitialAndFinal
+                    | NotionalExchange::MtmResetting { .. }
+            ) && end_date > as_of;
+            if unsettled_coupon || unsettled_initial || unsettled_final {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+}
+
 impl finstack_quant_cashflows::CashflowScheduleSource for XccySwap {
     fn raw_cashflow_schedule(
         &self,
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
-        self.validate_leg(&self.leg1)?;
-        self.validate_leg(&self.leg2)?;
+        self.validate()?;
+
+        if !self.has_unsettled_flows(as_of)? {
+            return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+                Vec::new(),
+                self.leg1.leg.day_count,
+                finstack_quant_cashflows::ScheduleBuildOpts {
+                    notional_hint: Some(Money::from((0_i64, self.reporting_currency))),
+                    ..Default::default()
+                },
+            )
+            .with_representation(
+                finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+            ));
+        }
 
         let anchor = if as_of < self.leg1.leg.start {
             as_of
@@ -1049,7 +1135,6 @@ impl finstack_quant_cashflows::CashflowScheduleSource for XccySwap {
         // routed through `pricing_mtm::mtm_resetting_leg_schedule` which mirrors the
         // PV cashflow stream but emits records instead of summing.
         if let NotionalExchange::MtmResetting { resetting_side } = self.notional_exchange {
-            self.validate()?;
             let schedule = crate::xccy_swap::pricing_mtm::mtm_cashflow_schedule(
                 self,
                 resetting_side,

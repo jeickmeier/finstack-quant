@@ -53,11 +53,11 @@ pub(crate) fn quoted_dirty_from_clean_px(
 ) -> finstack_quant_core::Result<Money> {
     let settlement = loan.settlement_date(as_of)?;
     let out_path = schedule.outstanding_by_date()?;
-    let outstanding = out_path
-        .iter()
-        .rev()
-        .find(|(date, _)| *date <= settlement)
-        .map_or(schedule.get_notional().initial, |(_, amount)| *amount);
+    let outstanding = crate::term_loan::pricing::outstanding_on(
+        &out_path,
+        settlement,
+        schedule.get_notional().initial.amount(),
+    );
     // Principal already removed from the interest base but still payable
     // after settlement is part of the balance purchased with the quote.
     let pending_principal: f64 = schedule
@@ -81,7 +81,7 @@ pub(crate) fn quoted_dirty_from_clean_px(
     )?
     .amount();
     Money::from_model_value(
-        px / 100.0 * (outstanding.amount() + pending_principal) + accrued,
+        px / 100.0 * (outstanding + pending_principal) + accrued,
         loan.currency,
     )
 }
@@ -150,6 +150,9 @@ pub(super) fn solve_irr_to_exercise(
 ) -> finstack_quant_core::Result<f64> {
     // Compute settlement date using loan calendar/business-day conventions.
     let settlement_date = loan.settlement_date(as_of)?;
+    if exercise_date <= settlement_date {
+        return Err(finstack_quant_core::InputError::InvalidDateRange.into());
+    }
 
     let mut flows: Vec<(Date, f64)> = Vec::with_capacity(schedule.get_flows().len() + 2);
 

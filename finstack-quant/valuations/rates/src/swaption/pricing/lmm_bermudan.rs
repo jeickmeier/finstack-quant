@@ -291,7 +291,7 @@ pub fn price_bermudan_lmm(
                 }
             }
 
-            if itm_continuation.len() > config.basis_degree + 3 {
+            if itm_continuation.len() > num_basis + 10 {
                 // Solve least-squares regression. A regression failure is a
                 // hard error (matching the HW1F LSMC harness) rather than a
                 // silent skip that would leave biased continuation values.
@@ -318,14 +318,10 @@ pub fn price_bermudan_lmm(
                     }
                     // else keep existing cashflow (continuation)
                 }
-            } else {
-                // Too few ITM train paths for regression: exercise if positive
-                for (i, &ev) in exercise_values.iter().enumerate() {
-                    if ev > 0.0 && ev > cashflow[i] {
-                        cashflow[i] = ev;
-                    }
-                }
             }
+            // With insufficient ITM training observations retain the later exercise
+            // policy (`cashflow[i]`); comparing against realized future payoffs would
+            // introduce look-ahead bias.
         }
     }
 
@@ -966,6 +962,37 @@ mod tests {
             "in-sample {} and OOS {} should agree within MC noise {tol}",
             in_sample.mean.amount(),
             out_sample.mean.amount()
+        );
+    }
+
+    #[test]
+    fn sparse_itm_date_retains_continuation_without_lookahead_bias() {
+        let params = test_lmm_params();
+        let df_terminal = (-0.03 * 4.0_f64).exp();
+        let config = Hw1fMcConfig {
+            num_paths: 12,
+            seed: 99,
+            basis_degree: 2,
+            antithetic: false,
+            min_steps_between_events: 4,
+            oos_lsmc: false,
+        };
+        let swap = LmmBermudanSwap {
+            strike: 0.025,
+            payer: true,
+            notional: 1_000_000.0,
+            discount_factor_terminal: df_terminal,
+            currency: Currency::USD,
+        };
+        let euro_last = price_bermudan_lmm(&params, &[3.0], &swap, &config).expect("last exercise");
+        let bermudan = price_bermudan_lmm(&params, &[1.0, 2.0, 3.0], &swap, &config)
+            .expect("sparse itm bermudan");
+        assert!(
+            (bermudan.mean.amount() - euro_last.mean.amount()).abs() < 1e-8,
+            "sparse ITM dates (< num_basis + 10) must keep continuation without lookahead exercise: \
+             berm={}, euro_last={}",
+            bermudan.mean.amount(),
+            euro_last.mean.amount()
         );
     }
 }

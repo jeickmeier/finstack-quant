@@ -947,3 +947,67 @@ fn protected_cpi_ratio_matches_independent_stochastic_density_grid() {
         }
     }
 }
+
+#[test]
+fn serde_rejects_invalid_ilb_invariants() {
+    let mut val =
+        serde_json::to_value(InflationLinkedBond::example().expect("example")).expect("serialize");
+    val["base_cpi"] = serde_json::json!(-10.0);
+    assert!(serde_json::from_value::<InflationLinkedBond>(val).is_err());
+}
+
+#[test]
+fn reference_cpi_uses_contractual_unadjusted_dates_when_bdc_shifts_payment() {
+    use finstack_quant_cashflows::CashflowScheduleSource;
+    // 2027-01-16 is Saturday -> Following shifts payment_date to Monday 2027-01-18,
+    // while Reference CPI lookup remains anchored to contractual unadjusted dates.
+    let issue = d(2025, Month::January, 16);
+    let maturity = d(2027, Month::January, 16);
+
+    let mut unadj = InflationLinkedBond::example().expect("example");
+    unadj.issue_date = issue;
+    unadj.maturity = maturity;
+    unadj.base_date = issue;
+    unadj.base_cpi = 300.0;
+    unadj.inflation_index_id = CurveId::new("US-CPI");
+    unadj.lag = InflationLag::None;
+    unadj.deflation_protection = DeflationProtection::None;
+    unadj.floor_vol_surface_id = None;
+    unadj.frequency = Tenor::annual();
+    unadj.business_day_convention = BusinessDayConvention::Unadjusted;
+    unadj.calendar_id = None;
+
+    let mut following = unadj.clone();
+    following.business_day_convention = BusinessDayConvention::Following;
+
+    let curve = InflationCurve::builder("US-CPI")
+        .base_date(issue)
+        .day_count(DayCount::Act365F)
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Flat)
+        .knots([(0.0, 300.0), (1.0, 306.0), (2.0, 312.0), (3.0, 324.0)])
+        .build()
+        .expect("curve");
+    let market = MarketContext::new()
+        .try_insert(curve)
+        .expect("market")
+        .insert_inflation_index(simple_index("US-CPI", issue, 300.0, Currency::USD));
+
+    let sched_unadj = unadj
+        .raw_cashflow_schedule(&market, issue)
+        .expect("unadjusted schedule");
+    let sched_fol = following
+        .raw_cashflow_schedule(&market, issue)
+        .expect("following schedule");
+
+    let unadj_last = sched_unadj.get_flows().last().expect("unadj last");
+    let fol_last = sched_fol.get_flows().last().expect("fol last");
+    assert_eq!(unadj_last.get_date(), d(2027, Month::January, 16));
+    assert_eq!(fol_last.get_date(), d(2027, Month::January, 18));
+    assert!(
+        (unadj_last.get_amount().amount() - fol_last.get_amount().amount()).abs() < 1e-9,
+        "principal indexed amount should be invariant to BDC shift: unadj={}, fol={}",
+        unadj_last.get_amount().amount(),
+        fol_last.get_amount().amount()
+    );
+}

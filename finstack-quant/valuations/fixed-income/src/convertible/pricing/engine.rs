@@ -19,7 +19,6 @@ use finstack_quant_valuations_core::instruments::{GreekBumps, Instrument};
 use finstack_quant_valuations_core::metrics::bump_discount_curve_parallel;
 
 use super::credit_tree::{CreditTreeEngine, CreditTreeMarketInputs, terminal_payoff};
-use super::tf_tree::TsiveriotisFernandesEngine;
 use super::valuator::ConvertibleBondValuator;
 use finstack_quant_valuations_core::pricer::ModelKey;
 
@@ -581,24 +580,14 @@ fn price_convertible_bond_with_inputs(
         risk_free_rate: inputs.risk_free_rate,
         dividend_yield: inputs.dividend_yield,
     };
-    let pv_amount = match model {
-        ConvertibleModel::DefaultableEquity => {
-            CreditTreeEngine {
-                valuator: &valuator,
-                steps,
-                time_to_maturity: inputs.time_to_maturity,
-            }
-            .price(lattice_inputs)?
-            .0
-        }
-        ConvertibleModel::TsiveriotisFernandes => TsiveriotisFernandesEngine {
-            valuator: &valuator,
-            steps,
-            time_to_maturity: inputs.time_to_maturity,
-            recovery_rate: bond.recovery_rate.unwrap_or(0.0),
-        }
-        .price(lattice_inputs)?,
-    };
+    let (pv_amount, _) = CreditTreeEngine {
+        valuator: &valuator,
+        steps,
+        time_to_maturity: inputs.time_to_maturity,
+        model,
+        recovery_rate: bond.recovery_rate.unwrap_or(0.0),
+    }
+    .price(lattice_inputs)?;
 
     Money::from_model_value(pv_amount, bond.notional.currency())
 }
@@ -658,40 +647,32 @@ pub(crate) fn price_bond_floor(
     }
     if as_of == bond.maturity {
         let schedule = build_convertible_schedule(bond, market_context)?;
-        let curve = market_context.get_discount(bond.discount_curve_id.as_str())?;
         return schedule
             .get_flows()
             .iter()
             .filter(|cf| cf.get_date() >= as_of && cf.get_kind().is_cash_settlement())
             .try_fold(0.0, |value, cf| {
-                Ok(value
-                    + cf.get_amount().amount() * curve.df_between_dates(as_of, cf.get_date())?)
+                let factors = cash_factors(model, bond, market_context, as_of, cf.get_date())?;
+                let recovery = if cf.get_kind().is_principal_like() {
+                    factors.recovery
+                } else {
+                    0.0
+                };
+                Ok(value + cf.get_amount().amount() * (factors.df * factors.credit + recovery))
             });
     }
     let inputs = prepare_for_pricing(bond, market_context, as_of)?;
     let steps = tree_steps(bond)?;
     let valuator =
         ConvertibleBondValuator::new(bond, &inputs, steps, as_of, market_context, model)?;
-    if model == ConvertibleModel::TsiveriotisFernandes {
-        return TsiveriotisFernandesEngine {
-            valuator: &valuator,
-            steps,
-            time_to_maturity: inputs.time_to_maturity,
-            recovery_rate: bond.recovery_rate.unwrap_or(0.0),
-        }
-        .bond_floor();
+    CreditTreeEngine {
+        valuator: &valuator,
+        steps,
+        time_to_maturity: inputs.time_to_maturity,
+        model,
+        recovery_rate: bond.recovery_rate.unwrap_or(0.0),
     }
-    let payment = |step| {
-        valuator.coupon_map.get(&step).copied().unwrap_or(0.0)
-            + valuator.principal_map.get(&step).copied().unwrap_or(0.0)
-    };
-    let mut value = payment(steps);
-    for step in (0..steps).rev() {
-        value = payment(step)
-            + value * valuator.rf_step_dfs[step] * valuator.survival_factors[step]
-            + valuator.recovery_by_step[step];
-    }
-    Ok(value)
+    .bond_floor()
 }
 
 /// Calculate Greeks for a convertible bond using central finite differences.

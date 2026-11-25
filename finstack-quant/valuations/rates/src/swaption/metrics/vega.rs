@@ -102,7 +102,7 @@ impl MetricCalculator for HwSigmaVegaCalculator {
                 "hw_sigma_vega requires positive sigma".into(),
             ));
         }
-        let price = |shift: f64| {
+        crate::vol_model::hw_sigma_vega_fd(h, true, |shift| {
             let mut bumped = option.clone();
             bumped
                 .instrument_pricing_overrides
@@ -111,7 +111,6 @@ impl MetricCalculator for HwSigmaVegaCalculator {
             bumped.instrument_pricing_overrides.model_config.hw1f_sigma =
                 Some(params.sigma + shift);
             context.reprice_instrument_raw(&bumped, &context.curves, context.as_of)
-        };
-        Ok((price(h)? - price(-h)?) / (2.0 * h) * 0.01)
+        })
     }
 }

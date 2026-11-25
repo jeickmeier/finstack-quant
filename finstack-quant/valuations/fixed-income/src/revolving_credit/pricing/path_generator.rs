@@ -231,6 +231,10 @@ pub(crate) fn generate_three_factor_paths(
 
     let credit_spread_params =
         build_credit_spread_params(mc_config, facility, market, simulation_anchor)?;
+    let constant_credit_spread = match mc_config.credit_spread_process {
+        CreditSpreadProcessSpec::Constant(spread) => Some(spread.max(0.0)),
+        _ => None,
+    };
 
     // Reject malformed rate specifications before any path is simulated: the
     // discretization indexes rate knots by position, so a mismatched or
@@ -383,6 +387,9 @@ pub(crate) fn generate_three_factor_paths(
             if is_zero_vol {
                 state[0] = u_frozen;
             }
+            if let Some(spread) = constant_credit_spread {
+                state[2] = spread;
+            }
 
             if next_payment_idx < refined.payment_indices.len()
                 && i + 1 == refined.payment_indices[next_payment_idx]
@@ -509,9 +516,10 @@ pub fn build_credit_spread_params(
             CreditSpreadParams::new(stable_kappa, stable_theta, *sigma, stable_initial)
         }
         CreditSpreadProcessSpec::Constant(spread) => {
-            // Use constant spread with minimal dynamics
+            // CIR sigma must be strictly positive for CirParams validation; generate_paths
+            // pins state[2] to `stable_spread` after each step for exact zero diffusion.
             let stable_spread = spread.max(0.0);
-            CreditSpreadParams::new(0.01, stable_spread, 0.001, stable_spread)
+            CreditSpreadParams::new(0.01, stable_spread, MIN_CIR_SPREAD, stable_spread)
         }
         CreditSpreadProcessSpec::MarketAnchored {
             credit_curve_id,

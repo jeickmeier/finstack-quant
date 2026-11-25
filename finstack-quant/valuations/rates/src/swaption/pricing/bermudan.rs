@@ -481,6 +481,14 @@ impl BermudanSwaptionPricer {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<ValuationResult, PricingError> {
+        if swaption.bermudan_type == crate::swaption::BermudanType::NonCoTerminal {
+            return Err(PricingError::model_failure_with_context(
+                "Non-co-terminal Bermudan swaptions are not supported by LSMC; \
+                 each exercise date would require a different swap end date. \
+                 Use BermudanType::CoTerminal instead.",
+                PricingErrorContext::from_instrument(swaption),
+            ));
+        }
         require_single_curve(
             "Bermudan Hull-White",
             swaption.get_forward_curve_id(),

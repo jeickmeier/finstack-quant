@@ -141,6 +141,14 @@ impl PyTermLoan {
         instrument_expiry(py, &self.inner)
     }
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments.term_loan", "TermLoan.to_builder")]
+    fn to_builder(&self) -> PyTermLoanBuilder {
+        PyTermLoanBuilder {
+            inner: Some(self.inner.to_builder()),
+            fields: Vec::new(),
+        }
+    }
+
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -218,10 +226,17 @@ impl PyTermLoanBuilder {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments.term_loan", "TermLoanBuilder.currency")]
     #[pyo3(text_signature = "($self, value)")]
-    fn currency<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        let ccy = crate::bindings::module_utils::parse_currency(value)?;
-        builder_set!(slf, currency, format!("{value:?}"), |b: TermLoanBuilder| b
-            .currency(ccy))
+    fn currency<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let ccy = crate::bindings::core::currency::extract_currency(value)?;
+        builder_set!(
+            slf,
+            currency,
+            format!("{:?}", ccy.to_string()),
+            |b: TermLoanBuilder| b.currency(ccy)
+        )
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments.term_loan", "TermLoanBuilder.notional_limit")]

@@ -5,7 +5,7 @@
   "description": "Every price, yield and spread quote of a bond, solved from any one of them.",
   "examples": [
     {
-      "asw_market": 0.00824535793167,
+      "asw_market": 0.00826176204715,
       "asw_par": 0.00648458998161,
       "clean_price_currency": 985000.0,
       "clean_price_pct": 98.5,

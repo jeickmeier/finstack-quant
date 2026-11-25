@@ -70,14 +70,54 @@ impl MetricCalculator for CollateralCoverageCalculator {
                 )
             })?;
 
+        let repo = context.instrument_as::<crate::repo::Repo>()?;
         if required_value == 0.0 {
             return Err(finstack_quant_core::Error::Validation(
                 "CollateralCoverage is undefined: required collateral is zero".to_string(),
             ));
         }
 
-        Ok(collateral_value / required_value)
+        let collateral_in_cash = collateral_in_cash_currency(repo, context, collateral_value)?;
+        Ok(collateral_in_cash / required_value)
     }
+}
+
+/// Convert collateral market value into the repo's cash currency via `MarketContext::fx`.
+pub(super) fn collateral_in_cash_currency(
+    repo: &crate::repo::Repo,
+    context: &MetricContext,
+    collateral_amount: f64,
+) -> Result<f64> {
+    let collateral_money = repo.collateral.market_value(&context.curves)?;
+    let cash_currency = repo.cash_amount.currency();
+    if collateral_money.currency() == cash_currency {
+        return Ok(collateral_amount);
+    }
+    let fx = context.curves.fx().ok_or_else(|| {
+        finstack_quant_core::Error::Validation(format!(
+            "Repo '{}' collateral currency {} differs from cash currency {}; FxMatrix is required",
+            repo.id,
+            collateral_money.currency(),
+            cash_currency
+        ))
+    })?;
+    let rate = fx
+        .rate(finstack_quant_core::money::fx::FxQuery::new(
+            collateral_money.currency(),
+            cash_currency,
+            context.as_of,
+            finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
+        ))
+        .map_err(|err| {
+            finstack_quant_core::Error::Validation(format!(
+                "Repo '{}' cannot convert collateral from {} to cash currency {}: {err}",
+                repo.id,
+                collateral_money.currency(),
+                cash_currency
+            ))
+        })?
+        .rate;
+    Ok(collateral_amount * rate)
 }
 
 /// Calculate the market value of collateral.
@@ -175,6 +215,9 @@ impl MetricCalculator for TimeToMaturityCalculator {
         let repo = context.instrument_as::<crate::repo::Repo>()?;
         // Use adjusted maturity for consistency with PV and interest calculations
         let (_, adj_maturity) = repo.adjusted_dates()?;
+        if context.as_of >= adj_maturity {
+            return Ok(0.0);
+        }
         let ttm = repo.day_count.year_fraction(
             context.as_of,
             adj_maturity,

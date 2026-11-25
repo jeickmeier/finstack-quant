@@ -62,16 +62,21 @@ pub(crate) fn accrued_interest(
     if interest == 0.0 {
         return Ok(0.0);
     }
-    let elapsed = facility.day_count.year_fraction(
-        period.accrual_start,
-        settlement,
-        DayCountContext::default(),
-    )?;
-    let full = facility.day_count.year_fraction(
-        period.accrual_start,
-        period.accrual_end,
-        DayCountContext::default(),
-    )?;
+    let ctx = if facility.day_count == finstack_quant_core::dates::DayCount::Act365L {
+        DayCountContext {
+            frequency: Some(facility.frequency),
+            coupon_period: Some((period.accrual_start, period.accrual_end)),
+            ..Default::default()
+        }
+    } else {
+        DayCountContext::default()
+    };
+    let elapsed = facility
+        .day_count
+        .year_fraction(period.accrual_start, settlement, ctx)?;
+    let full = facility
+        .day_count
+        .year_fraction(period.accrual_start, period.accrual_end, ctx)?;
     if full <= 0.0 {
         return Ok(0.0);
     }
@@ -120,11 +125,9 @@ fn target_price(
     // `TermLoan::value_at_settlement`. DF-only, like the term loan: survival
     // over the settlement lag is not removed.
     let mut pre_settlement = 0.0;
-    for cf in schedule
-        .get_flows()
-        .iter()
-        .filter(|cf| cf.get_date() > as_of && cf.get_date() <= settlement)
-    {
+    for cf in schedule.get_flows().iter().filter(|cf| {
+        cf.get_date() > as_of && cf.get_date() <= settlement && cf.get_kind().is_cash_settlement()
+    }) {
         pre_settlement += cf.get_amount().amount() * disc.df_between_dates(as_of, cf.get_date())?;
     }
     Ok((context.base_value.amount() - pre_settlement) / carry)

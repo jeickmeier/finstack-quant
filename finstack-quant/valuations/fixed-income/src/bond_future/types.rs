@@ -3,7 +3,7 @@
 //! This module defines the data structures for bond futures, including
 //! the deliverable basket, contract specifications, and the main BondFuture type.
 
-use super::specs::{BondFutureSpecs, repo_annualization_denominator};
+use super::specs::BondFutureSpecs;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
@@ -126,7 +126,7 @@ pub struct DeliverableBond {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct BondFuture {
     /// Unique identifier for the contract
     pub id: InstrumentId,
@@ -217,6 +217,8 @@ pub struct BondFuture {
     pub attributes: Attributes,
 }
 
+finstack_quant_valuations_core::validate_on_deserialize!(BondFuture);
+
 impl BondFuture {
     /// Create a representative UST 10Y bond future example.
     ///
@@ -303,7 +305,30 @@ Provide it at construction time via BondFutureBuilder::ctd_bond(...) or by using
                 ctd_bond_id.as_str()
             ))
         })?;
-        Ok((ctd_bond, self.conversion_factor_for(&ctd_bond_id)?))
+        if ctd_bond.id != ctd_bond_id {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "BondFuture '{}': ctd_bond.id ({}) must match ctd_bond_id ({})",
+                self.id.as_str(),
+                ctd_bond.id.as_str(),
+                ctd_bond_id.as_str()
+            )));
+        }
+        if ctd_bond.notional.currency() != self.terms.currency {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "BondFuture '{}': ctd_bond currency ({}) must match contract currency ({})",
+                self.id.as_str(),
+                ctd_bond.notional.currency(),
+                self.terms.currency
+            )));
+        }
+        let factor = self.conversion_factor_for(&ctd_bond_id)?;
+        if !factor.is_finite() || factor <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "BondFuture '{}': conversion_factor must be positive and finite, got {factor}",
+                self.id.as_str()
+            )));
+        }
+        Ok((ctd_bond, factor))
     }
 
     /// Model futures price in points per 100 face: the carry-adjusted forward
@@ -371,27 +396,31 @@ Provide it at construction time via BondFutureBuilder::ctd_bond(...) or by using
     /// Validate the BondFuture parameters.
     ///
     /// This method checks the following invariants:
-    /// - Date ordering: terms.last_trading_date < delivery_start < terms.settlement_date
+    /// - Exchange-standard delivery window ordering:
+    ///   `delivery_start <= terms.settlement_date` and
+    ///   `terms.last_trading_date <= terms.settlement_date`
+    ///   (supports CME UST / ICE Long Gilt where `delivery_start <= last_trading_date`,
+    ///   and Eurex Bund where `delivery_start == settlement_date`)
     /// - Deliverable basket is non-empty
-    /// - CTD bond exists in deliverable basket
-    /// - All conversion factors are positive
+    /// - CTD bond exists in deliverable basket and any embedded CTD matches ID and currency
+    /// - All conversion factors and contract specifications are valid
     ///
     /// # Errors
     ///
     /// Returns [`Error::Validation`](finstack_quant_core::Error::Validation) if any validation fails.
-    fn validate(&self) -> finstack_quant_core::Result<()> {
-        // Date ordering validation
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        // Date ordering validation (terms.settlement_date is the delivery window end)
         self.terms.validate()?;
-        if self.terms.last_trading_date >= self.delivery_start {
+        if self.delivery_start > self.terms.settlement_date {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "terms.last_trading_date ({}) must be before delivery_start ({})",
-                self.terms.last_trading_date, self.delivery_start
+                "delivery_start ({}) must not be after terms.settlement_date ({})",
+                self.delivery_start, self.terms.settlement_date
             )));
         }
-        if self.delivery_start >= self.terms.settlement_date {
+        if self.terms.last_trading_date > self.terms.settlement_date {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "delivery_start ({}) must be before terms.settlement_date ({})",
-                self.delivery_start, self.terms.settlement_date
+                "terms.last_trading_date ({}) must not be after terms.settlement_date ({})",
+                self.terms.last_trading_date, self.terms.settlement_date
             )));
         }
 
@@ -415,15 +444,22 @@ Provide it at construction time via BondFutureBuilder::ctd_bond(...) or by using
             )));
         }
 
-        // If an embedded CTD bond is provided, it must match the CTD id.
-        if let Some(bond) = &self.ctd_bond
-            && bond.id != resolved_ctd_id
-        {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "ctd_bond.id ({}) must match ctd_bond_id ({})",
-                bond.id.as_str(),
-                resolved_ctd_id.as_str()
-            )));
+        // If an embedded CTD bond is provided, it must match the CTD id and currency.
+        if let Some(bond) = &self.ctd_bond {
+            if bond.id != resolved_ctd_id {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "ctd_bond.id ({}) must match ctd_bond_id ({})",
+                    bond.id.as_str(),
+                    resolved_ctd_id.as_str()
+                )));
+            }
+            if bond.notional.currency() != self.terms.currency {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "ctd_bond currency ({}) must match future currency ({})",
+                    bond.notional.currency(),
+                    self.terms.currency
+                )));
+            }
         }
 
         // Conversion factors validation
@@ -437,13 +473,13 @@ Provide it at construction time via BondFutureBuilder::ctd_bond(...) or by using
             }
         }
 
-        if self.terms.entry_price < 0.0 {
+        if !self.terms.entry_price.is_finite() || self.terms.entry_price < 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "terms.entry_price must be finite and non-negative, got {}",
                 self.terms.entry_price
             )));
         }
-        repo_annualization_denominator(self.contract_specs.repo_day_count)?;
+        self.contract_specs.validate()?;
 
         Ok(())
     }
@@ -572,21 +608,22 @@ mod tests {
             conversion_factor: 0.8234,
         };
 
-        // expiry_date >= delivery_start (invalid)
+        // last_trading_date > settlement_date (invalid)
+        let mut terms = ListedFutureTerms::new(
+            10.0,
+            1_000.0,
+            Currency::USD,
+            125.50,
+            Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"),
+            Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"),
+            Position::Long,
+        )
+        .expect("terms");
+        terms.last_trading_date =
+            Date::from_calendar_date(2025, Month::April, 1).expect("Valid date");
         let result = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
-            .terms(
-                ListedFutureTerms::new(
-                    10.0,
-                    1_000.0,
-                    Currency::USD,
-                    125.50,
-                    Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"),
-                    Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"),
-                    Position::Long,
-                )
-                .expect("terms"),
-            )
+            .terms(terms)
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
             .contract_specs(BondFutureSpecs::default())
             .deliverable_basket(vec![deliverable])
@@ -597,7 +634,7 @@ mod tests {
 
         assert!(result.is_err());
         let err_msg = format!("{}", result.expect_err("Should have validation error"));
-        assert!(err_msg.contains("terms.last_trading_date") && err_msg.contains("delivery_start"));
+        assert!(err_msg.contains("last_trading_date") && err_msg.contains("settlement_date"));
     }
 
     #[test]
@@ -607,7 +644,7 @@ mod tests {
             conversion_factor: 0.8234,
         };
 
-        // delivery_start >= terms.settlement_date (invalid)
+        // delivery_start > terms.settlement_date (invalid)
         let result = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
             .terms(
@@ -631,8 +668,62 @@ mod tests {
             .build();
 
         assert!(result.is_err());
-        let err_msg = format!("{}", result.expect_err("Should have validation error"));
-        assert!(err_msg.contains("delivery_start") && err_msg.contains("terms.settlement_date"));
+    }
+
+    #[test]
+    fn test_validation_allows_cme_ust_and_eurex_bund_delivery_conventions() {
+        let deliverable = DeliverableBond {
+            bond_id: InstrumentId::new("DE0001102580"),
+            conversion_factor: 0.85,
+        };
+
+        // CME UST: delivery_start (Mar 3) <= last_trading_date (Mar 20) <= settlement_date (Mar 31)
+        let ust = BondFuture::builder()
+            .id(InstrumentId::new("TYH5-CME"))
+            .terms(
+                ListedFutureTerms::new(
+                    10.0,
+                    1_000.0,
+                    Currency::USD,
+                    112.0,
+                    Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"),
+                    Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"),
+                    Position::Long,
+                )
+                .expect("terms"),
+            )
+            .delivery_start(Date::from_calendar_date(2025, Month::March, 3).expect("Valid date"))
+            .contract_specs(BondFutureSpecs::ust_10y())
+            .deliverable_basket(vec![deliverable.clone()])
+            .ctd_bond_id(InstrumentId::new("DE0001102580"))
+            .discount_curve_id(CurveId::new("USD-TREASURY"))
+            .attributes(Attributes::new())
+            .build();
+        assert!(ust.is_ok(), "CME UST ordering must pass: {ust:?}");
+
+        // Eurex Bund: single delivery day (delivery_start == settlement_date)
+        let bund = BondFuture::builder()
+            .id(InstrumentId::new("FGBLH5"))
+            .terms(
+                ListedFutureTerms::new(
+                    10.0,
+                    1_000.0,
+                    Currency::EUR,
+                    132.0,
+                    Date::from_calendar_date(2025, Month::March, 6).expect("Valid date"),
+                    Date::from_calendar_date(2025, Month::March, 10).expect("Valid date"),
+                    Position::Long,
+                )
+                .expect("terms"),
+            )
+            .delivery_start(Date::from_calendar_date(2025, Month::March, 10).expect("Valid date"))
+            .contract_specs(BondFutureSpecs::bund())
+            .deliverable_basket(vec![deliverable])
+            .ctd_bond_id(InstrumentId::new("DE0001102580"))
+            .discount_curve_id(CurveId::new("EUR-BUND"))
+            .attributes(Attributes::new())
+            .build();
+        assert!(bund.is_ok(), "Eurex Bund ordering must pass: {bund:?}");
     }
 
     #[test]
@@ -1077,7 +1168,7 @@ mod tests {
             conversion_factor: 0.8234,
         };
 
-        // Invalid: expiry after delivery start
+        // Invalid: delivery_start after settlement_date
         let result = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
             .terms(
@@ -1092,7 +1183,7 @@ mod tests {
                 )
                 .expect("terms"),
             )
-            .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
+            .delivery_start(Date::from_calendar_date(2025, Month::April, 1).expect("Valid date"))
             .contract_specs(BondFutureSpecs::ust_10y())
             .deliverable_basket(vec![deliverable])
             .ctd_bond_id(InstrumentId::new("US912828XG33"))
@@ -1397,5 +1488,73 @@ mod instrument_trait_tests {
         assert_eq!(curves.discount_curves.len(), 2);
         assert_eq!(curves.discount_curves[1].as_str(), "USD-SPECIAL-REPO");
         assert_eq!(curves.forward_curves.len(), 0);
+    }
+
+    #[test]
+    fn test_serde_rejects_invalid_bond_future_specs_and_contract() {
+        let mut specs = serde_json::to_value(BondFutureSpecs::default()).expect("serialize specs");
+        specs["standard_maturity_years"] = serde_json::json!(-10.0);
+        assert!(serde_json::from_value::<BondFutureSpecs>(specs).is_err());
+
+        let mut future = serde_json::to_value(BondFuture::example().expect("example"))
+            .expect("serialize future");
+        future["terms"]["last_trading_date"] = serde_json::json!("2030-01-01");
+        assert!(serde_json::from_value::<BondFuture>(future).is_err());
+    }
+
+    #[test]
+    fn test_embedded_ctd_rejects_mismatched_id_or_currency() {
+        let deliverable = DeliverableBond {
+            bond_id: InstrumentId::new("CTD-A"),
+            conversion_factor: 0.85,
+        };
+        let wrong_id_bond = crate::bond::Bond::fixed(
+            "WRONG-ID",
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("rate"),
+            Date::from_calendar_date(2024, Month::January, 15).expect("date"),
+            Date::from_calendar_date(2034, Month::January, 15).expect("date"),
+            finstack_quant_core::dates::StubKind::None,
+            "USD-OIS",
+        )
+        .expect("bond");
+
+        let mut future = BondFuture::builder()
+            .id(InstrumentId::new("TY-MISMATCH"))
+            .terms(
+                ListedFutureTerms::new(
+                    10.0,
+                    1_000.0,
+                    Currency::USD,
+                    125.0,
+                    Date::from_calendar_date(2025, Month::March, 20).expect("date"),
+                    Date::from_calendar_date(2025, Month::March, 31).expect("date"),
+                    Position::Long,
+                )
+                .expect("terms"),
+            )
+            .delivery_start(Date::from_calendar_date(2025, Month::March, 1).expect("date"))
+            .contract_specs(BondFutureSpecs::default())
+            .deliverable_basket(vec![deliverable])
+            .ctd_bond_id(InstrumentId::new("CTD-A"))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .attributes(Attributes::new())
+            .build()
+            .expect("base future builds");
+        future.ctd_bond = Some(wrong_id_bond);
+        assert!(future.embedded_ctd().is_err());
+
+        let wrong_ccy_bond = crate::bond::Bond::fixed(
+            "CTD-A",
+            Money::from((1_000_000_i64, Currency::EUR)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("rate"),
+            Date::from_calendar_date(2024, Month::January, 15).expect("date"),
+            Date::from_calendar_date(2034, Month::January, 15).expect("date"),
+            finstack_quant_core::dates::StubKind::None,
+            "USD-OIS",
+        )
+        .expect("bond");
+        future.ctd_bond = Some(wrong_ccy_bond);
+        assert!(future.embedded_ctd().is_err());
     }
 }

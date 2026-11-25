@@ -97,7 +97,7 @@ impl TbaTerm {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct AgencyTba {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -189,6 +189,8 @@ pub struct AgencyTba {
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(AgencyTba);
 
 impl AgencyTba {
     /// Validate the TBA economic contract and optional assumed collateral.
@@ -498,5 +500,13 @@ mod tests {
         assert_eq!(TbaTerm::ThirtyYear.years(), 30);
         assert_eq!(TbaTerm::ThirtyYear.months(), 360);
         assert_eq!(TbaTerm::FifteenYear.years(), 15);
+    }
+
+    #[test]
+    fn serde_rejects_invalid_tba() {
+        let mut value =
+            serde_json::to_value(AgencyTba::example().expect("example")).expect("serialize");
+        value["coupon"] = serde_json::json!(-0.02);
+        assert!(serde_json::from_value::<AgencyTba>(value).is_err());
     }
 }

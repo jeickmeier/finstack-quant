@@ -7,6 +7,7 @@ from finstack_quant.cashflows.builder import CashFlowSchedule
 import datetime
 from typing import Any, Literal
 import pandas as pd
+from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, StubKind, Tenor
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
@@ -183,6 +184,27 @@ class TermLoan:
         ------
         ValueError
             If the value cannot be serialized to JSON.
+        """
+        ...
+    def to_builder(self) -> TermLoanBuilder:
+        """
+        Convert this term loan into an editable :class:`TermLoanBuilder`.
+
+        Returns
+        -------
+        TermLoanBuilder
+            Builder pre-populated with this loan's fields for incremental editing.
+
+        Notes
+        -----
+        This method does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import TermLoan
+        >>> tl = TermLoan.example().to_builder().id("TL-EDIT").build()
+        >>> tl.id
+        'TL-EDIT'
         """
         ...
     def price(
@@ -821,14 +843,14 @@ class TermLoanBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def currency(self, value: str) -> TermLoanBuilder:
+    def currency(self, value: Currency | str) -> TermLoanBuilder:
         """
         Set the loan currency.
 
         Parameters
         ----------
-        value : str
-            ISO-4217 currency code (e.g. ``"USD"``).
+        value : Currency | str
+            ISO-4217 :class:`~finstack_quant.core.currency.Currency` or currency code string (e.g. ``"USD"``).
 
         Returns
         -------

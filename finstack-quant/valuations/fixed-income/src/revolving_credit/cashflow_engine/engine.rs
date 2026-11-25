@@ -139,6 +139,30 @@ pub struct CashflowEngine<'a> {
 }
 
 impl<'a> CashflowEngine<'a> {
+    pub(super) fn period_day_count_context(
+        &self,
+        period_start: Date,
+        period_end: Date,
+    ) -> finstack_quant_core::dates::DayCountContext<'_> {
+        if self.day_count == DayCount::Act365L {
+            finstack_quant_core::dates::DayCountContext {
+                frequency: Some(self.facility.frequency),
+                coupon_period: Some((period_start, period_end)),
+                ..Default::default()
+            }
+        } else {
+            finstack_quant_core::dates::DayCountContext::default()
+        }
+    }
+
+    pub(super) fn notional_flow(date: Date, cash: Money) -> Result<CashFlow> {
+        // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
+        CashFlowParams::new(date, None, cash, CFKind::Notional, 0.0, None)
+            .with_principal_delta(cash.checked_neg())
+            .with_principal_date(date)
+            .build()
+    }
+
     pub(super) fn schedule_meta(&self) -> finstack_quant_cashflows::builder::CashFlowMeta {
         finstack_quant_cashflows::builder::CashFlowMeta {
             projected_fixings: Vec::new(),
@@ -169,15 +193,7 @@ impl<'a> CashflowEngine<'a> {
         if reset_effective == period_start && reset_end == period_end {
             return Ok((period_start, period_end, period.accrual_year_fraction));
         }
-        let accrual_ctx = if self.day_count == DayCount::Act365L {
-            finstack_quant_core::dates::DayCountContext {
-                frequency: Some(self.facility.frequency),
-                coupon_period: Some((period_start, period_end)),
-                ..Default::default()
-            }
-        } else {
-            finstack_quant_core::dates::DayCountContext::default()
-        };
+        let accrual_ctx = self.period_day_count_context(period_start, period_end);
         let reset_accrual =
             self.day_count
                 .year_fraction(reset_effective, reset_end, accrual_ctx)?;

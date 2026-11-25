@@ -78,9 +78,16 @@ getters!(JsAgencyTba, "AgencyTba", |i| {
     prepayment_spec as prepaymentSpec: "NonNullable<generated.valuations.AgencyTba['prepayment_spec']> | null" => json(i.prepayment_spec),
     /// Read the contract's discount curve id.
     /// @returns Discount curve identifier.
-    discount_curve_id as discountCurveId: "string" => json(i.discount_curve_id),
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
 });
 common_getters!(JsAgencyTba, "AgencyTba");
+to_builder_method!(
+    /// Seed an independent builder from the complete contract.
+    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
+    JsAgencyTba,
+    "AgencyTba",
+    JsAgencyTbaBuilder
+);
 
 builder_class!(
     /// Builder for an instrument.
@@ -98,18 +105,6 @@ builder_class!(
     /// ```
     JsAgencyTbaBuilder, "AgencyTbaBuilder", AgencyTbaBuilder, JsAgencyTba, |b| b.build()
 );
-
-#[wasm_bindgen(js_class = AgencyTba)]
-impl JsAgencyTba {
-    /// Seed an independent builder from the complete contract.
-    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsAgencyTbaBuilder {
-        JsAgencyTbaBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
 
 setters!(JsAgencyTbaBuilder, "AgencyTbaBuilder", {
     /// Set the stable contract identifier.

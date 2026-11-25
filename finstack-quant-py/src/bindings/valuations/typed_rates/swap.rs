@@ -87,6 +87,14 @@ impl PyInterestRateSwap {
         instrument_expiry(py, &self.inner)
     }
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates.swap", "InterestRateSwap.to_builder")]
+    fn to_builder(&self) -> PyInterestRateSwapBuilder {
+        PyInterestRateSwapBuilder {
+            inner: Some(self.inner.to_builder()),
+            fields: Vec::new(),
+        }
+    }
+
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(

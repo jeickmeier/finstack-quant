@@ -305,12 +305,8 @@ impl TermLoanValuator {
         // Helper: outstanding BEFORE a target date (pre-exercise).
         // Initialise with the schedule's actually funded balance. The facility
         // limit includes undrawn DDTL commitment and is not current principal.
-        let initial_funded = out_path
-            .iter()
-            .take_while(|(date, _)| *date <= origin)
-            .map(|(_, amount)| amount.amount())
-            .last()
-            .unwrap_or_else(|| schedule.get_notional().initial.amount());
+        let initial_funded =
+            super::outstanding_on(&out_path, origin, schedule.get_notional().initial.amount());
         let outstanding_before = |target: Date| -> f64 {
             let mut last = initial_funded;
             for (d, amt) in &out_path {
@@ -340,9 +336,9 @@ impl TermLoanValuator {
         }
 
         // Book a cashflow onto the grid: exercise cashflows snap to their
-        // (ceil) step, others are distributed between floor/ceil steps —
-        // matching the bond convention — with each piece carrying the DF
-        // timing correction to its destination step time.
+        // (ceil) step, others go to their single nearest step (no smearing
+        // across adjacent slices), carrying the DF timing correction to its
+        // destination step time.
         let book = |vec: &mut Vec<f64>,
                     components: &mut Vec<Vec<(f64, f64)>>,
                     amount: f64,
@@ -350,25 +346,15 @@ impl TermLoanValuator {
                     raw_clamped: f64,
                     snap: bool|
          -> Result<()> {
-            if snap {
-                let step = (raw_clamped.ceil() as usize).clamp(0, num_steps - 1);
-                let adjusted = value_at_step_time(amount, t, time_steps[step])?;
-                vec[step] += adjusted;
-                components[step].push((adjusted, t - time_steps[step]));
+            let step = if snap {
+                raw_clamped.ceil()
             } else {
-                let lo = raw_clamped.floor() as usize;
-                let weight = raw_clamped - lo as f64;
-                if lo < num_steps {
-                    let adjusted = value_at_step_time(amount * (1.0 - weight), t, time_steps[lo])?;
-                    vec[lo] += adjusted;
-                    components[lo].push((adjusted, t - time_steps[lo]));
-                }
-                if lo + 1 < num_steps {
-                    let adjusted = value_at_step_time(amount * weight, t, time_steps[lo + 1])?;
-                    vec[lo + 1] += adjusted;
-                    components[lo + 1].push((adjusted, t - time_steps[lo + 1]));
-                }
-            }
+                raw_clamped.round()
+            } as usize;
+            let step = step.clamp(0, num_steps - 1);
+            let adjusted = value_at_step_time(amount, t, time_steps[step])?;
+            vec[step] += adjusted;
+            components[step].push((adjusted, t - time_steps[step]));
             Ok(())
         };
 
@@ -752,11 +738,19 @@ pub struct TermLoanTreePricer;
 
 impl TermLoanTreePricer {
     /// Tree steps: `model_config.tree_steps`, else [`DEFAULT_TREE_STEPS`].
-    fn tree_steps(loan: &TermLoan) -> usize {
-        loan.instrument_pricing_overrides
+    fn tree_steps(loan: &TermLoan) -> Result<usize> {
+        let steps = loan
+            .instrument_pricing_overrides
             .model_config
             .tree_steps
-            .unwrap_or(DEFAULT_TREE_STEPS)
+            .unwrap_or(DEFAULT_TREE_STEPS);
+        if steps == 0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "TermLoan '{}' instrument_pricing_overrides.model_config.tree_steps must be at least 1",
+                loan.id
+            )));
+        }
+        Ok(steps)
     }
 
     /// Risk-free short-rate volatility: `model_config.hw1f_sigma`, else zero
@@ -802,7 +796,7 @@ impl TermLoanTreePricer {
             return Ok(None);
         }
 
-        let steps = Self::tree_steps(loan);
+        let steps = Self::tree_steps(loan)?;
         let rate_volatility = Self::rate_volatility(loan);
         let hazard_curve = loan
             .credit_curve_id
@@ -942,7 +936,22 @@ impl TermLoanTreePricer {
             )));
         }
         let Some(prepared) = self.prepare(loan, market, as_of)? else {
-            return Ok(Money::from((0_i64, loan.currency)));
+            if as_of >= loan.maturity {
+                return Ok(Money::from((0_i64, loan.currency)));
+            }
+            // Settlement-window carry: when `as_of < loan.maturity <= settlement_date`,
+            // settlement value is zero but pre-settlement cashflows in `(as_of, settlement]`
+            // (including final maturity redemption) still belong to the holder on `as_of`.
+            let schedule = super::discounting::TermLoanDiscountingPricer::pricing_schedule(
+                loan, market, as_of,
+            )?;
+            return super::discounting::TermLoanDiscountingPricer::value_at_as_of(
+                loan,
+                market,
+                as_of,
+                &schedule,
+                Money::from((0_i64, loan.currency)),
+            );
         };
         let settlement_value = Money::new(Self::price_on_tree(&prepared, oas_bp)?, loan.currency)?;
         super::discounting::TermLoanDiscountingPricer::value_at_as_of(
@@ -1196,5 +1205,47 @@ mod tests {
             .value_at_node(&state, 1_000.0, 1.0)
             .expect("node value");
         assert_eq!(actual, 106.0);
+    }
+
+    #[test]
+    fn b2_settlement_window_and_zero_steps_guarded() {
+        let mut loan = TermLoan::example().expect("example");
+        loan.credit_curve_id = None;
+        loan.instrument_pricing_overrides.model_config.tree_steps = Some(0);
+        let market = MarketContext::new()
+            .try_insert(
+                finstack_quant_core::market_data::term_structures::DiscountCurve::builder(
+                    "USD-OIS",
+                )
+                .base_date(loan.issue_date)
+                .day_count(DayCount::Act365F)
+                .knots([(0.0, 1.0), (10.0, (-0.05_f64 * 10.0).exp())])
+                .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("disc"),
+            )
+            .expect("mkt");
+        assert!(
+            TermLoanTreePricer
+                .price_callable(&loan, &market, loan.issue_date)
+                .is_err()
+        );
+
+        // Inside T+2 settlement window (as_of < maturity <= settlement_date): pre-settlement maturity
+        // redemption must be retained rather than returning 0, matching deterministic carry.
+        loan.instrument_pricing_overrides.model_config.tree_steps = Some(20);
+        let pre_mat = loan.maturity.previous_day().expect("prev day");
+        let tree_pv = TermLoanTreePricer
+            .price_callable(&loan, &market, pre_mat)
+            .expect("settlement window pv")
+            .amount();
+        let disc_pv = crate::term_loan::TermLoanDiscountingPricer::price(&loan, &market, pre_mat)
+            .expect("disc pv")
+            .amount();
+        assert!(
+            (tree_pv - disc_pv).abs() < 1e-6 && tree_pv > 0.0,
+            "settlement-window tree PV ({tree_pv}) must match discounting carry ({disc_pv})"
+        );
     }
 }

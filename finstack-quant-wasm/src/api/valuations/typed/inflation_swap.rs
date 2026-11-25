@@ -54,10 +54,10 @@ getters!(JsInflationSwap, "InflationSwap", |i| {
     fixed_rate as fixedRate: "string" => text(i.fixed_rate),
     /// Read the contract's inflation index id.
     /// @returns Inflation index identifier (e.g., US-CPI-U)
-    inflation_index_id as inflationIndexId: "string" => json(i.inflation_index_id),
+    inflation_index_id as inflationIndexId: "string" => text(i.inflation_index_id),
     /// Read the contract's discount curve id.
     /// @returns Discount curve identifier (quote currency)
-    discount_curve_id as discountCurveId: "string" => json(i.discount_curve_id),
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
     /// Read the contract's day count.
     /// @returns Day count for accrual calculation (fixed leg compounding)
     day_count as dayCount: "DayCount" => day_count(i.day_count),
@@ -78,9 +78,16 @@ getters!(JsInflationSwap, "InflationSwap", |i| {
     business_day_convention as businessDayConvention: "generated.valuations.InflationSwap['business_day_convention']" => json(i.business_day_convention),
     /// Read the contract's calendar id.
     /// @returns Holiday calendar identifier for payment date adjustment. If not specified, payment dates are used unadjusted.
-    calendar_id as calendarId: "string | null" => json(i.calendar_id),
+    calendar_id as calendarId: "string | null" => opt_text(i.calendar_id),
 });
 common_getters!(JsInflationSwap, "InflationSwap");
+to_builder_method!(
+    /// Seed an independent builder from the complete contract.
+    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
+    JsInflationSwap,
+    "InflationSwap",
+    JsInflationSwapBuilder
+);
 
 builder_class!(
     /// Builder for an instrument.
@@ -98,18 +105,6 @@ builder_class!(
     /// ```
     JsInflationSwapBuilder, "InflationSwapBuilder", InflationSwapBuilder, JsInflationSwap, |b| b.build()
 );
-
-#[wasm_bindgen(js_class = InflationSwap)]
-impl JsInflationSwap {
-    /// Seed an independent builder from the complete contract.
-    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsInflationSwapBuilder {
-        JsInflationSwapBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
 
 setters!(JsInflationSwapBuilder, "InflationSwapBuilder", {
     /// Set the stable contract identifier.

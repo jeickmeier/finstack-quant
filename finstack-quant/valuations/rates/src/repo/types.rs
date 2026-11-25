@@ -180,7 +180,7 @@ impl CollateralSpec {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 #[builder(validate = Repo::validate)]
 pub struct Repo {
     /// Unique instrument identifier
@@ -257,6 +257,8 @@ pub struct Repo {
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(Repo);
 
 impl Repo {
     /// Validate structural and economic repo invariants at the canonical boundary.
@@ -653,7 +655,11 @@ impl Instrument for Repo {
     }
 
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.maturity)
+        Some(
+            self.adjusted_dates()
+                .map(|(_, adj_maturity)| adj_maturity)
+                .unwrap_or(self.maturity),
+        )
     }
 
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();

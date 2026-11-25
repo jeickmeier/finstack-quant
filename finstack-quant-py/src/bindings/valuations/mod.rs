@@ -239,20 +239,12 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     exports.extend_from_slice(instruments::EXPORTS);
     exports.extend_from_slice(typed_legs::EXPORTS);
     exports.extend_from_slice(typed_rates::EXPORTS);
-    exports.extend([
-        "Deposit",
-        "DepositBuilder",
-        "InflationLinkedBond",
-        "InflationLinkedBondBuilder",
-        "BondFuture",
-        "BondFutureBuilder",
-        "InterestRateFuture",
-        "InterestRateFutureBuilder",
-        "ListedFutureTerms",
-        "FutureOptionTerms",
-        "ForwardRateAgreement",
-        "ForwardRateAgreementBuilder",
-    ]);
+    exports.extend_from_slice(typed_deposit::EXPORTS);
+    exports.extend_from_slice(typed_inflation_bond::EXPORTS);
+    exports.extend_from_slice(typed_bond_future::EXPORTS);
+    exports.extend_from_slice(typed_interest_rate_future::EXPORTS);
+    exports.extend(["ListedFutureTerms", "FutureOptionTerms"]);
+    exports.extend_from_slice(typed_fra::EXPORTS);
     exports.extend_from_slice(typed_equity_future::EXPORTS);
     exports.extend_from_slice(typed_volatility_index_future::EXPORTS);
     exports.extend_from_slice(typed_interest_rate_future_option::EXPORTS);
@@ -277,36 +269,19 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     exports.extend_from_slice(typed_basket::EXPORTS);
     exports.extend_from_slice(typed_real_estate_asset::EXPORTS);
     exports.extend_from_slice(typed_levered_real_estate_equity::EXPORTS);
-    exports.extend_from_slice(&[
-        "AgencyTba",
-        "AgencyTbaBuilder",
-        "AgencyMbsPassthrough",
-        "AgencyMbsPassthroughBuilder",
-        "DollarRoll",
-        "DollarRollBuilder",
-        "AgencyCmo",
-        "AgencyCmoBuilder",
-    ]);
-    exports.extend_from_slice(&[
-        "BasisSwap",
-        "BasisSwapBuilder",
-        "XccySwap",
-        "XccySwapBuilder",
-        "CmsSwap",
-        "CmsSwapBuilder",
-        "CmsOption",
-        "CmsOptionBuilder",
-        "CmsSpreadOption",
-        "CmsSpreadOptionBuilder",
-        "InflationSwap",
-        "InflationSwapBuilder",
-        "YoYInflationSwap",
-        "YoYInflationSwapBuilder",
-        "InflationCapFloor",
-        "InflationCapFloorBuilder",
-        "BermudanSwaption",
-        "BermudanSwaptionBuilder",
-    ]);
+    exports.extend_from_slice(typed_agency_tba::EXPORTS);
+    exports.extend_from_slice(typed_agency_mbs_passthrough::EXPORTS);
+    exports.extend_from_slice(typed_dollar_roll::EXPORTS);
+    exports.extend_from_slice(typed_agency_cmo::EXPORTS);
+    exports.extend_from_slice(typed_basis_swap::EXPORTS);
+    exports.extend_from_slice(typed_xccy_swap::EXPORTS);
+    exports.extend_from_slice(typed_cms_swap::EXPORTS);
+    exports.extend_from_slice(typed_cms_option::EXPORTS);
+    exports.extend_from_slice(typed_cms_spread_option::EXPORTS);
+    exports.extend_from_slice(typed_inflation_swap::EXPORTS);
+    exports.extend_from_slice(typed_yoy_inflation_swap::EXPORTS);
+    exports.extend_from_slice(typed_inflation_cap_floor::EXPORTS);
+    exports.extend_from_slice(typed_bermudan_swaption::EXPORTS);
     exports.extend_from_slice(typed_commodity_future_option::EXPORTS);
     exports.extend_from_slice(typed_commodity_forward::EXPORTS);
     exports.extend_from_slice(typed_commodity_future::EXPORTS);
@@ -322,10 +297,9 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
         "EquityTotalReturnSwapBuilder",
         "EquityTotalReturnFuture",
         "EquityTotalReturnFutureBuilder",
-        "FiIndexTotalReturnSwap",
-        "FiIndexTotalReturnSwapBuilder",
     ]);
-    exports.extend_from_slice(&["Repo", "RepoBuilder"]);
+    exports.extend_from_slice(typed_fi_index_total_return_swap::EXPORTS);
+    exports.extend_from_slice(typed_repo::EXPORTS);
     exports.extend_from_slice(typed_fx_spot::EXPORTS);
     exports.extend_from_slice(typed_fx_swap::EXPORTS);
     exports.extend_from_slice(typed_ndf::EXPORTS);

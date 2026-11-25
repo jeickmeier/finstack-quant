@@ -99,9 +99,14 @@ impl MetricCalculator for DiscountMarginCalculator {
         let target = if let Some(px) = quoted_px {
             super::irr_helpers::quoted_dirty_from_clean_px(loan, &schedule, as_of, px)?.amount()
         } else {
-            // No quote: the settlement-date model value, so the DM is the
-            // spread over the loan's own curve (zero by construction).
-            pv_given_dm(0.0)?
+            super::irr_helpers::target_price_from_quote_or_model(
+                loan,
+                &schedule,
+                &context.curves,
+                as_of,
+                context.base_value,
+            )?
+            .amount()
         };
 
         // PV is strictly decreasing in dm; the contractual margin is the

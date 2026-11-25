@@ -74,6 +74,13 @@ getters!(JsEquityTotalReturnSwap, "EquityTotalReturnSwap", |i| {
     discrete_dividends as discreteDividends: "generated.valuations.EquityTotalReturnSwap['discrete_dividends']" => dated_nums(i.discrete_dividends),
 });
 common_getters!(JsEquityTotalReturnSwap, "EquityTotalReturnSwap");
+to_builder_method!(
+    /// Seed an independent builder from the complete contract.
+    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
+    JsEquityTotalReturnSwap,
+    "EquityTotalReturnSwap",
+    JsEquityTotalReturnSwapBuilder
+);
 
 builder_class!(
     /// Builder for an instrument.
@@ -91,18 +98,6 @@ builder_class!(
     /// ```
     JsEquityTotalReturnSwapBuilder, "EquityTotalReturnSwapBuilder", EquityTotalReturnSwapBuilder, JsEquityTotalReturnSwap, |b| b.build()
 );
-
-#[wasm_bindgen(js_class = EquityTotalReturnSwap)]
-impl JsEquityTotalReturnSwap {
-    /// Seed an independent builder from the complete contract.
-    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsEquityTotalReturnSwapBuilder {
-        JsEquityTotalReturnSwapBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
 
 setters!(JsEquityTotalReturnSwapBuilder, "EquityTotalReturnSwapBuilder", {
     /// Set the stable contract identifier.

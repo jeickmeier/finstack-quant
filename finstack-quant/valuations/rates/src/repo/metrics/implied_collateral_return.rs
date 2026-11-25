@@ -49,6 +49,9 @@ impl MetricCalculator for ImpliedCollateralReturnCalculator {
 
         // Use adjusted maturity for consistency with PV and interest calculations
         let (_, adj_maturity) = repo.adjusted_dates()?;
+        if context.as_of >= adj_maturity || required_value == 0.0 {
+            return Ok(0.0);
+        }
 
         let ttm = repo.day_count.year_fraction(
             context.as_of,
@@ -56,11 +59,13 @@ impl MetricCalculator for ImpliedCollateralReturnCalculator {
             finstack_quant_core::dates::DayCountContext::default(),
         )?;
 
-        if ttm <= 0.0 || required_value == 0.0 {
+        if ttm <= 0.0 {
             return Ok(0.0);
         }
 
-        let return_rate = (collateral_value / required_value - 1.0) / ttm;
+        let collateral_in_cash =
+            super::register::collateral_in_cash_currency(repo, context, collateral_value)?;
+        let return_rate = (collateral_in_cash / required_value - 1.0) / ttm;
         Ok(return_rate)
     }
 }

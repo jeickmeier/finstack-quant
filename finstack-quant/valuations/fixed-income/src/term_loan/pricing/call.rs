@@ -9,6 +9,15 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 
+/// Outstanding principal on `date` (the latest entry in `path` dated on or
+/// before `date`, falling back to `initial`).
+pub(crate) fn outstanding_on(path: &[(Date, Money)], date: Date, initial: f64) -> f64 {
+    path.iter()
+        .take_while(|(d, _)| *d <= date)
+        .last()
+        .map_or(initial, |(_, amount)| amount.amount())
+}
+
 /// Exercise-date claims on one loan schedule. The outstanding path and both
 /// accrual indexes are built once, so pricing every tree step or candidate
 /// exercise date does not rebuild them.
@@ -34,12 +43,7 @@ impl ExerciseClaims {
     /// Remaining principal and cash accrual after scheduled exercise-date events.
     /// Earned but not yet capitalized PIK belongs to the principal exercise claim.
     pub(crate) fn at(&self, exercise: Date) -> Result<(f64, f64)> {
-        let principal = self
-            .outstanding
-            .iter()
-            .take_while(|(date, _)| *date <= exercise)
-            .last()
-            .map_or(0.0, |(_, amount)| amount.amount());
+        let principal = super::outstanding_on(&self.outstanding, exercise, 0.0);
         // A PIK row is dated at its capitalization (record
         // CORE-CONVENTIONS-015 #6), so earned PIK is either already in the
         // outstanding path or still accruing in `total`, never both.

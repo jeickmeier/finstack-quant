@@ -46,7 +46,7 @@ use rust_decimal::Decimal;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct CmsSwap {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -151,6 +151,8 @@ pub struct CmsSwap {
     #[builder(default)]
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(CmsSwap);
 
 /// Contractual dates and accrual fraction of one CMS funding coupon.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -325,6 +327,7 @@ impl CmsSwap {
 
     /// Validate CMS and funding leg schedule vectors.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        finstack_quant_core::validation::validate_money_gt(self.notional, 0.0, "CmsSwap notional")?;
         crate::cms_common::cms_tenor_months(self.cms_tenor, "CmsSwap cms_tenor")?;
         if self.fixing_dates.len() != self.payment_dates.len()
             || self.fixing_dates.len() != self.accrual_fractions.len()

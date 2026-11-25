@@ -355,7 +355,11 @@ impl Pricer for BermudanSwaptionLmmPricer {
         // Terminal discount factor P(0, T_N) for the last tenor
         let df_terminal = disc.df_between_dates(as_of, swaption.get_underlying_maturity())?;
 
-        // Price via LSMC with LMM dynamics
+        // Price via LSMC with LMM dynamics, honoring instrument-level path-count overrides
+        let mut config = self.config;
+        if let Some(mc_paths) = swaption.instrument_pricing_overrides.model_config.mc_paths {
+            config.num_paths = mc_paths;
+        }
         let estimate = price_bermudan_lmm(
             &lmm_params,
             &exercise_times,
@@ -366,7 +370,7 @@ impl Pricer for BermudanSwaptionLmmPricer {
                 discount_factor_terminal: df_terminal,
                 currency,
             },
-            &self.config,
+            &config,
         )?;
 
         let mut result = ValuationResult::stamped(swaption.id.as_str(), as_of, estimate.mean);
@@ -512,7 +516,7 @@ mod tests {
             .fixed_schedule_periods()
             .expect("contractual periods");
         let pricer = BermudanSwaptionLmmPricer::with_config(Hw1fMcConfig {
-            num_paths: 4,
+            num_paths: 16,
             min_steps_between_events: 1,
             antithetic: true,
             oos_lsmc: false,
@@ -716,5 +720,56 @@ mod tests {
             .copied()
             .expect("published expected exercise time");
         assert!(value.is_finite() && value > 0.0, "got {value}");
+    }
+
+    #[test]
+    fn mc_paths_override_and_model_validations_hold() {
+        use crate::RATES;
+        use crate::swaption::{BermudanSwaptionPricer, BermudanType};
+        use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
+        use finstack_quant_valuations_core::metrics::MetricId;
+        use finstack_quant_valuations_core::pricer::{ModelKey, PricerRegistry};
+        use std::sync::Arc;
+
+        let (as_of, mut option, market) = supported_contract();
+        option.instrument_pricing_overrides.model_config.mc_paths = Some(32);
+
+        let mut registry = PricerRegistry::new();
+        RATES
+            .register_pricers(&mut registry)
+            .expect("rates pricers");
+        let registry = Arc::new(registry);
+        let priced = option
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[],
+                PricingOptions::default()
+                    .with_model(ModelKey::LmmMonteCarlo)
+                    .with_registry(Arc::clone(&registry)),
+            )
+            .expect("LMM respects mc_paths override");
+        assert!(priced.value.amount().is_finite());
+
+        let vega_err = option
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[MetricId::HwSigmaVega],
+                PricingOptions::default()
+                    .with_model(ModelKey::LmmMonteCarlo)
+                    .with_registry(registry),
+            )
+            .expect_err("LmmMonteCarlo must reject HwSigmaVega");
+        assert!(vega_err.to_string().contains("HullWhite1F"));
+
+        let mut non_coterminal = option;
+        non_coterminal.bermudan_type = BermudanType::NonCoTerminal;
+        assert!(
+            BermudanSwaptionPricer::lsmc()
+                .price_dyn(&non_coterminal, &market, as_of)
+                .is_err(),
+            "LSMC must reject NonCoTerminal BermudanSwaption"
+        );
     }
 }

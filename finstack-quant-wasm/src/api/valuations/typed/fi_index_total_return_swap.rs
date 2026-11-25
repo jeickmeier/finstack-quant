@@ -59,12 +59,19 @@ getters!(JsFiIndexTotalReturnSwap, "FiIndexTotalReturnSwap", |i| {
     initial_level as initialLevel: "number | null" => json(i.initial_level),
     /// Read the contract's fixing series id.
     /// @returns Market time-series identifier containing positive total-return index levels on contractual reset dates, including the final accrual boundary. Historical endpoints require exact observations; no yield-based history is inferred.
-    fixing_series_id as fixingSeriesId: "string | null" => json(i.fixing_series_id),
+    fixing_series_id as fixingSeriesId: "string | null" => opt_text(i.fixing_series_id),
     /// Read the contract's margin spec.
     /// @returns Optional OTC margin specification for VM/IM. Fixed income index TRS use duration-based margin calculations.
     margin_spec as marginSpec: "NonNullable<generated.valuations.FiIndexTotalReturnSwap['margin_spec']> | null" => json(i.margin_spec),
 });
 common_getters!(JsFiIndexTotalReturnSwap, "FiIndexTotalReturnSwap");
+to_builder_method!(
+    /// Seed an independent builder from the complete contract.
+    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
+    JsFiIndexTotalReturnSwap,
+    "FiIndexTotalReturnSwap",
+    JsFiIndexTotalReturnSwapBuilder
+);
 
 builder_class!(
     /// Builder for an instrument.
@@ -82,18 +89,6 @@ builder_class!(
     /// ```
     JsFiIndexTotalReturnSwapBuilder, "FiIndexTotalReturnSwapBuilder", FiIndexTotalReturnSwapBuilder, JsFiIndexTotalReturnSwap, |b| b.build()
 );
-
-#[wasm_bindgen(js_class = FiIndexTotalReturnSwap)]
-impl JsFiIndexTotalReturnSwap {
-    /// Seed an independent builder from the complete contract.
-    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsFiIndexTotalReturnSwapBuilder {
-        JsFiIndexTotalReturnSwapBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
 
 setters!(JsFiIndexTotalReturnSwapBuilder, "FiIndexTotalReturnSwapBuilder", {
     /// Set the stable contract identifier.

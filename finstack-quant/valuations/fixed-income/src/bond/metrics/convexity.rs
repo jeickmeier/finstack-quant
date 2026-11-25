@@ -55,7 +55,7 @@ impl MetricCalculator for ConvexityCalculator {
         let has_options = bond.has_exercise_rights();
         if has_options && super::bond_risk_basis(context) == BondRiskBasis::CallableOas {
             return Ok(
-                super::effective::effective_duration_convexity(bond, context, None)?.convexity
+                super::effective::effective_duration_convexity_cached(context, None)?.convexity
                     / 100.0,
             );
         }

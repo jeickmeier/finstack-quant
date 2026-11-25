@@ -114,7 +114,7 @@ fn default_settlement_days() -> u32 {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct TermLoan {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -244,6 +244,8 @@ pub struct TermLoan {
     /// Attributes for tagging and scenarios
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(TermLoan);
 
 impl TermLoan {
     /// Validate the complete loan contract, including DDTL and event schedules.
@@ -1181,5 +1183,36 @@ mod tests {
             finstack_quant_valuations_core::instruments::Instrument::market_dependencies(&loan)
                 .expect("dependencies");
         assert_eq!(deps.series_ids, vec![expected]);
+    }
+
+    #[test]
+    fn serde_rejects_invalid_term_loan_ddtl_and_call_schedule() {
+        let mut loan = serde_json::to_value(TermLoan::example().expect("example")).expect("json");
+        loan["maturity"] = loan["issue_date"].clone();
+        assert!(serde_json::from_value::<TermLoan>(loan).is_err());
+
+        let mut ddtl = serde_json::to_value(DdtlSpec {
+            commitment: Money::from((1_000_000_i64, Currency::USD)),
+            availability_start: time::macros::date!(2026 - 01 - 01),
+            availability_end: time::macros::date!(2026 - 06 - 01),
+            draws: vec![],
+            commitment_steps: vec![],
+            usage_fee_bp: Decimal::ZERO,
+            commitment_fee_bp: Decimal::ZERO,
+            fee_base: super::super::spec::CommitmentFeeBase::Undrawn,
+            oid_policy: None,
+        })
+        .expect("json");
+        ddtl["availability_start"] = serde_json::json!("2027-01-01");
+        assert!(serde_json::from_value::<DdtlSpec>(ddtl).is_err());
+
+        let mut call = serde_json::to_value(crate::term_loan::LoanCall {
+            date: time::macros::date!(2026 - 01 - 01),
+            price_pct_of_par: 101.0,
+            call_type: crate::term_loan::LoanCallType::Hard,
+        })
+        .expect("json");
+        call["price_pct_of_par"] = serde_json::json!(-5.0);
+        assert!(serde_json::from_value::<crate::term_loan::LoanCall>(call).is_err());
     }
 }

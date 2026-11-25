@@ -257,18 +257,15 @@ fn try_create_ust_10y_future(
 ) -> finstack_quant_core::Result<BondFuture> {
     BondFuture::builder()
         .id(InstrumentId::new(config.id))
-        .terms(
-            ListedFutureTerms::new(
-                config.notional / 100_000.0,
-                1_000.0,
-                Currency::USD,
-                config.entry_price,
-                config.last_trading_date,
-                config.settlement_date,
-                config.position,
-            )
-            .expect("terms"),
-        )
+        .terms(ListedFutureTerms::new(
+            config.notional / 100_000.0,
+            1_000.0,
+            Currency::USD,
+            config.entry_price,
+            config.last_trading_date,
+            config.settlement_date,
+            config.position,
+        )?)
         .delivery_start(config.delivery_start)
         .contract_specs(BondFutureSpecs::ust_10y())
         .deliverable_basket(config.deliverable_basket)
@@ -566,13 +563,13 @@ fn test_short_position_npv() {
 
 #[test]
 fn test_error_handling_invalid_dates() {
-    // Test validation: expiry_date must be before delivery_start
+    // Test validation: last_trading_date must not follow delivery end (settlement_date)
     let (_, deliverable_bonds) = create_deliverable_basket();
 
     let result = try_create_ust_10y_future(TestBondFutureConfig {
         id: "INVALID",
         notional: 100_000.0,
-        last_trading_date: date!(2025 - 03 - 25), // Expiry AFTER delivery start (invalid!)
+        last_trading_date: date!(2025 - 04 - 02), // Expiry AFTER delivery end (invalid!)
         delivery_start: date!(2025 - 03 - 21),    // Delivery start
         settlement_date: date!(2025 - 03 - 31),   // Delivery end
         entry_price: 125.50,
@@ -584,12 +581,12 @@ fn test_error_handling_invalid_dates() {
 
     assert!(
         result.is_err(),
-        "Should fail validation when expiry_date >= delivery_start"
+        "Should fail validation when last_trading_date > terms.settlement_date"
     );
     let err = result.unwrap_err();
     assert!(
-        format!("{}", err).contains("terms.last_trading_date")
-            && format!("{}", err).contains("delivery_start"),
+        format!("{}", err).contains("last_trading_date")
+            && format!("{}", err).contains("settlement_date"),
         "Error message should mention date ordering: {}",
         err
     );
@@ -597,7 +594,7 @@ fn test_error_handling_invalid_dates() {
 
 #[test]
 fn test_error_handling_invalid_delivery_period() {
-    // Test validation: delivery_start must be before terms.settlement_date
+    // Test validation: delivery_start must not be after terms.settlement_date
     let (_, deliverable_bonds) = create_deliverable_basket();
 
     let result = try_create_ust_10y_future(TestBondFutureConfig {
@@ -615,7 +612,7 @@ fn test_error_handling_invalid_delivery_period() {
 
     assert!(
         result.is_err(),
-        "Should fail validation when delivery_start >= terms.settlement_date"
+        "Should fail validation when delivery_start > terms.settlement_date"
     );
     let err = result.unwrap_err();
     assert!(

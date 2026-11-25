@@ -8,7 +8,7 @@ use finstack_quant_core::dates::Date;
 /// `observation_days` consecutive trading days.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct PriceTrigger {
     /// Trigger level as a percent of the conversion price (`130.0` = 130%);
     /// must exceed 100.
@@ -76,6 +76,28 @@ impl PriceTrigger {
             )));
         }
         Ok(())
+    }
+}
+
+impl serde::Serialize for PriceTrigger {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        Self::serialize(self, serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for PriceTrigger {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Self::deserialize(deserializer)?;
+        value
+            .validate("price_trigger")
+            .map_err(serde::de::Error::custom)?;
+        Ok(value)
     }
 }
 
@@ -215,7 +237,7 @@ pub struct DilutionEvent {
 /// Conversion specification for the instrument.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct ConversionSpec {
     /// Conversion ratio (shares per bond). If not provided, derive from price.
     pub ratio: Option<f64>,
@@ -230,6 +252,102 @@ pub struct ConversionSpec {
     /// Historical dilution events recorded in chronological order.
     #[serde(default)]
     pub dilution_events: Vec<DilutionEvent>,
+}
+
+impl ConversionSpec {
+    /// Validate invariants of a conversion specification.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        use finstack_quant_core::validation;
+
+        if self.ratio.is_none() && self.price.is_none() {
+            return Err(finstack_quant_core::Error::Validation(
+                "conversion specification requires conversion.ratio or conversion.price"
+                    .to_string(),
+            ));
+        }
+        if let Some(ratio) = self.ratio {
+            validation::validate_f64_positive(ratio, "conversion ratio")?;
+        }
+        if let Some(price) = self.price {
+            validation::validate_f64_positive(price, "conversion price")?;
+        }
+        match &self.policy {
+            ConversionPolicy::Window { start, end } => {
+                validation::validate_date_range_non_strict(
+                    *start,
+                    *end,
+                    "convertible conversion window",
+                )?;
+            }
+            ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger(trigger)) => {
+                trigger.validate("conversion.policy.upon_event.price_trigger")?;
+            }
+            ConversionPolicy::MandatoryVariable {
+                upper_conversion_price,
+                lower_conversion_price,
+                ..
+            } => {
+                validation::validate_f64_positive(
+                    *lower_conversion_price,
+                    "mandatory-variable lower conversion price",
+                )?;
+                validation::validate_f64_positive(
+                    *upper_conversion_price,
+                    "mandatory-variable upper conversion price",
+                )?;
+                if lower_conversion_price > upper_conversion_price {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "mandatory-variable bounds inverted: lower ({lower_conversion_price}) \
+                         must not exceed upper ({upper_conversion_price})"
+                    )));
+                }
+            }
+            ConversionPolicy::Voluntary
+            | ConversionPolicy::MandatoryOn(_)
+            | ConversionPolicy::UponEvent(_) => {}
+        }
+        if self
+            .dilution_events
+            .windows(2)
+            .any(|w| w[1].date < w[0].date)
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "conversion dilution events must be chronologically ordered".to_string(),
+            ));
+        }
+        for event in &self.dilution_events {
+            validation::validate_f64_positive(event.new_issue_price, "dilution new_issue_price")?;
+            validation::validate_f64_positive(
+                event.new_shares_issued,
+                "dilution new_shares_issued",
+            )?;
+            validation::validate_f64_positive(
+                event.shares_outstanding_before,
+                "dilution shares_outstanding_before",
+            )?;
+        }
+        Ok(())
+    }
+}
+
+impl serde::Serialize for ConversionSpec {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        Self::serialize(self, serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ConversionSpec {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Self::deserialize(deserializer)?;
+        value.validate().map_err(serde::de::Error::custom)?;
+        Ok(value)
+    }
 }
 
 #[cfg(test)]

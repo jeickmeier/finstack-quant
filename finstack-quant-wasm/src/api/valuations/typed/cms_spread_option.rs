@@ -60,16 +60,16 @@ getters!(JsCmsSpreadOption, "CmsSpreadOption", |i| {
     payment_date as paymentDate: "string" => date(i.payment_date),
     /// Read the contract's long vol surface id.
     /// @returns Black swaption volatility surface for the long tenor. The selected expiry slice must be flat across strikes; tenor-axis ATM surfaces are valid.
-    long_vol_surface_id as longVolSurfaceId: "string" => json(i.long_vol_surface_id),
+    long_vol_surface_id as longVolSurfaceId: "string" => text(i.long_vol_surface_id),
     /// Read the contract's short vol surface id.
     /// @returns Black swaption volatility surface for the short tenor, subject to the same flat-strike restriction as the long-tenor surface.
-    short_vol_surface_id as shortVolSurfaceId: "string" => json(i.short_vol_surface_id),
+    short_vol_surface_id as shortVolSurfaceId: "string" => text(i.short_vol_surface_id),
     /// Read the contract's discount curve id.
     /// @returns Discount curve ID.
-    discount_curve_id as discountCurveId: "string" => json(i.discount_curve_id),
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
     /// Read the contract's forward curve id.
     /// @returns Forward curve ID (for swap rate projection).
-    forward_curve_id as forwardCurveId: "string" => json(i.forward_curve_id),
+    forward_curve_id as forwardCurveId: "string" => text(i.forward_curve_id),
     /// Read the contract's correlation.
     /// @returns Gaussian-copula correlation between the two CMS rates, a decimal in [-1, 1].
     correlation as correlation: "number" => json(i.correlation),
@@ -78,13 +78,13 @@ getters!(JsCmsSpreadOption, "CmsSpreadOption", |i| {
     day_count as dayCount: "DayCount" => day_count(i.day_count),
     /// Read the contract's index id.
     /// @returns Rate-index convention-registry key of the underlying CMS swaps (e.g. EUR-ESTR-OIS). Required for USD CMS; other supported currencies use their registered overnight-index default when omitted. Supplies calendar, settlement lag and default leg conventions. Individual leg fields override the index.
-    index_id as indexId: "NonNullable<generated.valuations.CmsSpreadOption['index_id']> | null" => json(i.index_id),
+    index_id as indexId: "string | null" => opt_text(i.index_id),
     /// Read the contract's long cms fixing index id.
     /// @returns Explicit CMS benchmark fixing identifier for the long-tenor leg (FIXING:<long_cms_fixing_index_id>), distinct from forward_curve_id, index_id, and short_cms_fixing_index_id.
-    long_cms_fixing_index_id as longCmsFixingIndexId: "NonNullable<generated.valuations.CmsSpreadOption['long_cms_fixing_index_id']> | null" => json(i.long_cms_fixing_index_id),
+    long_cms_fixing_index_id as longCmsFixingIndexId: "string | null" => opt_text(i.long_cms_fixing_index_id),
     /// Read the contract's short cms fixing index id.
     /// @returns Explicit CMS benchmark fixing identifier for the short-tenor leg (FIXING:<short_cms_fixing_index_id>), distinct from forward_curve_id, index_id, and long_cms_fixing_index_id.
-    short_cms_fixing_index_id as shortCmsFixingIndexId: "NonNullable<generated.valuations.CmsSpreadOption['short_cms_fixing_index_id']> | null" => json(i.short_cms_fixing_index_id),
+    short_cms_fixing_index_id as shortCmsFixingIndexId: "string | null" => opt_text(i.short_cms_fixing_index_id),
     /// Read the contract's swap fixed frequency.
     /// @returns Fixed leg frequency of the underlying CMS swaps (overrides convention).
     swap_fixed_frequency as swapFixedFrequency: "NonNullable<generated.valuations.CmsSpreadOption['swap_fixed_frequency']> | null" => json(i.swap_fixed_frequency),
@@ -99,6 +99,13 @@ getters!(JsCmsSpreadOption, "CmsSpreadOption", |i| {
     swap_float_day_count as swapFloatDayCount: "NonNullable<generated.valuations.CmsSpreadOption['swap_float_day_count']> | null" => json(i.swap_float_day_count),
 });
 common_getters!(JsCmsSpreadOption, "CmsSpreadOption");
+to_builder_method!(
+    /// Seed an independent builder from the complete contract.
+    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
+    JsCmsSpreadOption,
+    "CmsSpreadOption",
+    JsCmsSpreadOptionBuilder
+);
 
 builder_class!(
     /// Builder for an instrument.
@@ -116,18 +123,6 @@ builder_class!(
     /// ```
     JsCmsSpreadOptionBuilder, "CmsSpreadOptionBuilder", CmsSpreadOptionBuilder, JsCmsSpreadOption, |b| b.build()
 );
-
-#[wasm_bindgen(js_class = CmsSpreadOption)]
-impl JsCmsSpreadOption {
-    /// Seed an independent builder from the complete contract.
-    /// @returns Builder carrying contractual terms, settlement state and market identifiers.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsCmsSpreadOptionBuilder {
-        JsCmsSpreadOptionBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
 
 setters!(JsCmsSpreadOptionBuilder, "CmsSpreadOptionBuilder", {
     /// Set the stable contract identifier.

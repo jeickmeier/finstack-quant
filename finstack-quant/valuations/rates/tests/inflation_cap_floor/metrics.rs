@@ -439,3 +439,63 @@ fn test_cap_floor_parity_strike_difference_is_vol_independent() {
          2% vol {diff_low_vol}, 5% vol {diff_high_vol}"
     );
 }
+
+#[test]
+fn vega_uses_implied_vol_override_and_handles_low_vol_surfaces() {
+    use finstack_quant_core::market_data::surfaces::VolQuoteType;
+    use finstack_quant_valuations_core::pricer::ModelKey;
+
+    let as_of = Date::from_calendar_date(2025, Month::January, 2).unwrap();
+    let market = build_market(as_of, 0.20);
+    let mut overridden = build_caplet();
+    overridden
+        .instrument_pricing_overrides
+        .market_quotes
+        .implied_volatility = Some(0.20);
+    let override_vega = *overridden
+        .price_with_metrics(&market, as_of, &[MetricId::Vega], PricingOptions::default())
+        .unwrap()
+        .measures
+        .get("vega")
+        .unwrap();
+    let surface_vega = *build_caplet()
+        .price_with_metrics(&market, as_of, &[MetricId::Vega], PricingOptions::default())
+        .unwrap()
+        .measures
+        .get("vega")
+        .unwrap();
+    assert!((override_vega - surface_vega).abs() < 1e-6 * surface_vega.abs().max(1.0));
+
+    let low_vol_market = MarketContext::new()
+        .try_insert(flat_discount_curve_with_day_count(
+            0.02,
+            as_of,
+            "USD-OIS",
+            DayCount::Act365F,
+        ))
+        .expect("insert market curve")
+        .try_insert(flat_inflation_curve("US-CPI-U", as_of, 300.0, 0.025).unwrap())
+        .expect("insert market curve")
+        .insert_inflation_index(simple_index("US-CPI-U", as_of, 300.0, Currency::USD))
+        .insert_surface(
+            finstack_quant_valuations_test_support::volatility::flat_vol_surface_with_quote_type(
+                "US-CPI-VOL",
+                &[1.0, 5.0],
+                &[0.025],
+                0.005,
+                VolQuoteType::Normal,
+            ),
+        );
+    let low_vol_vega = *build_caplet()
+        .price_with_metrics(
+            &low_vol_market,
+            as_of,
+            &[MetricId::Vega],
+            PricingOptions::default().with_model(ModelKey::Normal),
+        )
+        .unwrap()
+        .measures
+        .get("vega")
+        .unwrap();
+    assert!(low_vol_vega.is_finite() && low_vol_vega > 0.0);
+}

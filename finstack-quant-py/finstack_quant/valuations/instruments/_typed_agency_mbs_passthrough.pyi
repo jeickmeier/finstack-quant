@@ -393,12 +393,12 @@ class AgencyMbsPassthrough:
         ...
 
     @property
-    def pool_id(self) -> dict[str, object] | str:
+    def pool_id(self) -> str:
         """Read the contract's pool id.
 
         Returns
         -------
-        dict[str, object] | str
+        str
             Pool identifier (CUSIP or internal pool ID).
 
         Notes
@@ -696,12 +696,12 @@ class AgencyMbsPassthroughBuilder:
         """
         ...
 
-    def pool_id(self, value: dict[str, object] | str) -> AgencyMbsPassthroughBuilder:
+    def pool_id(self, value: str) -> AgencyMbsPassthroughBuilder:
         """Set the contract's pool id.
 
         Parameters
         ----------
-        value : dict[str, object] | str
+        value : str
             Pool identifier (CUSIP or internal pool ID).
 
         Returns

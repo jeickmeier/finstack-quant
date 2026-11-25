@@ -1,10 +1,18 @@
-//! Defaultable-equity tree with fractional recovery of outstanding principal.
+//! Convertible binomial lattice engine supporting both defaultable-equity
+//! (jump-to-default with explicit principal recovery) and canonical
+//! Tsiveriotis-Fernandes (1998) two-component `(total, cash)` discounting.
+//!
+//! # References
+//!
+//! - Tsiveriotis, K., & Fernandes, C. (1998). "Valuing Convertible Bonds with
+//!   Credit Risk." `docs/REFERENCES.md#tsiveriotis-fernandes-1998`
 
 use super::exercise_level::{NodeExercise, apply_corrected_totals};
 use finstack_quant_core::{Error, Result};
 
 use finstack_quant_models::trees::tree_framework::EvolutionParams;
 
+use super::engine::ConvertibleModel;
 use super::valuator::ConvertibleBondValuator;
 
 /// Resolve the terminal exercise choice and its cash component.
@@ -67,9 +75,31 @@ pub(super) struct CreditTreeEngine<'a> {
     pub(super) valuator: &'a ConvertibleBondValuator,
     pub(super) steps: usize,
     pub(super) time_to_maturity: f64,
+    pub(super) model: ConvertibleModel,
+    /// Recovery rate as a decimal fraction of principal, in `[0, 1]`
+    /// (used by Tsiveriotis-Fernandes to map hazard survival to credit spread).
+    pub(super) recovery_rate: f64,
 }
 
 impl<'a> CreditTreeEngine<'a> {
+    /// Per-step credit discount factor `exp(-s_i * dt) = Q_i^(1 - R)` for TF98.
+    fn tf_credit_step_dfs(&self) -> Result<Vec<f64>> {
+        let loss = 1.0 - self.recovery_rate;
+        self.valuator
+            .survival_factors
+            .iter()
+            .map(|&survival| {
+                if survival > 0.0 && survival.is_finite() {
+                    Ok(survival.powf(loss))
+                } else {
+                    Err(Error::Validation(format!(
+                        "Tsiveriotis-Fernandes tree requires positive per-step survival, got {survival}"
+                    )))
+                }
+            })
+            .collect()
+    }
+
     pub(super) fn price(&self, market: CreditTreeMarketInputs) -> Result<(f64, f64)> {
         let CreditTreeMarketInputs {
             spot,
@@ -79,16 +109,16 @@ impl<'a> CreditTreeEngine<'a> {
         } = market;
 
         let dt = self.time_to_maturity / self.steps as f64;
+        let tf_credit_dfs = match self.model {
+            ConvertibleModel::TsiveriotisFernandes => Some(self.tf_credit_step_dfs()?),
+            ConvertibleModel::DefaultableEquity => None,
+        };
 
         // Dividend protection (continuous-yield model): the protected rate is
         // the full dividend yield (the DividendAdjustment variants carry no
         // threshold, so nothing is carved out) and the conversion ratio
         // accretes as `ratio(t) = ratio_0 * exp(q_prot * t)` from the
-        // valuation date. The stock keeps its conditional drift `r - q + lambda`;
-        // protection enters only through the conversion payoff, so with full
-        // protection the discounted conversion claim
-        // `E[e^{-∫r} * ratio_0 * e^{qT} * S_T] = ratio_0 * S_0` is restored to
-        // a martingale independent of `q`.
+        // valuation date.
         let protected_dividend_rate = if self.valuator.dividend_protected {
             dividend_yield.max(0.0)
         } else {
@@ -96,13 +126,12 @@ impl<'a> CreditTreeEngine<'a> {
         };
         let ratio_accretion_at = |step: usize| (protected_dividend_rate * step as f64 * dt).exp();
 
-        // Constant CRR up/down factors retain recombination. Conditional
-        // branch probabilities use r + lambda - q so survival-weighted stock
-        // growth, including its jump to zero, has risk-neutral drift r - q.
+        // Constant CRR up/down factors retain recombination.
         let params = EvolutionParams::equity_crr(volatility, risk_free_rate, dividend_yield, dt)?;
 
-        // Per-step probabilities driven by the per-step forward rates implied
-        // by the risk-free step discount factors (u/d unchanged).
+        // Per-step probabilities driven by the per-step forward rates:
+        // `r + lambda - q` for defaultable equity (conditional on survival),
+        // `r - q` for Tsiveriotis-Fernandes (credit enters via discounting only).
         let mut step_params = Vec::with_capacity(self.steps);
         for (&df, &survival) in self
             .valuator
@@ -116,7 +145,10 @@ impl<'a> CreditTreeEngine<'a> {
                      factors, got {df}"
                 )));
             }
-            let step_rate = -(df * survival).ln() / dt;
+            let step_rate = match self.model {
+                ConvertibleModel::DefaultableEquity => -(df * survival).ln() / dt,
+                ConvertibleModel::TsiveriotisFernandes => -df.ln() / dt,
+            };
             step_params.push(params.with_drift(step_rate - dividend_yield, dt)?);
         }
 
@@ -189,10 +221,15 @@ impl<'a> CreditTreeEngine<'a> {
         for step in (0..self.steps).rev() {
             let current_num_nodes = step + 1;
 
-            // Per-step discount factors from full term structure, and the
-            // per-step branch probabilities derived from the same forwards.
-            let discount = self.valuator.rf_step_dfs[step] * self.valuator.survival_factors[step];
+            // Per-step continuation from full term structure:
+            // - DefaultableEquity: both components discounted at `rf * survival` + recovery.
+            // - TsiveriotisFernandes: canonical two-component TF98 backward induction
+            //   discounting equity component `exp_total - exp_cash` at `rf` and
+            //   cash component `exp_cash` at `rf * credit_df` (no default recovery leg).
+            let rf_df = self.valuator.rf_step_dfs[step];
+            let survival = self.valuator.survival_factors[step];
             let recovery = self.valuator.recovery_by_step[step];
+            let tf_credit_df = tf_credit_dfs.as_ref().map(|dfs| dfs[step]);
             let sp = &step_params[step];
             let step_accretion = ratio_accretion_at(step);
             // Exercise decisions are ex-coupon; the coupon is added after
@@ -216,8 +253,21 @@ impl<'a> CreditTreeEngine<'a> {
                 let exp_total = sp.prob_up * v_up + sp.prob_down * v_down;
                 let exp_cash = sp.prob_up * c_up + sp.prob_down * c_down;
 
-                let continuation_total = exp_total * discount + recovery;
-                let continuation_cash = exp_cash * discount + recovery;
+                let (continuation_total, continuation_cash) = match tf_credit_df {
+                    Some(credit_df) if (credit_df - 1.0).abs() > 0.0 => {
+                        let exp_equity = exp_total - exp_cash;
+                        let cont_cash = exp_cash * rf_df * credit_df;
+                        (exp_equity * rf_df + cont_cash, cont_cash)
+                    }
+                    Some(_) => (exp_total * rf_df, exp_cash * rf_df),
+                    None => {
+                        let discount = rf_df * survival;
+                        (
+                            exp_total * discount + recovery,
+                            exp_cash * discount + recovery,
+                        )
+                    }
+                };
 
                 // Node decision logic
                 let node_spot = get_spot(step, i);
@@ -328,5 +378,38 @@ impl<'a> CreditTreeEngine<'a> {
         }
 
         Ok(values[0])
+    }
+
+    /// Present value of the straight cash component (no conversion or options).
+    pub(super) fn bond_floor(&self) -> Result<f64> {
+        let tf_credit_dfs = match self.model {
+            ConvertibleModel::TsiveriotisFernandes => Some(self.tf_credit_step_dfs()?),
+            ConvertibleModel::DefaultableEquity => None,
+        };
+        let payment = |step| {
+            self.valuator.coupon_map.get(&step).copied().unwrap_or(0.0)
+                + self
+                    .valuator
+                    .principal_map
+                    .get(&step)
+                    .copied()
+                    .unwrap_or(0.0)
+        };
+        let mut value = payment(self.steps);
+        for step in (0..self.steps).rev() {
+            value = match &tf_credit_dfs {
+                Some(credit_dfs) => {
+                    payment(step) + value * self.valuator.rf_step_dfs[step] * credit_dfs[step]
+                }
+                None => {
+                    payment(step)
+                        + value
+                            * self.valuator.rf_step_dfs[step]
+                            * self.valuator.survival_factors[step]
+                        + self.valuator.recovery_by_step[step]
+                }
+            };
+        }
+        Ok(value)
     }
 }

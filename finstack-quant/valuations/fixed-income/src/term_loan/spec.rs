@@ -193,7 +193,7 @@ pub enum CommitmentFeeBase {
 /// ```
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct DdtlSpec {
     /// Total commitment available for draws, in the loan currency.
     pub commitment: Money,
@@ -247,6 +247,46 @@ impl DdtlSpec {
     /// * `date` - Date the limit is wanted for; a step dated on it applies.
     pub(crate) fn limit_in_force_at(&self, date: Date) -> Money {
         crate::loan_terms::commitment_in_force(&self.commitment_steps, self.commitment, date)
+    }
+
+    /// Validate invariants of a DDTL specification.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        if !self.commitment.amount().is_finite() || self.commitment.amount() <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "DDTL commitment must be positive and finite".into(),
+            ));
+        }
+        if self.availability_start > self.availability_end {
+            return Err(finstack_quant_core::Error::Validation(
+                "DDTL availability_start must not follow availability_end".into(),
+            ));
+        }
+        if self.usage_fee_bp < Decimal::ZERO || self.commitment_fee_bp < Decimal::ZERO {
+            return Err(finstack_quant_core::Error::Validation(
+                "DDTL usage_fee_bp and commitment_fee_bp must be non-negative".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl serde::Serialize for DdtlSpec {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        Self::serialize(self, serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for DdtlSpec {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Self::deserialize(deserializer)?;
+        value.validate().map_err(serde::de::Error::custom)?;
+        Ok(value)
     }
 }
 
@@ -367,7 +407,7 @@ pub enum LoanCallType {
 /// `price_pct_of_par` and the make-whole amount.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct LoanCall {
     /// Call date (earliest prepayment date for this call provision)
     #[cfg_attr(
@@ -381,6 +421,49 @@ pub struct LoanCall {
     /// Type of call provision. Defaults to `Hard` when unspecified.
     #[serde(default)]
     pub call_type: LoanCallType,
+}
+
+impl LoanCall {
+    /// Validate invariants of a single loan call provision.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        if !self.price_pct_of_par.is_finite() || self.price_pct_of_par <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "LoanCall price_pct_of_par must be positive and finite, got {}",
+                self.price_pct_of_par
+            )));
+        }
+        if let LoanCallType::MakeWhole(spec) = &self.call_type
+            && (!spec.spread_bp.is_finite()
+                || spec.spread_bp < 0.0
+                || spec.reference_curve_id.as_str().trim().is_empty())
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "LoanCall make_whole spread_bp must be finite and non-negative with a non-empty reference_curve_id"
+                    .into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl serde::Serialize for LoanCall {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        Self::serialize(self, serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for LoanCall {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Self::deserialize(deserializer)?;
+        value.validate().map_err(serde::de::Error::custom)?;
+        Ok(value)
+    }
 }
 
 /// Complete call schedule for callable term loans.
@@ -417,8 +500,43 @@ pub struct LoanCall {
 /// ```
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct LoanCallSchedule {
     /// Ordered call provisions (typically sorted by date with descending premiums)
     pub calls: Vec<LoanCall>,
+}
+
+impl LoanCallSchedule {
+    /// Validate ordering and call prices across the call schedule.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        for call in &self.calls {
+            call.validate()?;
+        }
+        if self.calls.windows(2).any(|w| w[0].date >= w[1].date) {
+            return Err(finstack_quant_core::Error::Validation(
+                "LoanCallSchedule call dates must be strictly increasing".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl serde::Serialize for LoanCallSchedule {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        Self::serialize(self, serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for LoanCallSchedule {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Self::deserialize(deserializer)?;
+        value.validate().map_err(serde::de::Error::custom)?;
+        Ok(value)
+    }
 }

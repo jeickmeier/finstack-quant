@@ -46,7 +46,7 @@ impl CmsSwapPricer {
         convexity_scale: f64,
     ) -> Result<Money> {
         let npv = self.price_internal_with_convexity_raw(inst, market, as_of, convexity_scale)?;
-        Money::new(npv, inst.notional.currency())
+        Money::from_model_value(npv, inst.notional.currency())
     }
 
     pub(crate) fn price_internal_with_convexity_raw(
@@ -223,7 +223,7 @@ impl CmsSwapReplicationPricer {
         as_of: Date,
     ) -> Result<Money> {
         let npv = self.price_internal_raw(inst, market, as_of)?;
-        Money::new(npv, inst.notional.currency())
+        Money::from_model_value(npv, inst.notional.currency())
     }
 
     pub(crate) fn price_internal_raw(
@@ -560,6 +560,17 @@ pub(super) fn cms_embedded_option_value(
         return Ok(match option_type {
             OptionType::Call => (adjusted_forward - strike).max(0.0),
             OptionType::Put => (strike - adjusted_forward).max(0.0),
+        });
+    }
+    if strike <= 0.0 {
+        if !adjusted_forward.is_finite() || adjusted_forward <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Black CMS embedded option requires positive forward, got {adjusted_forward}"
+            )));
+        }
+        return Ok(match option_type {
+            OptionType::Call => adjusted_forward - strike,
+            OptionType::Put => 0.0,
         });
     }
     vol_surface.require_quote_type(
@@ -1388,5 +1399,50 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(error.contains("axis"), "{error}");
+    }
+
+    #[test]
+    fn embedded_cms_option_handles_non_positive_effective_strike_and_low_vol_volga() {
+        use crate::cms_option::CmsOption;
+        use finstack_quant_core::market_data::surfaces::{
+            VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+        };
+        use finstack_quant_models::types::OptionType;
+        use finstack_quant_valuations_core::metrics::MetricId;
+
+        let surface = VolSurface::builder("USD-CMS10Y-VOL")
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
+            .expiries(&[1.0, 2.0])
+            .secondary_values(&[0.01, 0.05])
+            .row(&[0.2, 0.2])
+            .row(&[0.2, 0.2])
+            .build()
+            .expect("surface");
+        let put_val = cms_embedded_option_value(0.03, -0.005, &surface, 1.0, OptionType::Put)
+            .expect("negative strike floorlet in Black");
+        assert_eq!(put_val, 0.0);
+        let call_val = cms_embedded_option_value(0.03, -0.005, &surface, 1.0, OptionType::Call)
+            .expect("negative strike caplet in Black");
+        assert!((call_val - 0.035).abs() < 1e-12);
+
+        let as_of = date(2025, 1, 1);
+        let low_vol_market = cms_market_with_vol(as_of, 0.005);
+        let option = CmsOption::example().expect("example");
+        let volga_res = option
+            .price_with_metrics(
+                &low_vol_market,
+                as_of,
+                &[MetricId::Volga],
+                finstack_quant_valuations_core::instruments::PricingOptions::default(),
+            )
+            .expect("low-vol volga should fall back to forward 2nd diff");
+        assert!(volga_res.measures["volga"].is_finite());
+
+        let swap = CmsSwap::example().expect("example");
+        let mut bad_swap = serde_json::to_value(&swap).expect("serialize");
+        bad_swap["notional"]["amount"] = serde_json::json!(-1.0);
+        assert!(serde_json::from_value::<CmsSwap>(bad_swap).is_err());
     }
 }

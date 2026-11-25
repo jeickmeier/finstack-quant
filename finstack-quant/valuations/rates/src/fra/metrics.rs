@@ -10,14 +10,10 @@
 //! See unit tests and `examples/` for usage.
 
 use crate::fra::ForwardRateAgreement;
-use finstack_quant_core::Result;
 use finstack_quant_core::market_data::term_structures::{
     RateCalibrationQuote, RateCalibrationRecipe,
 };
-use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
-use finstack_quant_valuations_core::metrics::{
-    MetricCalculator, MetricContext, MetricRegistry, sensitivity_central_diff,
-};
+use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricRegistry};
 
 /// Registers all FRA metrics to a registry.
 ///
@@ -32,7 +28,7 @@ pub(crate) fn register_fra_metrics(
         registry: registry,
         instrument: InstrumentType::Fra,
         metrics: [
-            (Dv01, FraRateCurveDv01Calculator),
+            (Dv01, crate::rate_bucketed_dv01::RateDv01(false)),
             (Pv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_forward_only())),
             (ForwardPv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_forward_only())),
             (ParRate, FraParRateCalculator),
@@ -69,66 +65,6 @@ impl MetricCalculator for FraParRateCalculator {
         let (rate, _) = fra.resolved_forward_rate(&context.curves, context.as_of)?;
         Ok(rate)
     }
-}
-
-// FRA quote-shock DV01.
-//
-// When the discount and forward curves carry rate-calibration metadata, this
-// reports quote-shock/rebootstrap DV01 through the shared
-// `bump_market_via_rate_quote_shock` helper. When metadata is unavailable, or
-// the forward curve was calibrated from tenor-basis quotes (which the shared
-// replay does not support), it falls back to the generic fitted-curve bump
-// path.
-
-/// FRA DV01 calculator. Prefers quote-shock/rebootstrap when replayable
-/// calibration metadata is available, falling back to the generic fitted-curve
-/// bump.
-pub(crate) struct FraRateCurveDv01Calculator;
-
-impl MetricCalculator for FraRateCurveDv01Calculator {
-    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let fra: &ForwardRateAgreement = context.instrument_as()?;
-        let market = context.curves.as_ref();
-        let discount = market.get_discount(fra.discount_curve_id.as_str())?;
-        let forward = market.get_forward(fra.forward_curve_id.as_str()).ok();
-
-        let replayable = discount.rate_calibration().is_some()
-            && forward
-                .as_ref()
-                .and_then(|f| f.rate_calibration())
-                .is_some_and(|recipe| !uses_basis_quotes(recipe));
-        if !replayable {
-            return generic_fallback(context);
-        }
-
-        let bump_bp = bump_config::resolve(context)?.rate_bump_bp;
-
-        let discount_id = &fra.discount_curve_id;
-        let forward_id = &fra.forward_curve_id;
-
-        let bumped_up = crate::rate_recalibration::bump_rate_market_cached(
-            context,
-            discount_id,
-            forward_id,
-            bump_bp,
-        )?;
-        let pv_up = context.reprice_raw(bumped_up.as_ref(), context.as_of)?;
-        let bumped_down = crate::rate_recalibration::bump_rate_market_cached(
-            context,
-            discount_id,
-            forward_id,
-            -bump_bp,
-        )?;
-        let pv_down = context.reprice_raw(bumped_down.as_ref(), context.as_of)?;
-        sensitivity_central_diff(pv_up, pv_down, bump_bp)
-    }
-}
-
-fn generic_fallback(context: &mut MetricContext) -> Result<f64> {
-    finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(
-        finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined(),
-    )
-    .calculate(context)
 }
 
 pub(crate) fn uses_basis_quotes(calibration: &RateCalibrationRecipe) -> bool {

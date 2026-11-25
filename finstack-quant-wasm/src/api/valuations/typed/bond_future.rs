@@ -42,8 +42,36 @@ getters!(JsBondFuture, "BondFuture", |i| {
     /// Return the contract's position and lifecycle terms.
     /// @returns Independent listed quantity, price units, marks and settlement terms.
     terms as terms: "generated.valuations.ListedFutureTerms" => json(i.terms),
+    /// First eligible delivery date.
+    /// @returns ISO-8601 delivery start date.
+    delivery_start as deliveryStart: "string" => date(i.delivery_start),
+    /// Conversion-factor and repo specifications for the contract.
+    /// @returns Standard coupon, maturity and repo day-count convention.
+    contract_specs as contractSpecs: "generated.valuations.BondFutureSpecs" => json(i.contract_specs),
+    /// Basket of eligible deliverable bonds with published conversion factors.
+    /// @returns Ordered deliverable basket entries.
+    deliverable_basket as deliverableBasket: "generated.valuations.DeliverableBond[]" => json(i.deliverable_basket),
+    /// Identifier of the selected cheapest-to-deliver (CTD) bond.
+    /// @returns Selected CTD bond identifier, or `null` when resolved implicitly from a single-bond basket.
+    ctd_bond_id as ctdBondId: "string | null" => opt_text(i.ctd_bond_id),
+    /// Embedded cheapest-to-deliver (CTD) bond definition, when supplied inline.
+    /// @returns Inline CTD bond spec plain object, or `null`.
+    ctd_bond as ctdBond: "NonNullable<generated.valuations.BondFuture['ctd_bond']> | null" => json(i.ctd_bond),
+    /// Financing and discount curve identifier.
+    /// @returns Curve identifier used for carrying the deliverable when no repo curve is set.
+    discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
+    /// Optional repo financing curve identifier for the chosen deliverable.
+    /// @returns Repo curve identifier, or `null`.
+    repo_curve_id as repoCurveId: "string | null" => opt_text(i.repo_curve_id),
 });
 common_getters!(JsBondFuture, "BondFuture");
+to_builder_method!(
+    /// Seed an independent builder from the complete listed contract.
+    /// @returns Builder carrying the terms, financing inputs and selected deliverable.
+    JsBondFuture,
+    "BondFuture",
+    JsBondFutureBuilder
+);
 
 builder_class!(
     /// Builder for a listed bond future.
@@ -61,18 +89,6 @@ builder_class!(
     /// ```
     JsBondFutureBuilder, "BondFutureBuilder", BondFutureBuilder, JsBondFuture, |b| b.build()
 );
-
-#[wasm_bindgen(js_class = BondFuture)]
-impl JsBondFuture {
-    /// Seed an independent builder from the complete listed contract.
-    /// @returns Builder carrying the terms, financing inputs and selected deliverable.
-    #[wasm_bindgen(js_name = toBuilder)]
-    pub fn to_builder(&self) -> JsBondFutureBuilder {
-        JsBondFutureBuilder {
-            inner: super::Staged::new(self.inner.to_builder()),
-        }
-    }
-}
 
 setters!(JsBondFutureBuilder, "BondFutureBuilder", {
     /// Set the stable contract identifier.

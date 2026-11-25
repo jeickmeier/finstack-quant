@@ -37,6 +37,96 @@ class BondBreakevenRow:
     True
     """
 
+    @staticmethod
+    def from_json(json: str) -> BondBreakevenRow:
+        """
+        Deserialize from the JSON produced by ``to_json``.
+
+        Parameters
+        ----------
+        json : str
+            JSON-encoded ``BondBreakevenRow`` (the shape ``to_json`` writes).
+
+        Returns
+        -------
+        BondBreakevenRow
+            The decoded value.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or carries unknown fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import BondBreakevenRow
+        >>> try:
+        ...     BondBreakevenRow.from_json("{}")
+        ... except ValueError:
+        ...     print("rejected")
+        rejected
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to the JSON shape ``from_json`` accepts.
+
+        Returns
+        -------
+        str
+            The row as canonical JSON.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Return the row's wire form as a dictionary.
+
+        Returns
+        -------
+        dict[str, Any]
+            The parsed form of :meth:`to_json`.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            :meth:`from_json` and the ``to_json`` text.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    def __repr__(self) -> str:
+        """
+        Return ``repr(self)``.
+
+        Returns
+        -------
+        str
+            A one-line summary of the row.
+        """
+        ...
+
     @property
     def horizon(self) -> Tenor:
         """Read horizon from the native result.
@@ -106,6 +196,111 @@ class BondBreakevenLadder:
     >>> hasattr(BondBreakevenLadder, "as_of")
     True
     """
+
+    @staticmethod
+    def from_json(json: str) -> BondBreakevenLadder:
+        """
+        Deserialize from the JSON produced by ``to_json``.
+
+        Parameters
+        ----------
+        json : str
+            JSON-encoded ``BondBreakevenLadder`` (the shape ``to_json`` writes).
+
+        Returns
+        -------
+        BondBreakevenLadder
+            The decoded ladder.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or carries unknown fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import BondBreakevenLadder
+        >>> try:
+        ...     BondBreakevenLadder.from_json("{}")
+        ... except ValueError:
+        ...     print("rejected")
+        rejected
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to the JSON shape ``from_json`` accepts.
+
+        Returns
+        -------
+        str
+            The ladder as canonical JSON.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Return the ladder's wire form as a dictionary.
+
+        Returns
+        -------
+        dict[str, Any]
+            The parsed form of :meth:`to_json`.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            :meth:`from_json` and the ``to_json`` text.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    def __repr__(self) -> str:
+        """
+        Return ``repr(self)``.
+
+        Returns
+        -------
+        str
+            A one-line summary of the ladder.
+        """
+        ...
+
+    @property
+    def config(self) -> BondBreakevenConfig:
+        """Read config from the native result.
+
+        Returns
+        -------
+        BondBreakevenConfig
+            Breakeven target and solve mode used to compute this ladder.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
 
     @property
     def as_of(self) -> date:
@@ -242,7 +437,7 @@ def bond_breakeven_ladder(
     market: MarketContext | str,
     as_of: date | str,
     horizons: Sequence[Tenor | str],
-    config: BondBreakevenConfig,
+    config: BondBreakevenConfig | str,
 ) -> BondBreakevenLadder:
     """Measure carry and signed basis-point breakeven for each horizon.
 
@@ -256,9 +451,10 @@ def bond_breakeven_ladder(
         Valuation date or ISO date string anchoring the horizons.
     horizons : Sequence[Tenor or str]
         Nonempty ordered positive calendar tenors, such as "1M" and "1Y".
-    config : BondBreakevenConfig
+    config : BondBreakevenConfig or str
         Select yield, Z-spread for a vanilla bond, or linear OAS for an
-        option-bearing bond. Spread targets require instrument spread CS01.
+        option-bearing bond, either as a mapping or its JSON string. Spread
+        targets require instrument spread CS01.
 
     Returns
     -------

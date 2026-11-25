@@ -53,7 +53,7 @@ pub fn bond_breakeven_ladder_table(
 ) -> Result<JsValue, JsValue> {
     use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::BondBreakevenLadder;
     let ladder: BondBreakevenLadder = crate::utils::input::from_js_json(&ladder, "ladder")?;
-    to_js_value(&ladder.to_table())
+    crate::utils::to_js_table_numeric(&ladder.to_table())
 }
 
 /// Yield and I-spread to every call, put and maturity exit of a bond at one market price, with the worst marked (mirrors Rust `bond_workout_ladder`).

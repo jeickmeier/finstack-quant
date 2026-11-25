@@ -115,21 +115,10 @@ impl<'a> CashflowEngine<'a> {
         if self.facility.issue_date > self.as_of
             && !rc.is_effectively_zero(self.facility.drawn.amount(), ZeroKind::Money(ccy))
         {
-            flows.push({
-                // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
-                let cash = self.facility.drawn.checked_neg();
-                CashFlowParams::new(
-                    self.facility.issue_date,
-                    None,
-                    cash,
-                    CFKind::Notional,
-                    0.0,
-                    None,
-                )
-                .with_principal_delta(cash.checked_neg())
-                .with_principal_date(self.facility.issue_date)
-                .build()?
-            });
+            flows.push(Self::notional_flow(
+                self.facility.issue_date,
+                self.facility.drawn.checked_neg(),
+            )?);
         }
 
         // Generate interest and fee cashflows with intra-period event slicing
@@ -540,18 +529,12 @@ impl<'a> CashflowEngine<'a> {
         // Add principal flows from draw/repay events
         for event in contract_events.iter() {
             if event.date > self.as_of {
-                flows.push({
-                    // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
-                    let cash = if event.is_draw {
-                        event.amount.checked_neg()
-                    } else {
-                        event.amount
-                    };
-                    CashFlowParams::new(event.date, None, cash, CFKind::Notional, 0.0, None)
-                        .with_principal_delta(cash.checked_neg())
-                        .with_principal_date(event.date)
-                        .build()?
-                });
+                let cash = if event.is_draw {
+                    event.amount.checked_neg()
+                } else {
+                    event.amount
+                };
+                flows.push(Self::notional_flow(event.date, cash)?);
             }
         }
 
@@ -571,21 +554,10 @@ impl<'a> CashflowEngine<'a> {
         if terminal_payment_date > self.as_of
             && !rc.is_effectively_zero(final_balance_for_terminal.amount(), ZeroKind::Money(ccy))
         {
-            flows.push({
-                // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
-                let cash = final_balance_for_terminal;
-                CashFlowParams::new(
-                    terminal_payment_date,
-                    None,
-                    cash,
-                    CFKind::Notional,
-                    0.0,
-                    None,
-                )
-                .with_principal_delta(cash.checked_neg())
-                .with_principal_date(terminal_payment_date)
-                .build()?
-            });
+            flows.push(Self::notional_flow(
+                terminal_payment_date,
+                final_balance_for_terminal,
+            )?);
         }
 
         Ok(finstack_quant_cashflows::schedule_from_classified_flows(

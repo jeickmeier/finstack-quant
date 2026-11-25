@@ -667,7 +667,17 @@ fn overnight_estr_leg_matches_shared_compounding_engine() {
     let mut mismatched = period;
     mismatched.accrual_year_fraction = 0.50;
     let projected = no_fallback_swap()
-        .projected_leg_period(&leg, &fwd, None, &mismatched, start, None)
+        .projected_leg_period(
+            &leg,
+            &crate::swap_legs::ResolvedProjectionCurve::Forward(std::sync::Arc::new(fwd.clone())),
+            None,
+            &mismatched,
+            start,
+            crate::xccy_swap::types::XccyPeriodProjectionArgs {
+                end_is_termination_date: false,
+                projected_fixings: None,
+            },
+        )
         .expect("overnight xccy period");
     let calendar = calendar_by_id_strict("target2").expect("target2");
     let expected = project_overnight_coupon(OvernightCouponProjectionInput {
@@ -752,7 +762,17 @@ fn overnight_unresolvable_calendar_without_fallback_errors() {
         },
     };
     let err = no_fallback_swap()
-        .projected_leg_period(&leg, &fwd, None, &period, start, None)
+        .projected_leg_period(
+            &leg,
+            &crate::swap_legs::ResolvedProjectionCurve::Forward(std::sync::Arc::new(fwd.clone())),
+            None,
+            &period,
+            start,
+            crate::xccy_swap::types::XccyPeriodProjectionArgs {
+                end_is_termination_date: false,
+                projected_fixings: None,
+            },
+        )
         .expect_err("unresolvable calendar must fail");
     assert!(
         err.to_string().contains("calendar"),
@@ -807,4 +827,71 @@ fn validate_rejects_simple_compounding_on_overnight_index() {
         format!("{err}").contains("Overnight RFR"),
         "expected overnight/Simple rejection, got {err}"
     );
+}
+
+#[test]
+fn xccy_swap_expired_mtm_returns_zero_without_fx_and_has_expiry() {
+    let start = Date::from_calendar_date(2024, time::Month::January, 2).expect("date");
+    let end = Date::from_calendar_date(2025, time::Month::January, 2).expect("date");
+    let mut swap = XccySwap::new(
+        "XCCY-EXPIRED-MTM",
+        XccySwapLeg {
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            side: PayReceive::Receive,
+            leg: FloatLegSpec {
+                index_id: "USD-SOFR-3M".into(),
+                forward_curve_id: CurveId::new("USD-SOFR-3M"),
+                discount_curve_id: CurveId::new("USD-OIS"),
+                start,
+                end,
+                frequency: Tenor::quarterly(),
+                day_count: DayCount::Act360,
+                business_day_convention: BusinessDayConvention::ModifiedFollowing,
+                calendar_id: None,
+                stub: StubKind::ShortFront,
+                reset_lag_days: 0,
+                fixing_calendar_id: None,
+                end_of_month: false,
+                spread_bp: Decimal::ZERO,
+                compounding: Default::default(),
+                payment_lag_days: 0,
+            },
+        },
+        XccySwapLeg {
+            notional: Money::from((900_000_i64, Currency::EUR)),
+            side: PayReceive::Pay,
+            leg: FloatLegSpec {
+                index_id: "EUR-EURIBOR-3M".into(),
+                forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
+                discount_curve_id: CurveId::new("EUR-OIS"),
+                start,
+                end,
+                frequency: Tenor::quarterly(),
+                day_count: DayCount::Act360,
+                business_day_convention: BusinessDayConvention::ModifiedFollowing,
+                calendar_id: None,
+                stub: StubKind::ShortFront,
+                reset_lag_days: 0,
+                fixing_calendar_id: None,
+                end_of_month: false,
+                spread_bp: Decimal::ZERO,
+                compounding: Default::default(),
+                payment_lag_days: 0,
+            },
+        },
+        Currency::USD,
+    )
+    .with_notional_exchange(NotionalExchange::MtmResetting {
+        resetting_side: finstack_quant_valuations_core::instruments::ResettingSide::Leg2,
+    });
+    swap.allow_calendar_fallback = true;
+
+    assert_eq!(swap.expiry(), Some(end));
+    let pv = swap
+        .value(
+            &MarketContext::new(),
+            Date::from_calendar_date(2026, time::Month::January, 2).expect("after"),
+        )
+        .expect("expired MtM XccySwap returns 0 without live curves/FX");
+    assert_eq!(pv.amount(), 0.0);
 }

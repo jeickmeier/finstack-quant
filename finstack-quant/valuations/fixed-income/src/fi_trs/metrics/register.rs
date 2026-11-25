@@ -85,6 +85,9 @@ pub(crate) struct DurationDv01Calculator;
 impl MetricCalculator for DurationDv01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let trs: &FiIndexTotalReturnSwap = context.instrument_as()?;
+        if context.as_of >= trs.schedule.end {
+            return Ok(0.0);
+        }
 
         let duration = trs.index_duration(context.curves.as_ref())?;
 

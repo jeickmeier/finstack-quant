@@ -52,7 +52,7 @@ use finstack_quant_valuations_core::impl_instrument_base;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct Deposit {
     /// Unique identifier for the deposit.
     pub id: InstrumentId,
@@ -127,6 +127,8 @@ pub struct Deposit {
     /// When set, enables calendar-aware spot date and accrual date adjustments.
     pub calendar_id: Option<CalendarId>,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(Deposit);
 
 impl Deposit {
     /// Create a canonical example deposit for testing and documentation.
