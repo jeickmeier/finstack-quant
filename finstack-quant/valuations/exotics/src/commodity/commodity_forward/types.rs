@@ -104,6 +104,7 @@ use finstack_quant_valuations_core::instruments::SettlementType;
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "json-schema", schemars(deny_unknown_fields))]
+#[serde(remote = "Self")]
 pub struct CommodityForward {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -255,6 +256,11 @@ pub struct CommodityForward {
     pub(crate) unknown_fields: finstack_quant_core::serde_guard::UnknownFieldGuard,
 }
 
+finstack_quant_valuations_core::validate_on_deserialize!(
+    CommodityForward,
+    CommodityForward::validate
+);
+
 fn default_multiplier() -> f64 {
     1.0
 }
@@ -383,9 +389,10 @@ impl CommodityForward {
                     finstack_quant_core::market_data::fixings::get_fixing_series(market, spot_id)?;
                 return series.get_value_exact(self.maturity);
             }
-            let spot = finstack_quant_valuations_core::metrics::scalar_numeric_value(
+            let spot = finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
                 market.get_price(spot_id)?,
-            );
+                self.underlying.currency,
+            )?;
             if delivered {
                 return Ok(spot);
             }
@@ -1316,5 +1323,48 @@ mod tests {
         assert_eq!(rebuilt.contract_price, Some(71.5));
         assert_eq!(rebuilt.quoted_forward, Some(74.25));
         assert!(rebuilt.attributes.has_tag("commodities-desk"));
+    }
+
+    #[test]
+    fn spot_fallback_enforces_currency_and_post_maturity_delta_is_zero() {
+        let as_of = date!(2025 - 01 - 15);
+        let mut forward = CommodityForward::example().expect("example");
+        forward.forward_curve_id = CurveId::new("MISSING-FWD");
+        forward.spot_id = Some("WTI-EUR-SPOT".into());
+        forward.maturity = date!(2025 - 04 - 15);
+
+        let market = test_market(as_of).insert_price(
+            "WTI-EUR-SPOT",
+            finstack_quant_core::market_data::scalars::MarketScalar::price(
+                Money::new(75.0, Currency::EUR).expect("money"),
+            ),
+        );
+        let err = forward
+            .forward_price(&market, as_of)
+            .expect_err("foreign spot scalar must error");
+        assert!(err.to_string().contains("Currency mismatch"), "err={err}");
+
+        // Post-maturity before payment date: fixed forward has zero delta.
+        let mut settled_fix_fwd = CommodityForward::example().expect("example");
+        settled_fix_fwd.maturity = date!(2025 - 04 - 15);
+        settled_fix_fwd.spot_id = Some("WTI-SETTLE".into());
+        settled_fix_fwd.contract_price = Some(70.0);
+        let payment_date = settled_fix_fwd.payment_date().expect("payment date");
+        let after_maturity = settled_fix_fwd.maturity + time::Duration::days(1);
+        assert!(after_maturity <= payment_date);
+        let metrics = settled_fix_fwd
+            .price_with_metrics(
+                &market,
+                after_maturity,
+                &[finstack_quant_valuations_core::metrics::MetricId::Delta],
+                Default::default(),
+            )
+            .expect("delta after maturity");
+        assert_eq!(
+            metrics
+                .metric(finstack_quant_valuations_core::metrics::MetricId::Delta)
+                .expect("delta"),
+            0.0
+        );
     }
 }

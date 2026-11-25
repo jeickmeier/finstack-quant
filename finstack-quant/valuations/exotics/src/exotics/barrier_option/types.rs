@@ -23,7 +23,7 @@ use finstack_quant_core::types::{BarrierType, PayoutTiming};
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct BarrierOption {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -121,6 +121,8 @@ pub struct BarrierOption {
     /// Attributes for scenario selection and grouping
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(BarrierOption);
 
 impl BarrierOption {
     /// Create a canonical example barrier option (up-and-out call).
@@ -313,7 +315,12 @@ impl finstack_quant_valuations_core::instruments::Instrument for BarrierOption {
         if !monitored {
             return Ok(None);
         }
-        let spot = super::pricer::resolve_spot(self, market)?;
+        let spot = crate::exotics::bs_gbm::resolve_positive_spot(
+            market,
+            &self.spot_id,
+            self.currency,
+            "BarrierOption",
+        )?;
         let breached = if self.barrier_type.is_up() {
             spot >= self.barrier
         } else {
@@ -374,8 +381,7 @@ mod tests {
         json.as_object_mut()
             .expect("object")
             .remove("rebate_timing");
-        let restored: super::BarrierOption = serde_json::from_value(json).expect("deserialize");
-        assert!(restored.validate_invariants().is_err());
+        assert!(serde_json::from_value::<super::BarrierOption>(json).is_err());
     }
 
     #[test]

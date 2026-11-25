@@ -1,10 +1,15 @@
 //! Black-Scholes DF-first inputs and curve-consistent GBM drift schedule for exotic pricers.
 
-use finstack_quant_core::dates::{Date, DayCountContext};
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_core::types::{CurveId, PriceId};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::monte_carlo::process::gbm::DriftSchedule;
 use finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df;
+use finstack_quant_valuations_core::instruments::pricing_overrides::MarketQuoteOverrides;
 
 /// Build a curve-consistent cumulative drift schedule for `GbmProcess::with_drift_schedule`.
 ///
@@ -110,6 +115,81 @@ impl BlackScholesInputsDf {
         }
         zero_rate_from_df(self.df, self.t, "BlackScholesInputsDf")
     }
+}
+
+/// Resolve a strictly positive spot level from `spot_id`, enforcing currency consistency.
+pub(crate) fn resolve_positive_spot(
+    market: &MarketContext,
+    spot_id: &PriceId,
+    currency: Currency,
+    context_label: &str,
+) -> Result<f64> {
+    let spot =
+        finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
+            market.get_price(spot_id)?,
+            currency,
+        )?;
+    finstack_quant_core::validation::validate_f64_positive(
+        spot,
+        &format!("{context_label} asset spot"),
+    )?;
+    Ok(spot)
+}
+
+/// Specification for collecting standard DF-first Black-Scholes market inputs.
+pub(crate) struct BsMarketInputSpec<'a> {
+    pub context_label: &'a str,
+    pub day_count: DayCount,
+    pub expiry: Date,
+    pub discount_curve_id: &'a CurveId,
+    pub spot_id: &'a PriceId,
+    pub vol_surface_id: &'a CurveId,
+    pub div_yield_id: Option<&'a PriceId>,
+    pub currency: Currency,
+    pub market_quotes: &'a MarketQuoteOverrides,
+    /// Explicit volatility lookup strike; `None` falls back to the resolved positive spot.
+    pub vol_strike: Option<f64>,
+}
+
+/// Collect DF-first Black-Scholes inputs in a fixed order: time/discount curve,
+/// positive spot, optional dividend yield, and volatility at strike.
+pub(crate) fn collect_bs_inputs(
+    market: &MarketContext,
+    as_of: Date,
+    spec: BsMarketInputSpec<'_>,
+) -> Result<BlackScholesInputsDf> {
+    let t = spec
+        .day_count
+        .year_fraction(as_of, spec.expiry, DayCountContext::default())?;
+    let df = market
+        .get_discount(spec.discount_curve_id.as_str())?
+        .df_between_dates(as_of, spec.expiry)?;
+    if !df.is_finite() || df <= 0.0 {
+        return Err(Error::Validation(format!(
+            "{}: invalid discount factor ({df:.6e}) between {as_of} and {}",
+            spec.context_label, spec.expiry
+        )));
+    }
+    let spot = resolve_positive_spot(market, spec.spot_id, spec.currency, spec.context_label)?;
+    let q = finstack_quant_valuations_core::instruments::pricing::market_inputs::resolve_optional_dividend_yield(
+        market,
+        spec.div_yield_id,
+    )?;
+    let vol_strike = spec.vol_strike.unwrap_or(spot);
+    let sigma = finstack_quant_valuations_core::instruments::pricing::volatility::resolve_sigma_at(
+        spec.market_quotes,
+        market,
+        spec.vol_surface_id.as_str(),
+        t,
+        vol_strike,
+    )?;
+    Ok(BlackScholesInputsDf {
+        spot,
+        df,
+        q,
+        sigma,
+        t,
+    })
 }
 
 #[cfg(test)]

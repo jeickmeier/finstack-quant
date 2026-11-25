@@ -478,3 +478,66 @@ fn scalar_spot_still_requires_a_finite_positive_amount() {
         assert!(MarketScalar::unitless(bad).is_err());
     }
 }
+
+#[test]
+fn low_vol_analytical_greeks_succeed_without_negative_vol_bump() {
+    let as_of = time::macros::date!(2025 - 01 - 02);
+    let mut option = CommoditySpotOption::example().expect("example");
+    option.strike = 75.0;
+    option
+        .instrument_pricing_overrides
+        .market_quotes
+        .implied_volatility = Some(0.005);
+    let disc = DiscountCurve::builder("USD-OIS")
+        .base_date(as_of)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .knots([(0.0, 1.0), (1.0, 0.96)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+        .build()
+        .expect("disc");
+    let fwd = PriceCurve::builder("WTI-FORWARD")
+        .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+        .base_date(as_of)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .knots([(0.0, 76.0), (1.0, 76.0)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
+        .build()
+        .expect("fwd");
+    let surf = VolSurface::from_grid(
+        "WTI-VOL",
+        &[0.1, 1.0],
+        &[50.0, 100.0],
+        &[0.005; 4],
+        finstack_quant_core::market_data::surfaces::VolGridOpts {
+            secondary_axis: finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+            quote_type: finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+            interpolation_mode:
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+        },
+        None,
+    )
+    .expect("surf");
+    let market = MarketContext::new()
+        .try_insert(disc)
+        .expect("disc")
+        .try_insert(fwd)
+        .expect("fwd")
+        .insert_surface(surf);
+
+    let metrics = [
+        finstack_quant_valuations_core::metrics::MetricId::Delta,
+        finstack_quant_valuations_core::metrics::MetricId::Gamma,
+        finstack_quant_valuations_core::metrics::MetricId::Vega,
+        finstack_quant_valuations_core::metrics::MetricId::Vanna,
+        finstack_quant_valuations_core::metrics::MetricId::Volga,
+    ];
+    let res = option
+        .price_with_metrics(&market, as_of, &metrics, Default::default())
+        .expect("low-vol Black-76 analytical Greeks must succeed");
+    for id in metrics {
+        let val = res.metric(id.clone()).expect("metric");
+        assert!(val.is_finite(), "{id:?} not finite: {val}");
+    }
+}

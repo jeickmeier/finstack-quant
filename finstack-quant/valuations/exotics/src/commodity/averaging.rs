@@ -120,6 +120,47 @@ pub(crate) fn business_day_average_price(
     Ok(sum.get_total()? / count as f64)
 }
 
+/// Count `(projected_observations, total_observations)` across the half-open window
+/// `[obs_start, obs_end)` (optionally including `obs_end`), where an observation
+/// is projected from the forward curve iff `date >= as_of`.
+pub(crate) fn business_day_observation_weights(
+    is_business_day: impl Fn(Date) -> Result<bool>,
+    obs_start: Date,
+    obs_end: Date,
+    include_end: bool,
+    as_of: Date,
+) -> Result<(u64, u64)> {
+    let mut projected = 0u64;
+    let mut total = 0u64;
+    let mut current = obs_start;
+
+    while current < obs_end {
+        if is_business_day(current)? {
+            total += 1;
+            if current >= as_of {
+                projected += 1;
+            }
+        }
+        current += time::Duration::days(1);
+    }
+    if include_end && obs_end >= obs_start && is_business_day(obs_end)? {
+        total += 1;
+        if obs_end >= as_of {
+            projected += 1;
+        }
+    }
+
+    if total == 0 {
+        let mid = obs_start + (obs_end - obs_start) / 2;
+        total = 1;
+        if mid >= as_of {
+            projected = 1;
+        }
+    }
+
+    Ok((projected, total))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

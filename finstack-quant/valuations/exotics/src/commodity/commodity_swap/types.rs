@@ -66,6 +66,7 @@ use finstack_quant_valuations_core::instruments::PayReceive;
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "json-schema", schemars(deny_unknown_fields))]
+#[serde(remote = "Self")]
 pub struct CommoditySwap {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -170,12 +171,14 @@ pub struct CommoditySwap {
     pub(crate) unknown_fields: finstack_quant_core::serde_guard::UnknownFieldGuard,
 }
 
+finstack_quant_valuations_core::validate_on_deserialize!(CommoditySwap, CommoditySwap::validate);
+
 fn default_pay_receive() -> PayReceive {
     PayReceive::Pay
 }
 
 impl CommoditySwap {
-    fn validate(&self) -> Result<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         use finstack_quant_core::validation;
 
         self.underlying.validate("CommoditySwap")?;
@@ -189,6 +192,13 @@ impl CommoditySwap {
         }
         if let Some(calendar_id) = self.calendar_id.as_deref() {
             calendar_by_id_strict(calendar_id)?;
+        }
+        if let Some(lag_days) = self.index_lag_days
+            && !(0..=3650).contains(&lag_days)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CommoditySwap index_lag_days must be in 0..=3650, got {lag_days}"
+            )));
         }
         let mut seen = std::collections::BTreeSet::new();
         for (date, value) in &self.past_fixings {
@@ -274,7 +284,7 @@ impl CommoditySwap {
         Ok(pv)
     }
 
-    fn periods(&self) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
+    pub(crate) fn periods(&self) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
         self.validate()?;
         super::super::averaging::commodity_periods(
             self.start_date,
@@ -283,6 +293,30 @@ impl CommoditySwap {
             self.calendar_id.as_deref(),
             self.business_day_convention,
         )
+    }
+
+    pub(crate) fn shifted_observation_window(
+        &self,
+        period: &finstack_quant_cashflows::builder::SchedulePeriod,
+    ) -> Result<(Date, Date)> {
+        let lag = time::Duration::days(i64::from(self.index_lag_days.unwrap_or(0)));
+        let obs_start = period.accrual_start.checked_sub(lag).ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "CommoditySwap '{}' accrual_start {} underflows index_lag_days {}",
+                self.id,
+                period.accrual_start,
+                lag.whole_days()
+            ))
+        })?;
+        let obs_end = period.accrual_end.checked_sub(lag).ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "CommoditySwap '{}' accrual_end {} underflows index_lag_days {}",
+                self.id,
+                period.accrual_end,
+                lag.whole_days()
+            ))
+        })?;
+        Ok((obs_start, obs_end))
     }
 
     /// Generate adjusted payment dates, retaining contractual averaging dates internally.
@@ -318,15 +352,15 @@ impl CommoditySwap {
                 price_curve.price_on_date(date)
             }
         };
-        let lag = time::Duration::days(i64::from(self.index_lag_days.unwrap_or(0)));
         periods
             .into_iter()
             .map(|period| {
+                let (obs_start, obs_end) = self.shifted_observation_window(&period)?;
                 let price = super::super::averaging::business_day_average_price(
                     get_price,
                     &is_business_day,
-                    period.accrual_start - lag,
-                    period.accrual_end - lag,
+                    obs_start,
+                    obs_end,
                     period.accrual_end == self.maturity,
                 )?;
                 Ok((period, price))
@@ -1235,5 +1269,73 @@ mod tests {
             deps.curves.forward_curves.as_slice(),
             &[swap.forward_curve_id]
         );
+    }
+
+    #[test]
+    fn sub_dollar_loglinear_delta_and_lag_validation() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        let end = Date::from_calendar_date(2025, Month::February, 28).expect("date");
+        let swap = CommoditySwap::builder()
+            .id(InstrumentId::new("SUB-DOLLAR-SWAP"))
+            .underlying(CommodityUnderlyingParams::new(
+                "Energy",
+                "HH",
+                "MMBTU",
+                Currency::USD,
+            ))
+            .quantity(1000.0)
+            .fixed_price(0.45)
+            .forward_curve_id(CurveId::new("SUB-FWD"))
+            .side(PayReceive::Pay)
+            .start_date(as_of)
+            .maturity(end)
+            .frequency(Tenor::monthly())
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .build()
+            .expect("swap");
+
+        let disc =
+            finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .knots([(0.0, 1.0), (1.0, 0.96)])
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("disc");
+        let sub_curve =
+            finstack_quant_core::market_data::term_structures::PriceCurve::builder("SUB-FWD")
+                .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+                .base_date(as_of)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .knots([(0.0, 0.50), (1.0, 0.55)])
+                .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
+                .build()
+                .expect("price curve");
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("disc")
+            .try_insert(sub_curve)
+            .expect("fwd");
+
+        let res = swap
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[finstack_quant_valuations_core::metrics::MetricId::Delta],
+                Default::default(),
+            )
+            .expect("analytical delta works even for sub-$1 LogLinear curve");
+        let delta = res
+            .metric(finstack_quant_valuations_core::metrics::MetricId::Delta)
+            .expect("delta");
+        assert!(delta > 1900.0 && delta < 2000.0, "delta={delta}");
+
+        let mut bad_lag = swap;
+        bad_lag.index_lag_days = Some(-1);
+        assert!(bad_lag.validate().is_err());
+        bad_lag.index_lag_days = Some(3651);
+        assert!(bad_lag.validate().is_err());
     }
 }

@@ -86,9 +86,54 @@ impl MetricCalculator for SpreadVegaCalculator {
             )),
         };
         let pv_up = inst.value(&bump_market(vol_bump)?, context.as_of)?.amount();
-        let pv_dn = inst
-            .value(&bump_market(-vol_bump)?, context.as_of)?
-            .amount();
+        let low_vol = match self.leg {
+            Some(1) => context
+                .curves
+                .get_surface(inst.leg1_vol_surface_id.as_str())?
+                .vols()
+                .iter()
+                .copied()
+                .any(|v| v <= vol_bump),
+            Some(2) => context
+                .curves
+                .get_surface(inst.leg2_vol_surface_id.as_str())?
+                .vols()
+                .iter()
+                .copied()
+                .any(|v| v <= vol_bump),
+            None => {
+                context
+                    .curves
+                    .get_surface(inst.leg1_vol_surface_id.as_str())?
+                    .vols()
+                    .iter()
+                    .copied()
+                    .any(|v| v <= vol_bump)
+                    || context
+                        .curves
+                        .get_surface(inst.leg2_vol_surface_id.as_str())?
+                        .vols()
+                        .iter()
+                        .copied()
+                        .any(|v| v <= vol_bump)
+            }
+            Some(_) => {
+                return Err(finstack_quant_core::Error::Validation(
+                    "invalid spread-option vega leg".into(),
+                ));
+            }
+        };
+        if low_vol {
+            let pv_base = context.base_value.amount();
+            return Ok((pv_up - pv_base) / (vol_bump * VOL_POINTS_PER_ABSOLUTE_VOL));
+        }
+        let pv_dn = match bump_market(-vol_bump).and_then(|dn| inst.value(&dn, context.as_of)) {
+            Ok(pv) => pv.amount(),
+            Err(_) => {
+                let pv_base = context.base_value.amount();
+                return Ok((pv_up - pv_base) / (vol_bump * VOL_POINTS_PER_ABSOLUTE_VOL));
+            }
+        };
 
         // Report cash P&L per one-vol-point move: normalise by the bump width
         // expressed in vol points (2.0 at the 1 vol-point default).
@@ -117,4 +162,109 @@ pub(crate) fn register_commodity_spread_option_metrics(
         ]
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::DayCount;
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, PriceCurve};
+    use finstack_quant_models::types::OptionType;
+    use finstack_quant_valuations_core::metrics::MetricId;
+    use time::macros::date;
+
+    #[test]
+    fn spread_option_low_vol_uses_forward_difference_vega() {
+        let as_of = date!(2025 - 01 - 01);
+        let expiry = date!(2025 - 07 - 01);
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (1.0, 0.96)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+            .build()
+            .expect("disc");
+        let p1 = PriceCurve::builder("LEG1")
+            .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 80.0), (1.0, 82.0)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
+            .build()
+            .expect("p1");
+        let p2 = PriceCurve::builder("LEG2")
+            .kind(finstack_quant_core::market_data::term_structures::PriceCurveKind::Price)
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 70.0), (1.0, 72.0)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
+            .build()
+            .expect("p2");
+        let low_vol = VolSurface::from_grid(
+            "V1",
+            &[0.1, 1.0],
+            &[50.0, 100.0],
+            &[0.005; 4],
+            finstack_quant_core::market_data::surfaces::VolGridOpts {
+                secondary_axis: VolSurfaceAxis::Strike,
+                quote_type: VolQuoteType::BlackLognormal,
+                interpolation_mode: VolInterpolationMode::Vol,
+            },
+            None,
+        )
+        .expect("v1");
+        let v2 = VolSurface::from_grid(
+            "V2",
+            &[0.1, 1.0],
+            &[50.0, 100.0],
+            &[0.20; 4],
+            finstack_quant_core::market_data::surfaces::VolGridOpts {
+                secondary_axis: VolSurfaceAxis::Strike,
+                quote_type: VolQuoteType::BlackLognormal,
+                interpolation_mode: VolInterpolationMode::Vol,
+            },
+            None,
+        )
+        .expect("v2");
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("disc")
+            .try_insert(p1)
+            .expect("p1")
+            .try_insert(p2)
+            .expect("p2")
+            .insert_surface(low_vol)
+            .insert_surface(v2);
+
+        let opt = CommoditySpreadOption::builder()
+            .id(finstack_quant_core::types::InstrumentId::new(
+                "SPREAD-LOW-VOL",
+            ))
+            .currency(Currency::USD)
+            .option_type(OptionType::Call)
+            .expiry(expiry)
+            .strike(10.0)
+            .quantity(100.0)
+            .leg1_forward_curve_id(finstack_quant_core::types::CurveId::new("LEG1"))
+            .leg2_forward_curve_id(finstack_quant_core::types::CurveId::new("LEG2"))
+            .leg1_vol_surface_id(finstack_quant_core::types::CurveId::new("V1"))
+            .leg2_vol_surface_id(finstack_quant_core::types::CurveId::new("V2"))
+            .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
+            .correlation(0.5)
+            .build()
+            .expect("spread");
+        let res = opt
+            .price_with_metrics(&market, as_of, &[MetricId::Vega], Default::default())
+            .expect("low-vol vega must succeed");
+        let vega = res.metric(MetricId::Vega).expect("vega");
+        assert!(vega.is_finite() && vega >= 0.0, "vega={vega}");
+    }
 }

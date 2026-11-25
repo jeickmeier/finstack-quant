@@ -60,6 +60,7 @@
 
 /// Shared business-day averaging helpers for floating legs.
 pub(crate) mod averaging;
+pub(crate) mod black76_greeks;
 mod bumps;
 /// Commodity Asian option module.
 pub mod commodity_asian_option;

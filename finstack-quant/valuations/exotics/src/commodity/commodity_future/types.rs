@@ -58,7 +58,7 @@ pub enum CommodityFutureFixing {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct CommodityFuture {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -99,6 +99,11 @@ pub struct CommodityFuture {
     #[serde(default)]
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(
+    CommodityFuture,
+    CommodityFuture::validate
+);
 
 impl CommodityFuture {
     /// Validate settlement dates, fixings, and listed terms.

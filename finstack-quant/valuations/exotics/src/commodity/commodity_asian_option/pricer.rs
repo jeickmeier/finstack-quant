@@ -19,14 +19,21 @@
 //!   European Average Options." `docs/REFERENCES.md#turnbull-wakeman-1991`
 
 use crate::commodity::commodity_asian_option::types::CommodityAsianOption;
+#[cfg(test)]
+use crate::exotics::asian_option::pricer::moments::{
+    arithmetic_moments, geometric_moments,
+    price_arithmetic_tw_asian as price_arithmetic_tw_commodity,
+    price_geometric_asian as price_geometric_commodity,
+};
+use crate::exotics::asian_option::pricer::moments::{
+    price_arithmetic_tw_asian, price_geometric_asian,
+};
 use crate::exotics::asian_option::types::{average_intrinsic, realized_average};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::math::summation::{NeumaierAccumulator, neumaier_sum};
 use finstack_quant_core::money::Money;
 use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
-use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, expect_inst,
@@ -133,9 +140,9 @@ pub(crate) fn compute_pv(
         )));
     }
 
-    // Compute price based on averaging method
+    // Compute price based on averaging method using shared O(m) moment-matching helpers.
     let price = match inst.averaging_method {
-        AveragingMethod::Geometric => price_geometric_commodity(
+        AveragingMethod::Geometric => price_geometric_asian(
             &future_forwards,
             inst.strike,
             sigma,
@@ -144,7 +151,7 @@ pub(crate) fn compute_pv(
             hist_prod_log,
             total_fixings,
         )?,
-        AveragingMethod::Arithmetic => price_arithmetic_tw_commodity(
+        AveragingMethod::Arithmetic => price_arithmetic_tw_asian(
             &future_forwards,
             inst.strike,
             sigma,
@@ -156,230 +163,6 @@ pub(crate) fn compute_pv(
     };
 
     Money::from_model_value(price * inst.quantity, inst.underlying.currency)
-}
-
-/// Return `(mean, variance)` for a nonempty projection in nondecreasing time.
-/// Forwards are validated positive prices; variance has squared price units.
-fn arithmetic_moments(
-    future_forwards: &[(f64, f64)],
-    sigma: f64,
-) -> finstack_quant_core::Result<(f64, f64)> {
-    let mut suffix = NeumaierAccumulator::new();
-    let mut covariance = NeumaierAccumulator::new();
-    let sigma_sq = sigma * sigma;
-    for &(time, forward) in future_forwards.iter().rev() {
-        // The suffix excludes the current fixing: its diagonal is counted once.
-        // Accumulate covariance directly; subtracting M1^2 from M2 would lose
-        // genuine small variance or turn moment rounding into spurious variance.
-        covariance
-            .add((sigma_sq * time).exp_m1() * forward * (forward + 2.0 * suffix.get_total()?))?;
-        suffix.add(forward)?;
-    }
-    let count = future_forwards.len() as f64;
-    Ok((
-        suffix.get_total()? / count,
-        covariance.get_total()? / (count * count),
-    ))
-}
-
-struct GeometricMoments {
-    log_sum: f64,
-    forward: f64,
-    log_variance: f64,
-}
-
-/// Moments of the full seasoned average from a nonempty ordered projection.
-/// Equal model times are valid; contractual dates are validated by the caller.
-fn geometric_moments(
-    future_forwards: &[(f64, f64)],
-    sigma: f64,
-    hist_prod_log: f64,
-    total_fixings: usize,
-) -> finstack_quant_core::Result<GeometricMoments> {
-    let count = future_forwards.len();
-    let m = count as f64;
-    let n = total_fixings as f64;
-    let log_sum: f64 = future_forwards
-        .iter()
-        .map(|(_, forward)| forward.ln())
-        .sum();
-    let geo_mean_fwd = (log_sum / m).exp();
-    // For ordered times, each t_i supplies its diagonal and both triangles
-    // against the m-i-1 later observations, including equal model times.
-    let weighted_times = neumaier_sum(
-        future_forwards
-            .iter()
-            .enumerate()
-            .map(|(index, (time, _))| (2.0 * (count - index) as f64 - 1.0) * time),
-    )?;
-    let vol_adj_sq = sigma * sigma * weighted_times / (m * m);
-    let sum_t: f64 = future_forwards.iter().map(|(time, _)| *time).sum();
-    let mean_log_drift = -0.5 * sigma * sigma * sum_t / m;
-    let realized_factor = (hist_prod_log / n).exp();
-    let ratio = m / n;
-    let log_variance = ratio * ratio * vol_adj_sq;
-    let forward = realized_factor
-        * geo_mean_fwd.powf(ratio)
-        * (ratio * mean_log_drift + 0.5 * log_variance).exp();
-    Ok(GeometricMoments {
-        log_sum,
-        forward,
-        log_variance,
-    })
-}
-
-/// Seasoned geometric Asian pricing on commodity forwards.
-///
-/// Once `n − m` of the `n` fixings are realized, the geometric average factors
-/// as `G = A · G_fut^(m/n)`, where `A = exp(hist_prod_log / n)` is the realized
-/// contribution and `G_fut = exp((1/m) Σ ln F_j)` is the geometric mean of the
-/// `m` remaining forwards. The terminal quantity `X = A · G_fut^(m/n)` is
-/// lognormal, so the option prices in closed form via Black-76 against the
-/// original strike `K`.
-///
-/// Crucially the remaining geometric mean enters at power `m/n`, not `1`: a
-/// past fixing both shrinks the remaining uncertainty
-/// (`Var[ln X] = (m/n)²·Var[ln G_fut]`) and reshapes the effective forward.
-/// Pricing a *fresh* geometric Asian on `G_fut` (power `1`) with an adjusted
-/// strike — as a naive strike transform does — overstates the remaining
-/// volatility by a factor of `n/m` and uses the wrong moneyness. This
-/// formulation covers unseasoned options with zero historical log sum as
-/// `m → n` (no realized fixings), preserving hedge ratios across fixings.
-///
-/// # References
-///
-/// Kemna, A. G. Z., & Vorst, A. C. F. (1990). "A Pricing Method for Options
-/// Based on Average Asset Values." *Journal of Banking & Finance*, 14(1),
-/// 113-129 — partially-averaged (seasoned) geometric options. `docs/REFERENCES.md#kemna-vorst-1990`
-fn price_geometric_commodity(
-    future_forwards: &[(f64, f64)], // (time, forward_price)
-    strike: f64,
-    sigma: f64,
-    df: f64,
-    option_type: OptionType,
-    hist_prod_log: f64,
-    total_fixings: usize,
-) -> finstack_quant_core::Result<f64> {
-    let n = total_fixings as f64;
-    let m = future_forwards.len() as f64;
-
-    if m == 0.0 || n <= 0.0 {
-        return Ok(0.0);
-    }
-
-    let GeometricMoments {
-        log_sum,
-        forward: fwd_x,
-        log_variance: var_x,
-    } = geometric_moments(future_forwards, sigma, hist_prod_log, total_fixings)?;
-
-    let t_last = future_forwards
-        .iter()
-        .map(|(t, _)| *t)
-        .fold(0.0_f64, f64::max);
-
-    // Degenerate / zero-variance: settle at the deterministic geometric average
-    // A · geo_mean_fwd^(m/n) = exp((hist_prod_log + Σ ln F_j) / n).
-    if !fwd_x.is_finite() || fwd_x <= 0.0 || var_x <= 0.0 || t_last <= 0.0 {
-        let geo_avg_all = ((hist_prod_log + log_sum) / n).exp();
-        let payoff = match option_type {
-            OptionType::Call => (geo_avg_all - strike).max(0.0),
-            OptionType::Put => (strike - geo_avg_all).max(0.0),
-        };
-        return Ok(payoff * df);
-    }
-
-    // Black-76 on X against the ORIGINAL strike K.
-    let total_vol = var_x.sqrt();
-    let d1 = ((fwd_x / strike).ln() + 0.5 * var_x) / total_vol;
-    let d2 = d1 - total_vol;
-    let price = match option_type {
-        OptionType::Call => {
-            fwd_x * finstack_quant_core::math::special_functions::norm_cdf(d1)?
-                - strike * finstack_quant_core::math::special_functions::norm_cdf(d2)?
-        }
-        OptionType::Put => {
-            strike * finstack_quant_core::math::special_functions::norm_cdf(-d2)?
-                - fwd_x * finstack_quant_core::math::special_functions::norm_cdf(-d1)?
-        }
-    };
-
-    Ok(price * df)
-}
-
-/// Arithmetic Asian pricing with commodity forwards (Turnbull-Wakeman adapted).
-///
-/// Uses moment matching on the forward prices. For commodity forwards, the
-/// first moment is simply the average of forward prices, and the second moment
-/// accounts for correlations between forward prices.
-///
-/// # Seasoned Option Handling
-///
-/// For seasoned options with `hist_count > 0` realized fixings:
-/// - Effective strike: `K_eff = (n × K - hist_sum) / m`
-/// - Scale factor: `m / n` applied to the result
-fn price_arithmetic_tw_commodity(
-    future_forwards: &[(f64, f64)], // (time, forward_price)
-    strike: f64,
-    sigma: f64,
-    df: f64,
-    option_type: OptionType,
-    hist_sum: f64,
-    total_fixings: usize,
-) -> finstack_quant_core::Result<f64> {
-    let n = total_fixings as f64;
-    let m = future_forwards.len() as f64;
-
-    if m == 0.0 {
-        return Ok(0.0);
-    }
-
-    // Effective strike adjustment for seasoned options
-    let k_eff = (n * strike - hist_sum) / m;
-    let scale = m / n;
-
-    // If effective strike is non-positive, option is deep ITM
-    if k_eff <= 0.0 {
-        let sum_fwd: f64 = future_forwards.iter().map(|(_, f)| f).sum();
-        let avg_fwd = (hist_sum + sum_fwd) / n;
-        let payoff = match option_type {
-            OptionType::Call => (avg_fwd - strike).max(0.0),
-            OptionType::Put => 0.0,
-        };
-        return Ok(payoff * df);
-    }
-
-    let (m1, variance) = arithmetic_moments(future_forwards, sigma)?;
-    // Match the lognormal variance without subtracting nearly equal moments.
-    // expm1 above and log1p here also make exact zero volatility deterministic.
-    let var = (variance / m1 / m1).ln_1p();
-    if var <= 0.0 {
-        return Ok(df
-            * scale
-            * match option_type {
-                OptionType::Call => (m1 - k_eff).max(0.0),
-                OptionType::Put => (k_eff - m1).max(0.0),
-            });
-    }
-
-    let sigma_star = var.sqrt();
-    let mu_star = m1.ln() - 0.5 * var;
-
-    let d1 = (mu_star - k_eff.ln() + var) / sigma_star;
-    let d2 = d1 - sigma_star;
-
-    let price = match option_type {
-        OptionType::Call => {
-            m1 * finstack_quant_core::math::special_functions::norm_cdf(d1)?
-                - k_eff * finstack_quant_core::math::special_functions::norm_cdf(d2)?
-        }
-        OptionType::Put => {
-            k_eff * finstack_quant_core::math::special_functions::norm_cdf(-d2)?
-                - m1 * finstack_quant_core::math::special_functions::norm_cdf(-d1)?
-        }
-    };
-
-    Ok((price * df * scale).max(0.0))
 }
 
 /// Commodity Asian option analytical pricer (Turnbull-Wakeman / Kemna-Vorst).
@@ -430,6 +213,7 @@ mod tests {
     };
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, PriceCurve};
     use finstack_quant_core::types::{CurveId, InstrumentId};
+    use finstack_quant_models::types::OptionType;
     use time::Month;
 
     fn date(year: i32, month: u8, day: u8) -> Date {
@@ -1015,7 +799,7 @@ mod tests {
             let average = (historical_sum + 150.0) / total_count as f64;
             for strike in [average - 5.0, average, average + 5.0] {
                 for sigma in [0.0, 1e-10, 1e-5] {
-                    let call = price_arithmetic_tw_commodity(
+                    let call = price_arithmetic_tw_asian(
                         &forwards,
                         strike,
                         sigma,
@@ -1025,7 +809,7 @@ mod tests {
                         total_count,
                     )
                     .expect("finite call price");
-                    let put = price_arithmetic_tw_commodity(
+                    let put = price_arithmetic_tw_asian(
                         &forwards,
                         strike,
                         sigma,

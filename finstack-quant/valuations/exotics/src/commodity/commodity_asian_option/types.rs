@@ -59,6 +59,7 @@ use finstack_quant_valuations_core::impl_instrument_base;
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "json-schema", schemars(deny_unknown_fields))]
+#[serde(remote = "Self")]
 pub struct CommodityAsianOption {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -158,56 +159,27 @@ pub struct CommodityAsianOption {
     pub(crate) unknown_fields: finstack_quant_core::serde_guard::UnknownFieldGuard,
 }
 
+finstack_quant_valuations_core::validate_on_deserialize!(
+    CommodityAsianOption,
+    CommodityAsianOption::validate_structure
+);
+
 impl CommodityAsianOption {
     fn validate_structure(&self) -> finstack_quant_core::Result<()> {
-        use finstack_quant_core::validation;
-
         self.underlying.validate("CommodityAsianOption")?;
-        validation::validate_f64_positive(self.strike, "CommodityAsianOption strike")?;
-        validation::validate_f64_positive(self.quantity, "CommodityAsianOption quantity")?;
-        if self.fixing_dates.is_empty() {
-            return Err(finstack_quant_core::Error::Validation(
-                "CommodityAsianOption requires at least one fixing date".to_string(),
-            ));
-        }
-        if self
-            .fixing_dates
-            .windows(2)
-            .any(|dates| dates[0] >= dates[1])
-        {
-            return Err(finstack_quant_core::Error::Validation(
-                "CommodityAsianOption fixing_dates must be strictly increasing".to_string(),
-            ));
-        }
-        if self.fixing_dates.iter().any(|date| *date > self.expiry) {
-            return Err(finstack_quant_core::Error::Validation(
-                "CommodityAsianOption fixing_dates cannot extend beyond expiry".to_string(),
-            ));
-        }
-        let mut seen = std::collections::BTreeSet::new();
-        for (date, value) in &self.past_fixings {
-            if !seen.insert(*date) {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CommodityAsianOption '{}' has duplicate past fixing for date {date}",
-                    self.id
-                )));
-            }
-            if !self.fixing_dates.contains(date) {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CommodityAsianOption '{}' has a past fixing for {date}, which is \
-                     not a scheduled fixing date",
-                    self.id
-                )));
-            }
-            validation::validate_f64_finite(*value, "CommodityAsianOption realized-fixing value")?;
-            if matches!(self.averaging_method, AveragingMethod::Geometric) && *value <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CommodityAsianOption '{}' geometric-average fixing for {date} must be positive, got {value}",
-                    self.id
-                )));
-            }
-        }
-        Ok(())
+        crate::exotics::asian_option::pricer::moments::validate_asian_fixing_schedule(
+            &crate::exotics::asian_option::pricer::moments::AsianScheduleSpec {
+                label: "CommodityAsianOption",
+                instrument_id: self.id.as_str(),
+                strike: self.strike,
+                quantity: self.quantity,
+                expiry: self.expiry,
+                fixing_dates: &self.fixing_dates,
+                past_fixings: &self.past_fixings,
+                averaging_method: self.averaging_method,
+                require_positive_all: false,
+            },
+        )
     }
 
     /// Create a canonical example commodity Asian option for testing.

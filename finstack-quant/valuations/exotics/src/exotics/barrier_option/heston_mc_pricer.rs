@@ -9,18 +9,16 @@ use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_models::monte_carlo::engine::McPricingInputs;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::pricing::heston_market::{
+    DEFAULT_HESTON_MC_PATHS, DEFAULT_HESTON_STEPS_PER_YEAR, HestonMcRequest, price_heston_mc,
+};
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, expect_inst,
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 
-use finstack_quant_models::monte_carlo::discretization::qe_heston::QeHeston;
-use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
-use finstack_quant_models::monte_carlo::process::heston::{HestonProcess, HestonProcessParams};
-use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 
 /// Barrier option Heston Monte Carlo pricer.
 ///
@@ -37,8 +35,8 @@ impl BarrierOptionHestonMcPricer {
     /// Create a new barrier option Heston MC pricer with default configuration.
     pub(crate) fn new() -> Self {
         Self {
-            num_paths: 100_000,
-            steps_per_year: 252.0,
+            num_paths: DEFAULT_HESTON_MC_PATHS,
+            steps_per_year: DEFAULT_HESTON_STEPS_PER_YEAR,
         }
     }
 
@@ -65,28 +63,19 @@ impl BarrierOptionHestonMcPricer {
                 t,
                 "BarrierOption Heston MC discount curve",
             )?;
-        let spot = super::pricer::resolve_spot(inst, market)?;
+        let spot = crate::exotics::bs_gbm::resolve_positive_spot(
+            market,
+            &inst.spot_id,
+            inst.currency,
+            "BarrierOption",
+        )?;
         let q = finstack_quant_valuations_core::instruments::pricing::market_inputs::resolve_optional_dividend_yield(
             market,
             inst.div_yield_id.as_ref(),
         )?;
 
-        let heston_params =
-            finstack_quant_valuations_core::instruments::pricing::heston_market::heston_params_from_market_strict(
-                market,
-            )?;
-        let v0 = heston_params.v0;
-        let sigma = v0.sqrt();
-        let process = HestonProcess::new(HestonProcessParams {
-            r,
-            q,
-            model: heston_params,
-        })
-        .with_drift_schedule(std::sync::Arc::new(super::pricer::barrier_drift(
-            inst, market, as_of, q,
-        )?));
-        let discretization = QeHeston::new();
-
+        let drift_schedule =
+            std::sync::Arc::new(super::pricer::barrier_drift(inst, market, as_of, q)?);
         let grid_config = PathDependentPricerConfig {
             steps_per_year: self.steps_per_year,
             min_steps: 10,
@@ -95,40 +84,32 @@ impl BarrierOptionHestonMcPricer {
         let (time_grid, monitoring) =
             inst.monitoring
                 .time_grid(as_of, inst.day_count, None, t, &grid_config)?;
-        // The Heston path variance supplies the local bridge volatility.
-        let payoff = super::pricer::barrier_payoff(inst, sigma, &time_grid, monitoring, r)
-            .with_observed_barrier_breached(inst.observed_barrier_breached.unwrap_or(false));
 
-        let num_paths =
-            finstack_quant_valuations_core::instruments::pricing::monte_carlo::resolve_mc_paths(
-                inst.instrument_pricing_overrides.model_config.mc_paths,
-                self.num_paths,
-            )?;
-
-        // Derive deterministic seed
-        let seed_val = inst
-            .instrument_pricing_overrides
-            .model_config
-            .mc_seed(&inst.id);
-
-        let engine = McEngine::new(McEngineConfig::new(num_paths, time_grid));
-
-        let rng = PhiloxRng::new(seed_val);
-
-        // Initial state: [spot, v0]
-        let initial_state = [spot, v0];
-
-        let result = engine.price(McPricingInputs {
-            rng: &rng,
-            process: &process,
-            disc: &discretization,
-            initial_state: &initial_state,
-            payoff: &payoff,
-            currency: inst.currency,
-            discount_factor,
-        })?;
-
-        Ok((result.mean, result.stderr))
+        price_heston_mc(
+            market,
+            HestonMcRequest {
+                instrument_id: &inst.id,
+                model_config: &inst.instrument_pricing_overrides.model_config,
+                default_num_paths: self.num_paths,
+                spot,
+                r,
+                q,
+                discount_factor,
+                currency: inst.currency,
+                time_grid,
+                drift_schedule: Some(drift_schedule),
+            },
+            |grid, heston_params| {
+                // The Heston initial variance supplies the local bridge volatility.
+                let sigma = heston_params.v0.sqrt();
+                Ok(
+                    super::pricer::barrier_payoff(inst, sigma, grid, monitoring, r)
+                        .with_observed_barrier_breached(
+                            inst.observed_barrier_breached.unwrap_or(false),
+                        ),
+                )
+            },
+        )
     }
 }
 

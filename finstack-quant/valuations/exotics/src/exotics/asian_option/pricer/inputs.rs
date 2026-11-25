@@ -187,14 +187,16 @@ pub(super) fn expiry_year_fraction_or_zero(
     }
 }
 
-/// Underlying spot from `spot_id`, in the option currency when quoted as a price.
+/// Underlying positive spot from `spot_id`, in the option currency when quoted as a price.
 pub(crate) fn resolve_spot(
     inst: &AsianOption,
     curves: &MarketContext,
 ) -> finstack_quant_core::Result<f64> {
-    finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
-        curves.get_price(&inst.spot_id)?,
+    crate::exotics::bs_gbm::resolve_positive_spot(
+        curves,
+        &inst.spot_id,
         inst.currency,
+        "AsianOption",
     )
 }
 
@@ -206,36 +208,22 @@ pub(super) fn analytic_inputs(
     market: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<BlackScholesInputsDf> {
-    let disc_curve = market.get_discount(inst.discount_curve_id.as_str())?;
-    let t = inst
-        .day_count
-        .year_fraction(as_of, inst.expiry, DayCountContext::default())?;
-    let df = disc_curve.df_between_dates(as_of, inst.expiry)?;
-    if !df.is_finite() || df <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "Invalid discount factor ({df:.6e}) between {as_of} and {}",
-            inst.expiry
-        )));
-    }
-    let spot = resolve_spot(inst, market)?;
-    let q = finstack_quant_valuations_core::instruments::pricing::market_inputs::resolve_optional_dividend_yield(
+    crate::exotics::bs_gbm::collect_bs_inputs(
         market,
-        inst.div_yield_id.as_ref(),
-    )?;
-    let sigma = finstack_quant_valuations_core::instruments::pricing::volatility::resolve_sigma_at(
-        &inst.instrument_pricing_overrides.market_quotes,
-        market,
-        inst.vol_surface_id.as_str(),
-        t,
-        inst.strike,
-    )?;
-    Ok(BlackScholesInputsDf {
-        spot,
-        df,
-        q,
-        sigma,
-        t,
-    })
+        as_of,
+        crate::exotics::bs_gbm::BsMarketInputSpec {
+            context_label: "AsianOption",
+            day_count: inst.day_count,
+            expiry: inst.expiry,
+            discount_curve_id: &inst.discount_curve_id,
+            spot_id: &inst.spot_id,
+            vol_surface_id: &inst.vol_surface_id,
+            div_yield_id: inst.div_yield_id.as_ref(),
+            currency: inst.currency,
+            market_quotes: &inst.instrument_pricing_overrides.market_quotes,
+            vol_strike: Some(inst.strike),
+        },
+    )
 }
 
 /// Year fractions (instrument day count) from `as_of` to each strictly-future

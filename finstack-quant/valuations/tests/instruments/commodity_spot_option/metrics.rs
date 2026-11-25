@@ -131,7 +131,7 @@ fn commodity_spot_option_volga_is_per_vol_point_squared() -> finstack_quant_core
     let expected = pv_up - 2.0 * pv.amount() + pv_dn;
 
     assert!(
-        (actual - expected).abs() < 1e-10,
+        (actual - expected).abs() < 1e-8,
         "volga per one-vol-point squared: actual={actual}, expected={expected}"
     );
     Ok(())
@@ -285,9 +285,9 @@ fn test_forward_based_greeks_with_both_spot_and_price_curve() -> finstack_quant_
     let ref_vanna =
         (pv_up_up - pv_up_down - pv_down_up + pv_down_down) / (4.0 * bump_size * vol_bump * 100.0);
 
-    // Validate that computed Greeks match reference within tolerance
-    let gamma_tol = 1e-6;
-    let vanna_tol = 1e-8;
+    // Validate that computed analytical Greeks match central FD within O(bump^2) tolerance
+    let gamma_tol = 1e-5;
+    let vanna_tol = 1e-5;
 
     assert!(
         (gamma - ref_gamma).abs() < gamma_tol,

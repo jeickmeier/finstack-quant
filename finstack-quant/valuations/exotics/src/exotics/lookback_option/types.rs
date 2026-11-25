@@ -88,7 +88,7 @@ pub enum LookbackType {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct LookbackOption {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -170,6 +170,8 @@ pub struct LookbackOption {
     pub attributes: Attributes,
 }
 
+finstack_quant_valuations_core::validate_on_deserialize!(LookbackOption);
+
 impl LookbackOption {
     /// Create a canonical example lookback option (fixed strike call).
     pub fn example() -> finstack_quant_core::Result<Self> {
@@ -209,17 +211,42 @@ impl finstack_quant_valuations_core::instruments::Instrument for LookbackOption 
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         use finstack_quant_core::validation;
-        // Fixed-strike lookbacks feed `strike` into ln-based closed forms that
-        // require a strictly positive strike; rejecting here surfaces a
-        // `Validation` error instead of a NaN sentinel reaching pricing.
-        if let Some(strike) = self.strike {
-            validation::validate_f64_positive(strike, "LookbackOption strike")?;
+
+        if self.underlying_ticker.trim().is_empty() {
+            return Err(finstack_quant_core::Error::Validation(
+                "LookbackOption requires a non-empty underlying_ticker".to_string(),
+            ));
+        }
+        validation::validate_f64_positive(self.quantity, "LookbackOption quantity")?;
+        match self.lookback_type {
+            LookbackType::FixedStrike => match self.strike {
+                Some(strike) => validation::validate_f64_positive(strike, "LookbackOption strike")?,
+                None => {
+                    return Err(finstack_quant_core::Error::Validation(
+                        "LookbackOption FixedStrike requires a positive strike".to_string(),
+                    ));
+                }
+            },
+            LookbackType::FloatingStrike => {
+                if self.strike.is_some() {
+                    return Err(finstack_quant_core::Error::Validation(
+                        "LookbackOption FloatingStrike cannot specify a strike".to_string(),
+                    ));
+                }
+            }
         }
         if let Some(observed_min) = self.observed_min {
             validation::validate_f64_positive(observed_min, "LookbackOption observed_min")?;
         }
         if let Some(observed_max) = self.observed_max {
             validation::validate_f64_positive(observed_max, "LookbackOption observed_max")?;
+        }
+        if let (Some(observed_min), Some(observed_max)) = (self.observed_min, self.observed_max)
+            && observed_min > observed_max
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "LookbackOption observed_min ({observed_min}) must not exceed observed_max ({observed_max})"
+            )));
         }
         if let Monitoring::Discrete { observation_dates } = &self.monitoring {
             validation::require_with(!observation_dates.is_empty(), || {
@@ -292,6 +319,60 @@ impl finstack_quant_valuations_core::instruments::Instrument for LookbackOption 
         let pricer = LookbackOptionAnalyticalPricer;
         let result = pricer.price_dyn(self, market, as_of)?;
         Ok(result.value)
+    }
+
+    fn expiry(&self) -> Option<Date> {
+        Some(self.expiry)
+    }
+
+    /// Record the held `as_of` spot as the running extremum when theta rolls
+    /// across expiry or a discrete observation date without an existing extremum.
+    ///
+    /// # Arguments
+    /// * `market` - Market at `as_of` supplying the `spot_id` level held over the roll.
+    /// * `as_of` - Valuation date the roll starts from.
+    /// * `rolled_date` - Date theta reprices at, capped at expiry.
+    fn theta_observed_state(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: Date,
+        rolled_date: Date,
+    ) -> finstack_quant_core::Result<
+        Option<Box<dyn finstack_quant_valuations_core::instruments::Instrument>>,
+    > {
+        if as_of >= self.expiry {
+            return Ok(None);
+        }
+        let needs_roll_extremum = rolled_date >= self.expiry
+            || matches!(
+                &self.monitoring,
+                Monitoring::Discrete { observation_dates }
+                    if observation_dates.iter().any(|date| *date < rolled_date)
+            );
+        if !needs_roll_extremum {
+            return Ok(None);
+        }
+        let spot = crate::exotics::bs_gbm::resolve_positive_spot(
+            market,
+            &self.spot_id,
+            self.currency,
+            "LookbackOption",
+        )?;
+        let mut observed = self.clone();
+        if super::pricer::tracks_max(self) {
+            let next = self.observed_max.map_or(spot, |prev| prev.max(spot));
+            if self.observed_max == Some(next) {
+                return Ok(None);
+            }
+            observed.observed_max = Some(next);
+        } else {
+            let next = self.observed_min.map_or(spot, |prev| prev.min(spot));
+            if self.observed_min == Some(next) {
+                return Ok(None);
+            }
+            observed.observed_min = Some(next);
+        }
+        Ok(Some(Box::new(observed)))
     }
 
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();

@@ -26,37 +26,22 @@ pub(crate) fn collect_barrier_inputs(
     curves: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<crate::exotics::bs_gbm::BlackScholesInputsDf> {
-    use crate::exotics::bs_gbm::BlackScholesInputsDf;
-    use finstack_quant_valuations_core::instruments::pricing::market_inputs::resolve_optional_dividend_yield;
-    let t = inst.day_count.year_fraction(
-        as_of,
-        inst.expiry,
-        finstack_quant_core::dates::DayCountContext::default(),
-    )?;
-    let df = curves
-        .get_discount(inst.discount_curve_id.as_str())?
-        .df_between_dates(as_of, inst.expiry)?;
-    if !df.is_finite() || df <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(
-            "Barrier discount factor must be positive and finite".into(),
-        ));
-    }
-    let spot = resolve_spot(inst, curves)?;
-    let q = resolve_optional_dividend_yield(curves, inst.div_yield_id.as_ref())?;
-    let sigma = finstack_quant_valuations_core::instruments::pricing::volatility::resolve_sigma_at(
-        &inst.instrument_pricing_overrides.market_quotes,
+    crate::exotics::bs_gbm::collect_bs_inputs(
         curves,
-        inst.vol_surface_id.as_str(),
-        t,
-        inst.strike,
-    )?;
-    Ok(BlackScholesInputsDf {
-        spot,
-        df,
-        q,
-        sigma,
-        t,
-    })
+        as_of,
+        crate::exotics::bs_gbm::BsMarketInputSpec {
+            context_label: "BarrierOption",
+            day_count: inst.day_count,
+            expiry: inst.expiry,
+            discount_curve_id: &inst.discount_curve_id,
+            spot_id: &inst.spot_id,
+            vol_surface_id: &inst.vol_surface_id,
+            div_yield_id: inst.div_yield_id.as_ref(),
+            currency: inst.currency,
+            market_quotes: &inst.instrument_pricing_overrides.market_quotes,
+            vol_strike: Some(inst.strike),
+        },
+    )
 }
 
 /// Positive underlying spot from `spot_id`, in the option currency when quoted as a price.
@@ -64,13 +49,12 @@ pub(crate) fn resolve_spot(
     inst: &BarrierOption,
     curves: &MarketContext,
 ) -> finstack_quant_core::Result<f64> {
-    let spot =
-        finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
-            curves.get_price(&inst.spot_id)?,
-            inst.currency,
-        )?;
-    finstack_quant_core::validation::validate_f64_positive(spot, "BarrierOption asset spot")?;
-    Ok(spot)
+    crate::exotics::bs_gbm::resolve_positive_spot(
+        curves,
+        &inst.spot_id,
+        inst.currency,
+        "BarrierOption",
+    )
 }
 
 /// Remaining known knock-out rebate, independent of spot, volatility and notional.

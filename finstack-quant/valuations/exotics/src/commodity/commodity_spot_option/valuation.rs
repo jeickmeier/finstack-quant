@@ -1,7 +1,6 @@
 //! Pricing, Greeks, and [`Instrument`] trait implementations for [`CommoditySpotOption`].
 
 use super::types::*;
-use crate::commodity::bump_price_curve_pct;
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -225,10 +224,9 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for Commo
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        request: &finstack_quant_valuations_core::instruments::OptionGreeksRequest,
+        _request: &finstack_quant_valuations_core::instruments::OptionGreeksRequest,
     ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::OptionGreeks>
     {
-        let mut greeks = finstack_quant_valuations_core::instruments::OptionGreeks::default();
         if self.resolved_claim(market, as_of)?.is_some() {
             let delta = if let Some(exercise) = self.exercise.filter(|event| event.date <= as_of) {
                 if exercise.exercised
@@ -265,46 +263,28 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for Commo
                     0.0
                 }
             };
-            greeks.delta = Some(delta);
-            greeks.gamma = Some(0.0);
-            greeks.vega = Some(0.0);
-            greeks.vanna = Some(0.0);
-            greeks.volga = Some(0.0);
-            return Ok(greeks);
+            return Ok(finstack_quant_valuations_core::instruments::OptionGreeks {
+                delta: Some(delta),
+                gamma: Some(0.0),
+                vega: Some(0.0),
+                theta: None,
+                rho_bp: None,
+                foreign_rho_bp: None,
+                vanna: Some(0.0),
+                volga: Some(0.0),
+            });
         }
-        match request.greek {
-            finstack_quant_valuations_core::instruments::OptionGreekKind::Delta => {
-                greeks.delta = self.option_delta(market, as_of, request.bumps)?
-            }
-            finstack_quant_valuations_core::instruments::OptionGreekKind::Gamma => {
-                greeks.gamma = self.option_gamma(market, as_of, request.bumps)?
-            }
-            finstack_quant_valuations_core::instruments::OptionGreekKind::Vega => {
-                greeks.vega = self.option_vega(market, as_of, request.bumps)?
-            }
-            finstack_quant_valuations_core::instruments::OptionGreekKind::Vanna => {
-                greeks.vanna = self.option_vanna(market, as_of, request.bumps)?
-            }
-            finstack_quant_valuations_core::instruments::OptionGreekKind::Volga => {
-                greeks.volga =
-                    self.option_volga(market, as_of, request.require_base_pv()?, request.bumps)?
-            }
-            _ => {}
-        }
-        Ok(greeks)
-    }
-}
-impl CommoditySpotOption {
-    fn option_delta(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_core::math::special_functions::norm_cdf;
-
         if as_of > self.expiry {
-            return Ok(Some(0.0));
+            return Ok(finstack_quant_valuations_core::instruments::OptionGreeks {
+                delta: Some(0.0),
+                gamma: Some(0.0),
+                vega: Some(0.0),
+                theta: None,
+                rho_bp: None,
+                foreign_rho_bp: None,
+                vanna: Some(0.0),
+                volga: Some(0.0),
+            });
         }
         if !matches!(self.exercise_style, ExerciseStyle::European) {
             return Err(finstack_quant_core::Error::Validation(
@@ -316,25 +296,17 @@ impl CommoditySpotOption {
             .day_count
             .year_fraction(as_of, self.expiry, DayCountContext::default())?
             .max(0.0);
+        let forward = self.forward_price(market, as_of)?;
         if t <= 0.0 {
-            let forward = self.forward_price(market, as_of)?;
-            let intrinsic = match self.option_type {
-                OptionType::Call => {
-                    if forward > self.strike {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
-                OptionType::Put => {
-                    if forward < self.strike {
-                        -1.0
-                    } else {
-                        0.0
-                    }
-                }
-            };
-            return Ok(Some(intrinsic * self.quantity * self.multiplier));
+            return crate::commodity::black76_greeks::black76_option_greeks(
+                forward,
+                self.strike,
+                1.0,
+                0.0,
+                0.0,
+                self.option_type,
+                self.quantity * self.multiplier,
+            );
         }
 
         let sigma =
@@ -345,228 +317,18 @@ impl CommoditySpotOption {
                 t,
                 self.strike,
             )?;
-        let forward = self.forward_price(market, as_of)?;
-        let disc = market.get_discount(self.discount_curve_id.as_str())?;
-        let df = disc.df_between_dates(as_of, self.expiry)?;
-        if sigma <= 0.0 {
-            let intrinsic_delta = match self.option_type {
-                OptionType::Call => f64::from(forward > self.strike),
-                OptionType::Put => -f64::from(forward < self.strike),
-            };
-            return Ok(Some(intrinsic_delta * df * self.quantity * self.multiplier));
-        }
-
-        let d1 =
-            finstack_quant_models::closed_form::d1_d2_black76(forward, self.strike, sigma, t).0;
-        let nd1 = norm_cdf(d1)?;
-
-        let delta_unit = match self.option_type {
-            OptionType::Call => df * nd1,
-            OptionType::Put => df * (nd1 - 1.0),
-        };
-        Ok(Some(delta_unit * self.quantity * self.multiplier))
-    }
-    fn option_gamma(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        if as_of > self.expiry {
-            return Ok(Some(0.0));
-        }
-        if !matches!(self.exercise_style, ExerciseStyle::European) {
-            return Err(finstack_quant_core::Error::Validation(
-                "CommoditySpotOption analytical Greeks support European exercise only".to_string(),
-            ));
-        }
-
-        // `forward_price` errors unless `quoted_forward` or the price curve
-        // supplies the forward, so those are the two drivers to bump.
-        let bump_pct = bumps.spot_bump_decimal;
-        let forward_price = self.forward_price(market, as_of)?;
-        let bump_size = forward_price * bump_pct;
-        if bump_size <= 0.0 {
-            return Ok(Some(0.0));
-        }
-
-        let pv_base = self.value(market, as_of)?.amount();
-
-        let (pv_up, pv_down) = match self.quoted_forward {
-            Some(fwd) => {
-                let mut up = self.clone();
-                up.quoted_forward = Some(fwd * (1.0 + bump_pct));
-                let pv_up = up.value(market, as_of)?.amount();
-
-                let mut down = self.clone();
-                down.quoted_forward = Some(fwd * (1.0 - bump_pct));
-                let pv_down = down.value(market, as_of)?.amount();
-                (pv_up, pv_down)
-            }
-            None => {
-                let up = bump_price_curve_pct(market, self.forward_curve_id.as_str(), bump_pct)?;
-                let pv_up = self.value(&up, as_of)?.amount();
-                let down = bump_price_curve_pct(market, self.forward_curve_id.as_str(), -bump_pct)?;
-                let pv_down = self.value(&down, as_of)?.amount();
-                (pv_up, pv_down)
-            }
-        };
-
-        Ok(Some(
-            (pv_up - 2.0 * pv_base + pv_down) / (bump_size * bump_size),
-        ))
-    }
-    fn option_vega(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_core::math::special_functions::norm_pdf;
-
-        if as_of > self.expiry {
-            return Ok(Some(0.0));
-        }
-        if !matches!(self.exercise_style, ExerciseStyle::European) {
-            return Err(finstack_quant_core::Error::Validation(
-                "CommoditySpotOption analytical Greeks support European exercise only".to_string(),
-            ));
-        }
-
-        let t = self
-            .day_count
-            .year_fraction(as_of, self.expiry, DayCountContext::default())?
-            .max(0.0);
-        if t <= 0.0 {
-            return Ok(Some(0.0));
-        }
-
-        let sigma =
-            finstack_quant_valuations_core::instruments::pricing::volatility::resolve_sigma_at(
-                &self.instrument_pricing_overrides.market_quotes,
-                market,
-                self.vol_surface_id.as_str(),
-                t,
-                self.strike,
-            )?;
-        if sigma <= 0.0 {
-            return Ok(Some(0.0));
-        }
-
-        let forward = self.forward_price(market, as_of)?;
-        let disc = market.get_discount(self.discount_curve_id.as_str())?;
-        let df = disc.df_between_dates(as_of, self.expiry)?;
-        let d1 =
-            finstack_quant_models::closed_form::d1_d2_black76(forward, self.strike, sigma, t).0;
-        let vega_abs = df * forward * norm_pdf(d1)? * t.sqrt();
-        Ok(Some(vega_abs * 0.01 * self.quantity * self.multiplier))
-    }
-    fn option_vanna(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        if as_of > self.expiry {
-            return Ok(Some(0.0));
-        }
-        if !matches!(self.exercise_style, ExerciseStyle::European) {
-            return Err(finstack_quant_core::Error::Validation(
-                "CommoditySpotOption analytical Greeks support European exercise only".to_string(),
-            ));
-        }
-        // `forward_price` errors unless `quoted_forward` or the price curve
-        // supplies the forward, so those are the two drivers to bump.
-        let fwd_bump_pct = bumps.spot_bump_decimal;
-        let vol_bump = bumps.vol_bump_decimal;
-
-        let forward_price = self.forward_price(market, as_of)?;
-        let fwd_bump_size = forward_price * fwd_bump_pct;
-        if fwd_bump_size <= 0.0 {
-            return Ok(Some(0.0));
-        }
-
-        let pv_with_bumps = |fwd_bump_pct: f64,
-                             vol_bump: f64|
-         -> finstack_quant_core::Result<f64> {
-            match self.quoted_forward {
-                Some(fwd) => {
-                    let mut inst = self.clone();
-                    inst.quoted_forward = Some(fwd * (1.0 + fwd_bump_pct));
-                    let (inst_vol, bumped) =
-                        finstack_quant_valuations_core::metrics::bump_active_volatility(
-                            &inst,
-                            market,
-                            self.vol_surface_id.as_str(),
-                            vol_bump,
-                        )?;
-                    Ok(inst_vol.value(&bumped, as_of)?.amount())
-                }
-                None => {
-                    let bumped_price =
-                        bump_price_curve_pct(market, self.forward_curve_id.as_str(), fwd_bump_pct)?;
-                    let (inst_vol, bumped) =
-                        finstack_quant_valuations_core::metrics::bump_active_volatility(
-                            self,
-                            &bumped_price,
-                            self.vol_surface_id.as_str(),
-                            vol_bump,
-                        )?;
-                    Ok(inst_vol.value(&bumped, as_of)?.amount())
-                }
-            }
-        };
-
-        let pv_up_up = pv_with_bumps(fwd_bump_pct, vol_bump)?;
-        let pv_up_dn = pv_with_bumps(fwd_bump_pct, -vol_bump)?;
-        let pv_dn_up = pv_with_bumps(-fwd_bump_pct, vol_bump)?;
-        let pv_dn_dn = pv_with_bumps(-fwd_bump_pct, -vol_bump)?;
-
-        // Report vanna per **vol point** on the σ axis (consistent with vega
-        // and `MetricId::Vanna`): the vol-axis width is the bump expressed in
-        // vol points; the forward axis is unchanged.
-        let width_vol_points =
-            vol_bump * finstack_quant_valuations_core::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
-        Ok(Some(
-            (pv_up_up - pv_up_dn - pv_dn_up + pv_dn_dn) / (4.0 * fwd_bump_size * width_vol_points),
-        ))
-    }
-    fn option_volga(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-        base_pv: f64,
-        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        if as_of > self.expiry {
-            return Ok(Some(0.0));
-        }
-        if !matches!(self.exercise_style, ExerciseStyle::European) {
-            return Err(finstack_quant_core::Error::Validation(
-                "CommoditySpotOption analytical Greeks support European exercise only".to_string(),
-            ));
-        }
-
-        let vol_bump = bumps.vol_bump_decimal;
-        let (inst_up, up) = finstack_quant_valuations_core::metrics::bump_active_volatility(
-            self,
-            market,
-            self.vol_surface_id.as_str(),
-            vol_bump,
-        )?;
-        let (inst_dn, dn) = finstack_quant_valuations_core::metrics::bump_active_volatility(
-            self,
-            market,
-            self.vol_surface_id.as_str(),
-            -vol_bump,
-        )?;
-        let pv_up = inst_up.value(&up, as_of)?.amount();
-        let pv_dn = inst_dn.value(&dn, as_of)?.amount();
-        let width_vol_points =
-            vol_bump * finstack_quant_valuations_core::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
-        Ok(Some(
-            (pv_up - 2.0 * base_pv + pv_dn) / (width_vol_points * width_vol_points),
-        ))
+        let df = market
+            .get_discount(self.discount_curve_id.as_str())?
+            .df_between_dates(as_of, self.expiry)?;
+        crate::commodity::black76_greeks::black76_option_greeks(
+            forward,
+            self.strike,
+            df,
+            sigma,
+            t,
+            self.option_type,
+            self.quantity * self.multiplier,
+        )
     }
 }
 

@@ -9,19 +9,17 @@ use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_models::monte_carlo::engine::McPricingInputs;
 use finstack_quant_models::monte_carlo::payoff::asian::AsianFixingHistory;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::pricing::heston_market::{
+    DEFAULT_HESTON_MC_PATHS, DEFAULT_HESTON_STEPS_PER_YEAR, HestonMcRequest, price_heston_mc,
+};
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, expect_inst,
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 
-use finstack_quant_models::monte_carlo::discretization::qe_heston::QeHeston;
-use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
 use finstack_quant_models::monte_carlo::payoff::asian::Asian;
-use finstack_quant_models::monte_carlo::process::heston::{HestonProcess, HestonProcessParams};
-use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 
 /// Asian option Heston Monte Carlo pricer.
 ///
@@ -39,8 +37,8 @@ impl AsianOptionHestonMcPricer {
     /// Create a new Asian option Heston MC pricer with default configuration.
     pub(crate) fn new() -> Self {
         Self {
-            num_paths: 100_000,
-            steps_per_year: 252.0,
+            num_paths: DEFAULT_HESTON_MC_PATHS,
+            steps_per_year: DEFAULT_HESTON_STEPS_PER_YEAR,
             min_steps: 10,
         }
     }
@@ -53,13 +51,18 @@ impl AsianOptionHestonMcPricer {
         as_of: Date,
     ) -> finstack_quant_core::Result<(Money, f64)> {
         inst.validate_past_fixings(as_of)?;
+        let (hist_sum, hist_prod_log, hist_count) = inst.accumulated_state(as_of);
+
+        if as_of >= inst.expiry {
+            let pv =
+                super::pricer::expired_value(inst, market, hist_sum, hist_prod_log, hist_count)?;
+            return Ok((pv, 0.0));
+        }
+
         // Time to maturity
         let t = inst
             .day_count
             .year_fraction(as_of, inst.expiry, DayCountContext::default())?;
-
-        let (hist_sum, hist_prod_log, hist_count) = inst.accumulated_state(as_of);
-
         if t <= 0.0 {
             let pv =
                 super::pricer::expired_value(inst, market, hist_sum, hist_prod_log, hist_count)?;
@@ -83,24 +86,17 @@ impl AsianOptionHestonMcPricer {
                 "AsianOption Heston MC discount curve",
             )?;
 
-        let spot = super::pricer::resolve_spot(inst, market)?;
+        let spot = crate::exotics::bs_gbm::resolve_positive_spot(
+            market,
+            &inst.spot_id,
+            inst.currency,
+            "AsianOption",
+        )?;
 
         let q = finstack_quant_valuations_core::instruments::pricing::market_inputs::resolve_optional_dividend_yield(
             market,
             inst.div_yield_id.as_ref(),
         )?;
-
-        let heston_params =
-            finstack_quant_valuations_core::instruments::pricing::heston_market::heston_params_from_market_strict(
-                market,
-            )?;
-        let v0 = heston_params.v0;
-        let process = HestonProcess::new(HestonProcessParams {
-            r,
-            q,
-            model: heston_params,
-        });
-        let discretization = QeHeston::new();
 
         // Insert each fixing time exactly and retain repeated observations at
         // shared diffusion times.
@@ -132,63 +128,46 @@ impl AsianOptionHestonMcPricer {
 
         let averaging = inst.averaging_method;
 
-        let num_paths = inst
-            .instrument_pricing_overrides
-            .model_config
-            .mc_paths
-            .filter(|&n| n > 0)
-            .unwrap_or(self.num_paths);
-
-        // Derive deterministic seed
-        let seed_val = inst
-            .instrument_pricing_overrides
-            .model_config
-            .mc_seed(&inst.id);
-
-        let engine = McEngine::new(McEngineConfig::new(num_paths, time_grid));
-
-        let rng = PhiloxRng::new(seed_val);
-
-        // Initial state: [spot, v0]
-        let initial_state = [spot, v0];
-
-        let ccy = inst.currency;
-
-        let payoff = if hist_count > 0 {
-            Asian::with_history(
-                inst.option_type,
-                inst.strike,
-                inst.quantity,
-                averaging,
-                fixing_steps,
-                AsianFixingHistory {
-                    sum: hist_sum,
-                    log_sum: hist_prod_log,
-                    count: hist_count,
-                },
-            )
-        } else {
-            Asian::new(
-                inst.option_type,
-                inst.strike,
-                inst.quantity,
-                averaging,
-                fixing_steps,
-            )
-        }?
-        .with_fixing_multipliers(&fixing_multipliers)?;
-        let result = engine.price(McPricingInputs {
-            rng: &rng,
-            process: &process,
-            disc: &discretization,
-            initial_state: &initial_state,
-            payoff: &payoff,
-            currency: ccy,
-            discount_factor,
-        })?;
-        let (pv, mc_stderr) = (result.mean, result.stderr);
-
-        Ok((pv, mc_stderr))
+        price_heston_mc(
+            market,
+            HestonMcRequest {
+                instrument_id: &inst.id,
+                model_config: &inst.instrument_pricing_overrides.model_config,
+                default_num_paths: self.num_paths,
+                spot,
+                r,
+                q,
+                discount_factor,
+                currency: inst.currency,
+                time_grid,
+                drift_schedule: None,
+            },
+            |_grid, _heston| {
+                if hist_count > 0 {
+                    Asian::with_history(
+                        inst.option_type,
+                        inst.strike,
+                        inst.quantity,
+                        averaging,
+                        fixing_steps,
+                        AsianFixingHistory {
+                            sum: hist_sum,
+                            log_sum: hist_prod_log,
+                            count: hist_count,
+                        },
+                    )
+                } else {
+                    Asian::new(
+                        inst.option_type,
+                        inst.strike,
+                        inst.quantity,
+                        averaging,
+                        fixing_steps,
+                    )
+                }?
+                .with_fixing_multipliers(&fixing_multipliers)
+            },
+        )
     }
 }
 
@@ -232,5 +211,43 @@ impl Pricer for AsianOptionHestonMcPricer {
             );
         }
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::Date;
+    use finstack_quant_core::market_data::scalars::MarketScalar;
+    use finstack_quant_models::types::OptionType;
+    use time::Month;
+
+    #[test]
+    fn post_expiry_heston_mc_settles_realized_average() {
+        let mut asian = AsianOption::example().expect("example");
+        asian.option_type = OptionType::Call;
+        asian.strike = 100.0;
+        asian.quantity = 10.0;
+        asian.fixing_dates = vec![
+            Date::from_calendar_date(2024, Month::June, 3).expect("date"),
+            Date::from_calendar_date(2024, Month::December, 2).expect("date"),
+        ];
+        asian.expiry = Date::from_calendar_date(2024, Month::December, 2).expect("date");
+        asian.past_fixings = vec![
+            (asian.fixing_dates[0], 110.0),
+            (asian.fixing_dates[1], 130.0),
+        ];
+        let as_of = Date::from_calendar_date(2025, Month::January, 10).expect("date");
+        let market = MarketContext::new().insert_price(
+            "SPX-SPOT",
+            MarketScalar::price(Money::new(90.0, Currency::USD).expect("money")),
+        );
+        let (pv, stderr) = AsianOptionHestonMcPricer::new()
+            .price_internal(&asian, &market, as_of)
+            .expect("post-expiry settlement");
+        assert_eq!(stderr, 0.0);
+        // Average = (110 + 130)/2 = 120; payoff = (120 - 100) * 10 = 200.
+        assert!((pv.amount() - 200.0).abs() < 1e-10, "pv={}", pv.amount());
     }
 }

@@ -99,6 +99,7 @@ pub struct CommoditySpotOptionExercise {
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "json-schema", schemars(deny_unknown_fields))]
+#[serde(remote = "Self")]
 pub struct CommoditySpotOption {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -217,6 +218,11 @@ pub struct CommoditySpotOption {
     #[builder(default)]
     pub(crate) unknown_fields: finstack_quant_core::serde_guard::UnknownFieldGuard,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(
+    CommoditySpotOption,
+    CommoditySpotOption::validate
+);
 
 impl CommoditySpotOption {
     /// Validate the static economic inputs shared by builders and JSON loads.

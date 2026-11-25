@@ -3,13 +3,13 @@
 pub(crate) mod analytic;
 pub(super) mod inputs;
 mod mc;
+pub(crate) mod moments;
 #[cfg(test)]
 mod tests;
 
 pub(crate) use analytic::{
     AsianOptionAnalyticalGeometricPricer, AsianOptionSemiAnalyticalTwPricer,
 };
-pub(crate) use inputs::resolve_spot;
 pub(super) use inputs::{expired_value, map_fixings_to_steps};
 pub(crate) use mc::AsianOptionMcPricer;
 

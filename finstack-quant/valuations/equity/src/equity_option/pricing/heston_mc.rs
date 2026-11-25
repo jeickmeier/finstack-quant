@@ -11,13 +11,11 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::money::Money;
-use finstack_quant_models::monte_carlo::discretization::qe_heston::QeHeston;
-use finstack_quant_models::monte_carlo::engine::McPricingInputs;
-use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
 use finstack_quant_models::monte_carlo::payoff::vanilla::European;
-use finstack_quant_models::monte_carlo::process::heston::{HestonProcess, HestonProcessParams};
-use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::pricing::heston_market::{
+    DEFAULT_HESTON_MC_PATHS, DEFAULT_HESTON_STEPS_PER_YEAR, HestonMcRequest, price_heston_mc,
+};
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, expect_inst,
 };
@@ -36,10 +34,9 @@ pub(crate) struct EquityOptionHestonMcPricer {
 impl EquityOptionHestonMcPricer {
     /// Create a new Heston MC pricer with default configuration.
     pub(crate) fn new() -> Self {
-        use crate::mc_defaults;
         Self {
-            num_paths: mc_defaults::DEFAULT_MC_PATHS,
-            steps_per_year: mc_defaults::DEFAULT_STEPS_PER_YEAR,
+            num_paths: DEFAULT_HESTON_MC_PATHS,
+            steps_per_year: DEFAULT_HESTON_STEPS_PER_YEAR,
         }
     }
 
@@ -68,59 +65,32 @@ impl EquityOptionHestonMcPricer {
         inputs: EquityOptionInputs,
     ) -> finstack_quant_core::Result<(Money, f64)> {
         let (spot, r, q, t) = (inputs.spot, inputs.r, inputs.q, inputs.t_vol);
-        let ccy = inst.currency;
-
-        // Heston parameters: **Audit P3b** — use the strict resolver so a
-        // Missing or mistyped HESTON_* scalars fail loudly rather than selecting
-        // representative SPX defaults. The canonical `HestonParams::new`
-        // enforces positive κ/θ/σᵥ/v₀ and ρ ∈ (−1, 1) for both Monte Carlo and
-        // Fourier paths.
-        let params = finstack_quant_valuations_core::instruments::pricing::heston_market::heston_params_from_market_strict(
-            market,
-        )?;
-        let process = HestonProcess::new(HestonProcessParams {
-            r,
-            q,
-            model: params,
-        });
-        let discretization = QeHeston::new();
-
         let num_steps = ((t * self.steps_per_year).round() as usize).max(10);
         let time_grid = TimeGrid::uniform(t, num_steps)?;
-        let maturity_step = time_grid.num_steps();
 
-        let num_paths =
-            finstack_quant_valuations_core::instruments::pricing::monte_carlo::resolve_mc_paths(
-                inst.instrument_pricing_overrides.model_config.mc_paths,
-                self.num_paths,
-            )?;
-
-        // Derive deterministic seed
-        let seed_val = inst
-            .instrument_pricing_overrides
-            .model_config
-            .mc_seed(&inst.id);
-
-        let engine = McEngine::new(McEngineConfig::new(num_paths, time_grid));
-
-        let rng = PhiloxRng::new(seed_val);
-        let discount_factor = (-r * t).exp();
-
-        // Initial state: [spot, v0]
-        let initial_state = [spot, params.v0];
-
-        let payoff = European::new(inst.option_type, inst.strike, inst.quantity, maturity_step);
-        let result = engine.price(McPricingInputs {
-            rng: &rng,
-            process: &process,
-            disc: &discretization,
-            initial_state: &initial_state,
-            payoff: &payoff,
-            currency: ccy,
-            discount_factor,
-        })?;
-
-        Ok((result.mean, result.stderr))
+        price_heston_mc(
+            market,
+            HestonMcRequest {
+                instrument_id: &inst.id,
+                model_config: &inst.instrument_pricing_overrides.model_config,
+                default_num_paths: self.num_paths,
+                spot,
+                r,
+                q,
+                discount_factor: (-r * t).exp(),
+                currency: inst.currency,
+                time_grid,
+                drift_schedule: None,
+            },
+            |grid, _heston| {
+                Ok(European::new(
+                    inst.option_type,
+                    inst.strike,
+                    inst.quantity,
+                    grid.num_steps(),
+                ))
+            },
+        )
     }
 }
 

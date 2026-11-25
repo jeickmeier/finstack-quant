@@ -11,12 +11,8 @@
 
 use crate::commodity::commodity_swap::CommoditySwap;
 use finstack_quant_core::Result;
-use finstack_quant_core::market_data::bumps::BumpMode;
-use finstack_quant_core::market_data::bumps::BumpSpec;
-use finstack_quant_core::market_data::bumps::BumpType;
-use finstack_quant_core::market_data::bumps::BumpUnits;
-use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
@@ -54,20 +50,36 @@ pub(crate) struct DeltaCalculator;
 impl MetricCalculator for DeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let swap: &CommoditySwap = context.instrument_as()?;
-        let curve_id = CurveId::new(swap.forward_curve_id.as_str());
-        let target = context.curves.curve_target(&curve_id)?;
-        let bump = |value| {
-            target.clone().into_bump(BumpSpec {
-                bump_type: BumpType::Parallel,
-                mode: BumpMode::Additive,
-                units: BumpUnits::Fraction,
-                value,
-            })
+        swap.validate()?;
+        let _ = context
+            .curves
+            .get_price_curve(swap.forward_curve_id.as_str())?;
+        let disc = context
+            .curves
+            .get_discount(swap.discount_curve_id.as_str())?;
+        let is_business_day =
+            crate::commodity::averaging::business_day_filter(swap.calendar_id.as_deref())?;
+        let float_sign = match swap.side {
+            PayReceive::Pay => 1.0,
+            PayReceive::Receive => -1.0,
         };
-        let up = context.curves.bump([bump(1.0)])?;
-        let down = context.curves.bump([bump(-1.0)])?;
-        let pv_up = swap.value(&up, context.as_of)?.amount();
-        let pv_down = swap.value(&down, context.as_of)?.amount();
-        Ok((pv_up - pv_down) / 2.0)
+        let mut delta = 0.0;
+        for period in swap
+            .periods()?
+            .into_iter()
+            .filter(|p| p.payment_date >= context.as_of)
+        {
+            let (obs_start, obs_end) = swap.shifted_observation_window(&period)?;
+            let (projected, total) = crate::commodity::averaging::business_day_observation_weights(
+                &is_business_day,
+                obs_start,
+                obs_end,
+                period.accrual_end == swap.maturity,
+                context.as_of,
+            )?;
+            let df_pay = disc.df_between_dates(context.as_of, period.payment_date)?;
+            delta += float_sign * swap.quantity * df_pay * (projected as f64 / total as f64);
+        }
+        Ok(delta)
     }
 }

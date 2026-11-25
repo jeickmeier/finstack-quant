@@ -83,6 +83,7 @@ use finstack_quant_valuations_core::instruments::Instrument;
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "json-schema", schemars(deny_unknown_fields))]
+#[serde(remote = "Self")]
 pub struct CommoditySpreadOption {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -167,6 +168,11 @@ pub struct CommoditySpreadOption {
     #[builder(default)]
     pub(crate) unknown_fields: finstack_quant_core::serde_guard::UnknownFieldGuard,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(
+    CommoditySpreadOption,
+    CommoditySpreadOption::validate
+);
 
 impl CommoditySpreadOption {
     /// Create a representative WTI-RBOB crack spread call option example.

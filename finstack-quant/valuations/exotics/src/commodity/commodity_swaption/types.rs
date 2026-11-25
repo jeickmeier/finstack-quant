@@ -83,6 +83,7 @@ use finstack_quant_valuations_core::impl_instrument_base;
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "json-schema", schemars(deny_unknown_fields))]
+#[serde(remote = "Self")]
 pub struct CommoditySwaption {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -183,6 +184,11 @@ pub struct CommoditySwaption {
     #[builder(default)]
     pub(crate) unknown_fields: finstack_quant_core::serde_guard::UnknownFieldGuard,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(
+    CommoditySwaption,
+    CommoditySwaption::validate
+);
 
 impl CommoditySwaption {
     /// Validate commodity swaption input invariants.
@@ -556,145 +562,31 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for Commo
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        request: &finstack_quant_valuations_core::instruments::OptionGreeksRequest,
+        _request: &finstack_quant_valuations_core::instruments::OptionGreeksRequest,
     ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::OptionGreeks>
     {
-        let mut greeks = finstack_quant_valuations_core::instruments::OptionGreeks::default();
-        match request.greek {
-            finstack_quant_valuations_core::instruments::OptionGreekKind::Delta => {
-                greeks.delta = self.option_delta(market, as_of, request.bumps)?
-            }
-            finstack_quant_valuations_core::instruments::OptionGreekKind::Gamma => {
-                greeks.gamma = self.option_gamma(market, as_of, request.bumps)?
-            }
-            finstack_quant_valuations_core::instruments::OptionGreekKind::Vega => {
-                greeks.vega = self.option_vega(market, as_of, request.bumps)?
-            }
-            _ => {}
-        }
-        Ok(greeks)
-    }
-}
-impl CommoditySwaption {
-    fn option_delta(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_core::math::special_functions::norm_cdf;
-
         if as_of > self.expiry {
-            return Ok(Some(0.0));
+            return Ok(finstack_quant_valuations_core::instruments::OptionGreeks {
+                delta: Some(0.0),
+                gamma: Some(0.0),
+                vega: Some(0.0),
+                theta: None,
+                rho_bp: None,
+                foreign_rho_bp: None,
+                vanna: Some(0.0),
+                volga: Some(0.0),
+            });
         }
-
         let inputs = self.black76_inputs(market, as_of)?;
-
-        if inputs.time <= 0.0 || inputs.sigma <= 0.0 {
-            let intrinsic = match self.option_type {
-                OptionType::Call => {
-                    if inputs.forward > self.fixed_price {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
-                OptionType::Put => {
-                    if inputs.forward < self.fixed_price {
-                        -1.0
-                    } else {
-                        0.0
-                    }
-                }
-            };
-            return Ok(Some(intrinsic * inputs.annuity * self.quantity));
-        }
-
-        let d1 = finstack_quant_models::closed_form::d1_d2_black76(
+        crate::commodity::black76_greeks::black76_option_greeks(
             inputs.forward,
             self.fixed_price,
+            inputs.annuity,
             inputs.sigma,
             inputs.time,
+            self.option_type,
+            self.quantity,
         )
-        .0;
-        let nd1 = norm_cdf(d1)?;
-
-        let delta_unit = match self.option_type {
-            OptionType::Call => inputs.annuity * nd1,
-            OptionType::Put => inputs.annuity * (nd1 - 1.0),
-        };
-        Ok(Some(delta_unit * self.quantity))
-    }
-    fn option_gamma(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_valuations_core::instruments::Instrument;
-
-        if as_of > self.expiry {
-            return Ok(Some(0.0));
-        }
-
-        let bump_pct = bumps.spot_bump_decimal;
-        let inputs = self.black76_inputs(market, as_of)?;
-        if inputs.time <= 0.0 || inputs.sigma <= 0.0 {
-            return Ok(Some(0.0));
-        }
-        let bump_size = inputs.forward * bump_pct;
-
-        let pv_base = self.value(market, as_of)?.amount();
-
-        let up = crate::commodity::bump_price_curve_pct(
-            market,
-            self.forward_curve_id.as_str(),
-            bump_pct,
-        )?;
-        let pv_up = self.value(&up, as_of)?.amount();
-
-        let down = crate::commodity::bump_price_curve_pct(
-            market,
-            self.forward_curve_id.as_str(),
-            -bump_pct,
-        )?;
-        let pv_down = self.value(&down, as_of)?.amount();
-
-        Ok(Some(
-            (pv_up - 2.0 * pv_base + pv_down) / (bump_size * bump_size),
-        ))
-    }
-    fn option_vega(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_core::math::special_functions::norm_pdf;
-
-        if as_of > self.expiry {
-            return Ok(Some(0.0));
-        }
-
-        let inputs = self.black76_inputs(market, as_of)?;
-        if inputs.time <= 0.0 {
-            return Ok(Some(0.0));
-        }
-
-        if inputs.sigma <= 0.0 {
-            return Ok(Some(0.0));
-        }
-
-        let d1 = finstack_quant_models::closed_form::d1_d2_black76(
-            inputs.forward,
-            self.fixed_price,
-            inputs.sigma,
-            inputs.time,
-        )
-        .0;
-        // Vega = annuity * F * N'(d1) * sqrt(T) * 0.01 (per vol point)
-        let vega_abs = inputs.annuity * inputs.forward * norm_pdf(d1)? * inputs.time.sqrt();
-        Ok(Some(vega_abs * 0.01 * self.quantity))
     }
 }
 
@@ -1241,33 +1133,25 @@ mod tests {
             };
 
             assert_validation(swaption.base_value(&market, as_of).map(|_| ()));
-            assert_validation(
-                swaption
-                    .option_delta(
+            for greek in [
+                finstack_quant_valuations_core::instruments::OptionGreekKind::Delta,
+                finstack_quant_valuations_core::instruments::OptionGreekKind::Gamma,
+                finstack_quant_valuations_core::instruments::OptionGreekKind::Vega,
+            ] {
+                assert_validation(
+                    <CommoditySwaption as finstack_quant_valuations_core::instruments::OptionGreeksProvider>::option_greeks(
+                        &swaption,
                         &market,
                         as_of,
-                        finstack_quant_valuations_core::instruments::GreekBumps::default(),
+                        &finstack_quant_valuations_core::instruments::OptionGreeksRequest {
+                            greek,
+                            bumps: Default::default(),
+                            base_pv: None,
+                        },
                     )
                     .map(|_| ()),
-            );
-            assert_validation(
-                swaption
-                    .option_gamma(
-                        &market,
-                        as_of,
-                        finstack_quant_valuations_core::instruments::GreekBumps::default(),
-                    )
-                    .map(|_| ()),
-            );
-            assert_validation(
-                swaption
-                    .option_vega(
-                        &market,
-                        as_of,
-                        finstack_quant_valuations_core::instruments::GreekBumps::default(),
-                    )
-                    .map(|_| ()),
-            );
+                );
+            }
         }
     }
 
@@ -1452,5 +1336,24 @@ mod tests {
             pv > expected * 0.5,
             "swaption PV ({pv}) shows the Σ DF·τ mis-scaling vs ({expected})"
         );
+    }
+
+    #[test]
+    fn low_vol_analytical_greeks_succeed() {
+        let as_of = date(2025, 1, 2);
+        let swaption = base_swaption(OptionType::Call, 3.50);
+        let market = build_market(as_of, 3.55, 0.005, 0.05);
+        let metrics = [
+            finstack_quant_valuations_core::metrics::MetricId::Delta,
+            finstack_quant_valuations_core::metrics::MetricId::Gamma,
+            finstack_quant_valuations_core::metrics::MetricId::Vega,
+        ];
+        let res = swaption
+            .price_with_metrics(&market, as_of, &metrics, Default::default())
+            .expect("low-vol swaption Greeks must succeed");
+        for id in metrics {
+            let val = res.metric(id.clone()).expect("metric");
+            assert!(val.is_finite(), "{id:?} not finite: {val}");
+        }
     }
 }

@@ -57,7 +57,7 @@ impl MetricCalculator for DeltaCalculator {
         let fwd: &CommodityForward = context.instrument_as()?;
 
         let payment_date = fwd.payment_date()?;
-        if payment_date < context.as_of {
+        if context.as_of > fwd.maturity || payment_date < context.as_of {
             return Ok(0.0);
         }
 

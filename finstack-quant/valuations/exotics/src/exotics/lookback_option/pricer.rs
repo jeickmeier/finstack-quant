@@ -4,7 +4,6 @@
 use crate::exotics::lookback_option::types::{LookbackOption, LookbackType};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
@@ -243,7 +242,7 @@ use finstack_quant_models::closed_form::{
 
 /// Whether the payoff depends on the running maximum (fixed-strike call,
 /// floating-strike put) rather than the running minimum.
-fn tracks_max(inst: &LookbackOption) -> bool {
+pub(super) fn tracks_max(inst: &LookbackOption) -> bool {
     use finstack_quant_models::types::OptionType;
     matches!(
         (inst.lookback_type, inst.option_type),
@@ -257,8 +256,12 @@ fn require_observed_extremum(
     as_of: Date,
 ) -> finstack_quant_core::Result<()> {
     use finstack_quant_valuations_core::instruments::Monitoring;
-    let has_history = matches!(&inst.monitoring, Monitoring::Discrete { observation_dates }
-        if observation_dates.iter().any(|date| *date < as_of));
+    let has_history = match &inst.monitoring {
+        Monitoring::Continuous => as_of >= inst.expiry,
+        Monitoring::Discrete { observation_dates } => {
+            observation_dates.iter().any(|date| *date < as_of)
+        }
+    };
     let needs_max = tracks_max(inst);
     if has_history
         && if needs_max {
@@ -268,7 +271,7 @@ fn require_observed_extremum(
         }
     {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "LookbackOption '{}' requires {} for elapsed discrete monitoring dates",
+            "LookbackOption '{}' requires {} when settled or for elapsed monitoring dates",
             inst.id,
             if needs_max {
                 "observed_max"
@@ -280,15 +283,17 @@ fn require_observed_extremum(
     Ok(())
 }
 
-/// Underlying spot from `spot_id`; a price-typed scalar must be quoted in the
-/// option currency (a lookback has no quanto leg), else `CurrencyMismatch`.
+/// Underlying positive spot from `spot_id`; a price-typed scalar must be quoted
+/// in the option currency (a lookback has no quanto leg), else `CurrencyMismatch`.
 fn lookback_spot(
     inst: &LookbackOption,
     curves: &MarketContext,
 ) -> finstack_quant_core::Result<f64> {
-    finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
-        curves.get_price(&inst.spot_id)?,
+    crate::exotics::bs_gbm::resolve_positive_spot(
+        curves,
+        &inst.spot_id,
         inst.currency,
+        "LookbackOption",
     )
 }
 
@@ -316,6 +321,22 @@ fn expired_lookback_payoff(inst: &LookbackOption, spot: f64) -> finstack_quant_c
             observation_dates.contains(&inst.expiry)
         }
     };
+    let require_max = || {
+        inst.observed_max.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "LookbackOption '{}' requires observed_max for settled payoff",
+                inst.id
+            ))
+        })
+    };
+    let require_min = || {
+        inst.observed_min.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "LookbackOption '{}' requires observed_min for settled payoff",
+                inst.id
+            ))
+        })
+    };
     let payoff = match inst.lookback_type {
         LookbackType::FixedStrike => {
             let strike = inst.strike.ok_or_else(|| {
@@ -325,7 +346,7 @@ fn expired_lookback_payoff(inst: &LookbackOption, spot: f64) -> finstack_quant_c
             })?;
             match inst.option_type {
                 finstack_quant_models::types::OptionType::Call => {
-                    let observed_max = inst.observed_max.unwrap_or(spot);
+                    let observed_max = require_max()?;
                     let maximum = if observes_expiry {
                         observed_max.max(spot)
                     } else {
@@ -334,7 +355,7 @@ fn expired_lookback_payoff(inst: &LookbackOption, spot: f64) -> finstack_quant_c
                     (maximum - strike).max(0.0)
                 }
                 finstack_quant_models::types::OptionType::Put => {
-                    let observed_min = inst.observed_min.unwrap_or(spot);
+                    let observed_min = require_min()?;
                     let minimum = if observes_expiry {
                         observed_min.min(spot)
                     } else {
@@ -346,12 +367,22 @@ fn expired_lookback_payoff(inst: &LookbackOption, spot: f64) -> finstack_quant_c
         }
         LookbackType::FloatingStrike => match inst.option_type {
             finstack_quant_models::types::OptionType::Call => {
-                let observed_min = inst.observed_min.unwrap_or(spot);
-                spot - observed_min.min(spot)
+                let observed_min = require_min()?;
+                let minimum = if observes_expiry {
+                    observed_min.min(spot)
+                } else {
+                    observed_min
+                };
+                (spot - minimum).max(0.0)
             }
             finstack_quant_models::types::OptionType::Put => {
-                let observed_max = inst.observed_max.unwrap_or(spot);
-                observed_max.max(spot) - spot
+                let observed_max = require_max()?;
+                let maximum = if observes_expiry {
+                    observed_max.max(spot)
+                } else {
+                    observed_max
+                };
+                (maximum - spot).max(0.0)
             }
         },
     };
@@ -379,42 +410,34 @@ fn collect_lookback_inputs(
     curves: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<LookbackInputs> {
-    let t = inst
-        .day_count
-        .year_fraction(as_of, inst.expiry, DayCountContext::default())?;
-
-    let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
-    let df = disc_curve.df_between_dates(as_of, inst.expiry)?;
-    // Keep analytical rate consistent with date-based discounting used by the curve.
+    let bs = crate::exotics::bs_gbm::collect_bs_inputs(
+        curves,
+        as_of,
+        crate::exotics::bs_gbm::BsMarketInputSpec {
+            context_label: "LookbackOption",
+            day_count: inst.day_count,
+            expiry: inst.expiry,
+            discount_curve_id: &inst.discount_curve_id,
+            spot_id: &inst.spot_id,
+            vol_surface_id: &inst.vol_surface_id,
+            div_yield_id: inst.div_yield_id.as_ref(),
+            currency: inst.currency,
+            market_quotes: &inst.instrument_pricing_overrides.market_quotes,
+            vol_strike: inst.strike,
+        },
+    )?;
     let r = finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df(
-        df,
-        t,
+        bs.df,
+        bs.t,
         "LookbackOption discount curve",
     )?;
-
-    let spot = lookback_spot(inst, curves)?;
-
-    let q = finstack_quant_valuations_core::instruments::pricing::market_inputs::resolve_optional_dividend_yield(
-        curves,
-        inst.div_yield_id.as_ref(),
-    )?;
-
-    let strike_val = inst.strike.unwrap_or(spot);
-    let sigma = finstack_quant_valuations_core::instruments::pricing::volatility::resolve_sigma_at(
-        &inst.instrument_pricing_overrides.market_quotes,
-        curves,
-        inst.vol_surface_id.as_str(),
-        t,
-        strike_val,
-    )?;
-
     Ok(LookbackInputs {
-        spot,
+        spot: bs.spot,
         r,
-        q,
-        sigma,
-        t,
-        df,
+        q: bs.q,
+        sigma: bs.sigma,
+        t: bs.t,
+        df: bs.df,
     })
 }
 
@@ -453,6 +476,7 @@ impl Pricer for LookbackOptionAnalyticalPricer {
                 PricingErrorContext::from_instrument(lookback),
             ));
         }
+        require_observed_extremum(lookback, as_of)?;
 
         if as_of >= lookback.expiry {
             let spot = terminal_lookback_spot(lookback, market, as_of)?;
@@ -851,23 +875,8 @@ mod tests {
 
     #[test]
     fn expired_lookback_payoff_requires_strike_for_fixed_strike_options() {
-        let option = LookbackOption::builder()
-            .id(InstrumentId::new("LOOKBACK-MISSING-STRIKE"))
-            .underlying_ticker("SPX".to_string())
-            .strike_opt(None)
-            .option_type(OptionType::Put)
-            .lookback_type(LookbackType::FixedStrike)
-            .expiry(date(2025, 1, 1))
-            .quantity(1.0)
-            .currency(Currency::USD)
-            .day_count(DayCount::Act365F)
-            .discount_curve_id(CurveId::new("USD-OIS"))
-            .spot_id("SPX-SPOT".into())
-            .vol_surface_id(CurveId::new("SPX-VOL"))
-            .div_yield_id_opt(Some(PriceId::new("SPX-DIV")))
-            .attributes(Attributes::new())
-            .build()
-            .expect("lookback option");
+        let mut option = fixed_strike_put(date(2025, 1, 1), 100.0, Some(90.0));
+        option.strike = None;
 
         let err = expired_lookback_payoff(&option, 100.0).expect_err("missing strike should error");
         assert!(err.to_string().contains("requires a strike"));
@@ -1180,5 +1189,32 @@ mod tests {
             (rho - expected).abs() <= 1e-9 * expected.abs().max(1e-12),
             "MC rho {rho} must match the same-model central bump {expected}"
         );
+    }
+
+    #[test]
+    fn expired_continuous_lookback_requires_observed_extremum_and_validates_invariants() {
+        let expiry = date(2025, 1, 31);
+        let curves = market(expiry, 110.0, 0.25, 0.03, 0.0);
+        let unrecorded_call = fixed_strike_call(expiry, 100.0, None);
+        assert!(unrecorded_call.value(&curves, expiry).is_err());
+
+        let mut bad = fixed_strike_call(expiry, 100.0, Some(120.0));
+        bad.observed_min = Some(130.0);
+        assert!(bad.validate_invariants().is_err());
+
+        let mut floating_with_strike = floating_strike_call(expiry, Some(90.0));
+        floating_with_strike.strike = Some(100.0);
+        assert!(floating_with_strike.validate_invariants().is_err());
+
+        assert_eq!(unrecorded_call.expiry(), Some(expiry));
+        let rolled = unrecorded_call
+            .theta_observed_state(&curves, date(2025, 1, 30), expiry)
+            .expect("theta roll")
+            .expect("records observed_max at expiry");
+        let rolled_lookback = rolled
+            .as_any()
+            .downcast_ref::<LookbackOption>()
+            .expect("downcast LookbackOption");
+        assert_eq!(rolled_lookback.observed_max, Some(110.0));
     }
 }
