@@ -77,8 +77,8 @@ impl MetricCalculator for CollateralCoverageCalculator {
             ));
         }
 
-        let collateral_in_cash_ccy = collateral_in_cash_currency(repo, context, collateral_value)?;
-        Ok(collateral_in_cash_ccy / required_value)
+        let collateral_in_cash = collateral_in_cash_currency(repo, context, collateral_value)?;
+        Ok(collateral_in_cash / required_value)
     }
 }
 
@@ -89,8 +89,8 @@ pub(super) fn collateral_in_cash_currency(
     collateral_amount: f64,
 ) -> Result<f64> {
     let collateral_money = repo.collateral.market_value(&context.curves)?;
-    let cash_ccy = repo.cash_amount.currency();
-    if collateral_money.currency() == cash_ccy {
+    let cash_currency = repo.cash_amount.currency();
+    if collateral_money.currency() == cash_currency {
         return Ok(collateral_amount);
     }
     let fx = context.curves.fx().ok_or_else(|| {
@@ -98,13 +98,13 @@ pub(super) fn collateral_in_cash_currency(
             "Repo '{}' collateral currency {} differs from cash currency {}; FxMatrix is required",
             repo.id,
             collateral_money.currency(),
-            cash_ccy
+            cash_currency
         ))
     })?;
     let rate = fx
         .rate(finstack_quant_core::money::fx::FxQuery::new(
             collateral_money.currency(),
-            cash_ccy,
+            cash_currency,
             context.as_of,
             finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
         ))
@@ -113,7 +113,7 @@ pub(super) fn collateral_in_cash_currency(
                 "Repo '{}' cannot convert collateral from {} to cash currency {}: {err}",
                 repo.id,
                 collateral_money.currency(),
-                cash_ccy
+                cash_currency
             ))
         })?
         .rate;

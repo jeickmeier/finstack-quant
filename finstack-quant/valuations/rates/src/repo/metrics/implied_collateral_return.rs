@@ -63,9 +63,9 @@ impl MetricCalculator for ImpliedCollateralReturnCalculator {
             return Ok(0.0);
         }
 
-        let collateral_in_cash_ccy =
+        let collateral_in_cash =
             super::register::collateral_in_cash_currency(repo, context, collateral_value)?;
-        let return_rate = (collateral_in_cash_ccy / required_value - 1.0) / ttm;
+        let return_rate = (collateral_in_cash / required_value - 1.0) / ttm;
         Ok(return_rate)
     }
 }
