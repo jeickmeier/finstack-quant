@@ -72876,7 +72876,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json",
-        "sha256": "21d58319b0cdce3772ad03e539dcbbfdd2018163b7077d10b13da26e08eabfb6"
+        "sha256": "ab467e800921fdc8251bfa579925104066dff84730b9940cd78f0e81739b9aff"
       },
       {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
@@ -73298,7 +73298,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/tests/portfolio/margin/cases.json",
-        "sha256": "bd85305b8ab10cec48fbd0d5e33e62cafcd7e97417f006f76384e1991de82547"
+        "sha256": "15b0d1417d05f87055db036895ef7c2f39508fd8cf330eb44d0fb5df8a29a885"
       },
       {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
@@ -74783,7 +74783,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
-        "sha256": "b1a564a9dbc2648fa7af7758c8909c644d7efc231f1708141de8cec89a562838"
+        "sha256": "96ea4391a7e79de8b2b1aac243eec168c8cc333d7a26f6357015e9b37f1ded4e"
       },
       {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
@@ -75052,7 +75052,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
-        "sha256": "b1a564a9dbc2648fa7af7758c8909c644d7efc231f1708141de8cec89a562838"
+        "sha256": "96ea4391a7e79de8b2b1aac243eec168c8cc333d7a26f6357015e9b37f1ded4e"
       },
       {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",

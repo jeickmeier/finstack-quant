@@ -3,7 +3,7 @@
   "sources": [
     {
       "path": "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json",
-      "sha256": "21d58319b0cdce3772ad03e539dcbbfdd2018163b7077d10b13da26e08eabfb6"
+      "sha256": "ab467e800921fdc8251bfa579925104066dff84730b9940cd78f0e81739b9aff"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
