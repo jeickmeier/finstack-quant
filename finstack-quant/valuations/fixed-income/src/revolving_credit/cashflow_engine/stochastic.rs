@@ -7,7 +7,7 @@ use finstack_quant_cashflows::builder::{CashFlowSchedule, RateSpec};
 use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::{CFKind, CashFlowParams};
 use finstack_quant_core::config::{RoundingContext, ZeroKind};
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 
 impl<'a> CashflowEngine<'a> {
@@ -91,21 +91,10 @@ impl<'a> CashflowEngine<'a> {
         if self.facility.issue_date > self.as_of
             && !rc.is_effectively_zero(self.facility.drawn.amount(), ZeroKind::Money(ccy))
         {
-            flows.push({
-                // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
-                let cash = self.facility.drawn.checked_neg();
-                CashFlowParams::new(
-                    self.facility.issue_date,
-                    None,
-                    cash,
-                    CFKind::Notional,
-                    0.0,
-                    None,
-                )
-                .with_principal_delta(cash.checked_neg())
-                .with_principal_date(self.facility.issue_date)
-                .build()?
-            });
+            flows.push(Self::notional_flow(
+                self.facility.issue_date,
+                self.facility.drawn.checked_neg(),
+            )?);
         }
 
         let anchor = self.facility.issue_date.max(self.as_of);
@@ -131,15 +120,7 @@ impl<'a> CashflowEngine<'a> {
         for period in self.payment_periods.iter() {
             let period_start = period.accrual_start;
             let period_end = period.accrual_end;
-            let accrual_context = if self.day_count == DayCount::Act365L {
-                DayCountContext {
-                    frequency: Some(self.facility.frequency),
-                    coupon_period: Some((period_start, period_end)),
-                    ..Default::default()
-                }
-            } else {
-                DayCountContext::default()
-            };
+            let accrual_context = self.period_day_count_context(period_start, period_end);
             let payment_date = period.payment_date;
             let idx_start = observation_index(period_start)?;
             let idx_end = observation_index(period_end)?;
@@ -171,14 +152,10 @@ impl<'a> CashflowEngine<'a> {
                     let leg = commitment_change * utilization_end;
                     if leg.abs() > 0.0 {
                         // Draw (increase) is negative for lender, repay (decrease) is positive
-                        flows.push({
-                            // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
-                            let cash = Money::from_model_value(-leg, ccy)?;
-                            CashFlowParams::new(sub_end, None, cash, CFKind::Notional, 0.0, None)
-                                .with_principal_delta(cash.checked_neg())
-                                .with_principal_date(sub_end)
-                                .build()?
-                        });
+                        flows.push(Self::notional_flow(
+                            sub_end,
+                            Money::from_model_value(-leg, ccy)?,
+                        )?);
                         step_legs += leg;
                     }
                 }
@@ -383,14 +360,10 @@ impl<'a> CashflowEngine<'a> {
             // leg nets exactly to the terminal repayment.
             if !rc.is_effectively_zero(balance_change, ZeroKind::Money(ccy)) {
                 // Draw (increase) is negative for lender, repay (decrease) is positive
-                flows.push({
-                    // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
-                    let cash = Money::from_model_value(-balance_change, ccy)?;
-                    CashFlowParams::new(principal_date, None, cash, CFKind::Notional, 0.0, None)
-                        .with_principal_delta(cash.checked_neg())
-                        .with_principal_date(principal_date)
-                        .build()?
-                });
+                flows.push(Self::notional_flow(
+                    principal_date,
+                    Money::from_model_value(-balance_change, ccy)?,
+                )?);
                 prev_balance = end_balance;
             } else {
                 prev_balance += step_legs;
@@ -410,21 +383,7 @@ impl<'a> CashflowEngine<'a> {
         if terminal_payment_date > self.as_of
             && !rc.is_effectively_zero(final_balance.amount(), ZeroKind::Money(ccy))
         {
-            flows.push({
-                // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
-                let cash = final_balance;
-                CashFlowParams::new(
-                    terminal_payment_date,
-                    None,
-                    cash,
-                    CFKind::Notional,
-                    0.0,
-                    None,
-                )
-                .with_principal_delta(cash.checked_neg())
-                .with_principal_date(terminal_payment_date)
-                .build()?
-            });
+            flows.push(Self::notional_flow(terminal_payment_date, final_balance)?);
         }
 
         Ok(finstack_quant_cashflows::schedule_from_classified_flows(

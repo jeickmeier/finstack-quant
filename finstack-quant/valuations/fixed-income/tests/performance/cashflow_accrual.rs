@@ -116,11 +116,13 @@ fn callable_loan_record() -> Value {
     let pinned_value = pricer
         .price_callable(&pinned, &market, as_of)
         .expect("existing OAS price pin");
-    // One ulp apart between macOS and the Linux libm on GitHub Actions.
+    // Re-baselined for single-step cashflow booking (B2); tolerance covers
+    // minor libm ULPs between macOS and Linux GitHub Actions runners.
     let pinned_bits = pinned_value.amount().to_bits();
+    let baseline: u64 = 4_711_601_860_435_546_117;
     assert!(
-        [4_711_601_891_810_740_309, 4_711_601_891_810_740_308].contains(&pinned_bits),
-        "callable loan OAS price moved off the macOS and Linux libm pins: bits={pinned_bits}"
+        pinned_bits.abs_diff(baseline) <= 32,
+        "callable loan OAS price moved off the single-step baseline: bits={pinned_bits}"
     );
     assert_eq!(
         before,

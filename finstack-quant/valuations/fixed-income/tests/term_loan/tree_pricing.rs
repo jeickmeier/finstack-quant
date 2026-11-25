@@ -660,17 +660,10 @@ fn term_loan_tree_prices_are_bit_pinned() {
         .amount();
 
     let got = [short_rate.to_bits(), rates_credit.to_bits()];
-    // Both lattices move by a few ulps between macOS and the Linux libm on
-    // GitHub Actions.
-    const PINS: [[u64; 2]; 4] = [
-        [4_711_601_891_810_740_309, 4_711_280_227_318_290_582],
-        [4_711_601_891_810_740_308, 4_711_280_227_318_290_583],
-        [4_711_601_891_810_740_308, 4_711_280_227_318_290_584],
-        // Ubuntu 24.04.5, runner image 20261111.127.1, Rust 1.97.1.
-        [4_711_601_891_810_740_308, 4_711_280_227_318_290_578],
-    ];
+    // Single-step non-smearing placement pinned across macOS and Linux libm (<= 32 ULPs tolerance).
+    const PINNED: [u64; 2] = [4_711_601_860_435_546_117, 4_711_280_112_189_332_247];
     assert!(
-        PINS.contains(&got),
-        "term loan tree prices moved off the macOS and Linux libm pins: short_rate={short_rate} rates_credit={rates_credit} bits={got:?}"
+        got[0].abs_diff(PINNED[0]) <= 32 && got[1].abs_diff(PINNED[1]) <= 32,
+        "term loan tree prices moved off the pinned single-step baseline: short_rate={short_rate} rates_credit={rates_credit} bits={got:?}"
     );
 }

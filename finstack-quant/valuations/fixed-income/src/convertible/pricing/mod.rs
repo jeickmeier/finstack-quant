@@ -5,9 +5,9 @@
 //! 2. Handle call/put provisions and various conversion policies.
 //!
 //! They differ in how issuer credit enters:
-//! - `tree` (the default, `credit_tree`): the stock jumps to zero on default,
+//! - `tree` (the default): the stock jumps to zero on default,
 //!   surviving claims are discounted and recovery of live principal is paid.
-//! - `tsiveriotis_fernandes` (`tf_tree`): no default event; the cash-only part
+//! - `tsiveriotis_fernandes`: no default event; the cash-only part
 //!   of the bond is discounted at the risk-free rate plus the credit spread.
 //!
 //! Public API:
@@ -20,7 +20,6 @@
 mod credit_tree;
 pub(crate) mod engine;
 pub(crate) mod spot_ladder;
-mod tf_tree;
 mod tree_pricer;
 mod valuator;
 

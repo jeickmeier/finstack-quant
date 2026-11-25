@@ -28,7 +28,7 @@ use finstack_quant_valuations_core::impl_instrument_base;
 /// use this state to retain a delayed delivery without replaying the option.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct ConvertibleSettlement {
     /// Date the holder's exercise decision extinguished the debt.
     #[cfg_attr(
@@ -51,6 +51,64 @@ pub struct ConvertibleSettlement {
     pub recovery_basis: Money,
 }
 
+impl ConvertibleSettlement {
+    /// Validate invariants of a resolved convertible settlement record.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        use finstack_quant_core::validation;
+
+        validation::validate_date_range_non_strict(
+            self.exercise_date,
+            self.delivery_date,
+            "convertible delivery",
+        )?;
+        if !self.shares.is_finite()
+            || self.shares < 0.0
+            || !self.cash.amount().is_finite()
+            || self.cash.amount() < 0.0
+        {
+            return Err(Error::Validation(
+                "convertible delivery amounts must be finite and nonnegative".into(),
+            ));
+        }
+        if !self.recovery_basis.amount().is_finite()
+            || self.recovery_basis.amount() < 0.0
+            || self.recovery_basis.amount() > self.cash.amount()
+        {
+            return Err(Error::Validation(
+                "convertible settlement recovery basis must be between zero and cash consideration"
+                    .into(),
+            ));
+        }
+        if self.recovery_basis.currency() != self.cash.currency() {
+            return Err(Error::CurrencyMismatch {
+                expected: self.cash.currency(),
+                actual: self.recovery_basis.currency(),
+            });
+        }
+        Ok(())
+    }
+}
+
+impl serde::Serialize for ConvertibleSettlement {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        Self::serialize(self, serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ConvertibleSettlement {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Self::deserialize(deserializer)?;
+        value.validate().map_err(serde::de::Error::custom)?;
+        Ok(value)
+    }
+}
+
 /// Convertible bond instrument with embedded equity conversion option.
 ///
 /// This fixed income instrument combines debt characteristics (coupons, principal)
@@ -64,7 +122,7 @@ pub struct ConvertibleSettlement {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct ConvertibleBond {
     /// Unique identifier for the instrument.
     pub id: InstrumentId,
@@ -172,6 +230,8 @@ pub struct ConvertibleBond {
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(ConvertibleBond);
 
 /// Greeks for convertible bonds priced with tree models.
 ///

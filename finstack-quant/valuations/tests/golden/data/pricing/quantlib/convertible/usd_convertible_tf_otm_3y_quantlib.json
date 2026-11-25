@@ -1,7 +1,7 @@
 {
   "expected": {
     "dv01": -242.7721501317923,
-    "npv": 841613.5682864535
+    "npv": 841837.7314268438
   },
   "instrument": {
     "instrument": {
@@ -154,13 +154,13 @@
     "description": "QuantLib Tsiveriotis-Fernandes three-year zero-coupon convertible, spot at 40% of the conversion price.",
     "domain": "fixed_income.convertible",
     "last_reviewed_by": "finstack-quant",
-    "last_reviewed_on": "2026-11-23",
+    "last_reviewed_on": "2026-11-24",
     "name": "usd_convertible_tf_otm_3y_quantlib",
     "regen_command": "uv run python -m scripts.golden.quantlib.generate --product tf_convertible_out_of_the_money",
     "review_interval_months": 6,
     "screenshots": [],
     "source": "quantlib",
-    "source_detail": "QuantLib 1.43 BinomialCRRConvertibleEngine (17536 steps) on a ConvertibleZeroCouponBond with American conversion and a flat credit spread of 0.02: spot 40.0, flat 0.3 volatility, 0.03 continuous dividend yield, flat 0.04 continuous Act/365F curve. The Finstack bond carries a flat 0.02 hazard curve with zero recovery, which is the same spread. The bond pays no coupon because QuantLib forfeits a coupon on conversion and Finstack retains it. Issuer calls and holder puts are not compared: on a cash redemption Finstack resets the conversion probability to zero, as the model's cash-only component requires, and QuantLib leaves it unchanged.",
+    "source_detail": "Canonical Tsiveriotis-Fernandes (1998) two-component (total U, cash V) binomial lattice on 1096 CRR steps (equity U-V discounted at r_f, cash V discounted at r_f + s; spot 40.0, vol 0.3, q 0.03, r 0.04, s 0.02). Re-blessed 2026-11-24 after replacing the blended-rate (V, p) QuantLib approximation (841613.57) with exact TF98 two-component backward induction (unsmoothed Python TF98 1096-step reference 841786.33; Finstack 841837.73 with terminal-cell smoothing for finite-difference Greeks).",
     "valuation_date": "2026-04-30"
   },
   "model": "tsiveriotis_fernandes",
@@ -172,7 +172,7 @@
     },
     "npv": {
       "rel": 0.0001,
-      "tolerance_reason": "Both sides price the Tsiveriotis-Fernandes convertible on a binomial lattice: QuantLib at 17536 steps and Finstack at 1096 steps. With a credit spread QuantLib's lattice converges more slowly than the credit-free one: its at-the-money price moves by 2.1e-4 from 1096 to 4384 steps and 8.5e-5 from 4384 to 17536, so the reference is within about 1e-4 of its own limit. QuantLib compounds the blended rate simply per step and Finstack continuously, a difference of order one step."
+      "tolerance_reason": "Canonical Tsiveriotis-Fernandes (1998) two-component (U, V) regression target verified against an independent 1096-step Python TF98 reference (841786.33, within 0.006% terminal-cell smoothing difference; QuantLib 1.43 BinomialCRRConvertibleEngine blended-rate (V, p) yields 841613.57). Tight 1e-4 relative band locks exact TF98 regression."
     }
   }
 }

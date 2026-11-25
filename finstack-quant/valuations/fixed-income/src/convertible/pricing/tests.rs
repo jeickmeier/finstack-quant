@@ -1153,6 +1153,8 @@ fn convertible_forced_delivery_overrides_put_and_retains_risky_coupon() {
                     valuator: &valuator,
                     steps,
                     time_to_maturity: inputs.time_to_maturity,
+                    model: super::ConvertibleModel::DefaultableEquity,
+                    recovery_rate: bond.recovery_rate.unwrap_or(0.0),
                 };
                 let expected_cash = 25.0 * (-hazard * 181.0 / 365.0).exp();
                 let (total, cash) = engine
@@ -1582,4 +1584,79 @@ fn tf_price_lies_between_the_bond_floor_and_the_credit_free_price() {
             "spot {spot}: {risky} below conversion value"
         );
     }
+}
+
+#[test]
+fn tf_coupon_bearing_discounts_cash_at_risky_rate_and_equity_at_risk_free_rate() {
+    use finstack_quant_core::market_data::term_structures::HazardCurve;
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+    let coupon_spec =
+        crate::bond::CashflowSpec::fixed(0.06, Tenor::semi_annual(), DayCount::Act365F)
+            .expect("coupon spec");
+
+    let mut bond = create_test_bond();
+    bond.cashflow_spec = coupon_spec;
+    bond.credit_curve_id = Some("CREDIT".into());
+    bond.recovery_rate = Some(0.0);
+
+    let price_with = |hazard: f64, spot: f64| -> f64 {
+        let mkt = create_test_market_context()
+            .try_insert(
+                HazardCurve::flat("CREDIT", as_of, hazard, 0.0, DayCount::Act365F).expect("hazard"),
+            )
+            .expect("market")
+            .insert_price("AAPL", MarketScalar::unitless(spot).expect("spot"));
+        crate::convertible::pricing::price_convertible_bond_with_model(
+            &bond,
+            &mkt,
+            as_of,
+            super::ConvertibleModel::TsiveriotisFernandes,
+        )
+        .expect("tf price")
+        .amount()
+    };
+
+    // Deep OTM coupon bond must decline strictly when credit spread widens.
+    let otm_low = price_with(0.01, 40.0);
+    let otm_high = price_with(0.08, 40.0);
+    assert!(
+        otm_low > otm_high,
+        "OTM coupon TF must fall with credit spread: {otm_low} vs {otm_high}"
+    );
+
+    // Deep ITM coupon bond retains coupons + conversion value without risky drag on equity.
+    let itm_low = price_with(0.01, 1000.0);
+    let itm_high = price_with(0.08, 1000.0);
+    assert!(
+        (itm_low - itm_high).abs() < 1e-6 * itm_low,
+        "deep ITM TF claim is predominantly equity and invariant to moderate credit spread: {itm_low} vs {itm_high}"
+    );
+}
+
+#[test]
+fn h22_and_h1_bond_floor_maturity_and_serde_validation() {
+    use finstack_quant_core::market_data::term_structures::HazardCurve;
+    let mut bond = create_test_bond();
+    let as_of = bond.maturity;
+    bond.credit_curve_id = Some("CREDIT".into());
+    bond.recovery_rate = Some(0.4);
+    let mkt = create_test_market_context()
+        .try_insert(
+            HazardCurve::flat("CREDIT", bond.issue_date, 0.05, 0.4, DayCount::Act365F)
+                .expect("hazard"),
+        )
+        .expect("market");
+    let floor = super::price_bond_floor(
+        &bond,
+        &mkt,
+        as_of,
+        super::ConvertibleModel::DefaultableEquity,
+    )
+    .expect("maturity floor");
+    assert!(floor.is_finite() && floor >= 0.0);
+
+    let mut invalid =
+        serde_json::to_value(ConvertibleBond::example().expect("example")).expect("serialize");
+    invalid["recovery_rate"] = serde_json::json!(1.5);
+    assert!(serde_json::from_value::<ConvertibleBond>(invalid).is_err());
 }

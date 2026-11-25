@@ -17,7 +17,7 @@ use rust_decimal::prelude::ToPrimitive;
 /// Flat fees can be represented as single-tier vectors.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct RevolvingCreditFees {
     /// One-time upfront (arrangement or OID) fee paid by the borrower to the
     /// lender on the commitment date, as an absolute amount or a fraction of
@@ -227,6 +227,56 @@ impl RevolvingCreditFees {
     /// tiers are not strictly ascending.
     pub fn usage_fee_bp(&self, utilization: f64) -> finstack_quant_core::Result<f64> {
         tier_bp(&self.usage_fee_tiers, utilization, "usage")
+    }
+
+    /// Validate fee rates and utilization-tier ordering.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        if !self.facility_fee_bp.is_finite() || self.facility_fee_bp < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "RevolvingCreditFees facility_fee_bp must be finite and non-negative, got {}",
+                self.facility_fee_bp
+            )));
+        }
+        for (label, tiers) in [
+            ("commitment_fee_tiers", &self.commitment_fee_tiers),
+            ("usage_fee_tiers", &self.usage_fee_tiers),
+        ] {
+            for (idx, tier) in tiers.iter().enumerate() {
+                if !(Decimal::ZERO..=Decimal::ONE).contains(&tier.threshold)
+                    || tier.bp < Decimal::ZERO
+                {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "RevolvingCreditFees {label}[{idx}] threshold must be in [0, 1] and bp >= 0"
+                    )));
+                }
+            }
+            if tiers.windows(2).any(|w| w[1].threshold <= w[0].threshold) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "RevolvingCreditFees {label} must be strictly increasing by threshold"
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl serde::Serialize for RevolvingCreditFees {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        Self::serialize(self, serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for RevolvingCreditFees {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Self::deserialize(deserializer)?;
+        value.validate().map_err(serde::de::Error::custom)?;
+        Ok(value)
     }
 }
 

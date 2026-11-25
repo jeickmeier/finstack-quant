@@ -191,38 +191,56 @@ impl RevolvingCreditPricer {
         // lender funds that draw at par and recovers it at `R`, a net (R − 1)
         // per unit. With `leq = 0` this is the plain recovery leg.
         let lc_leq = facility.lc.as_ref().map_or(0.0, |lc| lc.leq);
+        let integration_start = as_of.max(facility.issue_date);
         if facility.recovery_rate > 0.0 || facility.leq > 0.0 || lc_leq > 0.0 {
-            let future_grid = Self::build_recovery_grid(facility, as_of, &path_schedule)?;
+            let future_grid =
+                Self::build_recovery_grid(facility, integration_start, &path_schedule)?;
 
             if !future_grid.is_empty() {
-                let survival_at_grid = if let Some(ref path_data) = path_schedule.path_data {
-                    Self::compute_dynamic_survival_at_dates(
-                        &path_data.credit_spread_path,
-                        &path_data.time_points,
-                        &future_grid,
-                        facility.recovery_rate,
-                        facility.issue_date,
-                        crate::revolving_credit::MC_CLOCK_DAY_COUNT,
-                    )?
-                } else if let Some(ref hazard_id) = facility.credit_curve_id {
-                    let hazard = market.get_hazard(hazard_id.as_str())?;
-                    hazard.survival_at_dates(&future_grid)?
-                } else {
-                    vec![1.0; future_grid.len()]
-                };
+                let (prev_sp, survival_at_grid) =
+                    if let Some(ref path_data) = path_schedule.path_data {
+                        let mut dates = Vec::with_capacity(future_grid.len() + 1);
+                        dates.push(integration_start);
+                        dates.extend_from_slice(&future_grid);
+                        let mut sp = Self::compute_dynamic_survival_at_dates(
+                            &path_data.credit_spread_path,
+                            &path_data.time_points,
+                            &dates,
+                            facility.recovery_rate,
+                            facility.issue_date,
+                            crate::revolving_credit::MC_CLOCK_DAY_COUNT,
+                        )?;
+                        let start_sp = sp.remove(0);
+                        (start_sp, sp)
+                    } else if let Some(ref hazard_id) = facility.credit_curve_id {
+                        let hazard = market.get_hazard(hazard_id.as_str())?;
+                        let start_sp = if integration_start == as_of {
+                            sp_as_of
+                        } else {
+                            let t = hazard.day_count().year_fraction(
+                                hazard.base_date(),
+                                integration_start,
+                                finstack_quant_core::dates::DayCountContext::default(),
+                            )?;
+                            hazard.sp(t)?
+                        };
+                        (start_sp, hazard.survival_at_dates(&future_grid)?)
+                    } else {
+                        (sp_as_of, vec![1.0; future_grid.len()])
+                    };
 
                 let exposure_at_grid =
                     Self::exposure_at_grid(facility, as_of, &future_grid, &path_schedule)?;
 
-                // Same source as `sp_as_of` above: integration starts at the
-                // valuation date with S(as_of).
-                let mut prev_sp = sp_as_of;
+                // Conditioned survival starting at the active commitment date (so forward-start
+                // facilities integrate no phantom default exposure prior to issue_date).
+                let mut prev_sp = prev_sp;
 
-                // `drawn` is the balance at the simulation anchor in
+                // `drawn` is the balance at the simulation anchor (`issue_date.max(as_of)`) in
                 // both modes, and deterministic events are future-only.
                 let mut prev_exposure = facility.drawn.amount();
 
-                let mut prev_date = as_of;
+                let mut prev_date = integration_start;
                 for i in 0..future_grid.len() {
                     let curr_date = future_grid[i];
                     let curr_sp = survival_at_grid[i];
@@ -259,13 +277,26 @@ impl RevolvingCreditPricer {
             }
         }
 
-        // Add upfront fee if applicable
-        total_pv += compute_upfront_fee_pv(
-            facility.upfront_fee_amount()?,
-            facility.issue_date,
-            as_of,
-            disc_curve.as_ref(),
-        )?;
+        // Add upfront fee if applicable, weighted by conditional survival to issue_date.
+        let upfront_fee = facility.upfront_fee_amount()?;
+        if upfront_fee.amount() != 0.0 && facility.issue_date > as_of {
+            let issue_sp = if path_schedule.path_data.is_some() {
+                // Pathwise simulation starts at issue_date so S(issue_date) == 1.0 == sp_as_of.
+                sp_as_of
+            } else if let Some(ref hazard_id) = facility.credit_curve_id {
+                let hazard = market.get_hazard(hazard_id.as_str())?;
+                let t = hazard.day_count().year_fraction(
+                    hazard.base_date(),
+                    facility.issue_date,
+                    finstack_quant_core::dates::DayCountContext::default(),
+                )?;
+                hazard.sp(t)?
+            } else {
+                sp_as_of
+            };
+            total_pv +=
+                upfront_fee.amount() * df_asof_to(facility.issue_date)? * (issue_sp / sp_as_of);
+        }
 
         let draw_option_cost = match path_schedule.path_data.as_ref() {
             Some(path_data) if facility.is_stochastic() => {
@@ -412,6 +443,10 @@ impl RevolvingCreditPricer {
         // Now interpolate survival for each cashflow date
         let mut survival_probs = Vec::with_capacity(cashflow_dates.len());
         for &cf_date in cashflow_dates {
+            if cf_date <= issue_date {
+                survival_probs.push(1.0);
+                continue;
+            }
             let t_cf = day_count.year_fraction(issue_date, cf_date, DayCountContext::default())?;
 
             let hazard_at_cf = if let Some(idx) = time_points.iter().position(|&t| t >= t_cf) {
@@ -617,31 +652,4 @@ impl RevolvingCreditPricer {
         let util = utilization_path[i] + alpha * (utilization_path[i + 1] - utilization_path[i]);
         Ok(util.clamp(0.0, 1.0))
     }
-}
-
-/// Present value of the upfront fee at `as_of`.
-///
-/// Only includes the fee when the commitment date is strictly after the
-/// valuation date, consistent with "PV of remaining cashflows" semantics.
-/// When `issue_date <= as_of` the fee has already been paid and is
-/// excluded from the mark-to-market valuation.
-///
-/// # Arguments
-///
-/// * `upfront_fee` - Fee amount in the facility currency (the percentage
-///   form already resolved against the opening commitment).
-/// * `issue_date` - Date the fee is paid.
-/// * `as_of` - Valuation date.
-/// * `disc_curve` - Curve discounting the fee from the commitment date.
-fn compute_upfront_fee_pv(
-    upfront_fee: Money,
-    issue_date: Date,
-    as_of: Date,
-    disc_curve: &dyn Discounting,
-) -> Result<f64> {
-    if upfront_fee.amount() == 0.0 || issue_date <= as_of {
-        return Ok(0.0);
-    }
-    let df = disc_curve.df_between_dates(as_of, issue_date)?;
-    Ok(upfront_fee.amount() * df)
 }

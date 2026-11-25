@@ -40,7 +40,15 @@ pub(crate) struct ExpectedLossCalculator;
 impl MetricCalculator for ExpectedLossCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let facility: &RevolvingCredit = context.instrument_as()?;
-        if facility.credit_curve_id.is_none() {
+        let has_mc_credit = matches!(
+            &facility.draw_repay_spec,
+            DrawRepaySpec::Stochastic(spec)
+                if spec.mc_config.as_ref().is_some_and(|c| !matches!(
+                    c.credit_spread_process,
+                    CreditSpreadProcessSpec::Constant(s) if s == 0.0
+                ))
+        );
+        if facility.credit_curve_id.is_none() && !has_mc_credit {
             return Ok(0.0);
         }
         let mut risk_free = facility.clone();

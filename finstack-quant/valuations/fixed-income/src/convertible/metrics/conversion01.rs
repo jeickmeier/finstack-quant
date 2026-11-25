@@ -30,44 +30,44 @@ impl MetricCalculator for Conversion01Calculator {
         let bond: &ConvertibleBond = context.instrument_as()?;
         let as_of = context.as_of;
 
-        // Determine whether to bump ratio or price
-        let bump_ratio = bond.conversion.ratio.is_some();
-
-        // Bump conversion parameter up by 1%
-        let mut bond_up = bond.clone();
-        if bump_ratio {
-            if let Some(ratio) = bond.conversion.ratio {
-                bond_up.conversion.ratio = Some(ratio * (1.0 + CONVERSION_BUMP_PCT));
+        let apply_ratio_scale = |target: &mut ConvertibleBond, factor: f64| -> bool {
+            let mut touched = false;
+            if let Some(ratio) = target.conversion.ratio {
+                let bumped = ratio * factor;
+                target.conversion.ratio = Some(bumped);
+                if target.conversion.price.is_some() {
+                    target.conversion.price = Some(target.notional.amount() / bumped);
+                }
+                touched = true;
+            } else if let Some(price) = target.conversion.price {
+                target.conversion.price = Some(price / factor);
+                touched = true;
             }
-        } else if let Some(price) = bond.conversion.price {
-            // Decreasing price increases conversion value (same as increasing ratio)
-            bond_up.conversion.price = Some(price * (1.0 - CONVERSION_BUMP_PCT));
-        } else {
-            // Neither ratio nor price defined - cannot calculate
+            if let crate::ConversionPolicy::MandatoryVariable {
+                upper_conversion_price,
+                lower_conversion_price,
+                ..
+            } = &mut target.conversion.policy
+            {
+                *upper_conversion_price /= factor;
+                *lower_conversion_price /= factor;
+                touched = true;
+            }
+            touched
+        };
+
+        // Bump effective conversion ratio up by +1% and down by -1% symmetrically.
+        let mut bond_up = bond.clone();
+        if !apply_ratio_scale(&mut bond_up, 1.0 + CONVERSION_BUMP_PCT) {
             return Ok(0.0);
         }
-
         let pv_up = super::model::model_value(context, &bond_up, context.curves.as_ref(), as_of)?;
 
-        // Bump conversion parameter down by 1%
         let mut bond_down = bond.clone();
-        if bump_ratio {
-            if let Some(ratio) = bond.conversion.ratio {
-                bond_down.conversion.ratio = Some(ratio * (1.0 - CONVERSION_BUMP_PCT));
-            }
-        } else if let Some(price) = bond.conversion.price {
-            bond_down.conversion.price = Some(price * (1.0 + CONVERSION_BUMP_PCT));
-        }
-
+        let _ = apply_ratio_scale(&mut bond_down, 1.0 - CONVERSION_BUMP_PCT);
         let pv_down =
             super::model::model_value(context, &bond_down, context.curves.as_ref(), as_of)?;
 
-        // The two scenarios are already ±1%; the standardized metric is the
-        // PV change for a 1% move, not the derivative per unit ratio/price.
-        // For ratio: up = higher ratio = higher value, so PV_up > PV_down typically
-        // For price: up = lower price = higher value, so PV_up > PV_down typically
-        let conversion01 = (pv_up - pv_down) / 2.0;
-
-        Ok(conversion01)
+        Ok((pv_up - pv_down) / 2.0)
     }
 }

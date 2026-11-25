@@ -123,7 +123,7 @@ impl RevolvingCreditMcRun {
 /// correlation between factors, and default modeling.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct McConfig {
     /// Correlation matrix (3x3) between [utilization, rate, credit].
     ///
@@ -175,7 +175,7 @@ impl McConfig {
         // Validate util_credit_corr if provided
         if let Some(rho) = self.util_credit_corr {
             validation::require_or(
-                rho.abs() <= 1.0,
+                rho.is_finite() && rho.abs() <= 1.0,
                 finstack_quant_core::Error::Validation(
                     "util_credit_corr must lie in [-1, 1]".to_string(),
                 ),
@@ -190,17 +190,26 @@ impl McConfig {
                 sigma,
                 initial,
             } => {
-                // All parameters must be non-negative
                 validation::require_or(
-                    *kappa > 0.0 && *theta >= 0.0 && *sigma >= 0.0 && *initial >= 0.0,
-                    finstack_quant_core::Error::Validation("CIR credit spread process needs kappa > 0 and non-negative theta, sigma and initial".to_string()),
+                    kappa.is_finite()
+                        && theta.is_finite()
+                        && sigma.is_finite()
+                        && initial.is_finite()
+                        && *kappa > 0.0
+                        && *theta >= 0.0
+                        && *sigma >= 0.0
+                        && *initial >= 0.0,
+                    finstack_quant_core::Error::Validation(
+                        "CIR credit spread process needs finite kappa > 0 and non-negative theta, sigma and initial"
+                            .to_string(),
+                    ),
                 )?;
             }
             CreditSpreadProcessSpec::Constant(spread) => {
                 validation::require_or(
-                    *spread >= 0.0,
+                    spread.is_finite() && *spread >= 0.0,
                     finstack_quant_core::Error::Validation(
-                        "constant credit spread must be non-negative".to_string(),
+                        "constant credit spread must be finite and non-negative".to_string(),
                     ),
                 )?;
             }
@@ -210,12 +219,21 @@ impl McConfig {
                 tenor_years,
                 ..
             } => {
-                validation::require_or(*kappa > 0.0 && *implied_vol >= 0.0, finstack_quant_core::Error::Validation("market-anchored credit spread process needs kappa > 0 and non-negative implied_vol".to_string()))?;
+                validation::require_or(
+                    kappa.is_finite()
+                        && implied_vol.is_finite()
+                        && *kappa > 0.0
+                        && *implied_vol >= 0.0,
+                    finstack_quant_core::Error::Validation(
+                        "market-anchored credit spread process needs finite kappa > 0 and non-negative implied_vol"
+                            .to_string(),
+                    ),
+                )?;
                 if let Some(tenor) = tenor_years {
                     validation::require_or(
-                        *tenor > 0.0,
+                        tenor.is_finite() && *tenor > 0.0,
                         finstack_quant_core::Error::Validation(
-                            "market-anchored tenor_years must be positive".to_string(),
+                            "market-anchored tenor_years must be finite and positive".to_string(),
                         ),
                     )?;
                 }
@@ -230,9 +248,9 @@ impl McConfig {
         }) = &self.interest_rate_process
         {
             validation::require_or(
-                *kappa > 0.0 && *sigma >= 0.0,
+                kappa.is_finite() && sigma.is_finite() && *kappa > 0.0 && *sigma >= 0.0,
                 finstack_quant_core::Error::Validation(
-                    "Hull-White process needs positive mean reversion and non-negative sigma"
+                    "Hull-White process needs finite positive mean reversion and non-negative sigma"
                         .to_string(),
                 ),
             )?;
@@ -245,6 +263,26 @@ impl McConfig {
         }
 
         Ok(())
+    }
+}
+
+impl serde::Serialize for McConfig {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        Self::serialize(self, serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for McConfig {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Self::deserialize(deserializer)?;
+        value.validate().map_err(serde::de::Error::custom)?;
+        Ok(value)
     }
 }
 

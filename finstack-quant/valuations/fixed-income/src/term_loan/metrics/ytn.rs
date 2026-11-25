@@ -22,8 +22,9 @@ macro_rules! define_ytn {
                 let as_of = context.as_of;
                 let schedule = cached_full_schedule(context)?;
                 // Horizon yields use the same settlement price as YTM/YTC/YTW.
-                let (maturity, target_price) = {
+                let (settlement_date, maturity, target_price) = {
                     let loan: &TermLoan = context.instrument_as()?;
+                    let settlement_date = loan.settlement_date(as_of)?;
                     let target_price = target_price_from_quote_or_model(
                         loan,
                         &schedule,
@@ -33,13 +34,17 @@ macro_rules! define_ytn {
                     )?;
                     // Cap at the final payment date so a rolled final
                     // payment stays in the hold-to-maturity leg.
-                    (maturity_exercise_date(loan, &schedule), target_price)
+                    (
+                        settlement_date,
+                        maturity_exercise_date(loan, &schedule),
+                        target_price,
+                    )
                 };
 
                 // Feb 29 clamps to Feb 28 in a non-leap target year.
                 let target = as_of.add_months(12 * $years)?;
                 let exercise_date = if target < maturity { target } else { maturity };
-                if exercise_date <= as_of {
+                if exercise_date <= settlement_date {
                     return Err(finstack_quant_core::InputError::InvalidDateRange.into());
                 }
 

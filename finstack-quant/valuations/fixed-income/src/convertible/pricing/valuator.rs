@@ -133,6 +133,7 @@ impl ConvertibleBondValuator {
         };
         let mut coupon_map: FxHashMap<usize, f64> = FxHashMap::default();
         let mut principal_map: FxHashMap<usize, f64> = FxHashMap::default();
+        let mut effective_step_dates = step_dates.clone();
         for cf in cashflow_schedule.get_flows() {
             if cf.get_date() <= base_date || !cf.get_kind().is_cash_settlement() {
                 continue;
@@ -145,6 +146,11 @@ impl ConvertibleBondValuator {
                 DayCount::Act365F,
                 day_count_ctx,
             )?;
+            if cf.get_kind().is_principal_like() && cf.get_date() <= bond.maturity {
+                for slot in &mut effective_step_dates[step..] {
+                    *slot = (*slot).max(cf.get_date());
+                }
+            }
             // Preserve the contractual payment PV when a date is rounded onto
             // the equity grid, including final coupons paid after maturity.
             let correction = rf_curve.df_between_dates(base_date, cf.get_date())?
@@ -173,7 +179,7 @@ impl ConvertibleBondValuator {
         }
         let balance_path = cashflow_schedule.outstanding_by_date()?;
         let mut principal_by_step: Vec<f64> = cashflow_schedule
-            .outstanding_at_dates(&step_dates)?
+            .outstanding_at_dates(&effective_step_dates)?
             .into_iter()
             .map(|balance| balance.amount().max(0.0))
             .collect();
@@ -243,10 +249,11 @@ impl ConvertibleBondValuator {
                         let floor_price = principal_by_step[s] * call.price_pct_of_par / 100.0;
                         let call_price = if let Some((curve, spread)) = &reference_curve {
                             let mut pv_remaining = 0.0;
-                            for cashflow in cashflow_schedule
-                                .get_flows()
-                                .iter()
-                                .filter(|cashflow| cashflow.get_date() > exercise_date)
+                            for cashflow in
+                                cashflow_schedule.get_flows().iter().filter(|cashflow| {
+                                    cashflow.get_date() > exercise_date
+                                        && cashflow.get_kind().is_cash_settlement()
+                                })
                             {
                                 let df =
                                     curve.df_between_dates(exercise_date, cashflow.get_date())?;

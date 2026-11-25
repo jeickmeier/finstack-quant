@@ -132,21 +132,59 @@ impl MetricCalculator for TermLoanBucketedDv01Calculator {
     }
 }
 
-/// Parallel CS01: par-spread rebootstrap on the credit tree, z-spread on discounting.
+/// Parallel CS01: par-spread rebootstrap on the credit tree, OAS bump on
+/// the rates-only callable tree, and z-spread on discounting.
 pub(crate) struct TermLoanCs01Calculator;
 
 impl MetricCalculator for TermLoanCs01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let (uses_credit, is_tree, inst_id) = {
+            let loan: &TermLoan = context.instrument_as()?;
+            let model = context
+                .pricing_model()
+                .unwrap_or_else(|| loan.default_model());
+            (
+                uses_credit_tree(context, loan),
+                model == ModelKey::Tree,
+                loan.id().to_string(),
+            )
+        };
+        if uses_credit {
+            return with_term_loan_risk_view(context, |ctx| GenericParallelCs01.calculate(ctx));
+        }
+        if is_tree {
+            let cs01 = with_term_loan_risk_view(context, |ctx| {
+                let pinned_loan: &TermLoan = ctx.instrument_as()?;
+                let base_oas = pinned_loan
+                    .instrument_pricing_overrides
+                    .market_quotes
+                    .quoted_oas
+                    .unwrap_or(0.0);
+                let mut base_clone = pinned_loan.clone();
+                base_clone
+                    .instrument_pricing_overrides
+                    .market_quotes
+                    .quoted_oas = Some(base_oas);
+                let base_pv =
+                    ctx.reprice_instrument_raw(&base_clone, ctx.curves.as_ref(), ctx.as_of)?;
+                let mut bumped = base_clone;
+                bumped.instrument_pricing_overrides.market_quotes.quoted_oas =
+                    Some(base_oas + 1.0e-4);
+                let bumped_pv =
+                    ctx.reprice_instrument_raw(&bumped, ctx.curves.as_ref(), ctx.as_of)?;
+                Ok(bumped_pv - base_pv)
+            })?;
+            context.computed.insert(
+                finstack_quant_valuations_core::metrics::MetricId::composite(
+                    &finstack_quant_valuations_core::metrics::MetricId::Cs01,
+                    &[&inst_id],
+                ),
+                cs01,
+            );
+            return Ok(cs01);
+        }
         with_term_loan_risk_view(context, |ctx| {
-            let use_credit_tree = {
-                let loan: &TermLoan = ctx.instrument_as()?;
-                uses_credit_tree(ctx, loan)
-            };
-            if use_credit_tree {
-                GenericParallelCs01.calculate(ctx)
-            } else {
-                ZSpreadParallelCs01::<TermLoan>::z_spread_only().calculate(ctx)
-            }
+            ZSpreadParallelCs01::<TermLoan>::z_spread_only().calculate(ctx)
         })
     }
 }
