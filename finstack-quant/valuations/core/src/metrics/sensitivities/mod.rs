@@ -10,7 +10,7 @@ pub mod fd_greeks;
 pub mod fx01;
 pub mod option_greeks;
 pub mod recovery01;
-pub mod rf_component_dv01;
+mod rf_component_dv01;
 pub mod theta;
 
 pub use rf_component_dv01::{RfComponentDv01Calculator, RfComponentPriced};

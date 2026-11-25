@@ -3,7 +3,7 @@
 use crate::real_estate::{RealEstateAsset, pricer};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_valuations_core::metrics::sensitivities::rf_component_dv01::{
+use finstack_quant_valuations_core::metrics::sensitivities::{
     RfComponentDv01Calculator, RfComponentPriced,
 };
 use finstack_quant_valuations_core::metrics::{MetricRegistry, MetricRegistryError};

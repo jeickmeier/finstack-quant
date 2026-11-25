@@ -64,7 +64,10 @@ pub struct HestonMcRequest<'a> {
 ///
 /// Resolves `HESTON_*` market scalars via [`heston_params_from_market_strict`],
 /// honors `mc_paths`, `mc_antithetic`, `mc_target_ci_half_width`, and `mc_seed`
-/// overrides on `req.model_config`, and runs [`QeHeston`] with [`PhiloxRng`].
+/// overrides on `req.model_config`, and runs the
+/// [QE Heston discretization](finstack_quant_models::monte_carlo::discretization::qe_heston::QeHeston)
+/// with the
+/// [Philox random-number generator](finstack_quant_models::monte_carlo::rng::philox::PhiloxRng).
 ///
 /// # Arguments
 ///

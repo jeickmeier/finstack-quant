@@ -3,9 +3,7 @@
 use super::super::{LeveredRealEstateEquity, levered_pricer};
 use crate::instruments::Instrument;
 use crate::metrics::sensitivities::bump_config;
-use crate::metrics::sensitivities::rf_component_dv01::{
-    RfComponentDv01Calculator, RfComponentPriced,
-};
+use crate::metrics::sensitivities::{RfComponentDv01Calculator, RfComponentPriced};
 use crate::metrics::{MetricCalculator, MetricContext, MetricRegistry, MetricRegistryError};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
