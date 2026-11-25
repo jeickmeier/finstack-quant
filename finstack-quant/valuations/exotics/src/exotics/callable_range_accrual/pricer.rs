@@ -18,6 +18,7 @@ use finstack_quant_models::rates::hw1f::{
 use finstack_quant_valuations_core::instruments::pricing_overrides::ModelConfig;
 use finstack_quant_valuations_core::pricer::InstrumentType;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy)]
 struct CallableRangeAccrualEvent {
@@ -54,10 +55,10 @@ impl Default for CallableRangeAccrualEvent {
 
 #[derive(Debug, Clone)]
 struct CallableRangeAccrualSchedule {
-    events: Vec<CallableRangeAccrualEvent>,
+    events: Arc<[CallableRangeAccrualEvent]>,
     event_times: Vec<f64>,
     exercise_times: Vec<f64>,
-    call_prices: Vec<f64>,
+    call_prices: Arc<[f64]>,
     /// Index (into `events`) of the event coinciding with the final payment
     /// date, where the pathwise bank-account numeraire `B(T_pay)` is read.
     final_payment_event_idx: Option<usize>,
@@ -71,8 +72,8 @@ struct CallableRangeAccrualPayoff {
     upper_bound: f64,
     coupon_rate: f64,
     notional: f64,
-    events: Vec<CallableRangeAccrualEvent>,
-    call_prices: Vec<f64>,
+    events: Arc<[CallableRangeAccrualEvent]>,
+    call_prices: Arc<[f64]>,
     final_payment_event_idx: Option<usize>,
     final_payment_discount_factor: f64,
     past_in_range: usize,
@@ -310,8 +311,8 @@ impl Hw1fNote for CallableRangeAccrual {
             coupon_rate: inst.range_accrual.coupon_rate
                 * inst.range_accrual.accrual_year_fraction()?,
             notional: inst.range_accrual.notional.amount(),
-            events: schedule.events.clone(),
-            call_prices: schedule.call_prices.clone(),
+            events: Arc::clone(&schedule.events),
+            call_prices: Arc::clone(&schedule.call_prices),
             final_payment_event_idx: schedule.final_payment_event_idx,
             final_payment_discount_factor: schedule.final_payment_discount_factor,
             past_in_range: inst.range_accrual.past_observations_in_range.unwrap_or(0),
@@ -457,10 +458,10 @@ fn build_schedule(
 
     let future_observations = events.iter().filter(|event| event.is_observation).count();
     Ok(CallableRangeAccrualSchedule {
-        events,
+        events: Arc::from(events),
         event_times,
         exercise_times,
-        call_prices,
+        call_prices: Arc::from(call_prices),
         final_payment_event_idx,
         final_payment_discount_factor,
         future_observations,

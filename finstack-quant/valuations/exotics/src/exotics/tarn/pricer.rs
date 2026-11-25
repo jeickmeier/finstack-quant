@@ -1,22 +1,18 @@
 //! Hull-White 1F Monte Carlo pricer for TARNs.
 
-use crate::exotics::hw1f_note::{Hw1fNote, Hw1fNotePricer, exact_estimate, zero_estimate};
+use crate::exotics::hw1f_note::{
+    Hw1fNote, Hw1fNotePricer, InAdvanceNoteSpec, PathwiseCouponLedger,
+    build_in_advance_coupon_schedule, run_hw1f_coupon_mc, zero_estimate,
+};
 use crate::exotics::tarn::Tarn;
 use finstack_quant_core::Result;
-use finstack_quant_core::dates::{Date, DayCountContext};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
-use finstack_quant_models::monte_carlo::traits::{PathState, Payoff, StateKey};
-use finstack_quant_models::rates::clock::model_time;
+use finstack_quant_models::monte_carlo::traits::{PathState, Payoff};
 use finstack_quant_models::rates::hw1f::CouponEvent;
-use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
-use finstack_quant_models::rates::hw1f::Hw1fMcPricer;
-use finstack_quant_models::rates::hw1f::{
-    Hw1fTermForward, PeriodForwardCoeffs, initial_short_rate_from_curve, prepare_hw1f_params,
-};
 use finstack_quant_valuations_core::instruments::pricing_overrides::ModelConfig;
 use finstack_quant_valuations_core::pricer::InstrumentType;
 use std::sync::Arc;
@@ -73,22 +69,8 @@ struct TarnPayoff {
     fixed_rate: f64,
     coupon_floor: f64,
     notional: f64,
-    events: Arc<[CouponEvent]>,
     tracker: TargetTracker,
-    discounted_pv: f64,
-    next_event: usize,
-    redeemed: bool,
-    /// `true` in Monte-Carlo mode: cashflows are discounted with the pathwise
-    /// bank-account numeraire `B(t)` read from the simulation state, not the
-    /// deterministic curve DF baked into each [`CouponEvent`]. A coupon fixed
-    /// at the period start is held in `pending` until the simulation reaches
-    /// its payment date (the next event), where `B(T_pay)` is known.
-    pathwise: bool,
-    /// Cashflow amounts fixed but not yet paid; settled (pathwise-discounted)
-    /// at the next event, whose time is the payment date.
-    pending: f64,
-    /// Bank-account numeraire at the most recent event (pathwise mode).
-    last_bank: f64,
+    ledger: PathwiseCouponLedger,
 }
 
 impl TarnPayoff {
@@ -104,115 +86,78 @@ impl TarnPayoff {
             fixed_rate,
             coupon_floor,
             notional,
-            events,
             tracker: TargetTracker::new(target_coupon),
-            discounted_pv: 0.0,
-            next_event: 0,
-            redeemed: false,
-            pathwise,
-            pending: 0.0,
-            last_bank: 1.0,
+            ledger: PathwiseCouponLedger::new(events, pathwise),
         }
     }
 
-    fn add_redemption(&mut self, event: &CouponEvent) {
-        if !self.redeemed {
-            if self.pathwise {
-                self.pending += self.notional;
-            } else {
-                self.discounted_pv += self.notional * event.discount_factor;
-            }
-            self.redeemed = true;
-        }
-    }
-
-    /// Settle pending cashflows whose payment date has been reached, using the
-    /// pathwise bank-account numeraire at that date.
-    fn flush_pending(&mut self, bank: f64) {
-        if self.pending != 0.0 {
-            self.discounted_pv += self.pending / bank;
-            self.pending = 0.0;
-        }
-    }
-
-    /// Settle coupon `self.next_event` using the supplied short rate, advancing
-    /// the cumulative-coupon tracker and redeeming on knockout.
-    ///
-    /// `short_rate` is ignored for an already-seasoned first coupon, whose
-    /// `forward_coeffs` are a short-rate-independent flat rate.
-    fn settle_next(&mut self, short_rate: f64) {
-        let event = self.events[self.next_event];
-        // Reconstruct the coupon's in-advance term simple forward from the
-        // short rate via the HW1F affine bond formula, instead of using the
-        // instantaneous short rate r(t) directly as a term index rate.
+    fn settle_event(
+        fixed_rate: f64,
+        coupon_floor: f64,
+        notional: f64,
+        tracker: &mut TargetTracker,
+        ledger: &mut PathwiseCouponLedger,
+        event: CouponEvent,
+        short_rate: f64,
+    ) {
         let floating_rate = event.forward_coeffs.simple_forward(short_rate);
-        let coupon_rate = (self.fixed_rate - floating_rate).max(self.coupon_floor);
+        let coupon_rate = (fixed_rate - floating_rate).max(coupon_floor);
         let period_coupon = coupon_rate * event.accrual_fraction;
-        let actual_coupon = self.tracker.add_coupon(period_coupon);
+        let actual_coupon = tracker.add_coupon(period_coupon);
 
-        let coupon_amount = actual_coupon * self.notional;
-        if self.pathwise {
-            // Fixed now, paid at the period end — discounted when the
-            // simulation reaches the payment date.
-            self.pending += coupon_amount;
-        } else {
-            self.discounted_pv += coupon_amount * event.discount_factor;
+        ledger.record_cashflow(actual_coupon * notional, event.discount_factor);
+        if tracker.is_knocked_out() && !ledger.is_redeemed() {
+            ledger.record_cashflow(notional, event.discount_factor);
+            ledger.mark_redeemed();
         }
-        if self.tracker.is_knocked_out() {
-            self.add_redemption(&event);
-        }
-        self.next_event += 1;
-        if self.pathwise && !self.redeemed && self.next_event == self.events.len() {
-            // Final coupon settled without knockout: par redemption pays at
-            // maturity, the same payment date as the final coupon.
-            self.pending += self.notional;
-            self.redeemed = true;
-        }
-    }
-
-    /// Drain the leading run of already-seasoned coupons (in-advance fixings at
-    /// or before `as_of`), which carry no path events. Their `forward_coeffs`
-    /// are short-rate-independent, so the sampled rate passed in is irrelevant.
-    fn settle_seasoned_prefix(&mut self) {
-        while self.next_event < self.events.len()
-            && !self.events[self.next_event].needs_path_sample
-            && !self.redeemed
-        {
-            self.settle_next(0.0);
+        ledger.advance();
+        if !ledger.is_redeemed() {
+            let was_exhausted = ledger.is_exhausted();
+            ledger.add_maturity_redemption_if_pending(notional);
+            if was_exhausted {
+                ledger.mark_redeemed();
+            }
         }
     }
 
     /// Settle every coupon deterministically (no Monte-Carlo path), for a
     /// schedule whose coupons are all already seasoned.
     fn settle_all_seasoned(&mut self) {
-        self.settle_seasoned_prefix();
-        debug_assert_eq!(
-            self.next_event,
-            self.events.len(),
-            "settle_all_seasoned called with a non-seasoned coupon present",
-        );
+        let fixed_rate = self.fixed_rate;
+        let coupon_floor = self.coupon_floor;
+        let notional = self.notional;
+        let tracker = &mut self.tracker;
+        self.ledger.drain_seasoned(|ledger, event, short_rate| {
+            Self::settle_event(
+                fixed_rate,
+                coupon_floor,
+                notional,
+                tracker,
+                ledger,
+                event,
+                short_rate,
+            );
+        });
     }
 }
 
 impl Payoff for TarnPayoff {
     fn on_event(&mut self, state: &mut PathState) -> finstack_quant_core::Result<()> {
-        // The simulation fires one event per *forward-starting* coupon at that
-        // coupon's period start (the in-advance fixing date), plus a final
-        // settlement event at maturity. A leading already-seasoned coupon
-        // carries no path event, so drain any such coupons that precede this
-        // path-fixed one before settling it.
-        self.settle_seasoned_prefix();
-        // Coupons fixed at the previous event pay at this event's date
-        // (contiguous periods: period end == next period start; the final
-        // period's payment lands on the maturity settlement event).
-        let bank = state.get_key(StateKey::BankAccount).unwrap_or(1.0);
-        self.last_bank = bank;
-        self.flush_pending(bank);
-        if self.next_event >= self.events.len() || self.redeemed {
-            return Ok(());
-        }
-        let short_rate = state.get_key(StateKey::ShortRate).unwrap_or(0.0);
-        self.settle_next(short_rate);
+        let fixed_rate = self.fixed_rate;
+        let coupon_floor = self.coupon_floor;
+        let notional = self.notional;
+        let tracker = &mut self.tracker;
+        self.ledger.step_event(state, |ledger, event, short_rate| {
+            Self::settle_event(
+                fixed_rate,
+                coupon_floor,
+                notional,
+                tracker,
+                ledger,
+                event,
+                short_rate,
+            );
+        });
         Ok(())
     }
 
@@ -220,27 +165,12 @@ impl Payoff for TarnPayoff {
         &self,
         currency: finstack_quant_core::currency::Currency,
     ) -> finstack_quant_core::Result<Money> {
-        let mut pv = self.discounted_pv;
-        if self.pathwise {
-            // The maturity settlement event flushes all pending cashflows;
-            // discount any defensive remainder with the last observed bank
-            // factor rather than dropping it.
-            pv += self.pending / self.last_bank;
-        } else if !self.redeemed
-            && let Some(final_event) = self.events.last()
-        {
-            pv += self.notional * final_event.discount_factor;
-        }
-        Money::from_model_value(pv, currency)
+        self.ledger.value(self.notional, currency)
     }
 
     fn reset(&mut self) {
         self.tracker.reset();
-        self.discounted_pv = 0.0;
-        self.next_event = 0;
-        self.redeemed = false;
-        self.pending = 0.0;
-        self.last_bank = 1.0;
+        self.ledger.reset();
     }
 }
 
@@ -276,217 +206,67 @@ impl Hw1fNote for Tarn {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<MoneyEstimate> {
-        let inst = self;
-        inst.validate()?;
+        self.validate()?;
 
-        let first_coupon_date = inst.start_date;
-        let final_coupon_date = *inst.payment_dates.last().ok_or_else(|| {
-            finstack_quant_core::Error::Validation("TARN requires payment dates".to_string())
-        })?;
-        if as_of >= final_coupon_date {
-            return Ok(zero_estimate(inst.notional.currency()));
-        }
-        if as_of > first_coupon_date {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Seasoned TARN '{}' requires realized cumulative coupon, knockout/redemption state, and historical fixings; pricing without that state is not supported",
-                inst.id
-            )));
-        }
-        let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
-        let forward_curve = market.get_forward(inst.forward_curve_id.as_ref())?;
-        finstack_quant_valuations_core::instruments::pricing::term_fixings::validate_term_curve_tenor(
-            forward_curve.as_ref(),
-            inst.index_tenor,
-            inst.id.as_str(),
-        )?;
-
-        let hw_params = pricer.effective_hw_params(inst, market)?;
-        // HW1F bond-reconstruction built from the discount curve; turns the
-        // short rate sampled at each coupon's in-advance fixing date into that
-        // coupon's term forward.
-        let term_forward = Hw1fTermForward::new(hw_params, discount_curve.as_ref(), as_of)?;
-
-        // Initial short rate = discount-curve instantaneous forward f(0,0).
-        // HW1F reprices the discount curve only when r(0) = f(0,0); seeding it
-        // from a separate forward-curve projection would offset the simulated
-        // short rate from the curve and break the M6 repricing property. It is
-        // also the deterministic fixing of an already-seasoned first coupon.
-        let r0 = initial_short_rate_from_curve(discount_curve.as_ref(), as_of)?;
-        if !r0.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "TARN {} initial short rate is not finite",
-                inst.id.as_str()
-            )));
-        }
-
-        let mut events = Vec::new();
-        let mut event_times = Vec::new();
-
-        for period in inst.period_boundaries().windows(2) {
-            let start = period[0];
-            let end = period[1];
-            if end <= as_of {
-                continue;
-            }
-
-            let accrual_fraction =
-                inst.day_count
-                    .year_fraction(start, end, DayCountContext::default())?;
-            if !accrual_fraction.is_finite() || accrual_fraction <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "TARN {} has invalid accrual fraction {accrual_fraction} for {start} to {end}",
-                    inst.id.as_str()
-                )));
-            }
-
-            let discount_factor = discount_curve.as_ref().df_between_dates(as_of, end)?;
-
-            // TARN coupons fix in advance: the floating rate is set at the
-            // period start and applies over `[start, end]`.
-            let forward_coeffs = if start > as_of {
-                // Forward-starting coupon: the fixing is sampled from the
-                // simulated short rate at the period start `t_fix`; the index
-                // is the `[start, end]`-tenor simple forward. `t_fix` is the
-                // event time the simulation fires `on_event` at.
-                let fixing_time = model_time(as_of, start);
-                if !fixing_time.is_finite() || fixing_time <= 0.0 {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "TARN {} has invalid fixing time {fixing_time} for period start {start}",
-                        inst.id.as_str()
-                    )));
-                }
-                event_times.push(fixing_time);
-                let tenor = inst.index_tenor.to_years_approx();
-                let coeffs = term_forward.period_coeffs(fixing_time, tenor)?;
-                let discount_forward = term_forward.curve_forward(fixing_time, tenor)?;
-                let basis =
-                    forward_curve
-                        .as_ref()
-                        .rate_between_dates(start, end, accrual_fraction)?
-                        - discount_forward;
-                events.push(CouponEvent {
-                    accrual_fraction,
-                    discount_factor,
-                    forward_coeffs: coeffs.with_additive_spread(basis),
-                    needs_path_sample: true,
-                });
-                continue;
-            } else {
-                // At the valuation date the first fixing is not yet a
-                // historical observation. Use the projection curve for that
-                // fixing; discount-curve reconstruction alone would erase the
-                // projection/discount basis precisely at inception.
-                let proj_start = start.max(as_of);
-                let proj_accrual =
-                    inst.day_count
-                        .year_fraction(proj_start, end, DayCountContext::default())?;
-                let projected_rate =
-                    forward_curve
-                        .as_ref()
-                        .rate_between_dates(proj_start, end, proj_accrual)?;
-                PeriodForwardCoeffs::from_flat_rate(projected_rate, accrual_fraction)
-            };
-
-            events.push(CouponEvent {
-                accrual_fraction,
-                discount_factor,
-                forward_coeffs,
-                needs_path_sample: false,
-            });
-        }
-
-        if events.is_empty() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "TARN {} has no future coupon period after {as_of}",
-                inst.id.as_str()
-            )));
-        }
-
-        let config = pricer.effective_config(inst);
-
-        // No forward-starting coupon: every fixing is the deterministic
-        // `r(0) = f(0,0)` reconstruction, so the price has no Monte-Carlo
-        // component. Settle the (fully seasoned) schedule directly.
-        if event_times.is_empty() {
-            return deterministic_estimate(inst, &events, &config);
-        }
-
-        // Final settlement event at maturity (the last payment date): coupons
-        // fix in advance but pay at the period end, so the simulation must
-        // reach the last payment date for the pathwise bank-account numeraire
-        // B(T_pay) to be observable.
-        let maturity_date = *inst.payment_dates.last().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "TARN {} requires payment dates",
-                inst.id.as_str()
-            ))
-        })?;
-        event_times.push(model_time(as_of, maturity_date));
-
-        // Bootstrap a time-dependent θ(t) from the discount curve so the
-        // simulated short rate reprices the initial curve (HW1F, not Vasicek).
-        // The grid covers up to the last payment date so every cashflow is
-        // discounted with the pathwise numeraire.
-        let horizon = event_times.last().copied().unwrap_or(0.0);
-        let process_params =
-            prepare_hw1f_params(hw_params, discount_curve.as_ref(), as_of, horizon)?;
-        let mc = Hw1fMcPricer {
-            process_params,
-            r0,
-            event_times,
-            config,
-            currency: inst.notional.currency(),
+        let spec = InAdvanceNoteSpec {
+            label: Self::LABEL,
+            id: &self.id,
+            start_date: self.start_date,
+            payment_dates: &self.payment_dates,
+            index_tenor: self.index_tenor,
+            forward_curve_id: &self.forward_curve_id,
+            discount_curve_id: &self.discount_curve_id,
+            day_count: self.day_count,
+            currency: self.notional.currency(),
+        };
+        let seasoned_msg = format!(
+            "Seasoned TARN '{}' requires realized cumulative coupon, knockout/redemption state, and historical fixings; pricing without that state is not supported",
+            self.id
+        );
+        let Some(prepared) =
+            build_in_advance_coupon_schedule(self, pricer, &spec, market, as_of, &seasoned_msg)?
+        else {
+            return Ok(zero_estimate(self.notional.currency()));
         };
 
-        let payoff = TarnPayoff::new(
-            inst.fixed_rate.as_f64(),
-            inst.coupon_floor,
-            inst.target_coupon,
-            inst.notional.amount(),
-            Arc::from(events),
-            true,
-        );
-        mc.price(|| payoff.clone())
+        let fixed_rate = self.fixed_rate.as_f64();
+        let coupon_floor = self.coupon_floor;
+        let target_coupon = self.target_coupon;
+        let notional = self.notional.amount();
+        run_hw1f_coupon_mc(
+            &spec,
+            market,
+            as_of,
+            prepared,
+            |events, pathwise| {
+                TarnPayoff::new(
+                    fixed_rate,
+                    coupon_floor,
+                    target_coupon,
+                    notional,
+                    events,
+                    pathwise,
+                )
+            },
+            TarnPayoff::settle_all_seasoned,
+        )
     }
-}
-
-/// PV of a fully-seasoned TARN schedule whose every coupon fixes off the
-/// deterministic `r(0) = f(0,0)`, so there is no Monte-Carlo component.
-///
-/// The returned [`MoneyEstimate`] reports the exact PV with zero dispersion.
-/// `num_paths` mirrors what an MC run with this configuration would have
-/// reported, keeping the result shape consistent for callers.
-fn deterministic_estimate(
-    inst: &Tarn,
-    events: &[CouponEvent],
-    config: &Hw1fMcConfig,
-) -> finstack_quant_core::Result<MoneyEstimate> {
-    let mut payoff = TarnPayoff::new(
-        inst.fixed_rate.as_f64(),
-        inst.coupon_floor,
-        inst.target_coupon,
-        inst.notional.amount(),
-        Arc::from(events.to_vec()),
-        false,
-    );
-    payoff.settle_all_seasoned();
-    let pv = payoff.value(inst.notional.currency())?;
-    Ok(exact_estimate(
-        pv,
-        config.num_paths,
-        config.simulated_path_count(),
-    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{Date, DayCount, Tenor};
+    use finstack_quant_core::dates::{
+        BusinessDayConvention, Date, DayCount, DayCountContext, Tenor,
+    };
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+    use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::types::{CurveId, InstrumentId};
+    use finstack_quant_models::monte_carlo::traits::StateKey;
     use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
+    use finstack_quant_models::rates::hw1f::{Hw1fMcConfig, PeriodForwardCoeffs};
     use finstack_quant_valuations_core::pricer::Pricer;
     use time::Month;
 
@@ -1010,6 +790,73 @@ mod tests {
                 "missing discount curve must stay NotFound, got {err:?}"
             );
         }
+    }
+
+    #[test]
+    fn semi_annual_tarn_with_3m_index_projects_over_3m_window_on_sloped_curve() {
+        let as_of = date(2025, Month::January, 1);
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots(
+                (0..=16)
+                    .map(|i| {
+                        let t = i as f64 * 0.25;
+                        let zero = 0.02 + 0.03 * (1.0 - (-0.6 * t).exp());
+                        (t, (-zero * t).exp())
+                    })
+                    .collect::<Vec<_>>(),
+            )
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+            .build()
+            .expect("discount");
+        let fwd_3m =
+            ForwardCurve::from_discount_curve("USD-SOFR-3M", &disc, Some(Tenor::quarterly()));
+        let curves = MarketContext::new()
+            .try_insert(disc.clone())
+            .expect("disc")
+            .try_insert(fwd_3m.clone())
+            .expect("fwd");
+
+        let mut tarn = test_tarn(1.0);
+        tarn.forward_curve_id = CurveId::new("USD-SOFR-3M");
+        tarn.index_tenor = Tenor::quarterly();
+
+        let mc = deterministic_pricer(128)
+            .price_estimate(&tarn, &curves, as_of)
+            .expect("mc")
+            .mean
+            .amount();
+
+        let ctx = DayCountContext::default();
+        let mut expected = 0.0;
+        for period in tarn.period_boundaries().windows(2) {
+            let start = period[0];
+            let end = period[1];
+            let accrual = tarn.day_count.year_fraction(start, end, ctx).expect("yf");
+            let df = disc.df_between_dates(as_of, end).expect("df");
+            let index_end = Tenor::quarterly()
+                .add_to_date(start, None, BusinessDayConvention::Unadjusted)
+                .expect("index_end");
+            let index_yf = tarn
+                .day_count
+                .year_fraction(start, index_end, ctx)
+                .expect("index_yf");
+            let r_3m = fwd_3m
+                .rate_between_dates(start, index_end, index_yf)
+                .expect("3m fwd");
+            let c = (tarn.fixed_rate.as_f64() - r_3m).max(tarn.coupon_floor);
+            expected += c * accrual * tarn.notional.amount() * df;
+        }
+        let mat_df = disc
+            .df_between_dates(as_of, *tarn.payment_dates.last().expect("mat"))
+            .expect("mat df");
+        expected += tarn.notional.amount() * mat_df;
+        assert!(
+            (mc - expected).abs() < 2_000.0,
+            "3M TARN index on 6M coupon periods drifted from 3M forward truth: mc={mc}, expected={expected}"
+        );
     }
 }
 

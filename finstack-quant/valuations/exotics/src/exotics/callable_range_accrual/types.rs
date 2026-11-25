@@ -35,7 +35,7 @@ use finstack_quant_valuations_core::impl_instrument_base;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct CallableRangeAccrual {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -71,6 +71,8 @@ pub struct CallableRangeAccrual {
     pub attributes: Attributes,
 }
 
+finstack_quant_valuations_core::validate_on_deserialize!(CallableRangeAccrual);
+
 impl CallableRangeAccrual {
     /// Validate the callable range accrual parameters.
     ///
@@ -84,6 +86,18 @@ impl CallableRangeAccrual {
                     .to_string(),
             ));
         }
+        if self.range_accrual.quanto.is_some() {
+            return Err(finstack_quant_core::Error::Validation(
+                "CallableRangeAccrual does not support quanto adjustments; remove range_accrual.quanto"
+                    .to_string(),
+            ));
+        }
+        if self.range_accrual.div_yield_id.is_some() {
+            return Err(finstack_quant_core::Error::Validation(
+                "CallableRangeAccrual does not support div_yield_id; remove range_accrual.div_yield_id"
+                    .to_string(),
+            ));
+        }
         if self.range_accrual.forward_curve_id.as_ref()
             != Some(&self.range_accrual.discount_curve_id)
         {
@@ -91,6 +105,30 @@ impl CallableRangeAccrual {
                 "CallableRangeAccrual '{}' HW1F implementation is currently single-curve; forward_curve_id must equal discount_curve_id until basis-adjusted projection is implemented",
                 self.id
             )));
+        }
+        let final_payment_date = self
+            .range_accrual
+            .payment_date
+            .or_else(|| self.range_accrual.observation_dates.last().copied())
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "CallableRangeAccrual {} requires at least one observation date",
+                    self.id.as_str()
+                ))
+            })?;
+        for call_date in self.call_provision.eligible_call_dates() {
+            if call_date <= self.range_accrual.start_date {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CallableRangeAccrual '{}' call date {call_date} must be strictly after start_date {}",
+                    self.id, self.range_accrual.start_date
+                )));
+            }
+            if call_date > final_payment_date {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CallableRangeAccrual '{}' call date {call_date} is after the final payment date {final_payment_date}; the note has already redeemed",
+                    self.id
+                )));
+            }
         }
         Ok(())
     }
@@ -301,5 +339,30 @@ mod tests {
             msg.contains("LSMC") && msg.contains("HW tree"),
             "expected LSMC/HW tree pricer in error message, got: {msg}"
         );
+    }
+
+    #[test]
+    fn rejects_quanto_div_yield_and_out_of_window_call_dates() {
+        let mut cra_div = CallableRangeAccrual::example().expect("example");
+        cra_div.range_accrual.div_yield_id = Some(finstack_quant_core::types::PriceId::new("DIV"));
+        assert!(cra_div.validate().is_err());
+
+        let mut cra_quanto = CallableRangeAccrual::example().expect("example");
+        cra_quanto.range_accrual.quanto = Some(
+            finstack_quant_valuations_core::instruments::QuantoSpec::new(
+                0.2,
+                "FX-VOL",
+                finstack_quant_core::currency::Currency::EUR,
+                "EUR-OIS",
+                "EURUSD",
+            )
+            .expect("quanto"),
+        );
+        assert!(cra_quanto.validate().is_err());
+
+        let mut cra_early = CallableRangeAccrual::example().expect("example");
+        cra_early.call_provision.lockout_end = None;
+        cra_early.call_provision.call_dates = vec![cra_early.range_accrual.start_date];
+        assert!(cra_early.validate().is_err());
     }
 }

@@ -61,6 +61,7 @@ pub enum BoundsType {
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "json-schema", schemars(deny_unknown_fields))]
+#[serde(remote = "Self")]
 pub struct RangeAccrual {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -95,6 +96,8 @@ pub struct RangeAccrual {
     pub attributes: Attributes,
 }
 
+finstack_quant_valuations_core::validate_on_deserialize!(RangeAccrual);
+
 /// Contract terms of a range accrual note, without identity or pricing overrides.
 ///
 /// [`RangeAccrual`] flattens these terms into its own payload, and
@@ -110,6 +113,7 @@ pub struct RangeAccrual {
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "json-schema", schemars(deny_unknown_fields))]
+#[serde(remote = "Self")]
 #[builder(validate = RangeAccrualTerms::validate)]
 pub struct RangeAccrualTerms {
     /// Underlying asset ticker symbol
@@ -182,6 +186,11 @@ pub struct RangeAccrualTerms {
     #[builder(default)]
     pub(crate) unknown_fields: finstack_quant_core::serde_guard::UnknownFieldGuard,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(
+    RangeAccrualTerms,
+    RangeAccrualTerms::validate
+);
 
 impl RangeAccrual {
     /// Create a canonical example range accrual (monthly observations).
@@ -268,9 +277,17 @@ impl RangeAccrual {
 
     /// Validate the range accrual parameters.
     ///
-    /// Delegates to [`RangeAccrualTerms::validate`].
+    /// Checks positive lower bound for lognormal equity/FX contracts (when
+    /// `index_id` is absent) in addition to [`RangeAccrualTerms::validate`].
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        self.terms.validate()
+        self.terms.validate()?;
+        if self.terms.index_id.is_none() && self.terms.lower_bound <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "RangeAccrual '{}' lognormal contract requires lower_bound > 0.0, got {}",
+                self.id, self.terms.lower_bound
+            )));
+        }
+        Ok(())
     }
 }
 
@@ -302,6 +319,13 @@ impl RangeAccrualTerms {
             .filter(|&&date| date <= as_of)
             .count();
         if expected == 0 {
+            if self.past_observations_in_range.unwrap_or(0) > 0
+                || self.total_past_observations.unwrap_or(0) > 0
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{label} '{id}' supplies historical observations when no observation date is on or before {as_of}"
+                )));
+            }
             return Ok(());
         }
         let in_range = self.past_observations_in_range.ok_or_else(|| {

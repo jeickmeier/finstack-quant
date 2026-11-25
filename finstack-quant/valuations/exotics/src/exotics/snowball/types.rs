@@ -14,9 +14,9 @@ use rust_decimal::Decimal;
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum SnowballVariant {
-    /// Path-dependent snowball: c_i = max(c_{i-1} + fixed - floating, 0).
+    /// Path-dependent snowball: c_i = max(c_{i-1} + fixed - gearing * floating, floor).
     Snowball,
-    /// Inverse floater: c_i = max(fixed - gearing * floating, 0).
+    /// Inverse floater: c_i = max(fixed - gearing * floating, floor).
     InverseFloater,
 }
 
@@ -26,7 +26,7 @@ pub enum SnowballVariant {
 /// creating a path-dependent "snowball" accumulation:
 ///
 /// ```text
-/// c_i = max(c_{i-1} + fixed_rate - L_i, 0)
+/// c_i = max(c_{i-1} + fixed_rate - gearing * L_i, coupon_floor)
 /// ```
 ///
 /// where L_i is the floating rate and c_0 = initial_coupon.
@@ -52,7 +52,7 @@ pub enum SnowballVariant {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct Snowball {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -67,7 +67,7 @@ pub struct Snowball {
         schemars(with = "finstack_quant_core::wire::DecimalWire")
     )]
     pub fixed_rate: Decimal,
-    /// Multiplier on the floating fixing (1.0 for snowball, variable for inverse floater).
+    /// Multiplier on the floating fixing applied in both `Snowball` and `InverseFloater` variants.
     pub gearing: f64,
     /// Floor on each period coupon (typically 0.0).
     pub coupon_floor: f64,
@@ -131,17 +131,19 @@ pub struct Snowball {
     pub attributes: Attributes,
 }
 
+finstack_quant_valuations_core::validate_on_deserialize!(Snowball);
+
 impl Snowball {
     /// Validate the snowball parameters.
     ///
     /// Checks:
     /// - At least one payment date
     /// - `start_date` and the payment dates are strictly ascending
-    /// - Fixed rate converts to `f64`
+    /// - Notional is positive and finite
+    /// - Initial coupon is finite (and non-negative for snowball variant)
     /// - Gearing is positive and finite
-    /// - Floor is non-negative
-    /// - Cap (if set) is greater than floor
-    /// - Initial coupon is non-negative for snowball variant
+    /// - Floor is non-negative and finite
+    /// - Cap (if set) is finite and greater than floor
     /// - Callable provision validates (if present)
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         validation::require_with(!self.payment_dates.is_empty(), || {
@@ -152,6 +154,10 @@ impl Snowball {
             &self.period_boundaries(),
             "Snowball start_date followed by payment_dates",
         )?;
+
+        validation::validate_f64_positive(self.notional.amount(), "Snowball notional")?;
+
+        validation::validate_f64_finite(self.initial_coupon, "Snowball initial_coupon")?;
 
         validation::require_with(self.gearing > 0.0 && self.gearing.is_finite(), || {
             format!(
@@ -171,6 +177,7 @@ impl Snowball {
         )?;
 
         if let Some(cap) = self.coupon_cap {
+            validation::validate_f64_finite(cap, "Snowball coupon_cap")?;
             validation::require_with(cap > self.coupon_floor, || {
                 format!(
                     "Snowball coupon_cap ({}) must be greater than coupon_floor ({})",
@@ -277,7 +284,7 @@ impl Snowball {
 
     /// Compute the coupon for a given period based on the variant.
     ///
-    /// For snowball: c_i = max(prev_coupon + fixed_rate - floating, floor)
+    /// For snowball: c_i = max(prev_coupon + fixed_rate - gearing * floating, floor)
     /// For inverse floater: c_i = max(fixed_rate - gearing * floating, floor)
     ///
     /// Applies optional cap after floor.
@@ -318,7 +325,9 @@ impl SnowballCouponSpec {
 
     pub(super) fn compute_coupon(&self, floating_rate: f64, prev_coupon: f64) -> f64 {
         let raw = match self.variant {
-            SnowballVariant::Snowball => prev_coupon + self.fixed_rate - floating_rate,
+            SnowballVariant::Snowball => {
+                prev_coupon + self.fixed_rate - self.gearing * floating_rate
+            }
             SnowballVariant::InverseFloater => self.fixed_rate - self.gearing * floating_rate,
         };
         let floored = raw.max(self.coupon_floor);
@@ -460,6 +469,15 @@ mod tests {
         // c_3 = max(0.08 + 0.05 - 0.06, 0) = 0.07
         let c3 = s.compute_coupon(0.06, c2);
         assert!((c3 - 0.07).abs() < 1e-12);
+    }
+
+    #[test]
+    fn snowball_gearing_scales_floating_rate() {
+        let mut s = Snowball::example().expect("example");
+        s.gearing = 2.0;
+        // c_1 = max(0.03 + 0.05 - 2.0 * 0.02, 0.0) = 0.04
+        let c1 = s.compute_coupon(0.02, 0.03);
+        assert!((c1 - 0.04).abs() < 1e-12);
     }
 
     #[test]

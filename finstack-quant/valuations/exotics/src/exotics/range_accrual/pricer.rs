@@ -144,6 +144,13 @@ impl RangeAccrualMcPricer {
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<finstack_quant_core::money::Money> {
+        inst.validate()?;
+        if inst.terms.index_id.is_some() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Rate-linked RangeAccrual '{}' cannot use the equity GBM Monte Carlo pricer",
+                inst.id
+            )));
+        }
         let final_date = inst.terms.payment_date.unwrap_or(
             inst.terms
                 .observation_dates
@@ -153,13 +160,6 @@ impl RangeAccrualMcPricer {
         );
         if final_date <= as_of {
             return Ok(Money::from((0_i64, inst.terms.notional.currency())));
-        }
-        inst.validate()?;
-        if inst.terms.index_id.is_some() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Rate-linked RangeAccrual '{}' cannot use the equity GBM Monte Carlo pricer",
-                inst.id
-            )));
         }
         inst.terms
             .validate_historical_observations("RangeAccrual", &inst.id, as_of)?;
@@ -404,6 +404,7 @@ pub(crate) fn compute_pv(
     use finstack_quant_core::math::special_functions::norm_cdf;
     use finstack_quant_models::closed_form::d1_d2_black76;
 
+    inst.validate()?;
     if inst.terms.index_id.is_some() {
         return Err(finstack_quant_core::Error::Validation(format!(
             "Rate-linked RangeAccrual '{}' cannot use equity static replication",
@@ -421,25 +422,17 @@ pub(crate) fn compute_pv(
     if final_date <= as_of {
         return Ok(Money::from((0_i64, inst.terms.notional.currency())));
     }
-    inst.validate()?;
     inst.terms
         .validate_historical_observations("RangeAccrual", &inst.id, as_of)?;
 
-    let has_future_observations =
-        inst.terms
-            .observation_dates
-            .iter()
-            .try_fold(false, |has_future, &date| {
-                Ok::<_, finstack_quant_core::Error>(
-                    has_future
-                        || inst.terms.day_count.signed_year_fraction(
-                            as_of,
-                            date,
-                            DayCountContext::default(),
-                        )? > 0.0,
-                )
-            })?;
-    if !has_future_observations {
+    let future_dates: Vec<Date> = inst
+        .terms
+        .observation_dates
+        .iter()
+        .copied()
+        .filter(|&date| date > as_of)
+        .collect();
+    if future_dates.is_empty() {
         return compute_known_value(inst, market, as_of, final_date);
     }
 
@@ -452,28 +445,26 @@ pub(crate) fn compute_pv(
     let disc_curve = market.get_discount(inst.terms.discount_curve_id.as_str())?;
     let discount_factor = disc_curve.df_between_dates(as_of, final_date)?;
 
-    // Count observations and track past/future split
-    let n_total_obs = inst.terms.observation_dates.len();
-    if n_total_obs == 0 {
-        return Ok(Money::from((0_i64, inst.terms.notional.currency())));
-    }
-
     // Count future observations
-    let mut future_obs_count = 0usize;
+    let future_obs_count = future_dates.len();
     let mut total_expected_in_range = 0.0;
 
-    for &date in &inst.terms.observation_dates {
-        let t_obs =
-            inst.terms
-                .day_count
-                .signed_year_fraction(as_of, date, DayCountContext::default())?;
+    for &date in &future_dates {
+        let t_obs = inst
+            .terms
+            .day_count
+            .year_fraction(as_of, date, DayCountContext::default())?;
 
         if t_obs <= 0.0 {
-            // Past observation - skip (handled via past_observations_in_range)
+            // Equal model time on a strictly future date (e.g., ThirtyE360
+            // Jan 30 -> Jan 31): evaluate deterministically on its dated forward.
+            let forward = initial_spot * asset_growth(inst, market, as_of, date, 0.0)?;
+            if (effective_lower..=effective_upper).contains(&forward) {
+                total_expected_in_range += 1.0;
+            }
             continue;
         }
 
-        future_obs_count += 1;
         let sigma = resolve_sigma_at(
             &inst.instrument_pricing_overrides.market_quotes,
             market,
@@ -504,22 +495,18 @@ pub(crate) fn compute_pv(
 
         // Digital Call Probability P(S_t > K) via finite-width call spread.
         //
-        // Using a 25bp spread replaces the analytically thin N(d₂) digital with
-        // a hedgeable call spread that correctly captures the volatility skew
-        // contribution to the digital price.  The formula is:
+        // Using a relative 1bp spread replaces the analytically thin N(d₂)
+        // digital with a hedgeable call spread that captures the volatility
+        // skew across arbitrary underlying scales (equity index vs FX rate).
         //
         //   P(S > K) ≈ [Call(K - h/2) - Call(K + h/2)] / h
         //
-        // where h = DIGITAL_SPREAD_WIDTH = 0.0025 (25 basis points) and
-        // Call(k) is the undiscounted Black-76 call price at strike k.
-        //
-        // For a flat smile this recovers N(d₂) exactly as h → 0.  With a
-        // downward skew (higher vol at lower strikes), P(S > K) is larger
-        // than the flat-smile N(d₂), matching market digital prices.
+        // where h = K * DIGITAL_SPREAD_REL and Call(k) is the undiscounted
+        // Black-76 call price at strike k.
         //
         // Lower node is clamped to DIGITAL_SPREAD_FLOOR to ensure K - h/2 > 0.
-        const DIGITAL_SPREAD_WIDTH: f64 = 0.0025; // 25 bp
-        const DIGITAL_SPREAD_FLOOR: f64 = 1e-6; // prevent negative strikes
+        const DIGITAL_SPREAD_REL: f64 = 1e-4; // 1 bp of strike
+        const DIGITAL_SPREAD_FLOOR: f64 = 1e-12; // prevent non-positive strikes
 
         // Undiscounted Black-76 call price: F·N(d1) - K·N(d2)
         let black_call = |k: f64| -> Result<f64> {
@@ -541,7 +528,7 @@ pub(crate) fn compute_pv(
         // Digital call probability using finite-width call spread.
         // The spread half-width is clipped so K - h/2 ≥ DIGITAL_SPREAD_FLOOR.
         let calc_prob_above = |strike: f64| -> finstack_quant_core::Result<f64> {
-            let half_h = DIGITAL_SPREAD_WIDTH / 2.0;
+            let half_h = 0.5 * strike * DIGITAL_SPREAD_REL;
             let k_lo = (strike - half_h).max(DIGITAL_SPREAD_FLOOR);
             let k_hi = strike + half_h;
             // Effective spread width (may be narrower near zero)
@@ -1215,6 +1202,117 @@ mod tests {
         assert!(
             (rho - expected).abs() <= 1e-9 * expected.abs().max(1e-12),
             "MC rho {rho} must match the same-model central bump {expected}"
+        );
+    }
+
+    #[test]
+    fn static_replication_is_scale_invariant_across_spx_and_jpy_usd() {
+        let as_of = date(2025, 1, 1);
+        let sigma = 0.20_f64;
+        let tau = 1.0_f64;
+        let df = (-0.03_f64 * tau).exp();
+        let obs = date(2026, 1, 1);
+
+        let std = sigma * tau.sqrt();
+        let fwd_scale = 1.0 / df;
+        let z_lo = ((0.90_f64 / fwd_scale).ln() + 0.5 * sigma * sigma * tau) / std;
+        let z_hi = ((1.10_f64 / fwd_scale).ln() + 0.5 * sigma * sigma * tau) / std;
+        let prob = finstack_quant_core::math::special_functions::norm_cdf(z_hi).expect("norm")
+            - finstack_quant_core::math::special_functions::norm_cdf(z_lo).expect("norm");
+
+        for spot in [5_000.0_f64, 0.0065_f64] {
+            let curve = DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .knots([(0.0, 1.0), (1.0, df)])
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("curve");
+            let surface = VolSurface::builder("SPX-VOL")
+                .secondary_axis(VolSurfaceAxis::Strike)
+                .quote_type(VolQuoteType::BlackLognormal)
+                .interpolation_mode(VolInterpolationMode::Vol)
+                .expiries(&[0.25, 1.0, 2.0])
+                .secondary_values(&[spot * 0.5, spot, spot * 1.5])
+                .row(&[sigma; 3])
+                .row(&[sigma; 3])
+                .row(&[sigma; 3])
+                .build()
+                .expect("surface");
+            let curves = MarketContext::new()
+                .try_insert(curve)
+                .expect("curve")
+                .insert_surface(surface)
+                .insert_price("SPX-SPOT", MarketScalar::unitless(spot).expect("spot"))
+                .insert_price("SPX-DIV", MarketScalar::unitless(0.0).expect("div"));
+
+            let mut inst = RangeAccrual::example().expect("example");
+            inst.terms.start_date = as_of;
+            inst.terms.observation_dates = vec![obs];
+            inst.terms.payment_date = Some(obs);
+            inst.terms.lower_bound = spot * 0.90;
+            inst.terms.upper_bound = spot * 1.10;
+            inst.terms.bounds_type = crate::exotics::range_accrual::BoundsType::Absolute;
+            inst.terms.day_count = finstack_quant_core::dates::DayCount::Act365F;
+
+            let expected = inst.terms.notional.amount() * inst.terms.coupon_rate * tau * df * prob;
+            let actual = compute_pv(&inst, &curves, as_of).expect("pv").amount();
+            assert!(
+                (actual - expected).abs() < 1e-3 * expected.max(1.0),
+                "spot={spot}: actual={actual}, expected={expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn validates_positive_bounds_phantom_history_and_thirty_e360_observation() {
+        let as_of = date(2025, 1, 1);
+        let mut neg_bound = RangeAccrual::example().expect("example");
+        neg_bound.terms.lower_bound = -0.01;
+        assert!(neg_bound.validate().is_err());
+
+        let mut phantom_hist = RangeAccrual::example().expect("example");
+        phantom_hist.terms.start_date = date(2025, 1, 1);
+        phantom_hist.terms.observation_dates = vec![date(2025, 6, 30)];
+        phantom_hist.terms.payment_date = Some(date(2025, 6, 30));
+        phantom_hist.terms.past_observations_in_range = Some(1);
+        phantom_hist.terms.total_past_observations = Some(1);
+        assert!(compute_pv(&phantom_hist, &market(as_of), as_of).is_err());
+
+        // Invalid settled contract must still error before returning 0.0.
+        let mut bad_settled = RangeAccrual::example().expect("example");
+        bad_settled.terms.lower_bound = -0.01;
+        assert!(compute_pv(&bad_settled, &MarketContext::new(), date(2030, 1, 1)).is_err());
+
+        // ThirtyE360 Jan 30 -> Jan 31 has t_obs == 0.0 despite date > as_of: must not be dropped.
+        let jan30 = date(2025, 1, 30);
+        let jan31 = date(2025, 1, 31);
+        let mut thirty = deterministic_range(jan30);
+        thirty.terms.day_count = finstack_quant_core::dates::DayCount::ThirtyE360;
+        thirty.terms.observation_dates = vec![jan31, date(2025, 6, 30)];
+        thirty.terms.payment_date = Some(date(2025, 6, 30));
+        thirty.terms.lower_bound = 99.0;
+        thirty.terms.upper_bound = 101.0;
+        thirty
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.0);
+
+        let curves = market(jan30);
+        let pv = compute_pv(&thirty, &curves, jan30).expect("thirty e360 future obs");
+        let df = curves
+            .get_discount("USD-OIS")
+            .expect("disc")
+            .df_between_dates(jan30, date(2025, 6, 30))
+            .expect("df");
+        // jan31 (t_obs == 0.0 under ThirtyE360) has forward 100.0 (in range [99, 101]);
+        // jun30 grows above 101.0 (out of range), so exactly 1 of 2 future observations accrues.
+        let expected_jan30_obs_plus_jun30 = 1_000_000.0 * 0.1 * (150.0 / 360.0) * 0.5 * df;
+        assert!(
+            (pv.amount() - expected_jan30_obs_plus_jun30).abs() < 1e-6,
+            "pv={}, expected={expected_jan30_obs_plus_jun30}",
+            pv.amount()
         );
     }
 }

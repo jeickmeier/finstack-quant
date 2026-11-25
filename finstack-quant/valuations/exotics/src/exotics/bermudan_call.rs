@@ -8,7 +8,7 @@ use finstack_quant_core::dates::Date;
 /// at a specified call price (typically par).
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct BermudanCallProvision {
     /// Dates on which the issuer can call (must be sorted ascending).
     #[cfg_attr(
@@ -28,6 +28,11 @@ pub struct BermudanCallProvision {
     )]
     pub lockout_end: Option<Date>,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(
+    BermudanCallProvision,
+    BermudanCallProvision::validate
+);
 
 impl BermudanCallProvision {
     /// Create a new Bermudan call provision.

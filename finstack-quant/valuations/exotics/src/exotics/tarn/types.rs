@@ -43,7 +43,7 @@ use rust_decimal::Decimal;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct Tarn {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -117,14 +117,16 @@ pub struct Tarn {
     pub attributes: Attributes,
 }
 
+finstack_quant_valuations_core::validate_on_deserialize!(Tarn);
+
 impl Tarn {
     /// Validate the TARN parameters.
     ///
     /// Checks:
     /// - At least one payment date (need a period to accrue)
     /// - `start_date` and the payment dates are strictly ascending
-    /// - Fixed rate converts to `f64`
-    /// - Target coupon is non-negative
+    /// - Notional is positive and finite
+    /// - Target coupon is non-negative and finite
     /// - Coupon floor is finite and non-negative by convention
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         validation::require_with(!self.payment_dates.is_empty(), || {
@@ -135,6 +137,8 @@ impl Tarn {
             &self.period_boundaries(),
             "TARN start_date followed by payment_dates",
         )?;
+
+        validation::validate_f64_positive(self.notional.amount(), "TARN notional")?;
 
         validation::require_with(
             self.target_coupon >= 0.0 && self.target_coupon.is_finite(),
