@@ -202,34 +202,35 @@ fn callable_bond_tree_prices_are_bit_pinned() {
     // Ho-Lee, BDT, Black-Karasinski, then the bond-pricer BDT and Hull-White
     // values, re-pinned on macOS when the lattices began kink-correcting the
     // call decision across each level. These prices moved by one ulp between
-    // macOS and the Linux libm on GitHub Actions before; the Linux values of
-    // the new pins have not been observed yet, so one ulp either side of
-    // each macOS value is accepted.
-    const PINS: [[u64; 3]; 5] = [
-        [
+    // macOS and the Linux libm on GitHub Actions before; retain the one-ulp
+    // range around each macOS value and the observed Ubuntu 24.04 results.
+    const PINS: [&[u64]; 5] = [
+        &[
             4_652_395_789_064_874_040,
             4_652_395_789_064_874_041,
             4_652_395_789_064_874_042,
         ],
-        [
+        &[
+            4_652_417_832_473_332_218,
             4_652_417_832_473_332_219,
             4_652_417_832_473_332_220,
             4_652_417_832_473_332_221,
         ],
-        [
+        &[
             4_652_420_478_416_366_438,
             4_652_420_478_416_366_439,
             4_652_420_478_416_366_440,
         ],
-        [
+        &[
             4_652_412_794_233_861_981,
             4_652_412_794_233_861_982,
             4_652_412_794_233_861_983,
         ],
-        [
+        &[
             4_652_317_668_994_646_524,
             4_652_317_668_994_646_525,
             4_652_317_668_994_646_526,
+            4_652_317_668_994_646_527,
         ],
     ];
     let got: [u64; 5] = bits.try_into().expect("five tree prices");
