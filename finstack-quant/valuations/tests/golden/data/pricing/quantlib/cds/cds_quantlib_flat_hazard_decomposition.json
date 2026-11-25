@@ -31,11 +31,11 @@
         "convention": "isda_na",
         "doc_clause": "xr14",
         "id": "QL-FLAT-HAZARD-CDS-5Y-20260105",
+        "include_valuation_date_cashflows": false,
         "notional": {
           "amount": "10000000",
           "currency": "USD"
         },
-        "include_valuation_date_cashflows": false,
         "premium_leg": {
           "calendar_id": "weekends_only",
           "coupon_bp": "100.0",

@@ -337,6 +337,48 @@ impl finstack_quant_valuations_core::instruments::Instrument for CommodityAsianO
         Some(self.expiry)
     }
 
+    /// Record the fixings a theta roll passes.
+    ///
+    /// Theta holds the market fixed and the price curve is dated, so a
+    /// scheduled fixing in `(as_of, rolled_date]` with no recorded value fixes
+    /// at the `as_of` curve's price for that date.
+    ///
+    /// # Arguments
+    /// * `market` - Market at `as_of` supplying the `forward_curve_id` price curve.
+    /// * `as_of` - Valuation date the roll starts from.
+    /// * `rolled_date` - Date theta reprices at.
+    fn theta_observed_state(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        rolled_date: Date,
+    ) -> finstack_quant_core::Result<
+        Option<Box<dyn finstack_quant_valuations_core::instruments::Instrument>>,
+    > {
+        let rolled_fixings: Vec<Date> = self
+            .fixing_dates
+            .iter()
+            .copied()
+            .filter(|date| {
+                *date > as_of
+                    && *date <= rolled_date
+                    && !self.past_fixings.iter().any(|(fixed, _)| fixed == date)
+            })
+            .collect();
+        if rolled_fixings.is_empty() {
+            return Ok(None);
+        }
+        let price_curve = market.get_price_curve(self.forward_curve_id.as_str())?;
+        let mut observed = self.clone();
+        for date in rolled_fixings {
+            observed
+                .past_fixings
+                .push((date, price_curve.price_on_date(date)?));
+        }
+        observed.past_fixings.sort_by_key(|(date, _)| *date);
+        Ok(Some(Box::new(observed)))
+    }
+
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 

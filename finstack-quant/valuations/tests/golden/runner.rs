@@ -57,6 +57,14 @@ fn is_pricing_domain(domain: &str) -> bool {
             | "rates.cms_option"
             | "rates.cms_swap"
             | "rates.cms_spread_option"
+            | "commodity.commodity_forward"
+            | "commodity.commodity_swap"
+            | "listed.commodity_future"
+            | "listed.fx_future"
+            | "listed.equity_total_return_future"
+            | "listed.volatility_index_future"
+            | "fx.fx_spot"
+            | "rates.repo"
     )
 }
 

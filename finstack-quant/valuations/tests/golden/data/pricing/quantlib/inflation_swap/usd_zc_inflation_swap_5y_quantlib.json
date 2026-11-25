@@ -1,7 +1,9 @@
 {
   "expected": {
     "dv01": -53.93755817314377,
+    "fixed_leg_pv": 963357.8866326399,
     "inflation01": 4446.532578562386,
+    "inflation_leg_pv": 1071173.9212000906,
     "npv": 107816.03456745064,
     "par_rate": 0.024898441652104752
   },
@@ -400,7 +402,15 @@
       "rel": 1e-09,
       "tolerance_reason": "QuantLib native ZeroCouponInflationSwap and Finstack discount the same two bullet cash flows off identical monthly CPI levels; tolerance allows only cross-engine floating-point residual."
     },
+    "fixed_leg_pv": {
+      "rel": 1e-09,
+      "tolerance_reason": "QuantLib native ZeroCouponInflationSwap and Finstack discount the same two bullet cash flows off identical monthly CPI levels; tolerance allows only cross-engine floating-point residual."
+    },
     "inflation01": {
+      "rel": 1e-09,
+      "tolerance_reason": "QuantLib native ZeroCouponInflationSwap and Finstack discount the same two bullet cash flows off identical monthly CPI levels; tolerance allows only cross-engine floating-point residual."
+    },
+    "inflation_leg_pv": {
       "rel": 1e-09,
       "tolerance_reason": "QuantLib native ZeroCouponInflationSwap and Finstack discount the same two bullet cash flows off identical monthly CPI levels; tolerance allows only cross-engine floating-point residual."
     },

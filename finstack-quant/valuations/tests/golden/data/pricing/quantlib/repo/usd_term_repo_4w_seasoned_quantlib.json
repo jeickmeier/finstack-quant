@@ -1,0 +1,124 @@
+{
+  "expected": {
+    "dv01": -57.6363827008754,
+    "effective_rate": 0.0525,
+    "npv": 10017752.231363738,
+    "repo_interest": 40833.333333333336
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "business_day_convention": "following",
+        "calendar_id": "usny",
+        "cash_amount": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "collateral": {
+          "collateral_type": "general",
+          "instrument_id": "UST-10Y",
+          "market_value_id": "UST_10Y_PRICE",
+          "quantity": 10000.0
+        },
+        "day_count": "act_360",
+        "discount_curve_id": "USD-OIS",
+        "haircut": 0.02,
+        "id": "USD-TERM-REPO-4W-QUANTLIB",
+        "maturity": "2026-05-21",
+        "repo_rate": "0.0525",
+        "repo_type": "term",
+        "start_date": "2026-04-23",
+        "triparty": false
+      },
+      "type": "repo"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {
+        "UST_10Y_PRICE": {
+          "price": {
+            "amount": "1020.0",
+            "currency": "USD"
+          }
+        }
+      },
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-24",
+    "description": "Four-week term repo one week after its start, valued from the cash lender's side.",
+    "domain": "rates.repo",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-24",
+    "name": "usd_term_repo_4w_seasoned_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product repo",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43: the cash was lent on 2026-04-23, before the valuation date, so only the repayment 10000000 * (1 + 0.0525 * Actual/360 from 2026-04-23 to 2026-05-21) remains; it is discounted on a FlatForward curve (continuous Act/365F, 0.04).",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "dv01": {
+      "rel": 1e-09,
+      "tolerance_reason": "One repayment with simple Actual/360 interest, discounted on the same flat curve; only floating-point evaluation order differs."
+    },
+    "effective_rate": {
+      "rel": 1e-09,
+      "tolerance_reason": "One repayment with simple Actual/360 interest, discounted on the same flat curve; only floating-point evaluation order differs."
+    },
+    "npv": {
+      "rel": 1e-09,
+      "tolerance_reason": "One repayment with simple Actual/360 interest, discounted on the same flat curve; only floating-point evaluation order differs."
+    },
+    "repo_interest": {
+      "rel": 1e-09,
+      "tolerance_reason": "One repayment with simple Actual/360 interest, discounted on the same flat curve; only floating-point evaluation order differs."
+    }
+  }
+}

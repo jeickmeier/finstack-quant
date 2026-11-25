@@ -240,6 +240,10 @@ def build_zero_coupon_inflation_swap() -> dict[str, Any]:
     expected = {
         "dv01": central_difference(lambda shift: swap(rate_shift=shift).NPV(), 0.0, RATE_BUMP),
         "inflation01": central_difference(lambda shift: swap(inflation_shift=shift).NPV(), 0.0, RATE_BUMP),
+        # Finstack reports each leg as the unsigned present value of its payment;
+        # QuantLib signs the paid fixed leg negative (asserted above).
+        "fixed_leg_pv": -fixed_leg_pv,
+        "inflation_leg_pv": inflation_leg_pv,
         "npv": base.NPV(),
         "par_rate": base.fairRate(),
     }

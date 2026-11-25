@@ -1,0 +1,133 @@
+{
+  "expected": {
+    "delta": 97971.5406831036,
+    "dv01": -6.715404626142117,
+    "npv": 131076.07954406098
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "commodity_type": "Energy",
+        "contract_price": 79.0,
+        "currency": "USD",
+        "discount_curve_id": "USD-OIS",
+        "forward_curve_id": "WTI-FORWARD",
+        "id": "WTI-FORWARD-6M-QUANTLIB",
+        "maturity": "2026-10-30",
+        "multiplier": 1.0,
+        "position": "long",
+        "quantity": 100000.0,
+        "settlement": "cash",
+        "settlement_calendar_id": "usny",
+        "settlement_days": 2,
+        "underlying_ticker": "CL",
+        "unit": "BBL"
+      },
+      "type": "commodity_forward"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        },
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "flat",
+          "id": "WTI-FORWARD",
+          "interp_style": "linear",
+          "knot_points": [
+            [
+              0.0,
+              78.0
+            ],
+            [
+              0.25,
+              79.5
+            ],
+            [
+              1.0,
+              82.0
+            ],
+            [
+              5.0,
+              85.0
+            ]
+          ],
+          "level_kind": "price",
+          "type": "price"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {},
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-24",
+    "description": "Six-month cash-settled WTI forward off a linear price curve, paid two business days after maturity.",
+    "domain": "commodity.commodity_forward",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-24",
+    "name": "wti_forward_6m_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product commodity_forward",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43: linear interpolation of the price curve at maturity 2026-10-30 (F = 80.337899543379), payment 2026-11-03 two Federal Reserve business days later, FlatForward discount factor (continuous Act/365F, 0.04); NPV = (F - 79.0) * 100000 * DF.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "delta": {
+      "rel": 1e-09,
+      "tolerance_reason": "One cash flow: the forward read off the same linear price curve, discounted on the same flat curve to a payment date both sides derive from the US calendar; only floating-point evaluation order differs."
+    },
+    "dv01": {
+      "rel": 1e-09,
+      "tolerance_reason": "One cash flow: the forward read off the same linear price curve, discounted on the same flat curve to a payment date both sides derive from the US calendar; only floating-point evaluation order differs."
+    },
+    "npv": {
+      "rel": 1e-09,
+      "tolerance_reason": "One cash flow: the forward read off the same linear price curve, discounted on the same flat curve to a payment date both sides derive from the US calendar; only floating-point evaluation order differs."
+    }
+  }
+}

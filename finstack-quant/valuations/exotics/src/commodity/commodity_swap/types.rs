@@ -462,6 +462,57 @@ impl finstack_quant_valuations_core::instruments::Instrument for CommoditySwap {
         Some(self.maturity)
     }
 
+    /// Record the floating-leg observations a theta roll passes.
+    ///
+    /// Theta holds the market fixed and the price curve is dated, so each
+    /// averaging date in `[as_of, rolled_date)` with no recorded fixing
+    /// observes the `as_of` curve's price for that date.
+    ///
+    /// # Arguments
+    /// * `market` - Market at `as_of` supplying the `forward_curve_id` price curve.
+    /// * `as_of` - Valuation date the roll starts from.
+    /// * `rolled_date` - Date theta reprices at.
+    fn theta_observed_state(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        rolled_date: Date,
+    ) -> finstack_quant_core::Result<
+        Option<Box<dyn finstack_quant_valuations_core::instruments::Instrument>>,
+    > {
+        let price_curve = market.get_price_curve(self.forward_curve_id.as_str())?;
+        let is_business_day =
+            super::super::averaging::business_day_filter(self.calendar_id.as_deref())?;
+        let mut observed = self.clone();
+        for period in self.periods()? {
+            let (obs_start, obs_end) = self.shifted_observation_window(&period)?;
+            let last = if period.accrual_end == self.maturity {
+                obs_end
+            } else {
+                obs_end - time::Duration::days(1)
+            };
+            let mut date = obs_start.max(as_of);
+            while date <= last && date < rolled_date {
+                if is_business_day(date)?
+                    && !observed
+                        .past_fixings
+                        .iter()
+                        .any(|(fixed, _)| *fixed == date)
+                {
+                    observed
+                        .past_fixings
+                        .push((date, price_curve.price_on_date(date)?));
+                }
+                date += time::Duration::days(1);
+            }
+        }
+        if observed.past_fixings.len() == self.past_fixings.len() {
+            return Ok(None);
+        }
+        observed.past_fixings.sort_by_key(|(date, _)| *date);
+        Ok(Some(Box::new(observed)))
+    }
+
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 

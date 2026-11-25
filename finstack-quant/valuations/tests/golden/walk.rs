@@ -5,7 +5,7 @@ use crate::golden::golden::schema::{Body, GoldenFixture, Market, SCHEMA};
 use finstack_quant_calibration::api::schema::CalibrationEnvelope;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations::metrics::MetricId;
-use finstack_quant_valuations::pricer::parse_boxed_instrument_from_json;
+use finstack_quant_valuations::pricer::{STANDARD, parse_boxed_instrument_from_json};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -243,10 +243,18 @@ fn validate_pricing_body(fixture: &GoldenFixture) -> Result<(), String> {
     validate_swaption_underlying_tenor(&pricing.instrument)?;
     let instrument_json = serde_json::to_string(&pricing.instrument)
         .map_err(|err| format!("serialize instrument: {err}"))?;
-    parse_boxed_instrument_from_json(&instrument_json, None, None)
+    let instrument = parse_boxed_instrument_from_json(&instrument_json, None, None)
         .map_err(|err| format!("instrument is not a valid instrument: {err}"))?;
 
+    // A metric base is a standard metric, or a custom one the standard
+    // registry registers for this instrument type (e.g. an inflation swap's
+    // `fixed_leg_pv`).
+    let registry = STANDARD.metrics();
     for metric in requested_metrics(fixture) {
+        let instrument_type = instrument.as_instrument().key();
+        if registry.is_applicable(&MetricId::custom(metric.as_str()), instrument_type) {
+            continue;
+        }
         MetricId::parse_strict(&metric)
             .map_err(|err| format!("expected metric base '{metric}': {err}"))?;
     }

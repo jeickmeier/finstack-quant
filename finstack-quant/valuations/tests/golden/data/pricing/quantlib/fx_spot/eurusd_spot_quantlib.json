@@ -1,0 +1,107 @@
+{
+  "expected": {
+    "npv": 1099397.4253779866
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "base_calendar_id": "target2",
+        "base_currency": "EUR",
+        "domestic_discount_curve_id": "USD-OIS",
+        "id": "EURUSD-SPOT-QUANTLIB",
+        "notional": {
+          "amount": "1000000",
+          "currency": "EUR"
+        },
+        "quote_calendar_id": "usny",
+        "quote_currency": "USD",
+        "settlement_days": 2
+      },
+      "type": "fx_spot"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        }
+      ],
+      "dividends": [],
+      "fx": {
+        "config": {
+          "cache_capacity": 256,
+          "pivot_currency": "USD"
+        },
+        "pinned_quotes": [],
+        "provider_pinned_quotes": [],
+        "provider_quotes": [],
+        "quotes": [
+          [
+            "EUR",
+            "USD",
+            1.1
+          ]
+        ]
+      },
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {},
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-24",
+    "description": "EUR/USD spot position valued as its USD proceeds discounted from the spot settlement date.",
+    "domain": "fx.fx_spot",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-24",
+    "name": "eurusd_spot_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product fx_spot",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43: settlement 2026-05-05, two business days after 2026-04-30 on the joint TARGET and US Federal Reserve calendar; NPV = 1000000 * 1.1 * FlatForward discount factor (continuous Act/365F, 0.04).",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "npv": {
+      "rel": 1e-09,
+      "tolerance_reason": "One quote-currency cash flow at the market spot rate, discounted on the same flat curve to a settlement date both sides derive from the joint calendar; only floating-point evaluation order differs."
+    }
+  }
+}

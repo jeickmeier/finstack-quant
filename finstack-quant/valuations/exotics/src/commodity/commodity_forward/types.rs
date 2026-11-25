@@ -552,6 +552,32 @@ impl finstack_quant_valuations_core::instruments::Instrument for CommodityForwar
         Some(self.maturity)
     }
 
+    /// Record the delivery price a theta roll reaches.
+    ///
+    /// Theta holds the market fixed and the price curve is dated, so a
+    /// forward whose maturity lies in `(as_of, rolled_date]` delivers at the
+    /// `as_of` forward price for that date.
+    ///
+    /// # Arguments
+    /// * `market` - Market at `as_of` supplying the forward price held over the roll.
+    /// * `as_of` - Valuation date the roll starts from.
+    /// * `rolled_date` - Date theta reprices at.
+    fn theta_observed_state(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        rolled_date: Date,
+    ) -> finstack_quant_core::Result<
+        Option<Box<dyn finstack_quant_valuations_core::instruments::Instrument>>,
+    > {
+        if self.quoted_forward.is_some() || self.maturity <= as_of || self.maturity > rolled_date {
+            return Ok(None);
+        }
+        let mut observed = self.clone();
+        observed.quoted_forward = Some(self.forward_price(market, as_of)?);
+        Ok(Some(Box::new(observed)))
+    }
+
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 

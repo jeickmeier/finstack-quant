@@ -1583,3 +1583,165 @@ fn tf_price_lies_between_the_bond_floor_and_the_credit_free_price() {
         );
     }
 }
+
+/// The test bond with one contractual feature changed, per feature the
+/// Tsiveriotis-Fernandes lattice shares with the default tree.
+fn tf_feature_variants() -> Vec<(&'static str, ConvertibleBond)> {
+    use crate::PriceTrigger;
+    use crate::bond::{CallPut, CallPutSchedule};
+    let base = create_test_bond();
+    let whole_life_call = CallPutSchedule {
+        calls: vec![CallPut {
+            start: base.issue_date,
+            end: base.maturity,
+            price_pct_of_par: 102.0,
+            make_whole: None,
+        }],
+        puts: Vec::new(),
+    };
+
+    let mut mandatory = base.clone();
+    mandatory.conversion.policy = ConversionPolicy::MandatoryOn(base.maturity);
+
+    let mut hard_call = base.clone();
+    hard_call.call_put = Some(whole_life_call.clone());
+
+    let mut soft_call = base.clone();
+    soft_call.call_put = Some(whole_life_call);
+    soft_call.soft_call_trigger = Some(PriceTrigger::default());
+
+    let mut dividend_protected = base.clone();
+    dividend_protected.conversion.dividend_adjustment = DividendAdjustment::AdjustRatio;
+
+    let mut zero_coupon = base.clone();
+    zero_coupon.cashflow_spec = crate::bond::CashflowSpec::default();
+
+    vec![
+        ("coupon", base),
+        ("mandatory", mandatory),
+        ("hard_call", hard_call),
+        ("soft_call", soft_call),
+        ("dividend_protected", dividend_protected),
+        ("zero_coupon", zero_coupon),
+    ]
+}
+
+#[test]
+fn tf_without_credit_reproduces_the_default_tree_for_every_feature() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+    for (name, bond) in tf_feature_variants() {
+        for spot in [60.0, 100.0, 160.0] {
+            let market = create_test_market_context()
+                .insert_price("AAPL", MarketScalar::unitless(spot).expect("valid scalar"));
+            let tree = price_convertible_bond(&bond, &market, as_of)
+                .expect("tree price")
+                .amount();
+            assert_eq!(
+                tf_price(&bond, spot, None).to_bits(),
+                tree.to_bits(),
+                "{name} at spot {spot}"
+            );
+        }
+    }
+}
+
+#[test]
+fn tf_price_falls_with_the_spread_for_every_feature() {
+    // Every variant here can end in a cash redemption the spread discounts.
+    // The mandatory convertible cannot and is covered by the next two tests.
+    for (name, bond) in tf_feature_variants()
+        .into_iter()
+        .filter(|(name, _)| *name != "mandatory")
+    {
+        let prices: Vec<f64> = [
+            None,
+            Some((0.01, 0.0)),
+            Some((0.04, 0.0)),
+            Some((0.10, 0.0)),
+        ]
+        .into_iter()
+        .map(|hazard| tf_price(&bond, 100.0, hazard))
+        .collect();
+        // A bond the issuer calls at once is worth the call price until the
+        // spread makes holding it cheaper, so a callable price may stay flat
+        // before it falls.
+        let callable = bond.call_put.is_some();
+        assert!(
+            prices
+                .windows(2)
+                .all(|pair| pair[1] < pair[0] || (callable && pair[1] == pair[0])),
+            "{name}: prices must fall as the spread widens: {prices:?}"
+        );
+        assert!(prices[3] < prices[0], "{name}: {prices:?}");
+    }
+}
+
+#[test]
+fn tf_mandatory_zero_coupon_is_all_equity_and_ignores_the_spread() {
+    // A zero-coupon bond that must convert at maturity delivers shares in
+    // every state: no cash flow exists for the spread to discount.
+    let mut bond = create_test_bond();
+    bond.cashflow_spec = crate::bond::CashflowSpec::default();
+    bond.conversion.policy = ConversionPolicy::MandatoryOn(bond.maturity);
+    for spot in [60.0, 100.0, 160.0] {
+        let credit_free = tf_price(&bond, spot, None);
+        for hazard in [(0.03, 0.0), (0.20, 0.4)] {
+            let risky = tf_price(&bond, spot, Some(hazard));
+            assert!(
+                (risky - credit_free).abs() < 1e-9 * credit_free,
+                "spot {spot}, hazard {hazard:?}: {risky} vs {credit_free}"
+            );
+        }
+    }
+}
+
+#[test]
+fn tf_mandatory_coupons_are_discounted_without_the_spread() {
+    // Known limitation of the conversion-probability blend (QuantLib's
+    // formulation, which this lattice follows): a node is discounted at
+    // r + (1 - p) * s, and a mandatory convertible has p = 1 everywhere, so
+    // its cash coupons are discounted at r although the issuer owes them.
+    // A split that tracked the cash component separately would discount them
+    // at r + s and take roughly 4% off this price at a 10% hazard.
+    //
+    // The residual is the payment-date correction, which moves each coupon
+    // onto the grid with the spread the lattice then does not apply.
+    let (_, bond) = tf_feature_variants()
+        .into_iter()
+        .find(|(name, _)| *name == "mandatory")
+        .expect("variant exists");
+    let credit_free = tf_price(&bond, 100.0, None);
+    for hazard in [0.01, 0.04, 0.10] {
+        let risky = tf_price(&bond, 100.0, Some((hazard, 0.0)));
+        assert!(
+            (risky - credit_free).abs() < 5e-5 * credit_free,
+            "hazard {hazard}: {risky} vs {credit_free}"
+        );
+    }
+}
+
+#[test]
+fn tf_call_caps_the_price_and_a_soft_call_caps_it_less() {
+    let variants = tf_feature_variants();
+    let price = |name: &str, spot: f64| {
+        let (_, bond) = variants
+            .iter()
+            .find(|(variant, _)| *variant == name)
+            .expect("variant exists");
+        tf_price(bond, spot, Some((0.03, 0.4)))
+    };
+    // Below the 130% trigger the soft call cannot be exercised, so it takes
+    // less from the holder than a hard call and no more than no call.
+    for spot in [80.0, 100.0, 120.0] {
+        let (plain, hard, soft) = (
+            price("coupon", spot),
+            price("hard_call", spot),
+            price("soft_call", spot),
+        );
+        assert!(hard < plain, "spot {spot}: hard call {hard} vs {plain}");
+        assert!(
+            hard <= soft && soft <= plain * (1.0 + 1e-12),
+            "spot {spot}: hard {hard}, soft {soft}, plain {plain}"
+        );
+    }
+}

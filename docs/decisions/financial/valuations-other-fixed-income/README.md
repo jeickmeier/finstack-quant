@@ -4,7 +4,7 @@ This scope covers bond futures, convertibles, inflation-linked bonds, shared loa
 
 Audit snapshot: **2026-11-05**, revision `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. Production implementations were inspected, including material defaults, validation and dispatch in `types.rs`, registry files and source appearing after inline test modules. Data/config dependencies are recorded where they select algorithms. The classification count describes source coverage, not independent validation or adoption.
 
-All sixteen records are **Accepted**. The original audit inspected source and named evidence without running Rust builds, tests or external price reconciliations. Evidence rows distinguish internal formula checks, independent arithmetic and production qualification.
+Records 01 to 16 are **Accepted**. [Record 17](17-convertible-tsiveriotis-fernandes.md), the optional Tsiveriotis–Fernandes convertible lattice, is **Proposed** and awaits acceptance. The original audit inspected source and named evidence without running Rust builds, tests or external price reconciliations. Evidence rows distinguish internal formula checks, independent arithmetic and production qualification.
 
 | Calculation / supported instruments | Implemented method / material variants | Actual selection | Decision record | Implementation / validation |
 |---|---|---|---|---|

@@ -13,8 +13,6 @@
   "instrument": {
     "instrument": {
       "spec": {
-        "spot_basis": {"type": "cash"},
-        "delivery": {"type": "cash_at_expiry"},
         "attributes": {
           "meta": {},
           "tags": [
@@ -23,6 +21,9 @@
           ]
         },
         "base_currency": "EUR",
+        "delivery": {
+          "type": "cash_at_expiry"
+        },
         "delta_convention": {
           "kind": "premium_adjusted_forward",
           "premium_currency": "EUR",
@@ -38,6 +39,9 @@
         },
         "option_type": "call",
         "quote_currency": "USD",
+        "spot_basis": {
+          "type": "cash"
+        },
         "strike": 1.1,
         "vol_surface_id": "EURUSD-VOL-QL"
       },

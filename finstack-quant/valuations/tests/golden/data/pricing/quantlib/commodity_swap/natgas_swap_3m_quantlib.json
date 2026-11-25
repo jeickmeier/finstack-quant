@@ -1,0 +1,131 @@
+{
+  "expected": {
+    "dv01": -0.035742622693078374,
+    "npv": 997.9061121632599
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "business_day_convention": "modified_following",
+        "commodity_type": "Energy",
+        "currency": "USD",
+        "discount_curve_id": "USD-OIS",
+        "fixed_price": 3.5,
+        "forward_curve_id": "NG-FORWARD",
+        "frequency": {
+          "count": 1,
+          "unit": "months"
+        },
+        "id": "NATGAS-SWAP-3M-QUANTLIB",
+        "maturity": "2026-09-01",
+        "past_fixings": [],
+        "quantity": 10000.0,
+        "side": "pay",
+        "start_date": "2026-06-01",
+        "underlying_ticker": "NG",
+        "unit": "MMBTU"
+      },
+      "type": "commodity_swap"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        },
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "flat",
+          "id": "NG-FORWARD",
+          "interp_style": "linear",
+          "knot_points": [
+            [
+              0.0,
+              3.4
+            ],
+            [
+              0.25,
+              3.55
+            ],
+            [
+              0.5,
+              3.8
+            ],
+            [
+              5.0,
+              4.2
+            ]
+          ],
+          "level_kind": "price",
+          "type": "price"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {},
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-24",
+    "description": "Pay-fixed natural gas swap with three monthly periods, each averaging weekday prices.",
+    "domain": "commodity.commodity_swap",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-24",
+    "name": "natgas_swap_3m_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product commodity_swap",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43: periods 2026-06-01 / 2026-07-01 / 2026-08-01 / 2026-09-01; each floating price is the mean of the linear price curve over the weekdays from the period start up to, but not including, the period end (the last period includes its end date); each net payment of 10000 * (average - 3.5) is discounted on a FlatForward curve (continuous Act/365F, 0.04) from the period end. Averages: [3.4755417185554167, 3.5271828469326976, 3.598505603985056].",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "dv01": {
+      "rel": 1e-09,
+      "tolerance_reason": "Three net payments built from weekday averages of the same linear price curve and discounted on the same flat curve; only floating-point evaluation order differs."
+    },
+    "npv": {
+      "rel": 1e-09,
+      "tolerance_reason": "Three net payments built from weekday averages of the same linear price curve and discounted on the same flat curve; only floating-point evaluation order differs."
+    }
+  }
+}

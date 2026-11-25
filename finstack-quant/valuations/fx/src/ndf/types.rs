@@ -591,24 +591,7 @@ impl Ndf {
             return Ok(rate);
         }
 
-        // The `FxProvider::rate` contract returns `to` per unit of `from`.
-        let (from_currency, to_currency) = match self.quote_convention {
-            NdfQuoteConvention::BasePerSettlement => (self.settlement_currency, self.base_currency),
-            NdfQuoteConvention::SettlementPerBase => (self.base_currency, self.settlement_currency),
-        };
-
-        let missing_msg = format!(
-            "NDF {} requires FxMatrix or quoted_spot to estimate a forward rate",
-            self.id
-        );
-        let spot = crate::market_inputs::resolve_fx_matrix_spot(
-            market,
-            from_currency,
-            to_currency,
-            as_of,
-            self.quoted_spot,
-            Some(&missing_msg),
-        )?;
+        let spot = self.spot_rate(market, as_of)?;
 
         let df_settlement = match df_settlement_cached {
             Some(df) => df,
@@ -631,6 +614,28 @@ impl Ndf {
             "NDF {} requires foreign_discount_curve_id or quoted_forward for pre-fixing forward estimation",
             self.id
         )))
+    }
+
+    /// Spot rate in `quote_convention` units: `quoted_spot` when set, else the
+    /// `FxMatrix` rate at `as_of`.
+    fn spot_rate(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
+        // The `FxProvider::rate` contract returns `to` per unit of `from`.
+        let (from_currency, to_currency) = match self.quote_convention {
+            NdfQuoteConvention::BasePerSettlement => (self.settlement_currency, self.base_currency),
+            NdfQuoteConvention::SettlementPerBase => (self.base_currency, self.settlement_currency),
+        };
+        let missing_msg = format!(
+            "NDF {} requires FxMatrix or quoted_spot to estimate a forward rate",
+            self.id
+        );
+        crate::market_inputs::resolve_fx_matrix_spot(
+            market,
+            from_currency,
+            to_currency,
+            as_of,
+            self.quoted_spot,
+            Some(&missing_msg),
+        )
     }
 
     #[inline]
@@ -776,6 +781,39 @@ impl finstack_quant_valuations_core::instruments::Instrument for Ndf {
 
         let pv = settlement_amount * df_settlement;
         Money::from_model_value(pv, self.settlement_currency)
+    }
+
+    /// Record the fixing a theta roll passes.
+    ///
+    /// Theta holds the market fixed, so a fixing date in `(as_of, rolled_date]`
+    /// with no observed rate fixes at the held level: `quoted_forward` when the
+    /// trade carries one, else the `as_of` spot (`quoted_spot` or `FxMatrix`).
+    /// Either is the level the pre-fixing forward converges to at maturity
+    /// under the held market.
+    ///
+    /// # Arguments
+    /// * `market` - Market at `as_of` supplying the spot held over the roll.
+    /// * `as_of` - Valuation date the roll starts from.
+    /// * `rolled_date` - Date theta reprices at.
+    fn theta_observed_state(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        rolled_date: Date,
+    ) -> finstack_quant_core::Result<
+        Option<Box<dyn finstack_quant_valuations_core::instruments::Instrument>>,
+    > {
+        if self.observed_fixing.is_some()
+            || self.fixing_date <= as_of
+            || self.fixing_date > rolled_date
+        {
+            return Ok(None);
+        }
+        let held = match self.quoted_forward {
+            Some(rate) => rate,
+            None => self.spot_rate(market, as_of)?,
+        };
+        Ok(Some(Box::new(self.clone().with_observed_fixing(held)?)))
     }
 
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();

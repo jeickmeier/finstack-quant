@@ -81,3 +81,25 @@ def test_missing_share_price_is_a_key_error() -> None:
 def test_ladder_round_trips() -> None:
     ladder = convertible_spot_ladder(_bond(), _market(100.0), AS_OF, [100.0])
     assert ConvertibleSpotLadder.from_json(ladder.to_json()).to_dict() == ladder.to_dict()
+
+
+def test_rows_follow_the_selected_model() -> None:
+    bond, market = _bond(), _market(100.0)
+    tf_row = convertible_spot_ladder(bond, market, AS_OF, [100.0], model="tsiveriotis_fernandes").rows[0]
+    result = price_instrument(
+        bond,
+        market,
+        AS_OF,
+        model="tsiveriotis_fernandes",
+        metrics=["delta", "bond_floor"],
+    )
+    assert tf_row.price == result.value.amount
+    assert tf_row.delta == result.get_metric("delta")
+    assert tf_row.bond_floor == result.get_metric("bond_floor")
+
+    tree_row = convertible_spot_ladder(bond, market, AS_OF, [100.0], model="tree").rows[0]
+    assert tree_row.to_dict() == convertible_spot_ladder(bond, market, AS_OF, [100.0]).rows[0].to_dict()
+    assert tf_row.price != tree_row.price
+
+    with pytest.raises(ValueError, match="tsiveriotis_fernandes"):
+        convertible_spot_ladder(bond, market, AS_OF, [100.0], model="hull_white_1f")

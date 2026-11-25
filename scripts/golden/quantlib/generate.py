@@ -49,6 +49,7 @@ from .inflation import (
     build_yoy_inflation_swap,
     build_zero_coupon_inflation_swap,
 )
+from .linear import LINEAR_BUILDERS
 from .ndf import build_ndf
 from .options import (
     build_arithmetic_asian_option,
@@ -289,6 +290,7 @@ PRODUCTS: dict[str, tuple[str, Callable[[], dict[str, Any]]]] = {
         "lookback_option/spx_floating_lookback_call_1y_quantlib.json",
         build_floating_lookback_option,
     ),
+    **LINEAR_BUILDERS,
 }
 DEFERRED_PRODUCTS: dict[str, tuple[str, Callable[[], dict[str, Any]]]] = {
     "irs": ("irs/usd_sofr_5y_quantlib.json", build_irs),

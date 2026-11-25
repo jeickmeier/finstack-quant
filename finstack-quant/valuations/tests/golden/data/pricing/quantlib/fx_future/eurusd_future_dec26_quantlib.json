@@ -1,0 +1,146 @@
+{
+  "expected": {
+    "delta": 500000.0,
+    "dv01": 0.0,
+    "futures_price": 1.1104465531949397,
+    "npv": 2723.276597469848
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "base_currency": "EUR",
+        "domestic_discount_curve_id": "USD-OIS",
+        "foreign_discount_curve_id": "EUR-OIS",
+        "id": "EURUSD-FUTURE-DEC26-QUANTLIB",
+        "terms": {
+          "contracts": 4.0,
+          "currency": "USD",
+          "entry_price": 1.105,
+          "last_trading_date": "2026-12-14",
+          "multiplier": 125000.0,
+          "position": "long",
+          "settlement": {
+            "type": "cash"
+          },
+          "settlement_date": "2026-12-16"
+        }
+      },
+      "type": "fx_future"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        },
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "EUR-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.4723665527410147
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        }
+      ],
+      "dividends": [],
+      "fx": {
+        "config": {
+          "cache_capacity": 256,
+          "pivot_currency": "USD"
+        },
+        "pinned_quotes": [],
+        "provider_pinned_quotes": [],
+        "provider_quotes": [],
+        "quotes": [
+          [
+            "EUR",
+            "USD",
+            1.1
+          ]
+        ]
+      },
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {},
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-24",
+    "description": "Long EUR/USD currency future valued at its covered-interest-parity fair price.",
+    "domain": "listed.fx_future",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-24",
+    "name": "eurusd_future_dec26_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product fx_future",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43: F = 1.1 * DF_EUR / DF_USD to 2026-12-16 on FlatForward curves (continuous Act/365F, EUR 0.025, USD 0.04); undiscounted variation margin 4 * 125000 * (F - 1.105); DV01 shifts both curves together.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "delta": {
+      "rel": 1e-09,
+      "tolerance_reason": "Covered-interest-parity forward from the same spot and flat curves, times contracts and multiplier, undiscounted on both sides; only floating-point evaluation order differs."
+    },
+    "dv01": {
+      "rel": 1e-09,
+      "tolerance_reason": "Covered-interest-parity forward from the same spot and flat curves, times contracts and multiplier, undiscounted on both sides; only floating-point evaluation order differs."
+    },
+    "futures_price": {
+      "rel": 1e-09,
+      "tolerance_reason": "Covered-interest-parity forward from the same spot and flat curves, times contracts and multiplier, undiscounted on both sides; only floating-point evaluation order differs."
+    },
+    "npv": {
+      "rel": 1e-09,
+      "tolerance_reason": "Covered-interest-parity forward from the same spot and flat curves, times contracts and multiplier, undiscounted on both sides; only floating-point evaluation order differs."
+    }
+  }
+}

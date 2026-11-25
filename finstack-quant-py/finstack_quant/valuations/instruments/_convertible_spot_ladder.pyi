@@ -564,14 +564,15 @@ def convertible_spot_ladder(
     market: MarketContext | str,
     as_of: datetime.date | str,
     spots: list[float] | None = None,
+    model: str | None = None,
 ) -> ConvertibleSpotLadder:
     """
     Price, delta, parity, conversion premium, regime and bond floor of a convertible at a ladder of share prices.
 
     Each row reprices on the market with only the share price moved, on the
-    convertible tree, the bond's only model, so volatility, rates, dividends and
-    credit stay as supplied. Price, delta, parity, conversion value, premium and floor
-    are the definitions of the metrics of those names. Each row runs the tree three times.
+    lattice ``model`` selects, so volatility, rates, dividends and credit stay as
+    supplied. Price, delta, parity, conversion value, premium and floor are the
+    definitions of the metrics of those names. Each row runs the lattice three times.
 
     Parameters
     ----------
@@ -589,6 +590,10 @@ def convertible_spot_ladder(
         Share prices in the bond's currency, each finite and positive, sorted ascending
         with duplicates dropped. ``None`` uses 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2 and 3
         times the market's share price.
+    model : str or None, optional
+        Credit lattice every price, delta and the bond floor use: ``"tree"`` (also the
+        ``None`` default) or ``"tsiveriotis_fernandes"``. The two differ only when the
+        bond has a credit curve.
 
     Returns
     -------
@@ -601,7 +606,8 @@ def convertible_spot_ladder(
         If market data the bond needs is missing.
     ValueError
         If ``spots`` is empty or holds a value that is not finite and positive, the
-        bond fails validation, or ``as_of`` or the market is malformed.
+        bond fails validation, ``model`` is not a convertible lattice, or ``as_of``
+        or the market is malformed.
     RuntimeError
         If the tree pricer fails.
 
@@ -626,5 +632,8 @@ def convertible_spot_ladder(
     [0.5, 1.0, 3.0]
     >>> [row.regime for row in ladder.rows]
     ['busted', 'balanced', 'equity_sensitive']
+    >>> tf = convertible_spot_ladder(bond, market, as_of, [100.0], model="tsiveriotis_fernandes")
+    >>> tf.rows[0].price != ladder.rows[1].price
+    True
     """
     ...

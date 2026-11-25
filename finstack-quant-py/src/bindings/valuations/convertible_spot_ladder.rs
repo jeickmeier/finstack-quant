@@ -157,20 +157,25 @@ crate::bindings::macros::py_getters!(PyConvertibleSpotLadder |s| {
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._convertible_spot_ladder", "convertible_spot_ladder")]
 #[pyfunction]
-#[pyo3(signature = (bond, market, as_of, spots=None), text_signature = "(bond, market, as_of, spots=None)")]
+#[pyo3(signature = (bond, market, as_of, spots=None, model=None), text_signature = "(bond, market, as_of, spots=None, model=None)")]
 fn convertible_spot_ladder(
     py: Python<'_>,
     bond: PyRef<'_, PyConvertibleBond>,
     market: &Bound<'_, PyAny>,
     as_of: &Bound<'_, PyAny>,
     spots: Option<Vec<f64>>,
+    model: Option<&str>,
 ) -> PyResult<PyConvertibleSpotLadder> {
+    let model = model
+        .map(finstack_quant_valuations::pricer::parse_model_key)
+        .transpose()
+        .map_err(core_to_py)?;
     let market = extract_market(py, market)?;
     let as_of = py_to_date(as_of)?;
     let bond = bond.inner.clone();
     let inner = py
         .detach(move || {
-            convertible::convertible_spot_ladder(&bond, &market, as_of, spots.as_deref())
+            convertible::convertible_spot_ladder(&bond, &market, as_of, spots.as_deref(), model)
         })
         .map_err(core_to_py)?;
     Ok(PyConvertibleSpotLadder { inner })

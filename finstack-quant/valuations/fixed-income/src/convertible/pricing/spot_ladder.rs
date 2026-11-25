@@ -19,9 +19,10 @@ use serde::{Deserialize, Serialize};
 
 use super::engine::{
     ConvertibleModel, compute_conversion_value, prepare_for_pricing, price_bond_floor,
-    price_convertible_bond, spot_bump_prices,
+    price_convertible_bond_with_model, spot_bump_prices,
 };
 use crate::convertible::ConvertibleBond;
+use finstack_quant_valuations_core::pricer::ModelKey;
 
 /// Multiples of the market share price on the default ladder. The market share
 /// price itself is one of them.
@@ -179,9 +180,9 @@ impl ConvertibleSpotLadder {
 /// Value a convertible at a ladder of share prices.
 ///
 /// Answers how price, delta, parity, conversion premium and regime move with the
-/// stock, with the bond floor to read them against. Prices on the convertible tree,
-/// the bond's only model, at `model_config.tree_steps` steps. Each row runs the tree
-/// three times, so the cost is linear in the rows.
+/// stock, with the bond floor to read them against. Prices on the lattice `model`
+/// selects, at `model_config.tree_steps` steps. Each row runs the lattice three
+/// times, so the cost is linear in the rows.
 ///
 /// # Arguments
 ///
@@ -195,6 +196,10 @@ impl ConvertibleSpotLadder {
 /// * `spots` - Share prices in the bond's currency, each finite and positive. They
 ///   are sorted ascending and duplicates dropped. `None` uses
 ///   0.25, 0.5, 0.75, 1, 1.25, 1.5, 2 and 3 times the market's share price.
+/// * `model` - Credit lattice every price, delta and the bond floor use:
+///   `ModelKey::Tree` (also the `None` default) or
+///   `ModelKey::TsiveriotisFernandes`. The two differ only when the bond has a
+///   credit curve.
 ///
 /// # Returns
 ///
@@ -205,7 +210,8 @@ impl ConvertibleSpotLadder {
 ///
 /// Returns a validation error when `spots` is empty or holds a value that is not
 /// finite and positive, when the market's share price is not positive and `spots`
-/// is `None`, or when the bond fails validation. Market data the bond needs and the
+/// is `None`, when `model` is not a convertible lattice, or when the bond fails
+/// validation. Market data the bond needs and the
 /// market lacks is a not-found error, a share price in another currency a currency
 /// mismatch, and a share price or value too large for `Money` a conversion error.
 ///
@@ -218,7 +224,9 @@ pub fn convertible_spot_ladder(
     market: &MarketContext,
     as_of: Date,
     spots: Option<&[f64]>,
+    model: Option<ModelKey>,
 ) -> Result<ConvertibleSpotLadder> {
+    let model = ConvertibleModel::from_model_key(model)?;
     bond.validate_for_pricing()?;
     let market_spot = bond.spot_value(market.get_price(&bond.spot_id)?)?;
     let spots = ladder_spots(market_spot, spots)?;
@@ -227,7 +235,7 @@ pub fn convertible_spot_ladder(
         Some(&bond.metric_pricing_overrides),
     )?);
     let inputs = prepare_for_pricing(bond, market, as_of)?;
-    let bond_floor = price_bond_floor(bond, market, as_of, ConvertibleModel::DefaultableEquity)?;
+    let bond_floor = price_bond_floor(bond, market, as_of, model)?;
     // A mandatory-variable bond delivers a share count that moves with the stock, so
     // no one ratio is the share exposure the delta bands read.
     let fixed_ratio = match bond.conversion.policy {
@@ -241,7 +249,7 @@ pub fn convertible_spot_ladder(
         .into_iter()
         .map(|spot| {
             let moved = inputs.market_at_spot(market, spot)?;
-            let price = price_convertible_bond(bond, &moved, as_of)?.amount();
+            let price = price_convertible_bond_with_model(bond, &moved, as_of, model)?.amount();
             let delta = spot_bump_prices(
                 bond,
                 &moved,
@@ -249,7 +257,7 @@ pub fn convertible_spot_ladder(
                 spot,
                 bumps.spot_bump_decimal,
                 as_of,
-                ConvertibleModel::DefaultableEquity,
+                model,
             )?
             .map(|bump| bump.delta())
             .filter(|delta| delta.is_finite());
@@ -314,6 +322,7 @@ fn ladder_spots(market_spot: f64, spots: Option<&[f64]>) -> Result<Vec<f64>> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::engine::price_convertible_bond;
     use super::*;
     use crate::bond::CashflowSpec;
     use crate::{AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment};
@@ -420,7 +429,7 @@ mod tests {
         ];
         let spots: Vec<f64> = cases.iter().map(|case| case.0).collect();
         let ladder =
-            convertible_spot_ladder(&bond(), &market(), AS_OF, Some(&spots)).expect("ladder");
+            convertible_spot_ladder(&bond(), &market(), AS_OF, Some(&spots), None).expect("ladder");
         assert_eq!(ladder.currency, Currency::USD);
         assert_eq!(ladder.market_spot, 100.0);
         for (row, (spot, n_d1, price, premium, regime)) in ladder.rows.iter().zip(cases) {
@@ -447,7 +456,7 @@ mod tests {
     #[test]
     fn market_row_is_what_the_greeks_and_terms_report() {
         let (bond, market) = (bond(), market());
-        let ladder = convertible_spot_ladder(&bond, &market, AS_OF, None).expect("ladder");
+        let ladder = convertible_spot_ladder(&bond, &market, AS_OF, None, None).expect("ladder");
         let row = ladder
             .rows
             .iter()
@@ -494,7 +503,8 @@ mod tests {
 
     #[test]
     fn default_ladder_runs_from_a_quarter_to_three_times_the_market() {
-        let ladder = convertible_spot_ladder(&bond(), &market(), AS_OF, None).expect("ladder");
+        let ladder =
+            convertible_spot_ladder(&bond(), &market(), AS_OF, None, None).expect("ladder");
         let spots: Vec<f64> = ladder.rows.iter().map(|row| row.spot).collect();
         assert_eq!(spots, [25.0, 50.0, 75.0, 100.0, 125.0, 150.0, 200.0, 300.0]);
         assert_eq!(
@@ -506,7 +516,7 @@ mod tests {
     #[test]
     fn supplied_spots_sort_and_drop_duplicates() {
         let ladder =
-            convertible_spot_ladder(&bond(), &market(), AS_OF, Some(&[150.0, 50.0, 150.0]))
+            convertible_spot_ladder(&bond(), &market(), AS_OF, Some(&[150.0, 50.0, 150.0]), None)
                 .expect("ladder");
         let spots: Vec<f64> = ladder.rows.iter().map(|row| row.spot).collect();
         assert_eq!(spots, [50.0, 150.0]);
@@ -516,7 +526,7 @@ mod tests {
     #[test]
     fn rejects_spots_the_tree_cannot_value() {
         for spots in [&[][..], &[0.0], &[-1.0], &[f64::NAN], &[f64::INFINITY]] {
-            let error = convertible_spot_ladder(&bond(), &market(), AS_OF, Some(spots))
+            let error = convertible_spot_ladder(&bond(), &market(), AS_OF, Some(spots), None)
                 .expect_err("rejected");
             assert!(matches!(error, Error::Validation(_)), "{spots:?}: {error}");
         }
@@ -525,7 +535,7 @@ mod tests {
     /// A price too large for `Money` errors, so no row carries a non-finite number.
     #[test]
     fn share_price_with_no_representable_value_is_an_error() {
-        assert!(convertible_spot_ladder(&bond(), &market(), AS_OF, Some(&[1e300])).is_err());
+        assert!(convertible_spot_ladder(&bond(), &market(), AS_OF, Some(&[1e300]), None).is_err());
     }
 
     #[test]
@@ -546,7 +556,7 @@ mod tests {
             upper_conversion_price: 120.0,
         };
         let ladder =
-            convertible_spot_ladder(&bond, &market(), AS_OF, Some(&[100.0])).expect("ladder");
+            convertible_spot_ladder(&bond, &market(), AS_OF, Some(&[100.0]), None).expect("ladder");
         let row = &ladder.rows[0];
         assert_eq!(row.hedge_ratio, None);
         assert_eq!(row.regime, None);
@@ -557,8 +567,8 @@ mod tests {
 
     #[test]
     fn ladder_round_trips_and_refuses_unknown_fields() {
-        let ladder =
-            convertible_spot_ladder(&bond(), &market(), AS_OF, Some(&[100.0])).expect("ladder");
+        let ladder = convertible_spot_ladder(&bond(), &market(), AS_OF, Some(&[100.0]), None)
+            .expect("ladder");
         let json = serde_json::to_string(&ladder).expect("json");
         assert_eq!(
             serde_json::from_str::<ConvertibleSpotLadder>(&json).expect("parse"),
@@ -566,5 +576,62 @@ mod tests {
         );
         let extra = json.replacen('{', "{\"extra\":1,", 1);
         assert!(serde_json::from_str::<ConvertibleSpotLadder>(&extra).is_err());
+    }
+
+    /// With a credit curve the two lattices differ, and every row follows the
+    /// selected one.
+    #[test]
+    fn rows_follow_the_selected_model() {
+        use finstack_quant_core::market_data::term_structures::HazardCurve;
+        let mut bond = bond();
+        bond.credit_curve_id = Some("CREDIT".into());
+        bond.recovery_rate = Some(0.4);
+        let market = market()
+            .try_insert(
+                HazardCurve::flat(
+                    "CREDIT",
+                    AS_OF,
+                    0.03,
+                    0.4,
+                    finstack_quant_core::dates::DayCount::Act365F,
+                )
+                .expect("hazard curve"),
+            )
+            .expect("insert market curve");
+        let ladder = |model| {
+            convertible_spot_ladder(&bond, &market, AS_OF, Some(&[100.0]), model).expect("ladder")
+        };
+        let tree = ladder(Some(ModelKey::Tree)).rows[0].clone();
+        assert_eq!(tree, ladder(None).rows[0]);
+
+        let tf = ladder(Some(ModelKey::TsiveriotisFernandes)).rows[0].clone();
+        assert_eq!(
+            tf.price,
+            price_convertible_bond_with_model(
+                &bond,
+                &market,
+                AS_OF,
+                ConvertibleModel::TsiveriotisFernandes
+            )
+            .expect("pv")
+            .amount()
+        );
+        assert_eq!(
+            tf.bond_floor,
+            price_bond_floor(
+                &bond,
+                &market,
+                AS_OF,
+                ConvertibleModel::TsiveriotisFernandes
+            )
+            .expect("floor")
+        );
+        assert!((tf.price - tree.price).abs() > 1e-6 * tree.price);
+        assert!(tf.delta.expect("delta").is_finite());
+
+        assert!(
+            convertible_spot_ladder(&bond, &market, AS_OF, None, Some(ModelKey::HullWhite1F))
+                .is_err()
+        );
     }
 }

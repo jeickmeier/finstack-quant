@@ -139,6 +139,7 @@ def build_single_name_cds() -> dict[str, Any]:
             "spec": {
                 "id": "QL-FLAT-HAZARD-CDS-5Y-20260105",
                 "notional": {"amount": "10000000", "currency": "USD"},
+                "include_valuation_date_cashflows": False,
                 "side": "pay",
                 "convention": "isda_na",
                 "premium_leg": {

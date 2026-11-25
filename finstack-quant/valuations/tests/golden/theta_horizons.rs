@@ -58,16 +58,6 @@ const EXPECTED_FAILURES: &[(&str, &[&str], &str)] = &[
     ("registry/trs_equity", &["1M", "6M"], HELD),
     ("registry/trs_fixed_income_index", &["1M", "6M"], HELD),
     ("registry/range_accrual", &["6M"], HELD),
-    (
-        "golden/quantlib/ndf/usdcny_ndf_6m_quantlib",
-        &["6M"],
-        "the 6M roll passes the fixing date; an NDF's observed_fixing is instrument-held and not rolled",
-    ),
-    (
-        "golden/quantlib/commodity_asian_option/wti_arithmetic_asian_call_1y_quantlib",
-        &["6M"],
-        "the 6M roll crosses the July and October fixings; a commodity Asian's past_fixings are instrument-held and not rolled",
-    ),
     // Not a fixing: the rolled trade has no schedule, needs lifecycle inputs,
     // or leaves its market grid.
     (
@@ -85,6 +75,11 @@ const EXPECTED_FAILURES: &[(&str, &[&str], &str)] = &[
         "golden/quantlib/equity_future/spx_future_3m_quantlib",
         &["6M"],
         "the 6M roll passes last_trading_date; the rolled future requires a settlement_price",
+    ),
+    (
+        "golden/quantlib/volatility_index_future/vix_future_sep26_quantlib",
+        &["6M"],
+        "the 6M roll reaches settlement_date; the rolled future requires a settlement_price",
     ),
     (
         "registry/levered_real_estate_equity",

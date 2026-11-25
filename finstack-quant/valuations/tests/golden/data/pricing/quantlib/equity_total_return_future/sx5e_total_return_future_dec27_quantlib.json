@@ -1,0 +1,112 @@
+{
+  "expected": {
+    "delta": 1005.7944444444445,
+    "futures_price": 5351.960555555555,
+    "npv": 101960.5555555554
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "accrued_distributions_id": "TESX-ACCRUED-DISTRIBUTIONS",
+        "accrued_funding_id": "TESX-ACCRUED-FUNDING",
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "id": "SX5E-TOTAL-RETURN-FUTURE-DEC27-QUANTLIB",
+        "spot_id": "SX5E-CLOSE",
+        "spread_bp_id": "TESX-SPREAD-BPS",
+        "spread_day_count": "act_360",
+        "terms": {
+          "contracts": 100.0,
+          "currency": "EUR",
+          "entry_price": 5250.0,
+          "last_trading_date": "2027-12-16",
+          "multiplier": 10.0,
+          "position": "long",
+          "settlement": {
+            "type": "cash"
+          },
+          "settlement_date": "2027-12-17"
+        },
+        "underlying_ticker": "SX5E"
+      },
+      "type": "equity_total_return_future"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {
+        "SX5E-CLOSE": {
+          "price": {
+            "amount": "5300.0",
+            "currency": "EUR"
+          }
+        },
+        "TESX-ACCRUED-DISTRIBUTIONS": {
+          "price": {
+            "amount": "62.5",
+            "currency": "EUR"
+          }
+        },
+        "TESX-ACCRUED-FUNDING": {
+          "price": {
+            "amount": "41.25",
+            "currency": "EUR"
+          }
+        },
+        "TESX-SPREAD-BPS": {
+          "unitless": 35.0
+        }
+      },
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-24",
+    "description": "Long equity index total-return future priced from spot, accrued legs and a traded spread.",
+    "domain": "listed.equity_total_return_future",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-24",
+    "name": "sx5e_total_return_future_dec27_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product equity_total_return_future",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43: fair price = spot 5300.0 + accrued distributions 62.5 - accrued funding 41.25 + spot * 35.0 bp * Actual/360 from 2026-04-30 to 2027-12-17; undiscounted variation margin 100 * 10 * (fair - 5250.0).",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "delta": {
+      "rel": 1e-09,
+      "tolerance_reason": "Four market scalars combined by the contract's total-return formula with a QuantLib Actual/360 year fraction; only floating-point evaluation order differs."
+    },
+    "futures_price": {
+      "rel": 1e-09,
+      "tolerance_reason": "Four market scalars combined by the contract's total-return formula with a QuantLib Actual/360 year fraction; only floating-point evaluation order differs."
+    },
+    "npv": {
+      "rel": 1e-09,
+      "tolerance_reason": "Four market scalars combined by the contract's total-return formula with a QuantLib Actual/360 year fraction; only floating-point evaluation order differs."
+    }
+  }
+}

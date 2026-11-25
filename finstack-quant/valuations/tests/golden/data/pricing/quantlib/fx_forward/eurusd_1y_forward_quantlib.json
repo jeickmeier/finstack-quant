@@ -7,7 +7,6 @@
   "instrument": {
     "instrument": {
       "spec": {
-        "spot_basis": {"type": "cash"},
         "attributes": {
           "meta": {},
           "tags": [
@@ -25,7 +24,10 @@
           "amount": "1000000",
           "currency": "EUR"
         },
-        "quote_currency": "USD"
+        "quote_currency": "USD",
+        "spot_basis": {
+          "type": "cash"
+        }
       },
       "type": "fx_forward"
     },

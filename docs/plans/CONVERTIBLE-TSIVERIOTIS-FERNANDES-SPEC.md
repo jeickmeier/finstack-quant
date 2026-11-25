@@ -315,12 +315,11 @@ models, and can be negative under TF (about -66 at 1096 steps against roughly +7
 `tree` gives +155 against roughly +86). Curing it needs the exercise kink in the value corrected
 in both lattices, which changes `tree` prices and is a separate decision.
 
-**Not done**
+**Follow-ups closed 2026-11-24**
 
-- No methodology decision record. `docs/decisions/financial/governance/0026` requires one per
-  methodology choice, with an inventory entry; this spec holds most of its content.
-
-- No test exercises mandatory conversion, dividend protection, soft call or coupons under TF.
-- `spot_ladder` still prices with `tree` whatever model is selected.
-- No Python or WASM documentation mentions the new model name; the generated schemas and types
-  do carry it.
+- Methodology record written as a proposal:
+  `docs/decisions/financial/valuations-other-fixed-income/17-convertible-tsiveriotis-fernandes.md`.
+- `convertible_spot_ladder` takes the model (Rust, Python `model=`, WASM `model`).
+- Tests now cover mandatory conversion, dividend protection, hard and soft calls and zero coupons
+  under TF. They exposed one limitation, recorded in the methodology record: a mandatory
+  convertible's coupons are discounted without the spread.

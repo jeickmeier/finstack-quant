@@ -2,7 +2,7 @@
 
 use crate::api::core::money::JsMoney;
 use crate::api::valuations::pricing::parse_market;
-use crate::utils::input::{from_js_json, js_f64, js_opt_f64_seq};
+use crate::utils::input::{from_js_json, js_f64, js_opt_f64_seq, js_opt_string};
 use crate::utils::wire::js_date;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::instruments::Instrument;
@@ -95,13 +95,14 @@ common_getters!(JsConvertibleBond, "ConvertibleBond");
 
 /// Price, delta, parity, conversion premium, regime and bond floor of a convertible at a ladder of share prices (mirrors Rust `convertible_spot_ladder`).
 ///
-/// Each row reprices on the market with only the share price moved, on the convertible tree, the bond's only model; volatility, rates and credit stay as supplied.
+/// Each row reprices on the market with only the share price moved, on the lattice `model` selects; volatility, rates and credit stay as supplied.
 /// @param bond - Borrowed `ConvertibleBond` handle; it is not consumed. Its `metric_pricing_overrides.bump_config` sets the spot bump behind delta (default 1% of each row's share price).
 /// @param marketJson - Canonical market-context JSON holding the bond's discount curve, share price, volatility and any dividend yield, hazard curve and floating index.
 /// @param asOf - ISO-8601 valuation date and origin of the tree's ACT/365F clock.
 /// @param spots - Share prices in the bond's currency, each finite and positive, sorted ascending with duplicates dropped; omit for 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2 and 3 times the market's share price.
+/// @param model - Credit lattice every price, delta and the bond floor use: `"tree"` (also the default when omitted) or `"tsiveriotis_fernandes"`; the two differ only when the bond has a credit curve.
 /// @returns `ConvertibleSpotLadder` plain object: `instrument_id`, `as_of`, `currency`, `market_spot` and `rows` in ascending share price, each with `spot`, `is_market_spot`, `price`, `conversion_value` and `bond_floor` in `currency`, `parity` over notional, and `delta` per unit of share price, `hedge_ratio` as a decimal share of the conversion ratio, `regime` (`busted` below 0.40, `balanced` to 0.80, `equity_sensitive` above) and `conversion_premium` as a decimal, each `null` where undefined: a mandatory-variable bond has no hedge ratio or regime.
-/// @throws Error - Throws with kind `validation` if `spots` is empty or holds a value that is not finite and positive, or the bond or market JSON is invalid, and kind `not_found` if market data the bond needs is missing.
+/// @throws Error - Throws with kind `validation` if `spots` is empty or holds a value that is not finite and positive, `model` is not a convertible lattice, or the bond or market JSON is invalid, and kind `not_found` if market data the bond needs is missing.
 #[wasm_bindgen(js_name = convertibleSpotLadder, unchecked_return_type = "generated.valuations.ConvertibleSpotLadder")]
 pub fn convertible_spot_ladder(
     bond: &JsConvertibleBond,
@@ -110,16 +111,23 @@ pub fn convertible_spot_ladder(
     #[wasm_bindgen(unchecked_optional_param_type = "readonly number[] | null")] spots: Option<
         JsValue,
     >,
+    #[wasm_bindgen(unchecked_optional_param_type = "string | null")] model: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let market = parse_market(&market_json)?;
     let as_of = js_date(&as_of, "asOf")?;
     let spots = js_opt_f64_seq(spots.as_ref(), "spots")?;
+    let model = js_opt_string(model.as_ref(), "model")?
+        .as_deref()
+        .map(finstack_quant_valuations::pricer::parse_model_key)
+        .transpose()
+        .map_err(to_js_err)?;
     to_js_value(
         &finstack_quant_valuations::instruments::fixed_income::convertible::convertible_spot_ladder(
             &bond.inner,
             &market,
             as_of,
             spots.as_deref(),
+            model,
         )
         .map_err(to_js_err)?,
     )

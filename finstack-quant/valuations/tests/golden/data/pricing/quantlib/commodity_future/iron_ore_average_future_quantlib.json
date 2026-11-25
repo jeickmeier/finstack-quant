@@ -1,0 +1,123 @@
+{
+  "expected": {
+    "delta": 1000.0,
+    "futures_price": 107.50547945205479,
+    "npv": 2255.4794520547857
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "fixing": {
+          "fixing_dates": [
+            "2026-12-29",
+            "2026-12-30",
+            "2026-12-31"
+          ],
+          "past_fixings": [],
+          "type": "arithmetic_average"
+        },
+        "forward_curve_id": "IRON-ORE-FORWARD",
+        "id": "IRON-ORE-AVERAGE-FUTURE-QUANTLIB",
+        "terms": {
+          "contracts": 10.0,
+          "currency": "USD",
+          "entry_price": 105.25,
+          "last_trading_date": "2026-12-31",
+          "multiplier": 100.0,
+          "position": "long",
+          "settlement": {
+            "type": "cash"
+          },
+          "settlement_date": "2027-01-04"
+        },
+        "underlying_ticker": "TSI-62-FE"
+      },
+      "type": "commodity_future"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "flat",
+          "id": "IRON-ORE-FORWARD",
+          "interp_style": "linear",
+          "knot_points": [
+            [
+              0.0,
+              104.0
+            ],
+            [
+              0.5,
+              107.0
+            ],
+            [
+              1.0,
+              108.5
+            ],
+            [
+              5.0,
+              110.0
+            ]
+          ],
+          "level_kind": "price",
+          "type": "price"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {},
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-24",
+    "description": "Long commodity future settling on the arithmetic average of three daily fixings.",
+    "domain": "listed.commodity_future",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-24",
+    "name": "iron_ore_average_future_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product commodity_future",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43: linear interpolation of the price curve on 2026-12-29, 2026-12-30, 2026-12-31, averaged to 107.50547945205479; undiscounted variation margin 10 * 100 * (fair - 105.25).",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "delta": {
+      "rel": 1e-09,
+      "tolerance_reason": "The mean of three prices read off the same linear curve, times contracts and multiplier, with no discounting on either side; only floating-point evaluation order differs."
+    },
+    "futures_price": {
+      "rel": 1e-09,
+      "tolerance_reason": "The mean of three prices read off the same linear curve, times contracts and multiplier, with no discounting on either side; only floating-point evaluation order differs."
+    },
+    "npv": {
+      "rel": 1e-09,
+      "tolerance_reason": "The mean of three prices read off the same linear curve, times contracts and multiplier, with no discounting on either side; only floating-point evaluation order differs."
+    }
+  }
+}

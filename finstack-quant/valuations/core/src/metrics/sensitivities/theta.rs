@@ -49,6 +49,11 @@
 //! - Scheduled fixings inside the roll (Asian averaging dates, autocallable
 //!   observations, cliquet resets) record the `as_of` spot, and a trade struck
 //!   at `as_of` records that spot as its strike-set level.
+//! - A commodity Asian or commodity swap records, for each averaging date
+//!   inside the roll, the `as_of` price curve's price for that date: the curve
+//!   is dated and is not rolled. A commodity forward the roll delivers takes
+//!   its `as_of` forward price the same way. An NDF whose fixing date the roll passes fixes at the `as_of`
+//!   spot, or at its `quoted_forward` when it carries one.
 //!
 //! A European swaption backed by a dated SABR cube holds the admitted opening
 //! quote at its contractual expiry and tenor, preserving the cube's original
