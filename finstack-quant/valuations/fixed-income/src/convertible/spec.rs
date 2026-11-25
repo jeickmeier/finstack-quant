@@ -261,7 +261,8 @@ impl ConversionSpec {
 
         if self.ratio.is_none() && self.price.is_none() {
             return Err(finstack_quant_core::Error::Validation(
-                "conversion specification requires ratio or price".to_string(),
+                "conversion specification requires conversion.ratio or conversion.price"
+                    .to_string(),
             ));
         }
         if let Some(ratio) = self.ratio {

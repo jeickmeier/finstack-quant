@@ -257,18 +257,15 @@ fn try_create_ust_10y_future(
 ) -> finstack_quant_core::Result<BondFuture> {
     BondFuture::builder()
         .id(InstrumentId::new(config.id))
-        .terms(
-            ListedFutureTerms::new(
-                config.notional / 100_000.0,
-                1_000.0,
-                Currency::USD,
-                config.entry_price,
-                config.last_trading_date,
-                config.settlement_date,
-                config.position,
-            )
-            .expect("terms"),
-        )
+        .terms(ListedFutureTerms::new(
+            config.notional / 100_000.0,
+            1_000.0,
+            Currency::USD,
+            config.entry_price,
+            config.last_trading_date,
+            config.settlement_date,
+            config.position,
+        )?)
         .delivery_start(config.delivery_start)
         .contract_specs(BondFutureSpecs::ust_10y())
         .deliverable_basket(config.deliverable_basket)

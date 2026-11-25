@@ -195,13 +195,14 @@ pub(super) fn decode_envelope_with_metric_overrides(
         .map(ToOwned::to_owned);
     let patch = parse_metric_patch(patch_str, id.as_deref())?;
 
-    // If the wire envelope carries an un-deserializable stored
+    // If the wire envelope carries an un-deserializable or invalid stored
     // `metric_pricing_overrides` object that the caller's patch repairs before
     // validation, patch that object in place so decoding can proceed to the
     // canonical typed override path below.
     if let Some(existing) = raw_metric_overrides_mut(&mut document)
         && existing.is_object()
-        && serde_json::from_value::<MetricPricingOverrides>(existing.clone()).is_err()
+        && serde_json::from_value::<MetricPricingOverrides>(existing.clone())
+            .map_or(true, |overrides| overrides.validate().is_err())
     {
         merge_metric_override_values(existing, &patch);
     }
