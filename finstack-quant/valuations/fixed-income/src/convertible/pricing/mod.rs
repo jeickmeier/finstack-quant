@@ -1,9 +1,14 @@
-//! Convertible pricing with defaultable equity and recovery of principal.
+//! Convertible pricing on a binomial equity lattice, with two credit models.
 //!
-//! Implements a hybrid debt-equity pricing model that:
-//! 1. Uses `CashFlowBuilder` for coupons, principal and PIK balances.
-//! 2. Discounts surviving claims and pays recovery of live principal on default.
-//! 3. Handles call/put provisions and various conversion policies
+//! Both models:
+//! 1. Use `CashFlowBuilder` for coupons, principal and PIK balances.
+//! 2. Handle call/put provisions and various conversion policies.
+//!
+//! They differ in how issuer credit enters:
+//! - `tree` (the default, `credit_tree`): the stock jumps to zero on default,
+//!   surviving claims are discounted and recovery of live principal is paid.
+//! - `tsiveriotis_fernandes` (`tf_tree`): no default event; the cash-only part
+//!   of the bond is discounted at the risk-free rate plus the credit spread.
 //!
 //! Public API:
 //! - `price_convertible_bond`: Present value using selected tree type
@@ -15,17 +20,19 @@
 mod credit_tree;
 pub(crate) mod engine;
 pub(crate) mod spot_ladder;
+mod tf_tree;
 mod tree_pricer;
 mod valuator;
 
+pub(crate) use engine::{
+    ConvertibleModel, build_convertible_schedule, calculate_accrued_interest,
+    calculate_convertible_greeks, calculate_convertible_greeks_with_model, calculate_parity,
+    compute_conversion_value, price_bond_floor, price_convertible_bond,
+    price_convertible_bond_with_model, settlement_dirty_price,
+};
 #[cfg(test)]
 pub(crate) use engine::{DEFAULT_CONVERTIBLE_TREE_STEPS, settlement_date};
-pub(crate) use engine::{
-    build_convertible_schedule, calculate_accrued_interest, calculate_convertible_greeks,
-    calculate_parity, compute_conversion_value, price_bond_floor, price_convertible_bond,
-    settlement_dirty_price,
-};
-pub(crate) use tree_pricer::ConvertibleTreePricer;
+pub(crate) use tree_pricer::{ConvertibleTreePricer, ConvertibleTsiveriotisFernandesPricer};
 
 #[cfg(test)]
 use engine::prepare_for_pricing;

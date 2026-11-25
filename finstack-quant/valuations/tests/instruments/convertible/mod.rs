@@ -6,3 +6,4 @@
 #[path = "../../../fixed-income/tests/convertible/fixtures.rs"]
 mod fixtures;
 mod test_credit_curve;
+mod test_tsiveriotis_fernandes;

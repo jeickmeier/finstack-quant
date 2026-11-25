@@ -17,10 +17,10 @@
 //! DVA = (1 - R_own) × Σᵢ ENE_mid(tᵢ) × [S_own(tᵢ₋₁) - S_own(tᵢ)] × DF_mid(tᵢ)
 //! ```
 //!
-//! In [`crate::xva::cva::compute_bilateral_xva`], posted IM reduces ENE before
-//! DVA integration: `ENE_effective(t) = max(ENE(t) - IM(t), 0)`. The public
-//! unilateral [`crate::xva::cva::compute_dva`] function retains the unadjusted
-//! formula above.
+//! [`crate::xva::cva::compute_bilateral_xva`] and the unilateral
+//! [`crate::xva::cva::compute_dva`] integrate the supplied ENE as is. Posted
+//! initial margin is not deducted; a collateral-aware exposure profile must
+//! already reflect it.
 //!
 //! **FVA** — funding cost/benefit on uncollateralized exposure:
 //!

@@ -3854,6 +3854,8 @@ export type ValuationDetails =
  * ## Credit Models
  * - [`HazardRate`](Self::HazardRate): Fractional-recovery hazard-rate pricing
  * - [`RatesCredit`](Self::RatesCredit): Joint short-rate and hazard-rate pricing
+ * - [`TsiveriotisFernandes`](Self::TsiveriotisFernandes): Convertible lattice with
+ *   spread-discounted cash component
  *
  * ## Monte Carlo Models
  * - [`MonteCarloGBM`](Self::MonteCarloGBM): GBM simulation
@@ -3896,7 +3898,8 @@ export type ModelKey =
   | "rough_heston_fourier"
   | "pde_crank_nicolson_1d"
   | "pde_adi_2d"
-  | "bloomberg_cdso";
+  | "bloomberg_cdso"
+  | "tsiveriotis_fernandes";
 /**
  * Domain-specific trace entry types.
  *

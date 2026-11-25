@@ -20,7 +20,7 @@
 //! metrics in the library.
 
 use crate::convertible::ConvertibleBond;
-use crate::convertible::pricing::{price_convertible_bond, settlement_dirty_price};
+use crate::convertible::pricing::{price_convertible_bond_with_model, settlement_dirty_price};
 use finstack_quant_core::Result;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_valuations_core::metrics::{
@@ -46,7 +46,8 @@ impl MetricCalculator for OasCalculator {
         // surfaces missing curves / vol surfaces / equity IDs with their real
         // error messages instead of letting the solver report opaque "did not
         // converge" failures driven by NaN objective values.
-        let _ = price_convertible_bond(bond, base_market, as_of)?;
+        let model = super::model::selected_model(context)?;
+        let _ = price_convertible_bond_with_model(bond, base_market, as_of, model)?;
 
         // Shift the issuer hazard curve when available (affects the cash/debt
         // component, default recovery and survival-conditioned equity drift).
@@ -77,8 +78,8 @@ impl MetricCalculator for OasCalculator {
         let objective = |spread: f64| -> finstack_quant_core::Result<f64> {
             shifted_market(spread)
                 .and_then(|bumped| {
-                    let pv = price_convertible_bond(bond, &bumped, as_of)?;
-                    settlement_dirty_price(bond, &bumped, as_of, pv.amount())
+                    let pv = price_convertible_bond_with_model(bond, &bumped, as_of, model)?;
+                    settlement_dirty_price(bond, &bumped, as_of, pv.amount(), model)
                 })
                 .map(|dirty| dirty - target_dirty)
                 .map_err(|inner| {
@@ -277,7 +278,8 @@ mod tests {
             oas * 10_000.0,
         )
         .unwrap();
-        let repriced = super::price_convertible_bond(bond, &bumped, as_of).unwrap();
+        let repriced =
+            crate::convertible::pricing::price_convertible_bond(bond, &bumped, as_of).unwrap();
         assert!((repriced.amount() - notional * quoted_clean_pct / 100.0).abs() < 1.0);
     }
 
@@ -303,7 +305,8 @@ mod tests {
                 expected_spread * 10_000.0,
             )
             .unwrap();
-            let target = super::price_convertible_bond(&bond, &bumped, as_of).unwrap();
+            let target =
+                crate::convertible::pricing::price_convertible_bond(&bond, &bumped, as_of).unwrap();
             bond.instrument_pricing_overrides
                 .market_quotes
                 .quoted_clean_price_pct = Some(target.amount() / bond.notional.amount() * 100.0);
@@ -387,7 +390,9 @@ mod tests {
                         .unwrap(),
                 )
                 .expect("insert market curve");
-            let target = super::price_convertible_bond(&bond, &shifted, as_of).unwrap();
+            let target =
+                crate::convertible::pricing::price_convertible_bond(&bond, &shifted, as_of)
+                    .unwrap();
             bond.instrument_pricing_overrides
                 .market_quotes
                 .quoted_clean_price_pct = Some(target.amount() / bond.notional.amount() * 100.0);

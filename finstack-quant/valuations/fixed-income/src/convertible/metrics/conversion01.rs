@@ -17,7 +17,6 @@
 
 use crate::convertible::ConvertibleBond;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Standard conversion bump: 1% (0.01)
@@ -48,7 +47,7 @@ impl MetricCalculator for Conversion01Calculator {
             return Ok(0.0);
         }
 
-        let pv_up = bond_up.value(context.curves.as_ref(), as_of)?.amount();
+        let pv_up = super::model::model_value(context, &bond_up, context.curves.as_ref(), as_of)?;
 
         // Bump conversion parameter down by 1%
         let mut bond_down = bond.clone();
@@ -60,7 +59,8 @@ impl MetricCalculator for Conversion01Calculator {
             bond_down.conversion.price = Some(price * (1.0 + CONVERSION_BUMP_PCT));
         }
 
-        let pv_down = bond_down.value(context.curves.as_ref(), as_of)?.amount();
+        let pv_down =
+            super::model::model_value(context, &bond_down, context.curves.as_ref(), as_of)?;
 
         // The two scenarios are already ±1%; the standardized metric is the
         // PV change for a 1% move, not the derivative per unit ratio/price.

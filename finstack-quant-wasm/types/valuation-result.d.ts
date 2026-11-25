@@ -361,6 +361,8 @@ export type DecimalWire = string;
  * ## Credit Models
  * - [`HazardRate`](Self::HazardRate): Fractional-recovery hazard-rate pricing
  * - [`RatesCredit`](Self::RatesCredit): Joint short-rate and hazard-rate pricing
+ * - [`TsiveriotisFernandes`](Self::TsiveriotisFernandes): Convertible lattice with
+ *   spread-discounted cash component
  *
  * ## Monte Carlo Models
  * - [`MonteCarloGBM`](Self::MonteCarloGBM): GBM simulation
@@ -409,7 +411,8 @@ export type ModelKey =
   | "rough_heston_fourier"
   | "pde_crank_nicolson_1d"
   | "pde_adi_2d"
-  | "bloomberg_cdso";
+  | "bloomberg_cdso"
+  | "tsiveriotis_fernandes";
 /**
  * Finite JSON number that is strictly greater than zero.
  *
@@ -2077,7 +2080,8 @@ export interface ValuationProvenance {
     | "rough_heston_fourier"
     | "pde_crank_nicolson_1d"
     | "pde_adi_2d"
-    | "bloomberg_cdso";
+    | "bloomberg_cdso"
+    | "tsiveriotis_fernandes";
   /**
    * Valuation date the caller requested.
    *
@@ -3000,7 +3004,8 @@ export interface CreditDerivativeValuationDetails {
     | "rough_heston_fourier"
     | "pde_crank_nicolson_1d"
     | "pde_adi_2d"
-    | "bloomberg_cdso";
+    | "bloomberg_cdso"
+    | "tsiveriotis_fernandes";
 }
 /**
  * Metadata for FX-bearing valuation paths (FX forwards, FX options, quanto).
@@ -3348,7 +3353,8 @@ export interface MonteCarloValuationDetails {
     | "rough_heston_fourier"
     | "pde_crank_nicolson_1d"
     | "pde_adi_2d"
-    | "bloomberg_cdso";
+    | "bloomberg_cdso"
+    | "tsiveriotis_fernandes";
   /**
    * Deterministic random seed used for the run.
    */

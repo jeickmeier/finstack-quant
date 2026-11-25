@@ -18,6 +18,7 @@ mod cs01;
 mod dividend_risk;
 mod greeks;
 mod implied_vol;
+mod model;
 mod oas;
 mod register;
 

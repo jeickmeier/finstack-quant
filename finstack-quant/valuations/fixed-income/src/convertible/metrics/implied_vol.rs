@@ -46,10 +46,14 @@ impl MetricCalculator for ImpliedVolCalculator {
             let price = context.reprice_instrument_money(&trial, &context.curves, as_of)?;
             // Price error per unit notional keeps the stopping rule independent
             // of trade scale while preserving the settlement-date quote basis.
-            let residual =
-                (settlement_dirty_price(&trial, &context.curves, as_of, price.amount())?
-                    - target_dirty)
-                    / bond.notional.amount();
+            let residual = (settlement_dirty_price(
+                &trial,
+                &context.curves,
+                as_of,
+                price.amount(),
+                super::model::selected_model(context)?,
+            )? - target_dirty)
+                / bond.notional.amount();
             if !residual.is_finite() {
                 return Err(Error::Validation(
                     "non-finite convertible implied-volatility residual".into(),

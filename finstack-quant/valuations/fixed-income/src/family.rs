@@ -33,6 +33,7 @@ fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
         crate::fi_trs::FiIndexTotalReturnSwap
     );
     registry.register(crate::convertible::pricing::ConvertibleTreePricer)?;
+    registry.register(crate::convertible::pricing::ConvertibleTsiveriotisFernandesPricer)?;
     register_generic!(
         registry,
         InstrumentType::InflationLinkedBond,

@@ -21,13 +21,13 @@
 //! [canonical]: finstack_quant_valuations_core::metrics::sensitivities::cs01
 
 use crate::convertible::ConvertibleBond;
+use crate::convertible::pricing::{ConvertibleModel, price_convertible_bond_with_model};
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_valuations_core::metrics::{STANDARD_BUCKETS_YEARS, format_bucket_label};
 use std::borrow::Cow;
@@ -38,6 +38,8 @@ struct Cs01Setup {
     bond: ConvertibleBond,
     market: MarketContext,
     curve_id: CurveId,
+    /// Credit lattice every base and shocked value is priced on.
+    model: ConvertibleModel,
 }
 
 /// Resolve the curve to shock: the bond's own hazard curve, or the z-spread
@@ -57,7 +59,11 @@ struct Cs01Setup {
 /// * `market` - Base market context supplying the risk-free discount curve and,
 ///   when set, the bond's hazard curve; cloned with the synthetic curve
 ///   inserted for the fallback.
-fn cs01_setup(bond: &ConvertibleBond, market: &MarketContext) -> Result<Cs01Setup> {
+fn cs01_setup(
+    bond: &ConvertibleBond,
+    market: &MarketContext,
+    model: ConvertibleModel,
+) -> Result<Cs01Setup> {
     tracing::debug!(
         instrument = %bond.id.as_str(),
         "convertible CS01: no credit curve configured; falling back to a z-spread \
@@ -80,6 +86,7 @@ fn cs01_setup(bond: &ConvertibleBond, market: &MarketContext) -> Result<Cs01Setu
         bond: shocked,
         market: market.clone().try_insert(synthetic)?,
         curve_id,
+        model,
     })
 }
 
@@ -90,7 +97,12 @@ impl Cs01Setup {
             id: self.curve_id.clone(),
             spec,
         }])?;
-        Ok(self.bond.value(&bumped, as_of)?.amount())
+        self.pv(&bumped, as_of)
+    }
+
+    /// Value of the prepared bond on `market`, on the selected lattice.
+    fn pv(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
+        Ok(price_convertible_bond_with_model(&self.bond, market, as_of, self.model)?.amount())
     }
 
     /// CS01 in currency per 1 bp of spread for the shock built by `spec_for`
@@ -113,8 +125,12 @@ impl MetricCalculator for Cs01Calculator {
             return finstack_quant_valuations_core::metrics::sensitivities::cs01::GenericParallelCs01.calculate(context);
         }
 
-        let setup = cs01_setup(bond, context.curves.as_ref())?;
-        let pv_base = setup.bond.value(&setup.market, as_of)?.amount();
+        let setup = cs01_setup(
+            bond,
+            context.curves.as_ref(),
+            super::model::selected_model(context)?,
+        )?;
+        let pv_base = setup.pv(&setup.market, as_of)?;
         setup.cs01(as_of, pv_base, BumpSpec::parallel_bp)
     }
 }
@@ -165,10 +181,14 @@ impl MetricCalculator for BucketedCs01Calculator {
         }
 
         let series_key = bond.id.as_str();
-        let setup = cs01_setup(&bond, context.curves.as_ref())?;
+        let setup = cs01_setup(
+            &bond,
+            context.curves.as_ref(),
+            super::model::selected_model(context)?,
+        )?;
         // Price the prepared synthetic-curve bond once using the same model
         // as every bumped value; the context may carry a different base model.
-        let pv_base = setup.bond.value(&setup.market, as_of)?.amount();
+        let pv_base = setup.pv(&setup.market, as_of)?;
 
         let mut series: Vec<(Cow<'static, str>, f64)> = Vec::new();
         let mut total = 0.0;
@@ -319,7 +339,12 @@ mod tests {
         let bond = make_bond_without_credit_curve();
         let mut ctx = make_context(bond.clone(), as_of);
         ctx.set_base_value(Money::from((17_i64, Currency::USD)));
-        let setup = super::cs01_setup(&bond, ctx.curves.as_ref()).expect("prepared setup");
+        let setup = super::cs01_setup(
+            &bond,
+            ctx.curves.as_ref(),
+            super::ConvertibleModel::DefaultableEquity,
+        )
+        .expect("prepared setup");
         let expected: Vec<_> = STANDARD_BUCKETS_YEARS
             .iter()
             .enumerate()

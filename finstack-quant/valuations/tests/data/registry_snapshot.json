@@ -1043,7 +1043,8 @@
         "vega"
       ],
       "models": [
-        "tree"
+        "tree",
+        "tsiveriotis_fernandes"
       ]
     },
     "credit_default_swap": {

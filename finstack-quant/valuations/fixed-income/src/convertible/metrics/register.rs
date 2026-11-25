@@ -102,7 +102,12 @@ pub(crate) struct BondFloorCalculator;
 impl MetricCalculator for BondFloorCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let bond: &ConvertibleBond = context.instrument_as()?;
-        crate::convertible::pricing::price_bond_floor(bond, &context.curves, context.as_of)
+        crate::convertible::pricing::price_bond_floor(
+            bond,
+            &context.curves,
+            context.as_of,
+            super::model::selected_model(context)?,
+        )
     }
 }
 

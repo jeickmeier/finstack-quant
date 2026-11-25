@@ -25,7 +25,12 @@ from .commodity import (
 )
 from .commodity_swaption import build_commodity_swaption_call, build_commodity_swaption_put
 from .common import require_supported_quantlib, write_or_check
-from .convertible import build_zero_coupon_convertible
+from .convertible import (
+    build_tf_convertible_at_the_money,
+    build_tf_convertible_in_the_money,
+    build_tf_convertible_out_of_the_money,
+    build_zero_coupon_convertible,
+)
 from .credit import build_single_name_cds
 from .credit_index import build_cds_index
 from .deposits import build_deposit
@@ -247,6 +252,18 @@ PRODUCTS: dict[str, tuple[str, Callable[[], dict[str, Any]]]] = {
     "yoy_inflation_floor_normal": (
         "inflation_cap_floor/usd_yoy_inflation_floor_normal_quantlib.json",
         build_yoy_inflation_floor_normal,
+    ),
+    "tf_convertible_at_the_money": (
+        "convertible/usd_convertible_tf_atm_3y_quantlib.json",
+        build_tf_convertible_at_the_money,
+    ),
+    "tf_convertible_out_of_the_money": (
+        "convertible/usd_convertible_tf_otm_3y_quantlib.json",
+        build_tf_convertible_out_of_the_money,
+    ),
+    "tf_convertible_in_the_money": (
+        "convertible/usd_convertible_tf_itm_3y_quantlib.json",
+        build_tf_convertible_in_the_money,
     ),
     "quanto_option": (
         "quanto_option/nky_usd_quanto_call_1y_quantlib.json",

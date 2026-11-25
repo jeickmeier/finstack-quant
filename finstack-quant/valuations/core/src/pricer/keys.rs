@@ -327,6 +327,8 @@ impl_key_strings!(
 /// ## Credit Models
 /// - [`HazardRate`](Self::HazardRate): Fractional-recovery hazard-rate pricing
 /// - [`RatesCredit`](Self::RatesCredit): Joint short-rate and hazard-rate pricing
+/// - [`TsiveriotisFernandes`](Self::TsiveriotisFernandes): Convertible lattice with
+///   spread-discounted cash component
 ///
 /// ## Monte Carlo Models
 /// - [`MonteCarloGBM`](Self::MonteCarloGBM): GBM simulation
@@ -521,6 +523,15 @@ pub enum ModelKey {
     ///
     /// Used for: CDS options (`InstrumentType::CdsOption`).
     BloombergCdso = 52,
+    /// Tsiveriotis-Fernandes convertible model on a binomial equity lattice.
+    ///
+    /// The cash-only part of the bond is discounted at the risk-free rate plus
+    /// the issuer credit spread and the equity part at the risk-free rate,
+    /// blended by the conversion probability at each node. There is no default
+    /// event on the lattice.
+    ///
+    /// Used for: convertible bonds (`InstrumentType::Convertible`).
+    TsiveriotisFernandes = 53,
 }
 
 impl_key_strings!(
@@ -556,6 +567,7 @@ impl_key_strings!(
     PdeCrankNicolson1D => "pde_crank_nicolson_1d",
     PdeAdi2D => "pde_adi_2d",
     BloombergCdso => "bloomberg_cdso",
+    TsiveriotisFernandes => "tsiveriotis_fernandes",
 );
 
 /// Composite key identifying a specific (instrument, model) pricing combination.
