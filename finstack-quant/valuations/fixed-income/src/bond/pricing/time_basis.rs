@@ -160,6 +160,8 @@ pub(crate) struct BondModelSchedule {
     /// Remaining coupons as `(model time, accrual year fraction, payment date)`.
     /// Coupons inside an ex-coupon window at `as_of` are excluded.
     pub(crate) coupons: Vec<(f64, f64, Date)>,
+    /// Annualized coupon rates as decimals corresponding element-wise to `coupons`.
+    pub(crate) coupon_rates: Vec<f64>,
     /// Accrued interest at `as_of` in currency units (negative inside an
     /// ex-coupon window).
     pub(crate) accrued: f64,
@@ -173,7 +175,8 @@ pub(crate) struct BondModelSchedule {
 pub(crate) fn bond_model_schedule(bond: &Bond, as_of: Date) -> Result<BondModelSchedule> {
     let schedule = bond.full_cashflow_schedule(&MarketContext::new())?;
     let ex_coupon = bond.accrual_config().ex_coupon;
-    let mut coupon_flows: Vec<(Date, f64)> = Vec::new();
+    let default_rate = bond.cashflow_spec.fixed_coupon_rate().unwrap_or(0.0);
+    let mut coupon_flows: Vec<(Date, f64, f64)> = Vec::new();
     for cf in schedule.get_flows() {
         if cf.get_date() <= as_of || !(cf.get_kind().is_coupon() || cf.get_kind() == CFKind::Pik) {
             continue;
@@ -187,11 +190,15 @@ pub(crate) fn bond_model_schedule(bond: &Bond, as_of: Date) -> Result<BondModelS
         // accrual period; keep one entry per payment date.
         if coupon_flows
             .last()
-            .is_some_and(|&(d, _)| d == cf.get_date())
+            .is_some_and(|&(d, _, _)| d == cf.get_date())
         {
             continue;
         }
-        coupon_flows.push((cf.get_date(), cf.get_accrual_factor()));
+        coupon_flows.push((
+            cf.get_date(),
+            cf.get_accrual_factor(),
+            cf.get_rate().unwrap_or(default_rate),
+        ));
     }
 
     let day_count = bond.cashflow_spec.day_count();
@@ -199,7 +206,7 @@ pub(crate) fn bond_model_schedule(bond: &Bond, as_of: Date) -> Result<BondModelS
     let ref_period = icma_reference_period(
         day_count,
         frequency,
-        coupon_flows.iter().map(|&(d, _)| d),
+        coupon_flows.iter().map(|&(d, _, _)| d),
         as_of,
     );
     let year_fraction = |date| {
@@ -211,12 +218,14 @@ pub(crate) fn bond_model_schedule(bond: &Bond, as_of: Date) -> Result<BondModelS
     };
     let horizon = coupon_flows
         .last()
-        .map_or(bond.maturity, |&(d, _)| d.max(bond.maturity));
+        .map_or(bond.maturity, |&(d, _, _)| d.max(bond.maturity));
     let maturity_years = year_fraction(horizon)?;
-    let coupons = coupon_flows
-        .into_iter()
-        .map(|(date, accrual)| Ok((year_fraction(date)?, accrual, date)))
-        .collect::<Result<Vec<_>>>()?;
+    let mut coupons = Vec::with_capacity(coupon_flows.len());
+    let mut coupon_rates = Vec::with_capacity(coupon_flows.len());
+    for (date, accrual, rate) in coupon_flows {
+        coupons.push((year_fraction(date)?, accrual, date));
+        coupon_rates.push(rate);
+    }
     let accrued = finstack_quant_cashflows::accrual::accrued_interest_amount(
         &schedule,
         as_of,
@@ -227,6 +236,7 @@ pub(crate) fn bond_model_schedule(bond: &Bond, as_of: Date) -> Result<BondModelS
         horizon,
         maturity_years,
         coupons,
+        coupon_rates,
         accrued,
     })
 }

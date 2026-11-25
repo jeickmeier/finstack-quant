@@ -87,10 +87,23 @@ impl MetricCalculator for DiscountMarginCalculator {
 
         // Root-find DM such that PV(dm) - dirty = 0. The objective is
         // `price_from_dm`: the Z-spread kernel on a clone with price-driving
-        // overrides cleared. The kernel (schedule projection, workout path,
-        // discount factors) does not depend on the DM, so build it once.
+        // overrides cleared except the workout-selecting clean price quote
+        // (needed for option-bearing FRNs). The kernel does not depend on DM,
+        // so build it once.
         let mut model_bond = bond.clone();
+        let saved_clean_px = model_bond
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price_pct;
         clear_price_driving_overrides(&mut model_bond);
+        model_bond
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price_pct = saved_clean_px.or_else(|| {
+            bond.has_exercise_rights().then(|| {
+                (target - quote_ctx.accrued_at_quote_date) / bond.notional.amount() * 100.0
+            })
+        });
         let kernel = BondZSpreadPricingKernel::new(&model_bond, &context.curves, context.as_of)?;
         solve_kernel_spread(
             bond,
@@ -179,6 +192,97 @@ mod tests {
             "DM solver must return Err when every price_from_dm call fails (missing forward \
              curve), not Ok({:?})",
             result.ok()
+        );
+    }
+
+    #[test]
+    fn callable_frn_dm_and_price_from_dm_roundtrip() {
+        use crate::bond::CallPut;
+        use finstack_quant_core::dates::Tenor;
+        use finstack_quant_core::market_data::term_structures::ForwardCurve;
+        use finstack_quant_core::math::Compounding;
+        use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
+
+        let as_of = date!(2025 - 01 - 01);
+        let mut bond = crate::bond::Bond::floating(crate::bond::FloatingBondParams {
+            id: "FRN-CALLABLE-DM".into(),
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            forward_curve_id: "USD-SOFR-3M".into(),
+            spread_bp: 150.into(),
+            issue_date: as_of,
+            maturity: date!(2029 - 01 - 01),
+            frequency: Tenor::quarterly(),
+            quote_compounding: Compounding::QUARTERLY,
+            day_count: finstack_quant_core::dates::DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+        })
+        .expect("frn");
+        bond.call_put = Some(crate::bond::CallPutSchedule {
+            calls: vec![CallPut {
+                start: date!(2027 - 01 - 01),
+                end: date!(2028 - 01 - 01),
+                price_pct_of_par: 100.0,
+                make_whole: None,
+            }],
+            puts: vec![],
+        });
+        bond.settlement_convention = None;
+        bond.instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price_pct = Some(99.25);
+
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .knots([(0.0, 1.0), (4.0, (-0.04_f64 * 4.0).exp())])
+            .interp(InterpStyle::MonotoneConvex)
+            .extrapolation(ExtrapolationPolicy::Extend)
+            .build()
+            .expect("disc");
+        let fwd = ForwardCurve::builder("USD-SOFR-3M")
+            .base_date(as_of)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .knots([(0.0, 1.0), (4.0, (-0.042_f64 * 4.0).exp())])
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Extend)
+            .build()
+            .expect("fwd");
+        let fixing = finstack_quant_core::market_data::scalars::ScalarTimeSeries::new(
+            "FIXING:USD-SOFR-3M",
+            vec![(date!(2024 - 12 - 30), 0.042)],
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("fixing series");
+        let market = Arc::new(
+            MarketContext::new()
+                .try_insert(disc)
+                .expect("disc")
+                .try_insert(fwd)
+                .expect("fwd")
+                .insert_series(fixing),
+        );
+
+        let mut mctx = MetricContext::new(
+            Arc::new(bond.clone()),
+            Arc::clone(&market),
+            as_of,
+            bond.notional,
+            MetricContext::default_config(),
+        );
+        let dm = DiscountMarginCalculator
+            .calculate(&mut mctx)
+            .expect("callable FRN DM solve");
+        assert!(dm.is_finite() && dm > 0.0, "expected positive DM, got {dm}");
+
+        let repriced =
+            crate::bond::pricing::quote_conversions::price_from_dm(&bond, &market, as_of, dm)
+                .expect("price_from_dm on callable FRN");
+        let clean_repriced = repriced / bond.notional.amount() * 100.0;
+        assert!(
+            (clean_repriced - 99.25).abs() < 1e-4,
+            "price_from_dm ({clean_repriced}) must match quoted clean price 99.25"
         );
     }
 }

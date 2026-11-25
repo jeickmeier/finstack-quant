@@ -67,7 +67,7 @@ use finstack_quant_valuations_core::impl_instrument_base;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct DollarRoll {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -171,6 +171,8 @@ pub struct DollarRoll {
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(DollarRoll);
 
 impl DollarRoll {
     /// Validate both TBA legs and the chronological roll contract.
@@ -649,5 +651,14 @@ mod production_mortgage_audit {
             -roll.notional.amount() * (roll.back_price / 100.0 + roll.coupon * 12.0 / 360.0);
         assert!((flows[0].get_amount().amount() - expected_front).abs() < 1e-8);
         assert!((flows[1].get_amount().amount() - expected_back).abs() < 1e-8);
+    }
+
+    #[test]
+    fn serde_rejects_invalid_dollar_roll() {
+        let mut value =
+            serde_json::to_value(DollarRoll::example().expect("example")).expect("serialize");
+        value["back_settlement_month"] = value["front_settlement_month"].clone();
+        value["back_settlement_year"] = value["front_settlement_year"].clone();
+        assert!(serde_json::from_value::<DollarRoll>(value).is_err());
     }
 }

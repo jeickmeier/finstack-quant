@@ -28,13 +28,12 @@ impl Marginable for FiIndexTotalReturnSwap {
         self.margin_spec.as_ref().map(netting_set_id_from_spec)
     }
 
-    fn simm_sensitivities(
-        &self,
-        market: &MarketContext,
-        _as_of: Date,
-    ) -> Result<SimmSensitivities> {
+    fn simm_sensitivities(&self, market: &MarketContext, as_of: Date) -> Result<SimmSensitivities> {
         let currency = self.notional.currency();
         let mut sens = SimmSensitivities::new(currency);
+        if as_of >= self.schedule.end {
+            return Ok(sens);
+        }
 
         let duration = self.index_duration(market)?;
 

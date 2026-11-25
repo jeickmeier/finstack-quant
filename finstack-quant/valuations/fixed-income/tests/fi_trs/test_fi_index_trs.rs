@@ -1063,3 +1063,43 @@ fn test_fi_index_trs_theta_across_a_financing_reset() {
         assert!(result.measures["theta"].is_finite(), "{compounding:?}");
     }
 }
+
+#[test]
+fn serde_rejects_invalid_and_expired_fi_trs_zero_risk() {
+    use finstack_quant_margin::Marginable;
+    use finstack_quant_valuations_core::metrics::MetricId;
+
+    let mut invalid = serde_json::to_value(
+        finstack_quant_valuations_fixed_income::fi_trs::FiIndexTotalReturnSwap::example()
+            .expect("example"),
+    )
+    .expect("serialize");
+    invalid["initial_level"] = serde_json::json!(-5.0);
+    assert!(
+        serde_json::from_value::<
+            finstack_quant_valuations_fixed_income::fi_trs::FiIndexTotalReturnSwap,
+        >(invalid)
+        .is_err()
+    );
+
+    let trs = TestFIIndexTrsBuilder::new().build();
+    let market = create_market_context();
+    let expired_as_of = trs.schedule.end;
+    let sens = trs
+        .simm_sensitivities(&market, expired_as_of)
+        .expect("expired simm");
+    assert!(
+        sens.is_empty(),
+        "expired TRS must emit no SIMM sensitivities"
+    );
+
+    let metrics = trs
+        .price_with_metrics(
+            &market,
+            expired_as_of,
+            &[MetricId::DurationDv01],
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
+        )
+        .expect("expired duration dv01");
+    assert_eq!(metrics.measures["duration_dv01"], 0.0);
+}

@@ -39,15 +39,19 @@ impl BondValuator {
     /// nodes, so the model price does not ripple with the rate level at the
     /// node spacing. A call with friction is a jump in value at the exercise
     /// threshold rather than a kink, and keeps the node-by-node rule.
-    fn apply_exercise_level(&self, step: usize, values: &mut [f64]) {
+    fn apply_exercise_level(&self, step: usize, values: &mut [f64], scratch: &mut Vec<f64>) {
         if let Some(put_price) = self.put_at(step) {
-            smoothed_max(values, &vec![put_price; values.len()]);
+            scratch.clear();
+            scratch.resize(values.len(), put_price);
+            smoothed_max(values, scratch);
         }
         if let Some(call_price) = self.call_at(step) {
             let friction_amount =
                 self.outstanding_principal_at(step) * (self.call_friction_cents / 10_000.0);
             if friction_amount == 0.0 {
-                smoothed_min(values, &vec![call_price; values.len()]);
+                scratch.clear();
+                scratch.resize(values.len(), call_price);
+                smoothed_min(values, scratch);
             } else {
                 for value in values.iter_mut() {
                     if *value > call_price + friction_amount {
@@ -100,6 +104,7 @@ impl BondValuator {
         if oas_compounding == Compounding::Continuous {
             let terminal_cf = self.terminal_value(final_step, oas_rate);
             let terminal_values = vec![terminal_cf; hw_tree.num_nodes(final_step)];
+            let mut scratch = Vec::with_capacity(hw_tree.num_nodes(final_step));
 
             return hw_tree.backward_induction(&terminal_values, |step, values| {
                 // The HW tree's backward_induction already discounts by the
@@ -109,7 +114,7 @@ impl BondValuator {
                 for value in values.iter_mut() {
                     *value *= oas_df;
                 }
-                self.apply_exercise_level(step, values);
+                self.apply_exercise_level(step, values, &mut scratch);
                 let cashflow = self.cashflow_at_oas(step, oas_rate);
                 for value in values.iter_mut() {
                     *value += cashflow;
@@ -133,12 +138,13 @@ impl BondValuator {
         let terminal_values: Vec<f64> = (0..hw_tree.num_nodes(final_step))
             .map(|node_idx| self.terminal_value(final_step, node_shifts[final_step][node_idx]))
             .collect();
+        let mut scratch = Vec::with_capacity(hw_tree.num_nodes(final_step));
         hw_tree.backward_induction(&terminal_values, |step, values| {
             let dt = hw_tree.dt_at_step(step);
             for (value, shift) in values.iter_mut().zip(&node_shifts[step]) {
                 *value *= (-shift * dt).exp();
             }
-            self.apply_exercise_level(step, values);
+            self.apply_exercise_level(step, values, &mut scratch);
             for (value, shift) in values.iter_mut().zip(&node_shifts[step]) {
                 *value += self.cashflow_at_oas(step, *shift);
             }

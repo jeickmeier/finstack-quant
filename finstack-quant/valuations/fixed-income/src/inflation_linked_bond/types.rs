@@ -138,7 +138,7 @@ impl std::str::FromStr for DeflationProtection {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct InflationLinkedBond {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -234,6 +234,8 @@ pub struct InflationLinkedBond {
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(InflationLinkedBond);
 
 impl InflationLinkedBond {
     /// Quoted clean price per 100 of real face from
@@ -780,13 +782,24 @@ impl finstack_quant_valuations_core::instruments::Instrument for InflationLinked
         let mut terms = finstack_quant_valuations_core::instruments::cashflow_export::CashflowExportTerms::from_schedule(
             finstack_quant_cashflows::CashflowProvider::cashflow_schedule(self, market, as_of)?,
         );
+        let mut contractual_by_payment: finstack_quant_core::FxHashMap<Date, Date> = self
+            .periods()?
+            .into_iter()
+            .map(|period| (period.payment_date, period.unadjusted_end))
+            .collect();
+        contractual_by_payment.insert(self.principal_payment_date()?, self.maturity);
+
         // A ratio the market cannot supply exports as an empty cell.
         let ratios = terms
             .schedule
             .get_flows()
             .iter()
-            .filter_map(
-                |flow| match self.index_ratio_from_market(flow.get_date(), market, as_of) {
+            .filter_map(|flow| {
+                let reference_date = contractual_by_payment
+                    .get(&flow.get_date())
+                    .copied()
+                    .unwrap_or_else(|| flow.get_date());
+                match self.index_ratio_from_market(reference_date, market, as_of) {
                     Ok(ratio) => Some((flow.get_date(), ratio)),
                     Err(err) => {
                         tracing::warn!(
@@ -798,8 +811,8 @@ impl finstack_quant_valuations_core::instruments::Instrument for InflationLinked
                         );
                         None
                     }
-                },
-            )
+                }
+            })
             .collect();
         terms.index_ratios = Some(ratios);
         Ok(terms)
@@ -894,7 +907,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
             let accrual_factor = period.accrual_year_fraction.max(0.0);
             let base_amount = self.notional.amount() * coupon_rate * accrual_factor;
             let ratio = self.payment_index_ratio(
-                period.payment_date,
+                period.unadjusted_end,
                 curves,
                 as_of,
                 self.deflation_protection == DeflationProtection::AllPayments,
@@ -915,7 +928,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
         let principal_date = self.principal_payment_date()?;
         if principal_date > as_of {
             let principal_ratio = self.payment_index_ratio(
-                principal_date,
+                self.maturity,
                 curves,
                 as_of,
                 self.deflation_protection != DeflationProtection::None,

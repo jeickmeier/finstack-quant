@@ -15,13 +15,11 @@ use smallvec::SmallVec;
 pub(crate) struct MertonBondTerms {
     /// Initial face amount in currency units.
     pub(crate) notional: f64,
-    /// Annual coupon rate as a decimal.
-    pub(crate) coupon_rate: f64,
     /// Horizon (final redemption) time in years; strictly positive.
     pub(crate) maturity_years: f64,
-    /// Remaining coupons as `(payment time, accrual year fraction)`, ascending,
-    /// with every payment time in `(0, maturity_years]`.
-    pub(crate) coupons: Vec<(f64, f64)>,
+    /// Remaining coupons as `(payment time, accrual year fraction, coupon rate)`,
+    /// ascending, with every payment time in `(0, maturity_years]`.
+    pub(crate) coupons: Vec<(f64, f64, f64)>,
     /// Accrued interest at the valuation date in currency units.
     pub(crate) accrued: f64,
 }
@@ -81,14 +79,17 @@ impl MertonMcEngine {
                 "Merton MC requires coupon_frequency >= 1".to_string(),
             ));
         }
-        let coupons = Self::coupon_schedule(maturity_years, coupon_frequency);
+        let coupon_schedule = Self::coupon_schedule(maturity_years, coupon_frequency);
         let period = 1.0 / coupon_frequency as f64;
-        let elapsed = coupons
+        let elapsed = coupon_schedule
             .first()
             .map_or(0.0, |&(t_first, _)| (period - t_first).max(0.0));
+        let coupons = coupon_schedule
+            .into_iter()
+            .map(|(t, accrual)| (t, accrual, coupon_rate))
+            .collect();
         let terms = MertonBondTerms {
             notional,
-            coupon_rate,
             maturity_years,
             coupons,
             accrued: notional * coupon_rate * elapsed,
@@ -106,8 +107,7 @@ impl MertonMcEngine {
         run: &MertonMcRun,
         discount_rate: f64,
     ) -> Result<MertonMcResult> {
-        let (notional, coupon_rate, maturity_years) =
-            (terms.notional, terms.coupon_rate, terms.maturity_years);
+        let (notional, maturity_years) = (terms.notional, terms.maturity_years);
         if !matches!(config.merton.dynamics(), AssetDynamics::GeometricBrownian) {
             return Err(finstack_quant_core::Error::Validation(
                 "Merton MC engine requires geometric Brownian asset dynamics".to_string(),
@@ -355,7 +355,7 @@ impl MertonMcEngine {
                         while coupon_idx < coupon_schedule.len()
                             && t >= coupon_schedule[coupon_idx].0 - dt * 0.5
                         {
-                            let (coupon_t, accrual) = coupon_schedule[coupon_idx];
+                            let (coupon_t, accrual, coupon_rate) = coupon_schedule[coupon_idx];
                             let coupon_amount = n_current * coupon_rate * accrual;
                             path_coupon_periods += 1;
                             let df = Self::df_at_time(dfs_ref, coupon_t, discount_rate);
@@ -710,9 +710,9 @@ impl MertonMcEngine {
         let mut pv = 0.0;
         let mut n = terms.notional;
 
-        for &(t, accrual) in &terms.coupons {
+        for &(t, accrual, coupon_rate) in &terms.coupons {
             let df = Self::df_at_time(cashflow_dfs, t, discount_rate) * (-spread * t).exp();
-            let coupon = n * terms.coupon_rate * accrual;
+            let coupon = n * coupon_rate * accrual;
 
             match pik_schedule.mode_at(t) {
                 PikMode::Cash | PikMode::Toggle => {

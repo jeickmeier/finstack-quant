@@ -324,17 +324,14 @@ impl Bond {
 
         let notional = self.notional.amount();
 
-        let (coupon_rate, coupon_type) = match &self.cashflow_spec {
-            CashflowSpec::Fixed(spec) => (spec.rate.to_f64().unwrap_or(0.0), spec.coupon_type),
+        let coupon_type = match &self.cashflow_spec {
+            CashflowSpec::Fixed(spec) => spec.coupon_type,
             CashflowSpec::Floating(_) => {
                 return Err(finstack_quant_core::Error::Validation(
                     "Merton MC pricing requires a fixed-coupon bond".to_string(),
                 ));
             }
-            // Step-up bonds are simulated at their initial rate.
-            CashflowSpec::StepUp(spec) => {
-                (spec.initial_rate.to_f64().unwrap_or(0.0), spec.coupon_type)
-            }
+            CashflowSpec::StepUp(spec) => spec.coupon_type,
             // The Merton MC engine simulates a constant notional with full
             // bullet redemption at maturity; silently extracting the base
             // coupon (the previous behavior) priced amortizers as bullets.
@@ -351,12 +348,12 @@ impl Bond {
         let schedule = crate::bond::pricing::time_basis::bond_model_schedule(self, as_of)?;
         let terms = MertonBondTerms {
             notional,
-            coupon_rate,
             maturity_years: schedule.maturity_years,
             coupons: schedule
                 .coupons
                 .iter()
-                .map(|&(t, accrual, _)| (t, accrual))
+                .zip(schedule.coupon_rates.iter())
+                .map(|(&(t, accrual, _), &rate)| (t, accrual, rate))
                 .collect(),
             accrued: schedule.accrued,
         };

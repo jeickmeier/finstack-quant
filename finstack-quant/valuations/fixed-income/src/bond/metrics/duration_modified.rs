@@ -49,7 +49,7 @@ impl MetricCalculator for ModifiedDurationCalculator {
         let has_options = bond.has_exercise_rights();
         if has_options && super::bond_risk_basis(context) == BondRiskBasis::CallableOas {
             return Ok(
-                super::effective::effective_duration_convexity(bond, context, None)?.duration,
+                super::effective::effective_duration_convexity_cached(context, None)?.duration,
             );
         }
         let workout = if has_options {

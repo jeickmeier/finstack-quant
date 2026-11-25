@@ -24,10 +24,35 @@ use finstack_quant_valuations_core::metrics::{MetricContext, MetricId};
 const DEFAULT_SHOCK_BPS: f64 = 25.0;
 
 /// Internal effective duration and convexity result.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct EffectiveDurationResult {
     pub duration: f64,
     pub convexity: f64,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CachedEffectiveDuration {
+    shock_bp: Option<f64>,
+    result: EffectiveDurationResult,
+}
+
+/// Cached variant of [`effective_duration_convexity`] storing the result in
+/// `context.ext` so sibling `DurationMod` and `Convexity` calculators under
+/// `BondRiskBasis::CallableOas` share one set of three tree pricings instead
+/// of repeating them (6 -> 3).
+pub(crate) fn effective_duration_convexity_cached(
+    context: &mut MetricContext,
+    shock_bp: Option<f64>,
+) -> Result<EffectiveDurationResult> {
+    if let Some(cached) = context.ext::<CachedEffectiveDuration>()
+        && cached.shock_bp == shock_bp
+    {
+        return Ok(cached.result);
+    }
+    let bond = context.instrument_as::<Bond>()?.clone();
+    let result = effective_duration_convexity(&bond, context, shock_bp)?;
+    context.set_ext(CachedEffectiveDuration { shock_bp, result });
+    Ok(result)
 }
 
 /// Calculate both effective duration and convexity in one pass (three

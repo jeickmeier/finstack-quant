@@ -81,7 +81,7 @@ mod repo_day_count_wire {
 /// ```
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct BondFutureSpecs {
     /// Standard coupon rate for conversion factor calculation (e.g., 0.06 for 6%).
     pub standard_coupon: f64,
@@ -91,6 +91,26 @@ pub struct BondFutureSpecs {
     #[serde(default = "default_repo_day_count", with = "repo_day_count_wire")]
     #[cfg_attr(feature = "json-schema", schemars(with = "RepoDayCountWire"))]
     pub repo_day_count: DayCount,
+}
+
+impl serde::Serialize for BondFutureSpecs {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        Self::serialize(self, serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for BondFutureSpecs {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Self::deserialize(deserializer)?;
+        value.validate().map_err(serde::de::Error::custom)?;
+        Ok(value)
+    }
 }
 
 fn default_repo_day_count() -> DayCount {
@@ -124,6 +144,28 @@ impl Default for BondFutureSpecs {
 }
 
 impl BondFutureSpecs {
+    /// Validate bond future specification fields.
+    ///
+    /// Checks that `standard_coupon` is finite and non-negative,
+    /// `standard_maturity_years` is finite and strictly positive, and
+    /// `repo_day_count` is supported (`act_360` or `act_365f`).
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        if !self.standard_coupon.is_finite() || self.standard_coupon < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "bond-future standard_coupon must be finite and non-negative, got {}",
+                self.standard_coupon
+            )));
+        }
+        if !self.standard_maturity_years.is_finite() || self.standard_maturity_years <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "bond-future standard_maturity_years must be finite and positive, got {}",
+                self.standard_maturity_years
+            )));
+        }
+        repo_annualization_denominator(self.repo_day_count)?;
+        Ok(())
+    }
+
     /// CME 10-Year U.S. Treasury Note futures (6% standard coupon, 10Y maturity, ACT/360 repo).
     #[must_use]
     pub const fn ust_10y() -> Self {

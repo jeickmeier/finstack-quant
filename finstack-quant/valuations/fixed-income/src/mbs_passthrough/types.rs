@@ -278,7 +278,7 @@ pub enum PoolType {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct AgencyMbsPassthrough {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -381,6 +381,8 @@ pub struct AgencyMbsPassthrough {
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
+
+finstack_quant_valuations_core::validate_on_deserialize!(AgencyMbsPassthrough);
 
 impl AgencyMbsPassthrough {
     /// Create a canonical example MBS for testing and documentation.
@@ -535,11 +537,29 @@ impl AgencyMbsPassthrough {
         self.wac - self.servicing_fee_bp / 10_000.0 - self.guarantee_fee_bp / 10_000.0
     }
 
+    /// Validate structural invariants of this agency MBS passthrough.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        finstack_quant_valuations_core::instruments::Instrument::validate_invariants(self)
+    }
+
     /// Validate that pass-through rate is consistent with WAC and fees.
     pub fn validate_coupon_consistency(&self) -> Result<()> {
+        for (label, value) in [
+            ("wac", self.wac),
+            ("coupon", self.coupon),
+            ("servicing_fee_bp", self.servicing_fee_bp),
+            ("guarantee_fee_bp", self.guarantee_fee_bp),
+        ] {
+            if !value.is_finite() || value < 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "MBS '{}' {label} must be finite and non-negative, got {value}",
+                    self.id
+                )));
+            }
+        }
         let calculated = self.calculated_net_coupon();
         let diff = (self.coupon - calculated).abs();
-        if diff > 1e-6 {
+        if !diff.is_finite() || diff > 1e-6 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "coupon {} does not match wac {} - servicing_fee_bp {} - guarantee_fee_bp {} (bp) = {}",
                 self.coupon, self.wac, self.servicing_fee_bp, self.guarantee_fee_bp, calculated
@@ -600,6 +620,45 @@ impl finstack_quant_valuations_core::instruments::Instrument for AgencyMbsPassth
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate_coupon_consistency()?;
+        if !self.original_face.amount().is_finite() || self.original_face.amount() <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "MBS '{}' original_face must be finite and positive, got {}",
+                self.id,
+                self.original_face.amount()
+            )));
+        }
+        if !self.current_face.amount().is_finite()
+            || self.current_face.amount() < 0.0
+            || self.current_face.amount() > self.original_face.amount()
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "MBS '{}' current_face ({}) must be finite in [0, original_face={}]",
+                self.id,
+                self.current_face.amount(),
+                self.original_face.amount()
+            )));
+        }
+        if self.current_face.currency() != self.original_face.currency() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "MBS '{}' current_face currency {} must match original_face currency {}",
+                self.id,
+                self.current_face.currency(),
+                self.original_face.currency()
+            )));
+        }
+        if self.wam_months == 0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "MBS '{}' wam_months must be positive",
+                self.id
+            )));
+        }
+        if self.discount_curve_id.as_str().trim().is_empty() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "MBS '{}' discount_curve_id cannot be empty",
+                self.id
+            )));
+        }
+        self.prepayment_spec.validate()?;
         finstack_quant_core::validation::validate_date_range_strict(
             self.issue_date,
             self.maturity,
@@ -923,6 +982,7 @@ mod tests {
             .expect("AgencyMbsPassthrough should serialize to an object");
         obj.remove("servicing_fee_bp");
         obj.remove("guarantee_fee_bp");
+        obj.insert("wac".into(), obj["coupon"].clone());
 
         let mbs: AgencyMbsPassthrough = serde_json::from_value(value).expect("deserialize");
         assert_eq!(mbs.servicing_fee_bp, 0.0);
@@ -1007,5 +1067,25 @@ mod production_mortgage_audit {
                 "{retired}: {err}"
             );
         }
+    }
+
+    #[test]
+    fn validation_and_serde_reject_nan_negative_and_invalid_faces() {
+        use finstack_quant_valuations_core::instruments::Instrument;
+
+        let mut nan_mbs = AgencyMbsPassthrough::example().expect("example");
+        nan_mbs.coupon = f64::NAN;
+        assert!(nan_mbs.validate_invariants().is_err());
+
+        let base = serde_json::to_value(AgencyMbsPassthrough::example().expect("example"))
+            .expect("serialize");
+
+        let mut neg_coupon = base.clone();
+        neg_coupon["coupon"] = serde_json::json!(-0.01);
+        assert!(serde_json::from_value::<AgencyMbsPassthrough>(neg_coupon).is_err());
+
+        let mut bad_face = base;
+        bad_face["current_face"]["amount"] = serde_json::json!(2_000_000.0);
+        assert!(serde_json::from_value::<AgencyMbsPassthrough>(bad_face).is_err());
     }
 }

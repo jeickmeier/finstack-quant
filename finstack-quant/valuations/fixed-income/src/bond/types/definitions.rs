@@ -18,6 +18,7 @@ fn is_linear_accrual_method(method: &finstack_quant_cashflows::accrual::AccrualM
 /// Bond settlement and ex-coupon conventions.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct BondSettlementConvention {
     /// Number of settlement days after trade date (e.g., 2 for T+2).
     #[serde(default)]
@@ -219,7 +220,7 @@ impl<'de> serde::Deserialize<'de> for Bond {
             None
         };
 
-        Ok(Bond {
+        let bond = Bond {
             id: helper.id,
             notional: helper.notional,
             issue_date,
@@ -239,7 +240,9 @@ impl<'de> serde::Deserialize<'de> for Bond {
             accrual_method: helper.accrual_method,
             attributes: helper.attributes,
             settlement_convention,
-        })
+        };
+        bond.validate().map_err(serde::de::Error::custom)?;
+        Ok(bond)
     }
 }
 
