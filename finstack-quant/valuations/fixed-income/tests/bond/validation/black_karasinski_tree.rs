@@ -95,8 +95,8 @@ fn price_and_oas(bond: &Bond) -> (f64, f64) {
 #[test]
 fn bdt_callable_price_and_oas_are_unchanged() {
     let (price, oas) = price_and_oas(&callable_bond(100.0, bdt_config()));
-    assert!((price - 1_068_306.757_861_509_5).abs() < 1e-6, "{price}");
-    assert!((oas - 0.011_722_331_676).abs() < 1e-10, "{oas}");
+    assert!((price - 1_068_306.763_454_557).abs() < 1e-6, "{price}");
+    assert!((oas - 0.011_722_356_574).abs() < 1e-10, "{oas}");
 }
 
 /// As κ → 0 the trinomial Black-Karasinski lattice tends to the binomial

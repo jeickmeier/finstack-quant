@@ -19,6 +19,7 @@
 
 mod credit_tree;
 pub(crate) mod engine;
+mod exercise_level;
 pub(crate) mod spot_ladder;
 mod tf_tree;
 mod tree_pricer;

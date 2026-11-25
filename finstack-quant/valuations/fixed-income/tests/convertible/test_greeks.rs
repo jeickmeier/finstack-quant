@@ -139,8 +139,10 @@ fn test_gamma_non_negative() {
 fn test_gamma_peaks_near_atm() {
     let bond = create_standard_convertible();
 
-    // Use enough tree steps for stable gamma (second derivative is noisy with few steps).
-    let bond = with_tree_steps(&bond, 100);
+    // At-the-money gamma from a 1% bump converges from below as the lattice
+    // refines (0.026 at 100 steps, 0.054 at 400, 0.060 at 1600, against 0.087
+    // at the low spot), so use enough steps for the comparison below to hold.
+    let bond = with_tree_steps(&bond, 400);
 
     // OTM
     let market_otm = create_market_context_with_params(

@@ -1,5 +1,6 @@
 //! Defaultable-equity tree with fractional recovery of outstanding principal.
 
+use super::exercise_level::{NodeExercise, apply_corrected_totals};
 use finstack_quant_core::{Error, Result};
 
 use finstack_quant_models::trees::tree_framework::EvolutionParams;
@@ -148,6 +149,9 @@ impl<'a> CreditTreeEngine<'a> {
             0.0
         };
 
+        // Exercise terms of the level being resolved; `None` marks a node
+        // with no decision to correct (a forced conversion).
+        let mut level: Vec<Option<NodeExercise>> = Vec::with_capacity(num_nodes);
         for i in 0..num_nodes {
             let node_spot = get_spot(self.steps, i);
             let conversion_val =
@@ -161,15 +165,23 @@ impl<'a> CreditTreeEngine<'a> {
                 .copied()
                 .unwrap_or(0.0);
             let cash_level = principal.max(terminal_put.unwrap_or(principal));
+            let can_convert = self.valuator.conversion_allowed(self.steps, node_spot);
             values.push(terminal_payoff(
                 conversion_val,
                 cash_level,
                 terminal_coupon,
-                self.valuator.conversion_allowed(self.steps, node_spot),
+                can_convert,
                 mandatory,
                 terminal_log_spacing,
             ));
+            level.push((can_convert && !mandatory).then_some(NodeExercise {
+                hold: cash_level,
+                conversion: Some(conversion_val),
+                called: None,
+                put: None,
+            }));
         }
+        apply_corrected_totals(&level, terminal_coupon, &mut values, |node| &mut node.0);
 
         // 2. Backward Induction. Double-buffer the value layers so each per-step
         // layer reuses one allocation (cleared) instead of allocating a fresh Vec.
@@ -196,6 +208,7 @@ impl<'a> CreditTreeEngine<'a> {
             let put_price_here = self.valuator.put_price_at_step(step);
 
             next_values.clear();
+            level.clear();
 
             for i in 0..current_num_nodes {
                 let (v_up, c_up) = values[i + 1];
@@ -230,6 +243,7 @@ impl<'a> CreditTreeEngine<'a> {
                         true,
                         0.0,
                     ));
+                    level.push(None);
                     continue;
                 } else if can_convert && conversion_val > final_total {
                     final_total = conversion_val;
@@ -256,6 +270,18 @@ impl<'a> CreditTreeEngine<'a> {
                 // the next credit-risky discounting step.
                 // Uses adjusted soft-call trigger with observation window correction.
                 let call_allowed = self.valuator.soft_call_triggered(node_spot);
+                level.push(Some(NodeExercise {
+                    hold: continuation_total,
+                    conversion: can_convert.then_some(conversion_val),
+                    called: call_price_here.filter(|_| call_allowed).map(|call_price| {
+                        if can_convert {
+                            call_price.max(conversion_val)
+                        } else {
+                            call_price
+                        }
+                    }),
+                    put: put_price_here,
+                }));
 
                 if call_allowed && let Some(call_price) = call_price_here {
                     // Holder converts in response to a call only if
@@ -295,6 +321,9 @@ impl<'a> CreditTreeEngine<'a> {
 
                 next_values.push((final_total, final_cash));
             }
+            // The node-wise decisions above set the cash component; the total
+            // takes the kink-corrected value of the same decisions.
+            apply_corrected_totals(&level, coupon, &mut next_values, |node| &mut node.0);
             std::mem::swap(&mut values, &mut next_values);
         }
 

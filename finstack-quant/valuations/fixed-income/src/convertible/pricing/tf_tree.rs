@@ -27,15 +27,17 @@
 //!
 //! On conversion `p` takes the share of the node's lattice cell that converts
 //! rather than jumping to one, so the price stays continuous in the share
-//! price as the conversion boundary crosses the lattice. The value itself
-//! takes the node's own decision, exactly as the defaultable-equity tree does,
-//! so with no credit spread the two lattices give the same price bit for bit.
+//! price as the conversion boundary crosses the lattice. The value takes the
+//! kink-corrected exercise decision of `exercise_level`, exactly as the
+//! defaultable-equity tree does, so with no credit spread the two lattices
+//! give the same price bit for bit.
 //!
 //! # References
 //!
 //! - Tsiveriotis, K., & Fernandes, C. (1998). "Valuing Convertible Bonds with
 //!   Credit Risk." `docs/REFERENCES.md#tsiveriotis-fernandes-1998`
 
+use super::exercise_level::{NodeExercise, apply_corrected_totals};
 use finstack_quant_core::{Error, Result};
 
 use finstack_quant_models::trees::tree_framework::EvolutionParams;
@@ -189,21 +191,32 @@ impl TsiveriotisFernandesEngine<'_> {
         let cash_level = principal.max(terminal_put.unwrap_or(principal));
 
         let mut values: Vec<(f64, f64)> = Vec::with_capacity(num_nodes);
+        // Exercise terms of the level being resolved; `None` marks a node
+        // with no decision to correct (a forced conversion).
+        let mut level: Vec<Option<NodeExercise>> = Vec::with_capacity(num_nodes);
         for i in 0..num_nodes {
             let node_spot = get_spot(self.steps, i);
             let conversion_val =
                 self.valuator
                     .conversion_value(node_spot, terminal_accretion, self.steps);
+            let can_convert = self.valuator.conversion_allowed(self.steps, node_spot);
             let (total, cash) = terminal_payoff(
                 conversion_val,
                 cash_level,
                 terminal_coupon,
-                self.valuator.conversion_allowed(self.steps, node_spot),
+                can_convert,
                 mandatory,
                 terminal_log_spacing,
             );
             values.push((total, equity_share(cash - terminal_coupon, cash_level)));
+            level.push((can_convert && !mandatory).then_some(NodeExercise {
+                hold: cash_level,
+                conversion: Some(conversion_val),
+                called: None,
+                put: None,
+            }));
         }
+        apply_corrected_totals(&level, terminal_coupon, &mut values, |node| &mut node.0);
 
         let mut next_values: Vec<(f64, f64)> = Vec::with_capacity(values.len());
         let mut rolled: Vec<RolledNode> = Vec::with_capacity(values.len());
@@ -249,6 +262,7 @@ impl TsiveriotisFernandesEngine<'_> {
 
             // Second pass: exercise decisions.
             next_values.clear();
+            level.clear();
             for i in 0..=step {
                 let RolledNode {
                     mut value,
@@ -270,13 +284,26 @@ impl TsiveriotisFernandesEngine<'_> {
                         0.0,
                     );
                     next_values.push((total, 1.0));
+                    level.push(None);
                     continue;
                 }
+                let call_allowed = self.valuator.soft_call_triggered(node_spot);
+                level.push(Some(NodeExercise {
+                    hold: value,
+                    conversion: can_convert.then_some(conversion_val),
+                    called: call_price_here.filter(|_| call_allowed).map(|call_price| {
+                        if can_convert {
+                            call_price.max(conversion_val)
+                        } else {
+                            call_price
+                        }
+                    }),
+                    put: put_price_here,
+                }));
                 if can_convert {
-                    // The value takes the node's own decision. The
-                    // conversion probability takes the share of the node's
-                    // cell that converts, so it moves continuously as the
-                    // conversion boundary crosses the lattice instead of
+                    // The conversion probability takes the share of the
+                    // node's cell that converts, so it moves continuously as
+                    // the conversion boundary crosses the lattice instead of
                     // jumping between zero and one.
                     let share = converting_share(&rolled, i);
                     probability = share + (1.0 - share) * probability;
@@ -288,9 +315,7 @@ impl TsiveriotisFernandesEngine<'_> {
                 // Issuer call: exercised only when it lowers the value, given
                 // the holder's best response (convert if permitted and worth
                 // more than the call price, else take cash).
-                if self.valuator.soft_call_triggered(node_spot)
-                    && let Some(call_price) = call_price_here
-                {
+                if call_allowed && let Some(call_price) = call_price_here {
                     let holder_converts = can_convert && conversion_val >= call_price;
                     let value_if_called = if holder_converts {
                         conversion_val
@@ -313,6 +338,9 @@ impl TsiveriotisFernandesEngine<'_> {
 
                 next_values.push((value + coupon, probability));
             }
+            // The node-wise decisions above set the conversion probability;
+            // the value takes the kink-corrected result of the same decisions.
+            apply_corrected_totals(&level, coupon, &mut next_values, |node| &mut node.0);
             std::mem::swap(&mut values, &mut next_values);
         }
 

@@ -360,7 +360,7 @@ fn checks() -> Vec<Check> {
                     json!({"anti_dilution": "none", "dilution_events": [], "dividend_adjustment": "none", "policy": {"upon_event": {"price_trigger": {"threshold_pct": 130.0, "observation_days": 20, "required_days_above": 20}}}, "price": 1.0, "ratio": null}),
                 ),
             ],
-            "1079.933110532801",
+            "1079.909159030148",
         ),
         (
             "cb_trigger_lo",
@@ -386,7 +386,7 @@ fn checks() -> Vec<Check> {
             ],
             // Last-digit move from the Tsiveriotis-Zhang terminal-split
             // smoothing (481dd75f3); the rename itself is still bit-exact.
-            "1119.083135256321",
+            "1119.1994063789316",
         ),
         (
             "cb_zero_cp",
@@ -402,7 +402,7 @@ fn checks() -> Vec<Check> {
                     json!({"anti_dilution": "none", "dilution_events": [], "dividend_adjustment": "none", "policy": "voluntary", "price": 1.0, "ratio": null}),
                 ),
             ],
-            "1069.083135256321",
+            "1069.1994063789311",
         ),
         (
             "sc_base",
