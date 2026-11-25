@@ -317,6 +317,10 @@ in both lattices, which changes `tree` prices and is a separate decision.
 
 **Follow-ups closed 2026-11-24**
 
+- The exercise kink in the value is now corrected in both lattices, which supersedes the "Kink
+  correction" difference and the "Known limitation" above: gamma is positive and converges with
+  the step count, and the credit-free price still equals `tree` bit for bit.
+
 - Methodology record written as a proposal:
   `docs/decisions/financial/valuations-other-fixed-income/17-convertible-tsiveriotis-fernandes.md`.
 - `convertible_spot_ladder` takes the model (Rust, Python `model=`, WASM `model`).

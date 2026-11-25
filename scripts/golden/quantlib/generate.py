@@ -51,6 +51,7 @@ from .inflation import (
     build_zero_coupon_inflation_swap,
 )
 from .linear import LINEAR_BUILDERS
+from .monte_carlo import MONTE_CARLO_BUILDERS
 from .ndf import build_ndf
 from .options import (
     build_arithmetic_asian_option,
@@ -293,6 +294,7 @@ PRODUCTS: dict[str, tuple[str, Callable[[], dict[str, Any]]]] = {
     ),
     **LINEAR_BUILDERS,
     **FUTURE_OPTION_BUILDERS,
+    **MONTE_CARLO_BUILDERS,
 }
 DEFERRED_PRODUCTS: dict[str, tuple[str, Callable[[], dict[str, Any]]]] = {
     "irs": ("irs/usd_sofr_5y_quantlib.json", build_irs),

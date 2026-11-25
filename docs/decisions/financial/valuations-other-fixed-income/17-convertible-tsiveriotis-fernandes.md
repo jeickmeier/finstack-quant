@@ -29,7 +29,7 @@ QuantLib's `BinomialConvertibleEngine` is the reference implementation of this m
 
 ### Limitations
 
-- The exercise kink in the value is not corrected in either convertible lattice, so gamma from a 1% spot bump is lattice noise at the money and can be negative under this model.
+- Gamma from a 1% spot bump converges from below as the lattice refines: at the money it reaches about 90% of its converged value at 400 steps. Both convertible lattices correct the exercise kink in the value, so it is no longer lattice noise.
 - **Coupons of a claim that converts are discounted with only part of the spread.** A node is discounted at `r + (1 − p) × s`, QuantLib's formulation. A mandatory convertible has `p = 1` at every node, so its cash coupons are discounted at `r`: the price does not respond to the spread (it rises by 0.002% at a 10% hazard, from the payment-date correction). A split that tracked the cash component separately, as the 1998 paper does, would take roughly 4% off a five-year 5% mandatory at that hazard. Use `tree` for mandatory convertibles with credit risk.
 - One factor: deterministic rates, spread and volatility; no equity-credit correlation.
 - The spread is flat in the node's share price. Models that widen the spread as the share falls are out of scope.
