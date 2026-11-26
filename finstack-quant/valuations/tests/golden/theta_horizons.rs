@@ -6,6 +6,7 @@
 //! carved out of `regression_goldens` into families of their own.
 //! Structured-credit horizons exceed the fast suite's 60-second CI budget
 //! and run in the nightly slow suite.
+//! QuantLib theta sweeps also exceed the fast suite's budget and run nightly.
 //!
 //! Theta holds the market fixed and rolls the valuation date, so the rolled
 //! repricing crosses every index fixing inside the horizon. A fixture whose
@@ -334,8 +335,11 @@ theta_tests! {
     theta_is_finite_1d_bloomberg_goldens => bloomberg, 0;
     theta_is_finite_1m_bloomberg_goldens => bloomberg, 1;
     theta_is_finite_6m_bloomberg_goldens => bloomberg, 2;
+    #[ignore = "slow: QuantLib theta sweeps exceed the 60s CI budget; covered by mise run rust-test --slow"]
     theta_is_finite_1d_quantlib_goldens => quantlib, 0;
+    #[ignore = "slow: QuantLib theta sweeps exceed the 60s CI budget; covered by mise run rust-test --slow"]
     theta_is_finite_1m_quantlib_goldens => quantlib, 1;
+    #[ignore = "slow: QuantLib theta sweeps exceed the 60s CI budget; covered by mise run rust-test --slow"]
     theta_is_finite_6m_quantlib_goldens => quantlib, 2;
     #[ignore = "slow: structured-credit theta exceeds the 60s CI budget; covered by mise run rust-test --slow"]
     theta_is_finite_1d_structured_credit_goldens => structured_credit, 0;

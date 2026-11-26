@@ -371,7 +371,8 @@ impl PeriodId {
     /// # Example
     /// ```
     /// use finstack_quant_core::dates::{create_date, PeriodId};
-    ///     ///
+    /// use time::Month;
+    ///
     /// let (start, end) = PeriodId::quarter(2025, 2)?.bounds()?;
     /// assert_eq!(start, create_date(2025, Month::April, 1)?);
     /// assert_eq!(end, create_date(2025, Month::July, 1)?);
@@ -417,7 +418,7 @@ impl PeriodId {
     ///
     /// let q3 = PeriodId::quarter(2025, 3)?;
     /// assert_eq!(q3.shift(-6, PeriodCalendar::Gregorian)?, PeriodId::quarter(2024, 1)?);
-    /// let fiscal = "FY2025M11".super::parse::<PeriodId>()?;
+    /// let fiscal: PeriodId = "FY2025M11".parse()?;
     /// let october = PeriodCalendar::Fiscal(FiscalConfig::new(10, 1)?);
     /// assert_eq!(fiscal.shift(2, october)?.to_string(), "FY2026M01");
     /// # Ok::<(), finstack_quant_core::Error>(())
