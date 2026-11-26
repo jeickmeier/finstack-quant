@@ -14,6 +14,18 @@ gave 44247.34 on the production grid (200 by 80 space points, 100 time
 steps) and 44233.10 with every dimension doubled, against QuantLib's
 44214.36: the gap closes at about first order, so the rule above does not
 bound it, and the production grid sits 7.5 basis points of price away.
+
+Refining one dimension at a time (error against QuantLib, 2026-11-25):
+time steps 100, 200, 400 give +33.0, +33.3, +33.4, so time is converged;
+variance points 80, 160, 320 give +33.0, +1.6, -9.0; spot points 200, 400,
+800 give +33.0, +49.7, +46.4. All three doubled twice gives +18.7 then +5.0,
+which is second order. Two causes follow. The payoff kink is sampled at
+nodes that are not aligned with the strike, so the spot error is not
+monotone; averaging the payoff over each spot cell makes it monotone but
+removes a cancellation (production error +54.7). The remaining error is in
+the variance direction (order about 1.5), where the zero-variance boundary
+is a linear extrapolation instead of the degenerate equation, on parameters
+that violate the Feller condition.
 """
 
 from __future__ import annotations

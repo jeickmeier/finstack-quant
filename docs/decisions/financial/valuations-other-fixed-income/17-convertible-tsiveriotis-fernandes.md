@@ -26,7 +26,7 @@ QuantLib's `BinomialConvertibleEngine` discounts each node at one blended rate, 
 
 ### Limitations
 
-- Both convertible lattices correct the exercise kink in the total value; the cash component follows the node-by-node decision.
+- Both convertible lattices correct the exercise kink in the total value; the cash component follows the node-by-node decision. Gamma from a 1% spot bump is therefore positive but not stable across step counts: at the money (three-year zero coupon, 2% spread) it reads 138, 100, 60, 127, 134 and 72 per 1,000,000 face at 100, 200, 400, 800, 1096 and 2192 steps, while the price moves by less than 2e-4 and delta by less than 1%.
 - One factor: deterministic rates, spread and volatility; no equity-credit correlation.
 - The spread is flat in the node's share price. Models that widen the spread as the share falls are out of scope.
 
