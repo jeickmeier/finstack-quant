@@ -1,0 +1,150 @@
+{
+  "expected": {
+    "npv": 44214.359003161524
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "currency": "USD",
+        "discount_curve_id": "USD-OIS",
+        "div_yield_id": "SPX-DIVYIELD",
+        "expiry": "2027-04-30",
+        "id": "SPX-HESTON-ATM-CALL-1Y-MONTE-CARLO-QUANTLIB",
+        "instrument_pricing_overrides": {
+          "model_config": {
+            "mc_paths": 50000
+          }
+        },
+        "option_type": "call",
+        "quantity": 100.0,
+        "spot_id": "SPX-SPOT",
+        "strike": 5000.0,
+        "underlying_ticker": "SPX",
+        "vol_surface_id": "SPX-VOL-QL"
+      },
+      "type": "equity_option"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "credit_indices": [],
+      "curves": [
+        {
+          "base": "2026-04-30",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "rate_calibration": null,
+          "type": "discount"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {
+        "HESTON_KAPPA": {
+          "unitless": 1.5
+        },
+        "HESTON_RHO": {
+          "unitless": -0.7
+        },
+        "HESTON_SIGMA_V": {
+          "unitless": 0.5
+        },
+        "HESTON_THETA": {
+          "unitless": 0.05
+        },
+        "HESTON_V0": {
+          "unitless": 0.04
+        },
+        "SPX-DIVYIELD": {
+          "unitless": 0.015
+        },
+        "SPX-SPOT": {
+          "price": {
+            "amount": "5000.0",
+            "currency": "USD"
+          }
+        }
+      },
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [
+        {
+          "expiries": [
+            0.25,
+            1.0,
+            2.0
+          ],
+          "id": "SPX-VOL-QL",
+          "interpolation_mode": "vol",
+          "quote_type": "black_lognormal",
+          "secondary_axis": "strike",
+          "secondary_values": [
+            2500.0,
+            5000.0,
+            10000.0
+          ],
+          "vols_row_major": [
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2
+          ]
+        }
+      ],
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-11-25",
+    "description": "One-year at-the-money Heston equity call priced by Monte Carlo against the semi-analytic value.",
+    "domain": "equity.equity_option",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-11-25",
+    "name": "spx_heston_atm_call_1y_monte_carlo_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product heston_equity_call_monte_carlo",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.43 AnalyticHestonEngine (adaptive Gauss-Lobatto, relative tolerance 1e-12): spot 5000.0, flat continuous Act/365F rate 0.04 and dividend yield 0.015, v0 0.04, kappa 1.5, theta 0.05, vol-of-vol 0.5, rho -0.7, quantity 100. Reference value 44214.359003161524. Discounted payoff standard deviation per unit at most 530.0, from 262144 independent full-truncation Euler paths with daily steps.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "monte_carlo_heston",
+  "schema": "finstack_quant.golden/1",
+  "tolerances": {
+    "npv": {
+      "abs": 711.0696168449331,
+      "tolerance_reason": "Three standard errors of a plain 50000-path estimator from the payoff's own dispersion. Finstack's time-stepping bias is not in the bound."
+    }
+  }
+}

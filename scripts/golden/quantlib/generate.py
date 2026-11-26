@@ -44,6 +44,7 @@ from .fx_exotics import (
     build_quanto_option,
 )
 from .fx_touch import build_fx_no_touch, build_fx_one_touch_at_expiry, build_fx_one_touch_at_hit
+from .heston_monte_carlo import HESTON_MONTE_CARLO_BUILDERS
 from .inflation import (
     build_inflation_linked_bond,
     build_yoy_inflation_cap_black,
@@ -74,6 +75,7 @@ from .rate_options import (
 )
 from .rates import build_fra, build_irs, build_sofr_future
 from .short_rate import build_hull_white_bermudan_swaption, build_hull_white_cap, build_hull_white_swaption
+from .short_rate_monte_carlo import SHORT_RATE_MONTE_CARLO_BUILDERS
 from .stochastic_vol import build_heston_equity_call, build_heston_equity_put
 
 WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
@@ -304,6 +306,8 @@ PRODUCTS: dict[str, tuple[str, Callable[[], dict[str, Any]]]] = {
         build_inflation_linked_bond,
     ),
     **LOAN_BUILDERS,
+    **HESTON_MONTE_CARLO_BUILDERS,
+    **SHORT_RATE_MONTE_CARLO_BUILDERS,
 }
 DEFERRED_PRODUCTS: dict[str, tuple[str, Callable[[], dict[str, Any]]]] = {
     "irs": ("irs/usd_sofr_5y_quantlib.json", build_irs),
