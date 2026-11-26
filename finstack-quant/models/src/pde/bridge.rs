@@ -17,6 +17,20 @@ pub(super) fn vanilla_payoff(x: f64, strike: f64, is_call: bool) -> f64 {
     }
 }
 
+/// Average of the vanilla payoff over the log-spot cell `[x_lo, x_hi]`.
+///
+/// The exact integral of `max(±(exp(x) - strike), 0)` divided by the cell
+/// width, so a strike inside the cell contributes its true weight.
+pub(super) fn vanilla_payoff_cell_average(x_lo: f64, x_hi: f64, strike: f64, is_call: bool) -> f64 {
+    let kink = strike.ln().clamp(x_lo, x_hi);
+    // In-the-money part of the cell: above the kink for a call, below for a put.
+    let (from, to) = if is_call { (kink, x_hi) } else { (x_lo, kink) };
+    let spot_integral = from.exp() * (to - from).exp_m1();
+    let intrinsic_integral = spot_integral - strike * (to - from);
+    let sign = if is_call { 1.0 } else { -1.0 };
+    sign * intrinsic_integral / (x_hi - x_lo)
+}
+
 /// Far-field condition of a vanilla option at the lower (`upper = false`) or
 /// upper edge of the log-spot grid: zero on the deep out-of-the-money side,
 /// affine in `S = exp(x)` on the other.
@@ -96,6 +110,35 @@ mod tests {
     use super::super::grid::Grid1D;
     use super::super::solver::Solver1D;
     use super::*;
+
+    #[test]
+    fn payoff_cell_average_integrates_the_kink_exactly() {
+        let strike = 100.0_f64;
+        let k = strike.ln();
+        // Away from the strike the average is the mean of exp(x) less the strike.
+        let (lo, hi) = (k + 0.1, k + 0.3);
+        let mean_spot = (hi.exp() - lo.exp()) / (hi - lo);
+        assert!(
+            (vanilla_payoff_cell_average(lo, hi, strike, true) - (mean_spot - strike)).abs()
+                < 1e-11
+        );
+        assert_eq!(vanilla_payoff_cell_average(lo, hi, strike, false), 0.0);
+        assert_eq!(
+            vanilla_payoff_cell_average(k - 0.3, k - 0.1, strike, true),
+            0.0
+        );
+
+        // Across the strike only the in-the-money part of the cell counts,
+        // and call minus put is the average of the forward payoff.
+        let (lo, hi) = (k - 0.02, k + 0.03);
+        let call = vanilla_payoff_cell_average(lo, hi, strike, true);
+        let put = vanilla_payoff_cell_average(lo, hi, strike, false);
+        let call_exact = ((hi.exp() - strike) - strike * (hi - k)) / (hi - lo);
+        assert!((call - call_exact).abs() < 1e-11, "{call} != {call_exact}");
+        assert!(call > 0.0 && put > 0.0);
+        let forward = (hi.exp() - lo.exp()) / (hi - lo) - strike;
+        assert!((call - put - forward).abs() < 1e-11);
+    }
 
     fn bs_call(s: f64, k: f64, r: f64, q: f64, sigma: f64, t: f64) -> f64 {
         crate::closed_form::bs_price_unchecked(s, k, r, q, sigma, t, crate::types::OptionType::Call)

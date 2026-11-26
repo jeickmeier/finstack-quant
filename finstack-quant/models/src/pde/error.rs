@@ -164,6 +164,16 @@ pub enum PdeError {
         maturity: f64,
     },
 
+    /// A [`BoundaryCondition::Degenerate`](super::BoundaryCondition::Degenerate)
+    /// edge was requested where the solver cannot impose it.
+    #[error("degenerate boundary condition rejected on the {edge} edge: {reason}")]
+    UnsupportedBoundary {
+        /// Edge that carried the condition.
+        edge: &'static str,
+        /// Why the condition cannot be imposed there.
+        reason: &'static str,
+    },
+
     /// The stepper was configured with zero time steps.
     #[error("PDE solve requires at least one time step, got n_steps = 0")]
     ZeroTimeSteps,

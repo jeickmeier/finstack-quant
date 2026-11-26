@@ -54,6 +54,26 @@ pub trait PdeProblem2D: Send + Sync {
     /// Terminal condition `u(x, y, T) = payoff(x, y)`.
     fn terminal_condition(&self, x: f64, y: f64) -> f64;
 
+    /// Terminal condition averaged over the x-cell `[x_lo, x_hi]` of node `x`.
+    ///
+    /// The solver starts each interior x-node from this value, with the cell
+    /// running between the midpoints to the neighbouring nodes. A payoff with
+    /// a kink that falls between nodes should return its exact cell average
+    /// here: sampled at the nodes instead, the kink's position inside its
+    /// cell changes with the grid and the price does not converge
+    /// monotonically. The default samples the node, which is right for a
+    /// smooth terminal condition.
+    ///
+    /// # Arguments
+    ///
+    /// * `x` - Node coordinate, inside `[x_lo, x_hi]`.
+    /// * `y` - Coordinate of the node on the y-axis.
+    /// * `x_lo` - Lower end of the cell, the midpoint to the node below.
+    /// * `x_hi` - Upper end of the cell, the midpoint to the node above.
+    fn terminal_cell_average(&self, x: f64, y: f64, _x_lo: f64, _x_hi: f64) -> f64 {
+        self.terminal_condition(x, y)
+    }
+
     /// Boundary condition at x = x_min (lower x-edge).
     fn boundary_x_lower(&self, y: f64, t: f64) -> BoundaryCondition;
 
@@ -61,6 +81,9 @@ pub trait PdeProblem2D: Send + Sync {
     fn boundary_x_upper(&self, y: f64, t: f64) -> BoundaryCondition;
 
     /// Boundary condition at y = y_min (lower y-edge).
+    ///
+    /// [`BoundaryCondition::Degenerate`] is accepted here, for every `x` and
+    /// `t` or for none: the edge is then solved with the interior.
     fn boundary_y_lower(&self, x: f64, t: f64) -> BoundaryCondition;
 
     /// Boundary condition at y = y_max (upper y-edge).

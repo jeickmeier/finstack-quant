@@ -13,9 +13,17 @@
 //!
 //! - **x-lower** (deep OTM): Dirichlet(0) for calls, LinearInExp for puts
 //! - **x-upper** (deep ITM): LinearInExp for calls, Dirichlet(0) for puts
-//! - **v-lower** (v → 0): reduces to 1D PDE `du/dt = (r-q)·du/dx + κθ·du/dv - r·u`;
-//!   handled via Linear extrapolation
+//! - **v-lower** (v = 0): the equation itself, which degenerates there to
+//!   `du/dt = (r-q)·du/dx + κθ·du/dv - r·u` and needs no boundary data. The
+//!   edge is solved with the interior, `du/dv` by the second-order one-sided
+//!   difference (In 't Hout & Foulon 2010). The variance grid must therefore
+//!   start at exactly `v = 0`; [`Solver2D`](super::Solver2D) rejects any other
+//!   lower edge. A linear extrapolation here loses accuracy when the Feller
+//!   condition `2κθ ≥ σ_v²` fails and the solution curves in `v` near zero.
 //! - **v-upper** (v → ∞): Linear extrapolation (option value becomes insensitive)
+//!
+//! The payoff is averaged over each log-spot cell, so the strike need not
+//! sit on a grid node.
 //!
 //! # References
 //!
@@ -87,6 +95,10 @@ impl PdeProblem2D for HestonPde {
         super::bridge::vanilla_payoff(x, self.strike, self.is_call)
     }
 
+    fn terminal_cell_average(&self, _x: f64, _y: f64, x_lo: f64, x_hi: f64) -> f64 {
+        super::bridge::vanilla_payoff_cell_average(x_lo, x_hi, self.strike, self.is_call)
+    }
+
     fn boundary_x_lower(&self, _y: f64, _t: f64) -> BoundaryCondition {
         super::bridge::vanilla_boundary(self.is_call, false)
     }
@@ -96,8 +108,9 @@ impl PdeProblem2D for HestonPde {
     }
 
     fn boundary_y_lower(&self, _x: f64, _t: f64) -> BoundaryCondition {
-        // At v = 0 the PDE degenerates. Linear extrapolation is robust.
-        BoundaryCondition::Linear
+        // At v = 0 every term carrying a factor v drops out and the equation
+        // itself is the boundary condition.
+        BoundaryCondition::Degenerate
     }
 
     fn boundary_y_upper(&self, _x: f64, _t: f64) -> BoundaryCondition {
@@ -115,7 +128,7 @@ mod tests {
     use super::super::adi::{AdiWorkBuffers, McsStepper, fill_boundaries};
     use super::super::grid::Grid1D;
     use super::super::grid2d::Grid2D;
-    use super::super::solver2d::Solver2D;
+    use super::super::solver2d::{Solver2D, terminal_state};
     use super::*;
 
     /// Heston Fourier reference price for validation.
@@ -188,7 +201,7 @@ mod tests {
         // Grid: log-spot concentrated near ln(strike), variance from 0 to 1.0
         let x_min = (spot * 0.05).ln();
         let x_max = (spot * 10.0).ln();
-        let v_min = 0.001;
+        let v_min = 0.0;
         let v_max = 1.5;
 
         let gx =
@@ -234,7 +247,7 @@ mod tests {
 
         let x_min = (spot * 0.05).ln();
         let x_max = (spot * 10.0).ln();
-        let v_min = 0.001;
+        let v_min = 0.0;
         let v_max = 1.5;
 
         for strike in [100.0, 120.0] {
@@ -313,7 +326,7 @@ mod tests {
         let x_max = (spot * 10.0).ln();
         let gx =
             Grid1D::sinh_concentrated(x_min, x_max, 141, strike.ln(), 0.1).expect("valid x-grid");
-        let gy = Grid1D::sinh_concentrated(0.001, 1.5, 61, theta_v, 0.15).expect("valid v-grid");
+        let gy = Grid1D::sinh_concentrated(0.0, 1.5, 61, theta_v, 0.15).expect("valid v-grid");
         let grid = Grid2D::new(gx, gy);
 
         let solver = Solver2D::new(grid, McsStepper::with_damping(4, 150));
@@ -335,9 +348,12 @@ mod tests {
     /// material even when the ADI time scheme is stable. This tests convergence
     /// against Fourier, not a claim that the coarse production mesh delivers
     /// a tight price tolerance in this difficult Feller-violating regime.
+    ///
+    /// Both directions are refined together: with the zero-variance edge
+    /// solved, the variance error no longer dominates a fixed log-spot grid.
     #[test]
     #[ignore = "slow: covered by mise run rust-test --slow"]
-    fn heston_pde_feller_violation_converges_with_variance_refinement() {
+    fn heston_pde_feller_violation_converges_with_spatial_refinement() {
         let problem = HestonPde {
             r: 0.03,
             q: 0.0,
@@ -349,15 +365,20 @@ mod tests {
             is_call: true,
         };
         let exact = heston_call_reference(100.0, 100.0, 1.0, 0.03, 0.0, 0.1, 0.04, 1.0, -0.7, 0.04);
-        let x_grid =
-            Grid1D::sinh_concentrated(5.0_f64.ln(), 1000.0_f64.ln(), 201, 100.0_f64.ln(), 0.1)
-                .expect("log-spot grid");
         let mut errors = Vec::new();
-        for variance_nodes in [41, 81, 161] {
+        for (spot_nodes, variance_nodes) in [(201, 41), (401, 81), (801, 161)] {
+            let x_grid = Grid1D::sinh_concentrated(
+                5.0_f64.ln(),
+                1000.0_f64.ln(),
+                spot_nodes,
+                100.0_f64.ln(),
+                0.1,
+            )
+            .expect("log-spot grid");
             let v_grid = Grid1D::sinh_concentrated(0.0, 1.5, variance_nodes, 0.04, 0.15)
                 .expect("variance grid");
             let solution = Solver2D::new(
-                Grid2D::new(x_grid.clone(), v_grid),
+                Grid2D::new(x_grid, v_grid),
                 McsStepper::with_damping(4, 400),
             )
             .solve(&problem, 1.0)
@@ -375,7 +396,7 @@ mod tests {
         );
         assert!(
             errors[2] < 0.5 * errors[0],
-            "variance refinement did not reduce error: {errors:?}"
+            "spatial refinement did not reduce error: {errors:?}"
         );
     }
 
@@ -394,7 +415,7 @@ mod tests {
 
         let x_min = (spot * 0.1).ln();
         let x_max = (spot * 5.0).ln();
-        let v_min = 0.001;
+        let v_min = 0.0;
         let v_max = 1.0;
 
         let gx =
@@ -461,27 +482,10 @@ mod tests {
         v0: f64,
         maturity: f64,
     ) -> f64 {
-        let nx = grid.nx();
-        let ny = grid.ny();
-        let nx_int = grid.nx_interior();
-        let ny_int = grid.ny_interior();
-
-        let mut u_full = vec![0.0; nx * ny];
-        for i in 0..nx {
-            for j in 0..ny {
-                u_full[i * ny + j] =
-                    pde.terminal_condition(grid.x().points()[i], grid.y().points()[j]);
-            }
-        }
-        let mut u_int = vec![0.0; nx_int * ny_int];
-        for ii in 0..nx_int {
-            for jj in 0..ny_int {
-                u_int[ii * ny_int + jj] = u_full[(ii + 1) * ny + (jj + 1)];
-            }
-        }
+        let (mut u_full, mut u_int) = terminal_state(pde, grid, maturity);
 
         let levels = stepper.time_levels(maturity);
-        let mut buffers = AdiWorkBuffers::for_grid(grid);
+        let mut buffers = AdiWorkBuffers::for_problem(pde, grid);
         for step in 0..stepper.n_steps() {
             stepper
                 .step(
@@ -556,7 +560,7 @@ mod tests {
         // refinements then isolate temporal error from the spatial bias.
         let x_min = (spot * 0.05).ln();
         let x_max = (spot * 10.0).ln();
-        let v_min = 0.001;
+        let v_min = 0.0;
         let v_max = 1.5;
         let gx =
             Grid1D::sinh_concentrated(x_min, x_max, 201, spot.ln(), 0.1).expect("valid x-grid");
@@ -693,7 +697,7 @@ mod tests {
 
         let x_min = (spot * 0.05).ln();
         let x_max = (spot * 10.0).ln();
-        let v_min = 0.001;
+        let v_min = 0.0;
         let v_max = 1.5;
         let gx =
             Grid1D::sinh_concentrated(x_min, x_max, 201, spot.ln(), 0.1).expect("valid x-grid");

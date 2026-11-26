@@ -158,12 +158,26 @@ impl Solver1D {
             return Err(PdeError::ZeroTimeSteps);
         }
 
+        let levels = self.stepper.time_levels(maturity);
+        for &t in &levels {
+            for (edge, bc) in [
+                ("lower", problem.lower_boundary(t)),
+                ("upper", problem.upper_boundary(t)),
+            ] {
+                if matches!(bc, BoundaryCondition::Degenerate) {
+                    return Err(PdeError::UnsupportedBoundary {
+                        edge,
+                        reason: "the 1D solver does not solve edge nodes",
+                    });
+                }
+            }
+        }
+
         let mut u: Vec<f64> = self.grid.points()[1..self.grid.n() - 1]
             .iter()
             .map(|&x| problem.terminal_condition(x))
             .collect();
 
-        let levels = self.stepper.time_levels(maturity);
         if let Some(PenaltyExercise {
             exercise_type: ExerciseType::Bermudan { exercise_times },
             ..
@@ -280,6 +294,9 @@ pub(super) fn boundary_value(
             };
             u1 + ratio * (u1 - u2)
         }
+        // A degenerate edge is solved with the interior and has no value to
+        // reconstruct; the solvers never ask for one.
+        BoundaryCondition::Degenerate => f64::NAN,
     }
 }
 
@@ -595,6 +612,42 @@ mod tests {
         fn is_time_homogeneous(&self) -> bool {
             true
         }
+    }
+
+    /// The 1D solver does not solve edge nodes, so a degenerate edge must be
+    /// rejected instead of being treated as some other condition.
+    #[test]
+    fn solver_rejects_degenerate_boundary() {
+        struct DegenerateEdge;
+        impl PdeProblem1D for DegenerateEdge {
+            fn diffusion(&self, x: f64, _t: f64) -> f64 {
+                x
+            }
+            fn convection(&self, _x: f64, _t: f64) -> f64 {
+                1.0
+            }
+            fn reaction(&self, _x: f64, _t: f64) -> f64 {
+                0.0
+            }
+            fn terminal_condition(&self, x: f64) -> f64 {
+                x
+            }
+            fn lower_boundary(&self, _t: f64) -> BoundaryCondition {
+                BoundaryCondition::Degenerate
+            }
+            fn upper_boundary(&self, _t: f64) -> BoundaryCondition {
+                BoundaryCondition::Linear
+            }
+        }
+        let solver = Solver1D::builder()
+            .grid(Grid1D::uniform(0.0, 1.0, 11).expect("grid"))
+            .crank_nicolson(10)
+            .build()
+            .expect("solver");
+        assert!(matches!(
+            solver.solve(&DegenerateEdge, 1.0),
+            Err(PdeError::UnsupportedBoundary { edge: "lower", .. })
+        ));
     }
 
     #[test]

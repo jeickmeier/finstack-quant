@@ -59,7 +59,7 @@
 
 use super::error::PdeError;
 use super::grid2d::Grid2D;
-use super::operator2d::{Operators2D, apply_cross_derivative};
+use super::operator2d::{Operators2D, SolvedRows, apply_cross_derivative};
 use super::problem2d::PdeProblem2D;
 use super::solver::boundary_value;
 
@@ -101,10 +101,16 @@ pub struct AdiWorkBuffers {
 }
 
 impl AdiWorkBuffers {
-    /// Pre-allocate buffers sized to a particular grid.
-    pub fn for_grid(grid: &Grid2D) -> Self {
+    /// Pre-allocate buffers for stepping `problem` on `grid`.
+    ///
+    /// # Arguments
+    ///
+    /// * `problem` - PDE whose lower y-edge condition decides whether that
+    ///   edge is solved with the interior.
+    /// * `grid` - Tensor-product grid the buffers are sized to.
+    pub fn for_problem(problem: &dyn PdeProblem2D, grid: &Grid2D) -> Self {
         let nx_int = grid.nx_interior();
-        let ny_int = grid.ny_interior();
+        let ny_int = SolvedRows::of(problem, grid).count;
         let interior = nx_int * ny_int;
         let line_max = nx_int.max(ny_int);
         Self {
@@ -246,8 +252,8 @@ impl McsStepper {
     /// (backward), reusing caller-owned scratch buffers.
     ///
     /// `u_full` is the full (boundary-inclusive) solution of length `nx * ny`.
-    /// `u_int` is the interior solution of length `nx_int * ny_int` (row-major).
-    /// Both are updated in place.
+    /// `u_int` is the solved part of it, row-major over the interior x-nodes
+    /// and the solved y-levels. Both are updated in place.
     ///
     /// Returns a [`PdeError`] if the step cannot be taken reliably — a
     /// non-positive `dt` or a degenerate tridiagonal solve.
@@ -333,7 +339,8 @@ impl McsStepper {
         let theta = if damping { 1.0 } else { self.theta };
 
         let nx_int = grid.nx_interior();
-        let ny_int = grid.ny_interior();
+        let rows = SolvedRows::of(problem, grid);
+        let ny_int = rows.count;
 
         let interior = nx_int * ny_int;
 
@@ -363,7 +370,7 @@ impl McsStepper {
                 cached_ops.get_or_insert_with(|| Operators2D::assemble(problem, grid, t_from));
             cached.set_boundary_rhs(problem, grid, t_from);
             // F_0(t_n, u^n): the mixed (cross-derivative) term applied to u^n.
-            apply_cross_derivative(cross, &cached.cross_deriv, u_full, grid);
+            apply_cross_derivative(cross, &cached.cross_deriv, u_full, grid, rows);
             // F_1(t_n, u^n) = A_x * u^n  (for each y-line).
             apply_x_operator(cached, u_int, nx_int, ny_int, x_line, line_out, ax_u);
             // F_2(t_n, u^n) = A_y * u^n  (for each x-line).
@@ -374,7 +381,7 @@ impl McsStepper {
             ops_from_owned = Operators2D::assemble(problem, grid, t_from);
             ops_to_owned = Operators2D::assemble(problem, grid, t_to);
             // F_0(t_n, u^n): the mixed (cross-derivative) term applied to u^n.
-            apply_cross_derivative(cross, &ops_from_owned.cross_deriv, u_full, grid);
+            apply_cross_derivative(cross, &ops_from_owned.cross_deriv, u_full, grid, rows);
             // F_1(t_n, u^n) = A_x * u^n  (for each y-line).
             apply_x_operator(
                 &ops_from_owned,
@@ -460,7 +467,7 @@ impl McsStepper {
 
         // --- MCS mixed-term corrector ---
         // F_0(t_{n+1}, Y_2): mixed term applied to Y_2.
-        apply_cross_derivative(cross_y2, &ops_impl.cross_deriv, u_full, grid);
+        apply_cross_derivative(cross_y2, &ops_impl.cross_deriv, u_full, grid, rows);
         // F_1(t_{n+1}, Y_2) = A_x * Y_2 and F_2(t_{n+1}, Y_2) = A_y * Y_2,
         // needed for the full-operator difference in the Ytld_0 line.
         apply_x_operator(ops_impl, y2, nx_int, ny_int, x_line, line_out, ax_y2);
@@ -647,10 +654,11 @@ fn implicit_y_sweep(
     Ok(())
 }
 
-/// Fill boundary values in the full grid from boundary conditions and the
-/// interior solution.
+/// Fill the full grid from the solved values and the boundary conditions.
 ///
-/// `u_full` has length `nx * ny`, `u_int` has length `nx_int * ny_int`.
+/// `u_full` has length `nx * ny`; `u_int` is row-major over the interior
+/// x-nodes and the solved y-levels, which include the lower y-edge when it
+/// is [`BoundaryCondition::Degenerate`](super::BoundaryCondition::Degenerate).
 ///
 /// # Arguments
 ///
@@ -660,8 +668,8 @@ fn implicit_y_sweep(
 ///   place the supplied solution.
 /// * `u_full` - Mutable row-major full-grid buffer of length `nx * ny`; its
 ///   interior and boundary entries are overwritten.
-/// * `u_int` - Row-major interior solution buffer of length
-///   `nx_int * ny_int` copied into `u_full` before boundary conditions apply.
+/// * `u_int` - Row-major solved values copied into `u_full` before boundary
+///   conditions apply.
 /// * `t` - PDE time at which the boundary conditions are evaluated.
 pub fn fill_boundaries(
     problem: &dyn PdeProblem2D,
@@ -673,13 +681,13 @@ pub fn fill_boundaries(
     let nx = grid.nx();
     let ny = grid.ny();
     let nx_int = grid.nx_interior();
-    let ny_int = grid.ny_interior();
+    let rows = SolvedRows::of(problem, grid);
     let x_pts = grid.x().points();
     let y_pts = grid.y().points();
 
     for ii in 0..nx_int {
-        for jj in 0..ny_int {
-            u_full[(ii + 1) * ny + (jj + 1)] = u_int[ii * ny_int + jj];
+        for jj in 0..rows.count {
+            u_full[(ii + 1) * ny + (jj + rows.first)] = u_int[ii * rows.count + jj];
         }
     }
 
@@ -688,9 +696,11 @@ pub fn fill_boundaries(
     // the corners used by the mixed-derivative stencil.
     for i in 1..nx - 1 {
         let x = x_pts[i];
-        u_full[i * ny] = boundary_value(problem.boundary_y_lower(x, t), grid.y(), true, |k| {
-            u_full[i * ny + 1 + k]
-        });
+        if rows.first == 1 {
+            u_full[i * ny] = boundary_value(problem.boundary_y_lower(x, t), grid.y(), true, |k| {
+                u_full[i * ny + 1 + k]
+            });
+        }
         u_full[i * ny + ny - 1] =
             boundary_value(problem.boundary_y_upper(x, t), grid.y(), false, |k| {
                 u_full[i * ny + ny - 2 - k]
@@ -797,7 +807,7 @@ mod tests {
 
         let stepper = McsStepper::new(n_time);
         let levels = stepper.time_levels(t_mat);
-        let mut buffers = AdiWorkBuffers::for_grid(&grid);
+        let mut buffers = AdiWorkBuffers::for_problem(&problem, &grid);
 
         for step in 0..n_time {
             stepper
@@ -940,7 +950,7 @@ mod tests {
         let initial_min = u_int.iter().copied().fold(f64::INFINITY, f64::min).min(0.0);
 
         let stepper = McsStepper::new(100);
-        let mut buffers = AdiWorkBuffers::for_grid(&grid);
+        let mut buffers = AdiWorkBuffers::for_problem(&problem, &grid);
         // March several steps: instability would amplify step over step.
         let mut t_from = 0.25;
         for step in 0..10 {
@@ -988,7 +998,7 @@ mod tests {
         let mut u_int = vec![1.0; nx_int * ny_int];
 
         let stepper = McsStepper::new(10);
-        let mut buffers = AdiWorkBuffers::for_grid(&grid);
+        let mut buffers = AdiWorkBuffers::for_problem(&Heat2D, &grid);
         let zero = stepper.step(
             &Heat2D,
             &grid,

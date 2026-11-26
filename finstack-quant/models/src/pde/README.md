@@ -39,7 +39,7 @@ pricers supply instrument terms and market data.
 | [`mod.rs`](mod.rs) | Pipeline overview, submodule declarations, root re-exports |
 | [`problem.rs`](problem.rs) | `PdeProblem1D` — `diffusion`/`convection`/`reaction`/`source`, terminal condition, two boundaries, `is_time_homogeneous` |
 | [`problem2d.rs`](problem2d.rs) | `PdeProblem2D` — `diffusion_xx`/`_yy`, `mixed_diffusion`, `convection_x`/`_y`, `reaction`, `source`, terminal condition, four edge boundaries |
-| [`boundary.rs`](boundary.rs) | `BoundaryCondition::{Dirichlet, Neumann, Linear}` |
+| [`boundary.rs`](boundary.rs) | `BoundaryCondition::{Dirichlet, Neumann, Linear, LinearInExp, Degenerate}` |
 | [`grid.rs`](grid.rs) | `Grid1D` (uniform / sinh-concentrated / user points), `PdeGridError`, `pub(crate)` `find_interval` and `find_nearest` |
 | [`grid2d.rs`](grid2d.rs) | `Grid2D` tensor product, row-major indexing, bilinear interpolation |
 | [`operator.rs`](operator.rs) | `TridiagOperator` assembly, boundary elimination, Thomas solve, `ThomasError` |
@@ -119,6 +119,19 @@ from the tridiagonal system and folding its contribution into an RHS correction.
 | `Neumann(g)` | **One-sided at the boundary node**: `u[0] = u[1] − h·g` with `h = h_left(1)`; `main[0] += lower[0]`, correction `−lower[0]·h·g` |
 | `Linear` | `d²u/dx² = 0` ⇒ `u[0] = (1 + q)u[1] − q·u[2]`, with `q = (x[1] − x[0])/(x[2] − x[1])`; the upper edge is analogous |
 | `LinearInExp` | Zero gamma in `S = exp(x)` ⇒ `u[0] = (1 + q)u[1] − q·u[2]`, with `q = (exp(x[1]) − exp(x[0]))/(exp(x[2]) − exp(x[1]))`; the upper edge is analogous |
+
+`Degenerate` is the exception: it eliminates nothing. It states that the PDE
+itself holds on the edge, which is right where the diffusion normal to the edge
+and the mixed coefficient vanish and the normal convection points into the
+domain, so that the equation needs no boundary data there. The edge nodes are
+then unknowns of the ADI systems. Their normal derivative is the second-order
+one-sided difference over the edge and the two nodes above it; its third weight
+lies outside the tridiagonal band, and `solve_thomas_into` removes it against
+row 1 before the forward sweep. Only the lower y-edge of a 2D problem supports
+it. `Solver2D::solve` and `Solver1D::solve` return
+`PdeError::UnsupportedBoundary` for any other edge, for an edge where
+`diffusion_yy` or `mixed_diffusion` is non-zero, and for one where
+`convection_y` is negative.
 
 The Neumann form is deliberately one-sided rather than a centered ghost node: a
 centered ghost imposes the derivative at a different location and is wrong on a
@@ -286,7 +299,10 @@ via the four-point stencil
 `node_stencil` carries the **monotone upwind switch**: the second-order central
 convection stencil is used while the off-diagonals stay non-negative
 (`b·h_p ≤ 2a` for `b ≥ 0`, `−b·h_m ≤ 2a` otherwise — cell Péclet at most 1), and
-falls back to the first-order one-sided upwind stencil otherwise. This replaced
+falls back to the first-order one-sided upwind stencil otherwise. The x-line
+along a `Degenerate` edge uses `central_stencil` whatever the Péclet number:
+its x-diffusion can be zero, and the `|b|·h/2` of numerical diffusion an upwind
+difference adds there smears the terminal kink at first order in `h`. This replaced
 a global `MCS_PECLET_MAX = 4` rejection: a strongly mean-reverting Heston
 configuration (large κ) now solves with locally reduced order near the variance
 floor instead of erroring out, which `bridge2d::tests::heston_pde_high_kappa_solves_via_upwinding`
@@ -336,8 +352,16 @@ polymorphism in either dimension.
 `Solver2D::solve` allocates them once per solve and reuses them across the whole
 time march.
 
-`fill_boundaries` writes the interior into `u_full`, then fills the two y-edges
-across interior `i`, followed by the x-edges across all `j`. The corners thus
+The solved vectors cover the interior x-nodes and the solved y-levels
+(`operator2d::SolvedRows`): the interior levels, preceded by the lower edge
+when it is `Degenerate`. `Solver2D` starts each interior x-node from
+`PdeProblem2D::terminal_cell_average`, the terminal condition averaged over the
+cell between the midpoints to its neighbours. The default samples the node;
+`HestonPde` returns the exact average of the payoff, so a strike between two
+nodes does not make the price depend on where in its cell it falls.
+
+`fill_boundaries` writes the solved values into `u_full`, then fills the y-edges
+that are not solved across interior `i`, followed by the x-edges across all `j`. The corners thus
 use current y-edge values. It runs after each MCS step — the mixed corrector needs a
 boundary-inclusive `Y₂` for its four-point stencil — and again at `t = 0`.
 
@@ -371,10 +395,14 @@ reports `is_time_homogeneous() == true`. `bridge::tests` grades it against
 ```
 
 Variance is floored with `y.max(0.0)` in every diffusion and in `convection_x`,
-but not in `convection_y`, so the mean-reversion drift stays signed. Both `v`
-edges use `Linear`; log-spot far fields use `LinearInExp` to impose zero spot
-gamma (`u_xx = u_x`). The PDE degenerates at `v → 0`, and the option value is
-insensitive at `v → ∞`.
+but not in `convection_y`, so the mean-reversion drift stays signed. The upper
+`v` edge uses `Linear`, since the option value is insensitive at `v → ∞`;
+log-spot far fields use `LinearInExp` to impose zero spot gamma (`u_xx = u_x`).
+At `v = 0` the PDE degenerates to `u_t = (r − q)·u_x + κθ·u_v − r·u`, and the
+lower edge is `Degenerate`: that equation is solved on the edge (In 't Hout &
+Foulon 2010), so the variance axis must start at exactly zero. A linear
+extrapolation there converges at an order of about 1.5 when the Feller condition
+fails. The terminal payoff is averaged over each log-spot cell.
 
 The documented anchor is against
 [`closed_form::heston_price`](../closed_form/README.md):

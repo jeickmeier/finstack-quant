@@ -171,7 +171,7 @@ Add the central drift stencil only when b≥0 and b h+≤2a, or b<0 and −b h�
 
 ## Two-dimensional selection and conventions
 
-[operator2d.rs](../../../../finstack-quant/models/src/pde/operator2d.rs) constructs one x-line operator per interior y and one y-line operator per interior x. Each receives half the reaction and half the source, preventing double counting. Mixed coefficient a_xy is stored divided by (h_x−+h_x+)(h_y−+h_y+). Application multiplies the four corner combination u++−u+−−u−++u−−, with boundary-inclusive values. ADI treats this term explicitly, independently of the directional upwind switch.
+[operator2d.rs](../../../../finstack-quant/models/src/pde/operator2d.rs) constructs one x-line operator per solved y level and one y-line operator per interior x. The solved y levels are the interior ones, preceded by the lower edge when it is `Degenerate`; the x-line on that edge uses central convection whatever the cell Péclet number, since a one-sided difference adds numerical diffusion to a line that may have none (tracked in the [scope follow-ups](../FOLLOW_UPS.md#trees-and-finite-differences)). Each receives half the reaction and half the source, preventing double counting. Mixed coefficient a_xy is stored divided by (h_x−+h_x+)(h_y−+h_y+). Application multiplies the four corner combination u++−u+−−u−++u−−, with boundary-inclusive values. ADI treats this term explicitly, independently of the directional upwind switch.
 
 ## Limitations and alternatives
 

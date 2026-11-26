@@ -6,10 +6,115 @@
 //! Greeks.
 
 use super::adi::{AdiWorkBuffers, McsStepper, fill_boundaries};
+use super::boundary::BoundaryCondition;
 use super::error::PdeError;
 use super::grid::find_nearest;
 use super::grid2d::Grid2D;
+use super::operator2d::SolvedRows;
 use super::problem2d::PdeProblem2D;
+
+/// Reject a [`BoundaryCondition::Degenerate`] edge the ADI scheme cannot
+/// impose.
+///
+/// It is accepted on the lower y-edge alone, for every interior x at once,
+/// where the y-diffusion and the mixed coefficient vanish and the y-convection
+/// does not point out of the domain. The coefficients are checked at both
+/// ends of the time interval.
+fn validate_degenerate_edges(
+    problem: &dyn PdeProblem2D,
+    grid: &Grid2D,
+    maturity: f64,
+) -> Result<(), PdeError> {
+    let degenerate = |bc| matches!(bc, BoundaryCondition::Degenerate);
+    let reject = |edge, reason| Err(PdeError::UnsupportedBoundary { edge, reason });
+    let x_interior = &grid.x().points()[1..grid.nx() - 1];
+    let y_lower = grid.y().x_min();
+    let solved_edge = SolvedRows::of(problem, grid).first == 0;
+
+    for t in [maturity, 0.0] {
+        for &y in grid.y().points() {
+            if degenerate(problem.boundary_x_lower(y, t)) {
+                return reject("lower x", "only the lower y-edge can be solved");
+            }
+            if degenerate(problem.boundary_x_upper(y, t)) {
+                return reject("upper x", "only the lower y-edge can be solved");
+            }
+        }
+        for &x in x_interior {
+            if degenerate(problem.boundary_y_upper(x, t)) {
+                return reject("upper y", "only the lower y-edge can be solved");
+            }
+            if degenerate(problem.boundary_y_lower(x, t)) != solved_edge {
+                return reject("lower y", "the condition must hold for every x and time");
+            }
+            if !solved_edge {
+                continue;
+            }
+            if problem.diffusion_yy(x, y_lower, t) != 0.0
+                || problem.mixed_diffusion(x, y_lower, t) != 0.0
+            {
+                return reject(
+                    "lower y",
+                    "the y-diffusion and mixed coefficients must vanish on the edge",
+                );
+            }
+            let convection = problem.convection_y(x, y_lower, t);
+            if convection.is_nan() || convection < 0.0 {
+                return reject(
+                    "lower y",
+                    "the y-convection must not point out of the domain",
+                );
+            }
+        }
+    }
+    if solved_edge && grid.ny() < 4 {
+        return reject("lower y", "the one-sided difference needs four y-nodes");
+    }
+    Ok(())
+}
+
+/// Terminal state on `grid`: the full solution and its solved part.
+///
+/// Interior x-nodes start from the cell average of the terminal condition
+/// (see [`PdeProblem2D::terminal_cell_average`]); the x-edges are sampled and
+/// then overwritten by the boundary conditions.
+pub(super) fn terminal_state(
+    problem: &dyn PdeProblem2D,
+    grid: &Grid2D,
+    maturity: f64,
+) -> (Vec<f64>, Vec<f64>) {
+    let nx = grid.nx();
+    let ny = grid.ny();
+    let x_pts = grid.x().points();
+    let y_pts = grid.y().points();
+
+    let mut u_full = vec![0.0; nx * ny];
+    for i in 0..nx {
+        for j in 0..ny {
+            u_full[i * ny + j] = if i == 0 || i == nx - 1 {
+                problem.terminal_condition(x_pts[i], y_pts[j])
+            } else {
+                problem.terminal_cell_average(
+                    x_pts[i],
+                    y_pts[j],
+                    0.5 * (x_pts[i - 1] + x_pts[i]),
+                    0.5 * (x_pts[i] + x_pts[i + 1]),
+                )
+            };
+        }
+    }
+
+    let rows = SolvedRows::of(problem, grid);
+    let nx_int = grid.nx_interior();
+    let mut u_int = vec![0.0; nx_int * rows.count];
+    for ii in 0..nx_int {
+        for jj in 0..rows.count {
+            u_int[ii * rows.count + jj] = u_full[(ii + 1) * ny + (jj + rows.first)];
+        }
+    }
+    fill_boundaries(problem, grid, &mut u_full, &u_int, maturity);
+    (u_full, u_int)
+}
 
 /// Two-dimensional PDE solver using Modified Craig-Sneyd (MCS) ADI splitting.
 pub struct Solver2D {
@@ -48,6 +153,10 @@ impl Solver2D {
     /// - [`PdeError::NonPositiveMaturity`] if `maturity <= 0`.
     /// - [`PdeError::ZeroTimeSteps`] if the stepper has no time steps
     ///   (the backward march would never run).
+    /// - [`PdeError::UnsupportedBoundary`] if a
+    ///   [`BoundaryCondition::Degenerate`] edge is anywhere but the lower
+    ///   y-edge, or sits where the y-diffusion or mixed coefficient is
+    ///   non-zero or the y-convection points out of the domain.
     /// - [`PdeError::NonPositiveStep`] / [`PdeError::DegeneratePivot`] if a
     ///   Modified Craig-Sneyd ADI step fails.
     pub fn solve(
@@ -67,33 +176,16 @@ impl Solver2D {
             return Err(PdeError::ZeroTimeSteps);
         }
 
-        let nx = self.grid.nx();
-        let ny = self.grid.ny();
-        let nx_int = self.grid.nx_interior();
-        let ny_int = self.grid.ny_interior();
+        validate_degenerate_edges(problem, &self.grid, maturity)?;
 
-        let mut u_full = vec![0.0; nx * ny];
-        for i in 0..nx {
-            for j in 0..ny {
-                u_full[i * ny + j] = problem
-                    .terminal_condition(self.grid.x().points()[i], self.grid.y().points()[j]);
-            }
-        }
-
-        let mut u_int = vec![0.0; nx_int * ny_int];
-        for ii in 0..nx_int {
-            for jj in 0..ny_int {
-                u_int[ii * ny_int + jj] = u_full[(ii + 1) * ny + (jj + 1)];
-            }
-        }
-        fill_boundaries(problem, &self.grid, &mut u_full, &u_int, maturity);
+        let (mut u_full, mut u_int) = terminal_state(problem, &self.grid, maturity);
 
         let levels = self.stepper.time_levels(maturity);
 
         // Pre-allocate ADI scratch buffers once per solve and reuse across all
         // timesteps. The previous implementation allocated six Vecs per step,
         // costing O(n_steps) allocations on hot pricing paths.
-        let mut buffers = AdiWorkBuffers::for_grid(&self.grid);
+        let mut buffers = AdiWorkBuffers::for_problem(problem, &self.grid);
 
         for step in 0..n_steps {
             self.stepper.step(
@@ -308,6 +400,133 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// `du/dt = a·y·d²u/dy² + b·du/dy` on `y >= 0`, with the equation itself
+    /// as the condition at `y = 0`. The surface `1 + x + 2y` stays affine and
+    /// rises by `2b` per unit time.
+    struct DegenerateDrift {
+        y_diffusion: f64,
+        y_drift: f64,
+        x_lower: BoundaryCondition,
+    }
+
+    impl PdeProblem2D for DegenerateDrift {
+        fn diffusion_xx(&self, _x: f64, y: f64, _t: f64) -> f64 {
+            y
+        }
+        fn diffusion_yy(&self, _x: f64, y: f64, _t: f64) -> f64 {
+            self.y_diffusion * y
+        }
+        fn mixed_diffusion(&self, _x: f64, y: f64, _t: f64) -> f64 {
+            0.5 * y
+        }
+        fn convection_x(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            0.0
+        }
+        fn convection_y(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            self.y_drift
+        }
+        fn reaction(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            0.0
+        }
+        fn terminal_condition(&self, x: f64, y: f64) -> f64 {
+            1.0 + x + 2.0 * y
+        }
+        fn boundary_x_lower(&self, _y: f64, _t: f64) -> BoundaryCondition {
+            self.x_lower
+        }
+        fn boundary_x_upper(&self, _y: f64, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Linear
+        }
+        fn boundary_y_lower(&self, _x: f64, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Degenerate
+        }
+        fn boundary_y_upper(&self, _x: f64, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Linear
+        }
+    }
+
+    fn degenerate_drift() -> DegenerateDrift {
+        DegenerateDrift {
+            y_diffusion: 0.8,
+            y_drift: 0.6,
+            x_lower: BoundaryCondition::Linear,
+        }
+    }
+
+    #[test]
+    fn degenerate_lower_edge_is_solved_with_the_interior() {
+        let gx = Grid1D::from_points(vec![0.0, 0.1, 0.4, 0.65, 1.0]).expect("x grid");
+        let gy = Grid1D::from_points(vec![0.0, 0.2, 0.3, 0.7, 1.0]).expect("y grid");
+        let grid = Grid2D::new(gx, gy);
+        let maturity = 0.5;
+        for damping in [0, 2] {
+            let solution = Solver2D::new(grid.clone(), McsStepper::with_damping(damping, 20))
+                .solve(&degenerate_drift(), maturity)
+                .expect("degenerate-edge solve");
+            for (i, &x) in grid.x().points().iter().enumerate() {
+                for (j, &y) in grid.y().points().iter().enumerate() {
+                    let expected = 1.0 + x + 2.0 * y + 2.0 * 0.6 * maturity;
+                    let actual = solution.values[i * grid.ny() + j];
+                    assert!(
+                        (actual - expected).abs() < 1e-10,
+                        "damping={damping}, x={x}, y={y}: {actual} != {expected}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn degenerate_edge_is_rejected_where_it_cannot_be_imposed() {
+        let uniform = |lo: f64, n| Grid1D::uniform(lo, lo + 1.0, n).expect("grid");
+        let solve = |problem: &DegenerateDrift, grid: Grid2D| {
+            Solver2D::new(grid, McsStepper::new(4))
+                .solve(problem, 0.5)
+                .map(|_| ())
+        };
+        let rejected = |result, expected_edge| {
+            assert!(
+                matches!(result, Err(PdeError::UnsupportedBoundary { edge, .. }) if edge == expected_edge),
+                "expected a rejection on the {expected_edge} edge, got {result:?}"
+            );
+        };
+
+        // Diffusion does not vanish on an edge away from y = 0.
+        rejected(
+            solve(
+                &degenerate_drift(),
+                Grid2D::new(uniform(0.0, 6), uniform(0.1, 6)),
+            ),
+            "lower y",
+        );
+        // Convection out of the domain would need boundary data.
+        let outward = DegenerateDrift {
+            y_drift: -0.6,
+            ..degenerate_drift()
+        };
+        rejected(
+            solve(&outward, Grid2D::new(uniform(0.0, 6), uniform(0.0, 6))),
+            "lower y",
+        );
+        // Only the lower y-edge is solved.
+        let x_edge = DegenerateDrift {
+            x_lower: BoundaryCondition::Degenerate,
+            ..degenerate_drift()
+        };
+        rejected(
+            solve(&x_edge, Grid2D::new(uniform(0.0, 6), uniform(0.0, 6))),
+            "lower x",
+        );
+        // The one-sided difference needs three nodes above the edge.
+        rejected(
+            solve(
+                &degenerate_drift(),
+                Grid2D::new(uniform(0.0, 6), uniform(0.0, 3)),
+            ),
+            "lower y",
+        );
     }
 
     /// 2D heat equation on [0,pi]^2 with Dirichlet BCs.

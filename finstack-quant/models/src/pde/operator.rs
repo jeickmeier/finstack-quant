@@ -40,6 +40,34 @@ fn check_pivot(d: f64, term_a: f64, term_b: f64, row: usize, n: usize) -> Result
     Ok(())
 }
 
+/// Second-difference weights of `a * u''` at a node with spacings `h_m`
+/// (below) and `h_p` (above).
+fn diffusion_stencil(a: f64, h_m: f64, h_p: f64) -> (f64, f64, f64) {
+    let h_sum = h_m + h_p;
+    (
+        2.0 * a / (h_m * h_sum),
+        -2.0 * a / (h_m * h_p),
+        2.0 * a / (h_p * h_sum),
+    )
+}
+
+/// Second-order diffusion/convection stencil with central convection
+/// whatever the cell Péclet number.
+///
+/// Used along a [`BoundaryCondition::Degenerate`] edge, where the diffusion
+/// in the direction of the line can vanish. A one-sided convection there adds
+/// `|b| * h / 2` of numerical diffusion to a line that has none, smearing a
+/// payoff kink at first order in `h`; the implicit ADI sweeps are stable with
+/// central convection.
+pub(super) fn central_stencil(a: f64, b: f64, h_m: f64, h_p: f64) -> (f64, f64, f64) {
+    let h_sum = h_m + h_p;
+    let (mut lower, mut main, mut upper) = diffusion_stencil(a, h_m, h_p);
+    lower -= b * h_p / (h_m * h_sum);
+    main += b * (h_p - h_m) / (h_m * h_p);
+    upper += b * h_m / (h_p * h_sum);
+    (lower, main, upper)
+}
+
 /// Monotone diffusion/convection stencil shared by the 1D and ADI operators.
 /// Central differences retain second-order accuracy where both off-diagonals
 /// are non-negative; convection-dominated cells use the appropriate one-sided
@@ -47,22 +75,17 @@ fn check_pivot(d: f64, term_a: f64, term_b: f64, row: usize, n: usize) -> Result
 /// The one-sided branch adds approximately `|b| * h / 2` numerical diffusion;
 /// low-volatility prices require spatial refinement to control that bias.
 pub(super) fn node_stencil(a: f64, b: f64, h_m: f64, h_p: f64) -> (f64, f64, f64) {
-    let h_sum = h_m + h_p;
     let central_is_monotone = if b >= 0.0 {
         b * h_p <= 2.0 * a
     } else {
         -b * h_m <= 2.0 * a
     };
-
-    let mut lower = 2.0 * a / (h_m * h_sum);
-    let mut main = -2.0 * a / (h_m * h_p);
-    let mut upper = 2.0 * a / (h_p * h_sum);
-
     if central_is_monotone {
-        lower -= b * h_p / (h_m * h_sum);
-        main += b * (h_p - h_m) / (h_m * h_p);
-        upper += b * h_m / (h_p * h_sum);
-    } else if b >= 0.0 {
+        return central_stencil(a, b, h_m, h_p);
+    }
+
+    let (mut lower, mut main, mut upper) = diffusion_stencil(a, h_m, h_p);
+    if b >= 0.0 {
         main -= b / h_p;
         upper += b / h_p;
     } else {
@@ -100,6 +123,10 @@ pub struct TridiagOperator {
     bc_lower_rhs: f64,
     /// RHS correction from upper boundary at the last interior point.
     bc_upper_rhs: f64,
+    /// Coupling from row 0 to `x[2]`: the third weight of a one-sided
+    /// difference on a [`BoundaryCondition::Degenerate`] lower edge row. Zero
+    /// for every other operator, which is then strictly tridiagonal.
+    lower_edge_upper2: f64,
     /// Number of interior points.
     n: usize,
 }
@@ -177,7 +204,29 @@ impl TridiagOperator {
             bc_upper_scale,
             bc_lower_rhs,
             bc_upper_rhs,
+            lower_edge_upper2: 0.0,
             n,
+        }
+    }
+
+    /// Set the coupling from row 0 to `x[2]` of a lower edge row that holds a
+    /// one-sided three-point difference.
+    ///
+    /// The row stays outside the tridiagonal band; [`Self::solve_thomas_into`]
+    /// eliminates the entry against row 1 before the forward sweep.
+    pub(super) fn with_lower_edge_coupling(mut self, upper2: f64) -> Self {
+        debug_assert!(self.n >= 3, "a three-point edge row needs three unknowns");
+        self.lower_edge_upper2 = upper2;
+        self
+    }
+
+    /// `lower_edge_upper2 * x[2]`, or zero for a strictly tridiagonal operator.
+    #[inline]
+    fn lower_edge_term(&self, x: &[f64]) -> f64 {
+        if self.lower_edge_upper2 == 0.0 {
+            0.0
+        } else {
+            self.lower_edge_upper2 * x[2]
         }
     }
 
@@ -209,7 +258,7 @@ impl TridiagOperator {
             return;
         }
 
-        out[0] = self.main[0] * x[0] + self.source[0] + self.bc_lower_rhs;
+        out[0] = self.main[0] * x[0] + self.source[0] + self.bc_lower_rhs + self.lower_edge_term(x);
         if self.n > 1 {
             out[0] += self.upper[0] * x[1];
         }
@@ -288,13 +337,28 @@ impl TridiagOperator {
         let n = self.n;
         let d = scratch;
 
+        // Row 0 of `(I - alpha*A)`: diagonal, super-diagonal and right-hand side.
+        let mut upper0 = -alpha * self.upper.first().copied().unwrap_or(0.0);
         d[0] = 1.0 - alpha * self.main[0];
-        check_pivot(d[0], 1.0, alpha * self.main[0], 0, n)?;
         out[0] = rhs[0];
+        if self.lower_edge_upper2 != 0.0 {
+            // A one-sided edge row also couples to x[2]. Subtract the multiple
+            // of row 1 that cancels that entry, leaving a tridiagonal system.
+            check_pivot(self.upper[1], self.lower_edge_upper2, 0.0, 1, n)?;
+            let factor = self.lower_edge_upper2 / self.upper[1];
+            d[0] += factor * alpha * self.lower[1];
+            upper0 -= factor * (1.0 - alpha * self.main[1]);
+            out[0] -= factor * rhs[1];
+        }
+        check_pivot(d[0], 1.0, alpha * self.main[0], 0, n)?;
 
         for i in 1..n {
             let a_i = -alpha * self.lower[i];
-            let c_prev = -alpha * self.upper[i - 1];
+            let c_prev = if i == 1 {
+                upper0
+            } else {
+                -alpha * self.upper[i - 1]
+            };
             let w = a_i / d[i - 1];
             let diag = 1.0 - alpha * self.main[i];
             let off = w * c_prev;
@@ -305,7 +369,11 @@ impl TridiagOperator {
 
         out[n - 1] /= d[n - 1];
         for i in (0..n - 1).rev() {
-            let c_i = -alpha * self.upper[i];
+            let c_i = if i == 0 {
+                upper0
+            } else {
+                -alpha * self.upper[i]
+            };
             out[i] = (out[i] - c_i * out[i + 1]) / d[i];
         }
         Ok(())
@@ -324,7 +392,12 @@ impl TridiagOperator {
             return y;
         }
 
-        y[0] = x[0] + beta * (self.main[0] * x[0] + self.source[0] + self.bc_lower_rhs);
+        y[0] = x[0]
+            + beta
+                * (self.main[0] * x[0]
+                    + self.source[0]
+                    + self.bc_lower_rhs
+                    + self.lower_edge_term(x));
         if self.n > 1 {
             y[0] += beta * self.upper[0] * x[1];
         }
@@ -381,7 +454,9 @@ impl TridiagOperator {
 fn boundary_scalar(bc: BoundaryCondition) -> f64 {
     match bc {
         BoundaryCondition::Dirichlet(g) | BoundaryCondition::Neumann(g) => g,
-        BoundaryCondition::Linear | BoundaryCondition::LinearInExp => 0.0,
+        BoundaryCondition::Linear
+        | BoundaryCondition::LinearInExp
+        | BoundaryCondition::Degenerate => 0.0,
     }
 }
 
@@ -435,6 +510,9 @@ fn apply_lower_boundary(
             lower[0] = 0.0;
             0.0
         }
+        // Row 0 is the edge node's own equation, supplied by the caller: it
+        // has no boundary value to eliminate.
+        BoundaryCondition::Degenerate => 0.0,
     };
     (scale, scale * boundary_scalar(bc))
 }
@@ -481,6 +559,9 @@ fn apply_upper_boundary(
             upper[last] = 0.0;
             0.0
         }
+        // Rejected by the solvers before assembly; the last row is left as
+        // supplied.
+        BoundaryCondition::Degenerate => 0.0,
     };
     (scale, scale * boundary_scalar(bc))
 }
@@ -511,6 +592,60 @@ mod tests {
         fn upper_boundary(&self, _t: f64) -> BoundaryCondition {
             BoundaryCondition::Dirichlet(1.0)
         }
+    }
+
+    /// A lower edge row with a third weight is solved by eliminating that
+    /// weight against row 1: `solve_thomas` must invert exactly what `apply`
+    /// applies.
+    #[test]
+    fn thomas_inverts_operator_with_lower_edge_coupling() {
+        let grid = Grid1D::from_points(vec![0.0, 0.1, 0.25, 0.45, 0.7, 1.0]).expect("grid");
+        let n = grid.n() - 1;
+        let lower = vec![0.0, 3.0, 2.5, 2.0, 1.5];
+        let main = vec![-4.0, -7.0, -6.0, -5.0, -4.0];
+        let upper = vec![5.0, 3.5, 3.0, 2.5, 2.0];
+        let op = TridiagOperator::from_parts(
+            lower,
+            main,
+            upper,
+            vec![0.0; n],
+            BoundaryCondition::Degenerate,
+            BoundaryCondition::Dirichlet(0.0),
+            &grid,
+        )
+        .with_lower_edge_coupling(-1.25);
+
+        let x = [1.0, -0.5, 2.0, 0.25, -1.5];
+        let mut applied = vec![0.0; n];
+        op.apply(&x, &mut applied);
+        // Row 0 carries the entry outside the band.
+        assert!((applied[0] - (-4.0 * 1.0 + 5.0 * -0.5 - 1.25 * 2.0)).abs() < 1e-14);
+
+        let alpha = 0.3;
+        let rhs: Vec<f64> = x
+            .iter()
+            .zip(&applied)
+            .map(|(x, ax)| x - alpha * ax)
+            .collect();
+        let solved = op.solve_thomas(alpha, &rhs).expect("edge-row solve");
+        for (solved, expected) in solved.iter().zip(&x) {
+            assert!((solved - expected).abs() < 1e-12, "{solved} != {expected}");
+        }
+    }
+
+    /// The upwind branch must be untouched by the stencil split, and the
+    /// central stencil must differentiate a quadratic exactly on a
+    /// non-uniform grid even with no diffusion.
+    #[test]
+    fn central_stencil_is_exact_for_quadratics_without_diffusion() {
+        let (h_m, h_p, b) = (0.2, 0.5, 1.7);
+        let (lower, main, upper) = central_stencil(0.0, b, h_m, h_p);
+        let u = |x: f64| 3.0 - 2.0 * x + 4.0 * x * x;
+        let x0 = 0.9;
+        let approx = lower * u(x0 - h_m) + main * u(x0) + upper * u(x0 + h_p);
+        assert!((approx - b * (-2.0 + 8.0 * x0)).abs() < 1e-12);
+        // With no diffusion the monotone stencil is one-sided instead.
+        assert_eq!(node_stencil(0.0, b, h_m, h_p), (0.0, -b / h_p, b / h_p));
     }
 
     #[test]

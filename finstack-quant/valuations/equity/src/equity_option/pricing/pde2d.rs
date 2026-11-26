@@ -36,6 +36,60 @@ fn checked_pde_value(value: f64, upper_bound: f64) -> finstack_quant_core::Resul
     Ok(value.clamp(0.0, upper_bound))
 }
 
+/// Sinh-concentrated axis on `[lower, upper]` with a node exactly at `node`.
+///
+/// The nodes follow the map of [`Grid1D::sinh_concentrated`],
+/// `center + d * sinh(xi)` with `d = intensity * (upper - lower)`, but `xi` is
+/// spaced evenly on each side of `node` separately, so `node` is itself a
+/// grid point. The price is read off the solution at such a node: a bilinear
+/// read-off between nodes carries an error of the same order as the scheme
+/// that moves with the position of the point inside its cell from one grid
+/// to the next. The two spacings differ by one part in `n`, which keeps the
+/// axis as smooth as the plain map.
+///
+/// # Errors
+///
+/// Returns the [`Grid1D::from_points`] error when the nodes are not finite
+/// and strictly increasing, which includes a `node` outside `[lower, upper)`.
+fn sinh_axis_through(
+    (lower, upper): (f64, f64),
+    n: usize,
+    (center, intensity): (f64, f64),
+    node: f64,
+) -> Result<Grid1D, finstack_quant_models::pde::PdeError> {
+    let d = intensity * (upper - lower);
+    let to_xi = |x: f64| ((x - center) / d).asinh();
+    let (xi_lower, xi_node, xi_upper) = (to_xi(lower), to_xi(node), to_xi(upper));
+    let last = n.saturating_sub(1);
+    // Index of `node`: its share of the transformed range, kept off both
+    // edges unless it is the lower edge itself.
+    let split = if node > lower && last >= 2 {
+        let share = (xi_node - xi_lower) / (xi_upper - xi_lower);
+        ((share * last as f64).round() as usize).clamp(1, last - 1)
+    } else {
+        0
+    };
+    let mut points = Vec::with_capacity(n);
+    for i in 0..n {
+        let xi = if i < split {
+            xi_lower + (xi_node - xi_lower) * (i as f64 / split as f64)
+        } else {
+            xi_node + (xi_upper - xi_node) * ((i - split) as f64 / (last - split) as f64)
+        };
+        points.push(center + d * xi.sinh());
+    }
+    if let Some(first) = points.first_mut() {
+        *first = lower;
+    }
+    if let Some(end) = points.last_mut() {
+        *end = upper;
+    }
+    if let Some(at_node) = points.get_mut(split) {
+        *at_node = node;
+    }
+    Grid1D::from_points(points)
+}
+
 /// Equity option pricer using 2D ADI PDE (Modified Craig-Sneyd) with Heston
 /// stochastic volatility dynamics.
 ///
@@ -116,14 +170,19 @@ impl EquityOptionHestonPdePricer {
         let x_min = spot.ln() + 0.05_f64.ln().min(-log_tail);
         let x_max = spot.ln() + 10.0_f64.ln().max(log_tail);
         let x_intensity = 0.1 * 200.0_f64.ln() / (x_max - x_min);
-        let gx =
-            Grid1D::sinh_concentrated(x_min, x_max, self.space_points_x, spot.ln(), x_intensity)
-                .map_err(|e| {
-                    PricingError::model_failure_with_context(
-                        e.to_string(),
-                        PricingErrorContext::from_instrument(inst).model(ModelKey::PdeAdi2D),
-                    )
-                })?;
+        // Both axes carry a node at the point the price is read from.
+        let gx = sinh_axis_through(
+            (x_min, x_max),
+            self.space_points_x,
+            (spot.ln(), x_intensity),
+            spot.ln(),
+        )
+        .map_err(|e| {
+            PricingError::model_failure_with_context(
+                e.to_string(),
+                PricingErrorContext::from_instrument(inst).model(ModelKey::PdeAdi2D),
+            )
+        })?;
         // Include the attainable zero boundary and the *actual* initial state.
         // Bound the CIR variance on [0,T]: e(1-e) increases until e=1/2,
         // while (1-e)^2 increases throughout. The mean stays between v0 and
@@ -149,14 +208,18 @@ impl EquityOptionHestonPdePricer {
             .max(5.0 * theta_v)
             .max(v0.max(theta_v) + 6.0 * variance_bound.sqrt())
             .max(1.5 * v0);
-        let gv =
-            Grid1D::sinh_concentrated(v_min, v_max, self.space_points_v, theta_v.min(v0), 0.025)
-                .map_err(|e| {
-                    PricingError::model_failure_with_context(
-                        e.to_string(),
-                        PricingErrorContext::from_instrument(inst).model(ModelKey::PdeAdi2D),
-                    )
-                })?;
+        let gv = sinh_axis_through(
+            (v_min, v_max),
+            self.space_points_v,
+            (theta_v.min(v0), 0.025),
+            v0,
+        )
+        .map_err(|e| {
+            PricingError::model_failure_with_context(
+                e.to_string(),
+                PricingErrorContext::from_instrument(inst).model(ModelKey::PdeAdi2D),
+            )
+        })?;
 
         if !v_max.is_finite() || !(gv.x_min() <= v0 && v0 < gv.x_max()) {
             return Err(PricingError::model_failure_with_context(
@@ -391,6 +454,75 @@ mod tests {
             );
             previous = actual;
         }
+    }
+
+    /// Price of the golden fixture `spx_heston_atm_call_1y_pde_quantlib` on
+    /// the production grid refined `refinement` times in every direction.
+    fn golden_case_price(refinement: usize) -> f64 {
+        let as_of = date(2026, 4, 30);
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (30.0, (-0.04_f64 * 30.0).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+            .build()
+            .expect("curve");
+        let mut market = MarketContext::new()
+            .try_insert(curve)
+            .expect("insert market curve");
+        for (name, value) in [
+            ("SPX-SPOT", 5000.0),
+            ("SPX-DIVYIELD", 0.015),
+            ("HESTON_KAPPA", 1.5),
+            ("HESTON_THETA", 0.05),
+            ("HESTON_SIGMA_V", 0.5),
+            ("HESTON_RHO", -0.7),
+            ("HESTON_V0", 0.04),
+        ] {
+            market =
+                market.insert_price(name, MarketScalar::unitless(value).expect("valid scalar"));
+        }
+        let mut inst = option(date(2027, 4, 30));
+        inst.strike = 5000.0;
+        inst.div_yield_id = Some("SPX-DIVYIELD".into());
+        let production = EquityOptionHestonPdePricer::default();
+        EquityOptionHestonPdePricer {
+            space_points_x: production.space_points_x * refinement,
+            space_points_v: production.space_points_v * refinement,
+            time_steps: production.time_steps * refinement,
+        }
+        .price_internal(&inst, &market, as_of)
+        .expect("golden-case PDE price")
+        .amount()
+    }
+
+    /// The golden fixture's tolerance is twice the change between these two
+    /// prices (`REFINEMENT` in `scripts/golden/quantlib/pde.py`). A change to
+    /// the scheme or the grid moves them: record the new pair there and
+    /// regenerate the fixture, before comparing with the reference.
+    #[test]
+    fn heston_pde_golden_refinement_prices_are_recorded() {
+        for (refinement, recorded) in [(1, 44_217.744_307_717), (2, 44_215.286_346_738)] {
+            let price = golden_case_price(refinement);
+            assert!(
+                (price - recorded).abs() < 1e-6,
+                "refinement {refinement}: {price:.12} differs from the recorded {recorded}"
+            );
+        }
+    }
+
+    /// Doubling every grid dimension must cut the change in price by about
+    /// four: second-order convergence from the production grid.
+    #[test]
+    #[ignore = "slow: covered by mise run rust-test --slow"]
+    fn heston_pde_converges_at_second_order_from_production_grid() {
+        let [production, doubled, quadrupled] = [1, 2, 4].map(golden_case_price);
+        let ratio = (production - doubled) / (doubled - quadrupled);
+        assert!(
+            (3.2..4.8).contains(&ratio),
+            "prices [{production}, {doubled}, {quadrupled}] change by a ratio of {ratio}"
+        );
     }
 
     #[test]

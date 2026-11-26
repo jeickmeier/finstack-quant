@@ -37,6 +37,23 @@ pub enum BoundaryCondition {
     /// the exact exponential cell widths, including on nonuniform grids.
     /// With only one interior node the extension is constant.
     LinearInExp,
+
+    /// The PDE itself holds on the edge, which is solved with the interior.
+    ///
+    /// For an edge where the diffusion normal to the edge and the mixed
+    /// derivative coefficient both vanish and the convection normal to the
+    /// edge points into the domain, the equation needs no boundary data: the
+    /// characteristics leave through the edge. The edge nodes are unknowns of
+    /// the linear systems, and their normal derivative is the second-order
+    /// one-sided three-point difference (In 't Hout & Foulon 2010 use this at
+    /// zero variance in the Heston equation).
+    ///
+    /// Supported on the lower y-edge of a 2D problem only, where the
+    /// condition must hold for every x and every time. A solver given this
+    /// condition on any other edge, or on an edge where the coefficient
+    /// requirements fail, returns
+    /// [`PdeError::UnsupportedBoundary`](super::PdeError::UnsupportedBoundary).
+    Degenerate,
 }
 
 impl BoundaryCondition {
