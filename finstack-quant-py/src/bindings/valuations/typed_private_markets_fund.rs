@@ -11,7 +11,7 @@ use finstack_quant_valuations::instruments::equity::private_markets_fund::{
 use pyo3::prelude::*;
 
 use super::convert::{attributes_from_py, instrument_expiry};
-use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
+use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_trait_methods};
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_private_markets_fund", "PrivateMarketsFund")]
 #[pyclass(
@@ -34,7 +34,7 @@ instrument_envelope_methods!(
     builder = PyPrivateMarketsFundBuilder("PrivateMarketsFundBuilder", no_fields),
     seed = PrivateMarketsFund::builder(),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyPrivateMarketsFund,
     "PrivateMarketsFund",
     module = "finstack_quant.valuations.instruments._typed_private_markets_fund"

@@ -4905,7 +4905,6 @@
     "methods": [
       "free",
       "marketDependencies",
-      "metric",
       "minMoic",
       "minXirr",
       "price",
@@ -4945,7 +4944,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "exampleCallable", "exampleFloatingWithDdtl", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "amortization",
       "attributes",
@@ -4986,7 +4985,6 @@
       "expectedCashflows",
       "free",
       "marketDependencies",
-      "metric",
       "price",
       "priceWithPaths",
       "toBuilder",
@@ -5038,7 +5036,6 @@
       "facilityIrr",
       "free",
       "marketDependencies",
-      "metric",
       "price",
       "project",
       "synthesizedDealJson",
@@ -5166,7 +5163,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "businessDayConvention",
@@ -5212,7 +5209,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "contractSpecs",
@@ -5235,7 +5232,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "defaultModel",
@@ -5267,7 +5264,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "defaultModel",
@@ -5299,7 +5296,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "defaultModel",
@@ -5331,7 +5328,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "defaultModel",
@@ -5386,7 +5383,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "compounding",
@@ -5440,7 +5437,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "defaultModel",
@@ -5488,7 +5485,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "baseCurrency",
@@ -5528,7 +5525,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "defaultModel",
@@ -5562,7 +5559,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "baseCpi",
@@ -5644,7 +5641,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "dayCount",
@@ -5700,7 +5697,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromConventions", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "adjustFixedAccrualDates",
       "adjustFloatAccrualDates",
@@ -5729,7 +5726,6 @@
       "getUnderlyingMaturity",
       "getUnderlyingStartDate",
       "marketDependencies",
-      "metric",
       "price",
       "toBuilder",
       "toDict",
@@ -5758,7 +5754,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "businessDayConvention",
@@ -5793,7 +5789,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "parSpread", "price", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "parSpread", "price", "toDict", "toJson"],
     "getters": [
       "attributes",
       "convention",
@@ -5825,7 +5821,6 @@
       "cs01",
       "free",
       "marketDependencies",
-      "metric",
       "parSpread",
       "price",
       "riskyPv01",
@@ -5862,7 +5857,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson", "standard"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toDict", "toJson"],
     "getters": [
       "attachPct",
       "attributes",
@@ -5896,7 +5891,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toDict", "toJson"],
     "getters": [
       "attributes",
       "couponBp",
@@ -5935,7 +5930,6 @@
       "free",
       "greeks",
       "marketDependencies",
-      "metric",
       "parity",
       "price",
       "toBuilder",
@@ -5973,7 +5967,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "currency",
@@ -6024,7 +6018,6 @@
       "greeks",
       "impliedVol",
       "marketDependencies",
-      "metric",
       "price",
       "toBuilder",
       "toDict",
@@ -6059,7 +6052,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "autocallBarriers",
@@ -6128,7 +6121,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "dayCount",
@@ -6191,7 +6184,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "currency",
@@ -6231,7 +6224,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "averagingMethod",
@@ -6288,7 +6281,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "barrier",
@@ -6353,7 +6346,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "currency",
@@ -6414,7 +6407,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "defaultModel",
@@ -6446,7 +6439,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "couponFloor",
@@ -6498,7 +6491,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "callProvision",
@@ -6558,7 +6551,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "callProvision",
@@ -6592,7 +6585,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "agency",
       "assumedPool",
@@ -6650,7 +6643,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "agency",
       "attributes",
@@ -6714,7 +6707,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "agency",
       "attributes",
@@ -6778,7 +6771,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "agency",
       "attributes",
@@ -6826,7 +6819,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "constituents",
@@ -6870,7 +6863,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "acquisitionCosts",
       "appraisalValue",
@@ -6936,7 +6929,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "asset",
       "attributes",
@@ -6972,7 +6965,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "allowCalendarFallback",
       "allowSameCurve",
@@ -7012,7 +7005,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "allowCalendarFallback",
       "attributes",
@@ -7052,7 +7045,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "accrualFractions",
       "attributes",
@@ -7122,7 +7115,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "accrualFractions",
       "attributes",
@@ -7186,7 +7179,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "correlation",
@@ -7255,7 +7248,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "baseCpi",
@@ -7311,7 +7304,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "baseCpi",
@@ -7369,7 +7362,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "businessDayConvention",
@@ -7431,7 +7424,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "bermudanType",
@@ -7477,7 +7470,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "defaultModel",
@@ -7533,7 +7526,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "contractMonth",
@@ -7597,7 +7590,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "defaultModel",
@@ -7635,7 +7628,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "averagingMethod",
@@ -7688,7 +7681,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "dayCount",
@@ -7749,7 +7742,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "correlation",
@@ -7802,7 +7795,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "businessDayConvention",
@@ -7858,7 +7851,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "businessDayConvention",
@@ -7955,7 +7948,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "closeSeriesId",
@@ -8033,7 +8026,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "defaultModel",
@@ -8085,7 +8078,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "accruedDistributionsId",
       "accruedFundingId",
@@ -8129,7 +8122,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "defaultModel",
@@ -8175,7 +8168,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "businessDayConvention",
@@ -8416,7 +8409,6 @@
       "equityMetrics",
       "free",
       "marketDependencies",
-      "metric",
       "price",
       "priceStochastic",
       "runSimulation",
@@ -8480,14 +8472,14 @@
     "kind": "class",
     "constructor": false,
     "statics": ["example", "fromDeal", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toDict", "toJson"],
     "getters": ["attributes", "defaultModel", "id", "trancheId"]
   },
   "valuations.instruments.FxSpot": {
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "baseCalendarId",
@@ -8515,7 +8507,6 @@
       "free",
       "marketDependencies",
       "marketForwardRate",
-      "metric",
       "price",
       "toDict",
       "toJson",
@@ -8547,7 +8538,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "baseCalendarId",
@@ -8573,7 +8564,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "baseCalendarId",
@@ -8603,16 +8594,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "european", "example", "fromJson"],
-    "methods": [
-      "free",
-      "greeks",
-      "impliedVol",
-      "marketDependencies",
-      "metric",
-      "price",
-      "toDict",
-      "toJson"
-    ],
+    "methods": ["free", "greeks", "impliedVol", "marketDependencies", "price", "toDict", "toJson"],
     "getters": [
       "attributes",
       "baseCurrency",
@@ -8639,22 +8621,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": [
-      "delta",
-      "foreignRho",
-      "free",
-      "gamma",
-      "greeks",
-      "marketDependencies",
-      "metric",
-      "price",
-      "rho",
-      "theta",
-      "toBuilder",
-      "toDict",
-      "toJson",
-      "vega"
-    ],
+    "methods": ["free", "greeks", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "baseCurrency",
@@ -8680,22 +8647,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": [
-      "delta",
-      "foreignRho",
-      "free",
-      "gamma",
-      "greeks",
-      "marketDependencies",
-      "metric",
-      "price",
-      "rho",
-      "theta",
-      "toBuilder",
-      "toDict",
-      "toJson",
-      "vega"
-    ],
+    "methods": ["free", "greeks", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "barrier",
@@ -8723,24 +8675,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": [
-      "delta",
-      "foreignRho",
-      "free",
-      "gamma",
-      "greeks",
-      "marketDependencies",
-      "metric",
-      "price",
-      "rho",
-      "theta",
-      "toBuilder",
-      "toDict",
-      "toJson",
-      "vanna",
-      "vega",
-      "volga"
-    ],
+    "methods": ["free", "greeks", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "barrier",
@@ -8772,7 +8707,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": ["free", "marketDependencies", "metric", "price", "toBuilder", "toDict", "toJson"],
+    "methods": ["free", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "baseCalendarId",
@@ -8812,24 +8747,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson"],
-    "methods": [
-      "delta",
-      "foreignRho",
-      "free",
-      "gamma",
-      "greeks",
-      "marketDependencies",
-      "metric",
-      "price",
-      "rho",
-      "theta",
-      "toBuilder",
-      "toDict",
-      "toJson",
-      "vanna",
-      "vega",
-      "volga"
-    ],
+    "methods": ["free", "greeks", "marketDependencies", "price", "toBuilder", "toDict", "toJson"],
     "getters": [
       "attributes",
       "baseCurrency",

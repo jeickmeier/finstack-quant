@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-import datetime
 from datetime import date
 from typing import Any
-import pandas as pd
 from finstack_quant.core.dates import DayCount
 from finstack_quant.core.money import Money
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.types import Attributes
-from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments._pricing import PriceExtras, MetricPricingOverrides
 
 class FxDigitalOption:
@@ -146,281 +143,6 @@ class FxDigitalOption:
         """
         ...
 
-    def price(
-        self,
-        market: MarketContext | str,
-        as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
-        model: str = "default",
-        metrics: list[str] | None = None,
-        extras: PriceExtras | dict[str, Any] | str | None = None,
-    ) -> ValuationResult:
-        """
-        Price this FX digital option and return a :class:`~finstack_quant.valuations.ValuationResult`.
-
-        Same pipeline and keyword surface as :func:`price_instrument`.
-
-        Parameters
-        ----------
-        market : MarketContext | str
-            Market context object or its JSON string.
-        as_of : datetime.date | datetime.datetime | pd.Timestamp | str
-            Valuation date (ISO 8601 strings accepted).
-        model : str, default "default"
-            Registered model key for these terms. The default uses default_model.
-        metrics : list[str], optional
-            Metric identifiers to compute (see :func:`list_standard_metrics`).
-        extras : PriceExtras or dict[str, Any] or str, optional
-            The rarer pricing inputs, as a dict or JSON text in the shape of the
-            Rust ``PriceExtras``; every key is optional and an unknown key raises
-            ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
-            or dict) is merged into ``instrument.spec.metric_pricing_overrides``
-            before pricing (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``):
-            only the keys present replace stored controls, ``bump_config`` keys
-            merge into the stored bump configuration and an explicit ``None``
-            clears a control; omitted keeps the instrument's overrides. ``market_history`` (a ``MarketHistory`` or dict)
-            holds the historical scenarios ``hvar`` and ``expected_shortfall``
-            require; omitted prices without history. ``explain`` (bool, default
-            ``False``) attaches a step trace as ``result.explanation`` when
-            ``True``. ``None`` (the default) means no extras.
-
-        Returns
-        -------
-        ValuationResult
-            Typed valuation envelope with price, currency and metrics.
-
-        Raises
-        ------
-        ValueError
-            If an input cannot be interpreted or the instrument fails validation.
-        KeyError
-            If a required market observation or requested metric key is missing.
-        RuntimeError
-            If pricing or a metric computation fails.
-        """
-        ...
-
-    def delta(
-        self,
-        market: MarketContext | str,
-        as_of: date | str,
-        model: str = "default",
-        extras: PriceExtras | dict[str, Any] | str | None = None,
-    ) -> float:
-        """Compute spot delta.
-
-        Parameters
-        ----------
-        market : MarketContext or str
-            Market state providing the configured spot, yield curves and volatility.
-        as_of : date or str
-            Valuation date for the current contract and observation state.
-        model : str
-            Registered model to use. The default selects the instrument's canonical model.
-        extras : PriceExtras or dict or str, optional
-            Request configuration and overrides accepted by ``price``.
-            Omit to use the stored instrument controls.
-
-        Returns
-        -------
-        float
-            Cash PV change per unit of spot, including contract notional.
-
-        Raises
-        ------
-        ValueError
-            If the date or selected engine is invalid.
-        KeyError
-            If a required market input or sensitivity is absent.
-        RuntimeError
-            If pricing or the sensitivity calculation fails.
-        """
-        ...
-
-    def gamma(
-        self,
-        market: MarketContext | str,
-        as_of: date | str,
-        model: str = "default",
-        extras: PriceExtras | dict[str, Any] | str | None = None,
-    ) -> float:
-        """Compute spot gamma.
-
-        Parameters
-        ----------
-        market : MarketContext or str
-            Market state providing the configured spot, yield curves and volatility.
-        as_of : date or str
-            Valuation date for the current contract and observation state.
-        model : str
-            Registered model to use. The default selects the instrument's canonical model.
-        extras : PriceExtras or dict or str, optional
-            Request configuration and overrides accepted by ``price``.
-            Omit to use the stored instrument controls.
-
-        Returns
-        -------
-        float
-            Cash PV curvature per squared unit of spot, including contract notional.
-
-        Raises
-        ------
-        ValueError
-            If the date or selected engine is invalid.
-        KeyError
-            If a required market input or sensitivity is absent.
-        RuntimeError
-            If pricing or the sensitivity calculation fails.
-        """
-        ...
-
-    def vega(
-        self,
-        market: MarketContext | str,
-        as_of: date | str,
-        model: str = "default",
-        extras: PriceExtras | dict[str, Any] | str | None = None,
-    ) -> float:
-        """Compute option vega.
-
-        Parameters
-        ----------
-        market : MarketContext or str
-            Market state providing the configured spot, yield curves and volatility.
-        as_of : date or str
-            Valuation date for the current contract and observation state.
-        model : str
-            Registered model to use. The default selects the instrument's canonical model.
-        extras : PriceExtras or dict or str, optional
-            Request configuration and overrides accepted by ``price``.
-            Omit to use the stored instrument controls.
-
-        Returns
-        -------
-        float
-            Cash PV change per volatility point (0.01 absolute implied volatility).
-
-        Raises
-        ------
-        ValueError
-            If the date or selected engine is invalid.
-        KeyError
-            If a required market input or sensitivity is absent.
-        RuntimeError
-            If pricing or the sensitivity calculation fails.
-        """
-        ...
-
-    def theta(
-        self,
-        market: MarketContext | str,
-        as_of: date | str,
-        model: str = "default",
-        extras: PriceExtras | dict[str, Any] | str | None = None,
-    ) -> float:
-        """Compute option theta.
-
-        Parameters
-        ----------
-        market : MarketContext or str
-            Market state providing the configured spot, yield curves and volatility.
-        as_of : date or str
-            Valuation date for the current contract and observation state.
-        model : str
-            Registered model to use. The default selects the instrument's canonical model.
-        extras : PriceExtras or dict or str, optional
-            Request configuration and overrides accepted by ``price``.
-            Omit to use the stored instrument controls.
-
-        Returns
-        -------
-        float
-            Cash time decay per day on the configured theta day-count basis.
-
-        Raises
-        ------
-        ValueError
-            If the date or selected engine is invalid.
-        KeyError
-            If a required market input or sensitivity is absent.
-        RuntimeError
-            If pricing or the sensitivity calculation fails.
-        """
-        ...
-
-    def rho(
-        self,
-        market: MarketContext | str,
-        as_of: date | str,
-        model: str = "default",
-        extras: PriceExtras | dict[str, Any] | str | None = None,
-    ) -> float:
-        """Compute domestic rate rho.
-
-        Parameters
-        ----------
-        market : MarketContext or str
-            Market state providing the configured spot, yield curves and volatility.
-        as_of : date or str
-            Valuation date for the current contract and observation state.
-        model : str
-            Registered model to use. The default selects the instrument's canonical model.
-        extras : PriceExtras or dict or str, optional
-            Request configuration and overrides accepted by ``price``.
-            Omit to use the stored instrument controls.
-
-        Returns
-        -------
-        float
-            Cash PV change per upward basis point of domestic yields.
-
-        Raises
-        ------
-        ValueError
-            If the date or selected engine is invalid.
-        KeyError
-            If a required market input or sensitivity is absent.
-        RuntimeError
-            If pricing or the sensitivity calculation fails.
-        """
-        ...
-
-    def foreign_rho(
-        self,
-        market: MarketContext | str,
-        as_of: date | str,
-        model: str = "default",
-        extras: PriceExtras | dict[str, Any] | str | None = None,
-    ) -> float:
-        """Compute foreign rate rho.
-
-        Parameters
-        ----------
-        market : MarketContext or str
-            Market state providing the configured spot, yield curves and volatility.
-        as_of : date or str
-            Valuation date for the current contract and observation state.
-        model : str
-            Registered model to use. The default selects the instrument's canonical model.
-        extras : PriceExtras or dict or str, optional
-            Request configuration and overrides accepted by ``price``.
-            Omit to use the stored instrument controls.
-
-        Returns
-        -------
-        float
-            Cash PV change per upward basis point of foreign yields.
-
-        Raises
-        ------
-        ValueError
-            If the date or selected engine is invalid.
-        KeyError
-            If a required market input or sensitivity is absent.
-        RuntimeError
-            If pricing or the sensitivity calculation fails.
-        """
-        ...
-
     def greeks(
         self,
         market: MarketContext | str,
@@ -439,7 +161,7 @@ class FxDigitalOption:
         model : str
             Registered engine name. The default uses the instrument's standard model.
         extras : PriceExtras or dict or str, optional
-            Request configuration and overrides accepted by ``price``.
+            Request configuration and overrides accepted by ``price_instrument``.
             Omit to use the stored instrument controls.
 
         Returns
@@ -455,49 +177,6 @@ class FxDigitalOption:
             If a required market input is missing.
         RuntimeError
             If the selected pricing or sensitivity calculation fails.
-        """
-        ...
-
-    def metric(
-        self,
-        market: MarketContext | str,
-        as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
-        metric_id: str,
-        model: str = "default",
-        extras: PriceExtras | dict[str, Any] | str | None = None,
-    ) -> float:
-        """
-        Compute a registered scalar metric for this FX digital option.
-
-        Parameters
-        ----------
-        market : MarketContext | str
-            Market context object or its JSON string.
-        as_of : datetime.date | datetime.datetime | pd.Timestamp | str
-            Valuation date.
-        metric_id : str
-            Registered metric identifier (see :func:`list_standard_metrics`).
-        model : str, default "default"
-            Model key.
-        extras : PriceExtras or dict or str, optional
-            Request configuration and overrides accepted by ``price``.
-            Omit to use the stored instrument controls.
-
-        Returns
-        -------
-        float
-            The metric value in the metric's native unit (decimal for rates and
-            yields, currency units for DV01-style sensitivities, basis points for
-            spreads).
-
-        Raises
-        ------
-        ValueError
-            If ``metric_id`` is unknown or an input cannot be interpreted.
-        KeyError
-            If an observation required by the selected metric is missing.
-        RuntimeError
-            If the metric computation fails.
         """
         ...
 
@@ -538,7 +217,7 @@ class FxDigitalOption:
     @property
     def default_model(self) -> str:
         """
-        Canonical model key used when ``model="default"`` is passed to ``price``.
+        Canonical model key used when ``model="default"`` is passed to ``price_instrument``.
 
         Returns
         -------

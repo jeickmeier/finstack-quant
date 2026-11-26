@@ -6,7 +6,7 @@ use finstack_quant_valuations::instruments::Instrument;
 use wasm_bindgen::prelude::*;
 
 instrument_class!(
-    /// Typed wrapper for the Rust `CdsOption` instrument: a European option on a single-name or index CDS, struck on a forward spread or a clean index price. A call is the right to buy protection (payer), a put the right to sell it (receiver); `delta`, `gamma`, `vega`, `theta` and `implied_vol` are metric ids of `price` / `metric`.
+    /// Typed wrapper for the Rust `CdsOption` instrument: a European option on a single-name or index CDS, struck on a forward spread or a clean index price. A call is the right to buy protection (payer), a put the right to sell it (receiver); `delta`, `gamma`, `vega`, `theta` and `implied_vol` are metric ids of `price`.
     ///
     /// @example
     /// ```typescript

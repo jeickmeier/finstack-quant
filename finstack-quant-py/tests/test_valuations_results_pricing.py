@@ -227,15 +227,9 @@ def test_missing_curve_raises_key_error() -> None:
         price_instrument(_bond(), MarketContext(), AS_OF)
 
 
-@pytest.mark.parametrize("typed", [False, True])
-def test_cds_missing_curve_raises_key_error(typed: bool) -> None:
-    cds = CreditDefaultSwap.example()
-    if typed:
-        with pytest.raises(KeyError, match="USD-OIS"):
-            cds.price(MarketContext(), AS_OF)
-    else:
-        with pytest.raises(KeyError, match="USD-OIS"):
-            price_instrument(cds, MarketContext(), AS_OF)
+def test_cds_missing_curve_raises_key_error() -> None:
+    with pytest.raises(KeyError, match="USD-OIS"):
+        price_instrument(CreditDefaultSwap.example(), MarketContext(), AS_OF)
 
 
 def test_validation_failure_raises_value_error() -> None:
@@ -592,8 +586,6 @@ def test_price_extras_rejects_unknown_keys_and_the_retired_keywords() -> None:
 def test_pricing_entry_points_reject_retired_pricing_options_keyword() -> None:
     market = _market()
     bond = _bond()
-    with pytest.raises(TypeError):
-        bond.price(market, AS_OF, pricing_options={})  # schema-rejection-test: retired kwarg pricing_options
     with pytest.raises(TypeError):
         price_instrument(
             bond, market, AS_OF, pricing_options={}

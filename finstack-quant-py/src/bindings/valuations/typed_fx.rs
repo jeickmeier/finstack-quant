@@ -1,7 +1,7 @@
 //! Typed FX instruments: `FxForward` and `FxOption`.
 //! Mirrors the `PyInterestRateSwap` pattern in `typed_rates.rs`.
 //!
-//! The `instrument_pricing_methods!` /
+//! The `instrument_trait_methods!` /
 //! `instrument_envelope_methods!` / `builder_set!` macros shared by every
 //! typed wrapper live in `typed_macros.rs`.
 
@@ -23,7 +23,7 @@ use super::convert::{
     money_to_py, opt_repr,
 };
 use super::pricing::typed_option_greeks;
-use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
+use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_trait_methods};
 
 use finstack_quant_valuations::instruments::fx::fx_forward::FxForwardBuilder;
 use finstack_quant_valuations::instruments::fx::fx_option::FxOptionBuilder;
@@ -50,7 +50,7 @@ instrument_envelope_methods!(
     builder = PyFxForwardBuilder("FxForwardBuilder", fields),
     seed = finstack_quant_valuations::instruments::fx::fx_forward::FxForward::builder(),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyFxForward,
     "FxForward",
     module = "finstack_quant.valuations.instruments._typed_fx"
@@ -387,7 +387,7 @@ instrument_envelope_methods!(
     builder = PyFxOptionBuilder("FxOptionBuilder", fields),
     seed = finstack_quant_valuations::instruments::fx::fx_option::FxOption::builder(),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyFxOption,
     "FxOption",
     module = "finstack_quant.valuations.instruments._typed_fx"

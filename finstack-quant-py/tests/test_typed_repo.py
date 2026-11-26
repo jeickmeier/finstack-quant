@@ -24,6 +24,6 @@ def test_repo_exact_rate_survives_builder_copy_and_wire_pricing() -> None:
         day_count="act_365f",
     )
     market = MarketContext().insert(curve)
-    assert trade.price(market, as_of).value == price_instrument(trade.to_json(), market, as_of).value
+    assert price_instrument(trade, market, as_of).value == price_instrument(trade.to_json(), market, as_of).value
     with pytest.raises(ValueError, match="maturity"):
         trade.to_builder().maturity(date(1990, 1, 1)).build()

@@ -18,7 +18,7 @@ use super::super::convert::{
     money_to_py, opt_serde_to_py, rate_from_py, stub_kind_from_py,
 };
 use super::super::typed_macros::{
-    builder_set, instrument_envelope_methods, instrument_pricing_methods,
+    builder_set, instrument_envelope_methods, instrument_trait_methods,
 };
 
 use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoanBuilder;
@@ -45,7 +45,7 @@ instrument_envelope_methods!(
     builder = PyTermLoanBuilder("TermLoanBuilder", fields),
     seed = finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan::builder(),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyTermLoan,
     "TermLoan",
     module = "finstack_quant.valuations.instruments._instruments.term_loan"

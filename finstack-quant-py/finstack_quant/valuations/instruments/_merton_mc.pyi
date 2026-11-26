@@ -143,7 +143,7 @@ class MertonMcCalibrationSpec:
     Market calibration of a Merton Monte Carlo configuration.
 
     Set on a configuration with :meth:`MertonMcConfig.calibration`. The
-    ``merton_mc`` pricing model (``Bond.price(..., model="merton_mc")`` with
+    ``merton_mc`` pricing model (``price_instrument(bond, ..., model="merton_mc")`` with
     the configuration in the bond's
     ``bond.merton_mc_config``) first
     solves ``parameter`` by low-path bisection so the cash base-case price
@@ -620,7 +620,7 @@ class MertonMcConfig:
         """
         Set the market-calibration specification.
 
-        Honoured by the ``merton_mc`` pricing model (``Bond.price(...,
+        Honoured by the ``merton_mc`` pricing model (``price_instrument(bond, ...,
         model="merton_mc")`` with this configuration in the bond's
         ``bond.merton_mc_config``), which
         solves the structural parameter to the target quote before the

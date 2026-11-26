@@ -20,7 +20,7 @@ use super::super::convert::{
 };
 use super::super::typed_legs::{PyPremiumLegSpec, PyProtectionLegSpec};
 use super::super::typed_macros::{
-    builder_set, instrument_envelope_methods, instrument_pricing_methods,
+    builder_set, instrument_envelope_methods, instrument_trait_methods,
 };
 
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwapBuilder;
@@ -50,7 +50,7 @@ instrument_envelope_methods!(
         finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap::builder(
         ),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyCreditDefaultSwap,
     "CreditDefaultSwap",
     module = "finstack_quant.valuations.instruments._typed_credit.cds"

@@ -111,10 +111,6 @@ def test_swap_from_legs_prices_on_start_date_without_fixings() -> None:
     assert isinstance(result, ValuationResult)
     assert result.currency == "USD"
     assert result.get_metric("dv01") is not None
-    # Same answer through the free function and through ``metric``.
-    via_fn = price_instrument(swap, _market(), AS_OF)
-    assert via_fn.price == pytest.approx(result.price)
-    assert swap.metric(_market(), AS_OF, "dv01") == pytest.approx(result.get_metric("dv01"))
 
 
 def test_swap_from_conventions_prices_on_start_date_without_fixings() -> None:
@@ -522,7 +518,6 @@ def test_bond_getters_and_pricing_helpers() -> None:
         extras={"metric_pricing_overrides": {"theta_period": {"count": 1, "unit": "days"}}},
     )
     assert result.get_metric("ytm") is not None
-    assert bond.metric(_market(), AS_OF, "ytm") == pytest.approx(result.get_metric("ytm"))
     assert bond.id in repr(bond)
     assert "Money(" in repr(bond)
 
@@ -830,7 +825,7 @@ def test_deposit_builder_retains_exact_rate_and_matches_wire_pricing() -> None:
     assert deposit.fixed_rate == rate
     assert Deposit.from_json(deposit.to_json()).fixed_rate == rate
     market = MarketContext().insert(DiscountCurve.flat("USD-OIS", "2025-01-15", 0.05, day_count="act_365f"))
-    direct = deposit.price(market, "2025-01-15", metrics=["dv01"])
+    direct = price_instrument(deposit, market, "2025-01-15", metrics=["dv01"])
     wire = price_instrument(deposit.to_json(), market, "2025-01-15", metrics=["dv01"])
     assert direct.value == wire.value
     assert direct.metrics == wire.metrics
@@ -855,5 +850,5 @@ def test_forward_rate_agreement_builder_preserves_fixing_and_exact_rate() -> Non
     assert fra.fixed_rate == Decimal("0.047505")
     assert fra.fixing_date == ForwardRateAgreement.example().fixing_date
     assert fra.forward_curve_id == "USD-SOFR-3M"
-    assert fra.price(market, base).value == price_instrument(fra.to_json(), market, base).value
+    assert price_instrument(fra, market, base).value == price_instrument(fra.to_json(), market, base).value
     assert fra.to_builder().build().to_json() == fra.to_json()

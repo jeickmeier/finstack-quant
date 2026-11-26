@@ -15,7 +15,7 @@ use crate::bindings::valuations::convert::{
     attributes_from_py, day_count_from_py, money_from_py, money_to_py,
 };
 use crate::bindings::valuations::typed_macros::{
-    builder_set, instrument_envelope_methods, instrument_pricing_methods,
+    builder_set, instrument_envelope_methods, instrument_trait_methods,
 };
 use crate::bindings::valuations::typed_structured_credit::{
     PyAssetPool, PySimulationDiagnostics, PyStructuredCredit, PyTrancheCashflows,
@@ -55,7 +55,7 @@ instrument_envelope_methods!(
     builder = PyAssetBackedFacilityBuilder("AssetBackedFacilityBuilder", no_fields),
     seed = AssetBackedFacility::builder(),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyAssetBackedFacility,
     "AssetBackedFacility",
     module = "finstack_quant.valuations.instruments._typed_asset_backed_facility.facility"

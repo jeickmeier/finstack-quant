@@ -435,4 +435,4 @@ def test_other_listed_futures_roundtrip_typed_terms_at_exchange_marks() -> None:
         assert edited.terms.to_json() == terms.to_json()
         as_of = datetime.date(2025, 1, 2)
         market = MarketContext()
-        assert edited.price(market, as_of).value == price_instrument(edited.to_json(), market, as_of).value
+        assert price_instrument(edited, market, as_of).value == price_instrument(edited.to_json(), market, as_of).value

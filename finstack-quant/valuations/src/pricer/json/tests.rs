@@ -61,24 +61,6 @@ fn price_instrument_from_json(
     )
 }
 
-fn metric_value_from_instrument_json(
-    instrument_json: &str,
-    market: &MarketContext,
-    as_of: &str,
-    model: &str,
-    metric: &str,
-) -> finstack_quant_core::Result<f64> {
-    let instrument = parse_boxed_instrument_from_json(instrument_json, None, None)?;
-    metric_value(
-        &instrument,
-        market,
-        as_of,
-        model,
-        metric,
-        crate::instruments::PricingOptions::default(),
-    )
-}
-
 fn envelope_value(instrument: InstrumentJson) -> Value {
     serde_json::to_value(InstrumentEnvelope::new(instrument)).expect("serialize envelope")
 }
@@ -847,16 +829,7 @@ fn json_pricing_routes_validate_instrument_before_model_resolution() {
         None,
     )
     .expect_err("instrument validation must win");
-    let scalar = metric_value_from_instrument_json(
-        &invalid,
-        &market,
-        "not-a-date",
-        "not-a-model",
-        "not-a-metric",
-    )
-    .expect_err("instrument validation must win");
-
-    for error in [plain, with_metrics, scalar] {
+    for error in [plain, with_metrics] {
         let message = error.to_string();
         assert!(
             message.contains("strike") && message.contains("positive"),
@@ -1065,18 +1038,8 @@ fn price_instrument_from_json_accepts_market_history_for_hvar() {
 }
 
 #[test]
-fn metric_helpers_return_requested_present_metrics() {
+fn price_instrument_returns_requested_present_metrics() {
     let json = bond_instrument_json();
-    let dirty_price = metric_value_from_instrument_json(
-        &json,
-        &market_context(),
-        "2024-01-01",
-        "discounting",
-        "dirty_price",
-    )
-    .expect("metric");
-    assert!(dirty_price.is_finite());
-
     let result = price_instrument_from_json(
         &json,
         &market_context(),
@@ -1087,6 +1050,9 @@ fn metric_helpers_return_requested_present_metrics() {
         None,
     )
     .expect("metrics");
-    assert_eq!(result.metric_str("dirty_price"), Some(dirty_price));
+    let dirty_price = result
+        .metric_str("dirty_price")
+        .expect("requested metric is present");
+    assert!(dirty_price.is_finite());
     assert_eq!(result.metric_str("vega"), Some(0.0));
 }

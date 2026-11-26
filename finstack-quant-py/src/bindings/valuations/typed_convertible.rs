@@ -21,7 +21,7 @@ use finstack_quant_valuations::instruments::fixed_income::{
 use super::convert::{
     attributes_from_py, date_repr, enum_to_py_string, float_repr, money_repr, money_to_py, opt_repr,
 };
-use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
+use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_trait_methods};
 
 use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBondBuilder;
 
@@ -213,7 +213,7 @@ instrument_envelope_methods!(
         finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond::builder(
         ),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyConvertibleBond,
     "ConvertibleBond",
     module = "finstack_quant.valuations.instruments._typed_convertible"

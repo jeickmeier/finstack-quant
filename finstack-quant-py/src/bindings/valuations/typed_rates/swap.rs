@@ -12,7 +12,7 @@ use super::super::typed_legs::{PyFixedLegSpec, PyFloatLegSpec};
 use crate::bindings::valuations::convert::money_repr;
 use crate::bindings::valuations::convert::{enum_from_str, instrument_expiry, opt_serde_to_py};
 use crate::bindings::valuations::typed_macros::{
-    builder_set, instrument_envelope_methods, instrument_pricing_methods,
+    builder_set, instrument_envelope_methods, instrument_trait_methods,
 };
 
 use finstack_quant_valuations::instruments::rates::irs::InterestRateSwapBuilder;
@@ -44,7 +44,7 @@ instrument_envelope_methods!(
     builder = PyInterestRateSwapBuilder("InterestRateSwapBuilder", fields),
     seed = finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::builder(),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyInterestRateSwap,
     "InterestRateSwap",
     module = "finstack_quant.valuations.instruments._typed_rates.swap"

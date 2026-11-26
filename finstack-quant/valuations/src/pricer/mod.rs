@@ -26,9 +26,9 @@ pub use catalog::{
 };
 pub use json::dispatch::{
     ParsedInstrument, PriceExtras, STANDARD_OPTION_GREEKS, instrument_envelope_from_spec,
-    instrument_from_spec, metric_value, parse_boxed_instrument_from_json,
-    parse_boxed_instruments_from_json, parse_instrument_from_json, parse_typed_instrument_json,
-    present_standard_option_greeks, pretty_instrument_json, price_instrument,
-    validate_instrument_json, validate_typed_instrument_json,
+    instrument_from_spec, parse_boxed_instrument_from_json, parse_boxed_instruments_from_json,
+    parse_instrument_from_json, parse_typed_instrument_json, present_standard_option_greeks,
+    pretty_instrument_json, price_instrument, validate_instrument_json,
+    validate_typed_instrument_json,
 };
 pub use standard::{FAMILIES, STANDARD};

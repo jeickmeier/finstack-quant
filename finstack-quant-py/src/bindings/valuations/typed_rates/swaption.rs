@@ -15,7 +15,7 @@ use super::super::typed_legs::{PyFixedLegSpec, PyFloatLegSpec};
 use crate::bindings::valuations::convert::money_repr;
 use crate::bindings::valuations::convert::{enum_from_str, opt_serde_to_py};
 use crate::bindings::valuations::typed_macros::{
-    builder_set, instrument_envelope_methods, instrument_pricing_methods,
+    builder_set, instrument_envelope_methods, instrument_trait_methods,
 };
 
 use finstack_quant_valuations::instruments::rates::swaption::SwaptionBuilder;
@@ -42,7 +42,7 @@ instrument_envelope_methods!(
     builder = PySwaptionBuilder("SwaptionBuilder", fields),
     seed = finstack_quant_valuations::instruments::rates::swaption::Swaption::builder(),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PySwaption,
     "Swaption",
     module = "finstack_quant.valuations.instruments._typed_rates.swaption"

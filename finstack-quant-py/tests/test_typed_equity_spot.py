@@ -23,7 +23,7 @@ def test_equity_builder_prices_short_and_preserves_quote_choice() -> None:
         .build()
     )
     assert price_instrument(asset, market, as_of).price == -48.5
-    assert price_instrument(asset.to_json(), market, as_of).value == asset.price(market, as_of).value
+    assert price_instrument(asset.to_json(), market, as_of).value == price_instrument(asset, market, as_of).value
     assert asset.discrete_dividends == [(date(2025, 2, 3), 0.38)]
     edited = asset.to_builder().quoted_spot(None).build()
     assert edited.spot_id == "EXPLICIT-QUOTE"

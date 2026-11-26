@@ -1,8 +1,8 @@
 //! Macros shared by every typed instrument wrapper and builder.
 //!
-//! `instrument_pricing_methods!` stamps the common `price` / `metric` /
-//! `market_dependencies` / `default_model` / `attributes` / `to_dict` surface
-//! onto a wrapper, `instrument_envelope_methods!` the `builder` /
+//! `instrument_trait_methods!` stamps the common `market_dependencies` /
+//! `default_model` / `attributes` / `to_dict` surface onto a wrapper,
+//! `instrument_envelope_methods!` the `builder` /
 //! `__reduce__` / `from_json` / `to_json` / `id` surface plus the builder's
 //! `build` / `__repr__` / pricing-override setters, and `builder_set!` is the
 //! body of one consuming builder setter. Each macro expands to
@@ -10,64 +10,18 @@
 //! per-instrument constructors, accessors and typed helpers stay in a
 //! hand-written block beside the invocations.
 
-/// Stamp the pricing surface shared by every typed instrument wrapper.
+/// Stamp the `Instrument` trait surface shared by every typed instrument wrapper.
 ///
-/// Expands to a `#[pymethods]` block with `price`, `metric`,
-/// `market_dependencies`, `default_model`, `attributes` and `to_dict`. The
-/// wrapper must expose `pub(crate) inner` (the Rust instrument); `$name` is its
-/// Python class name and `module` the stub module holding its docstrings (the
-/// private fragment that mirrors the wrapper's Rust file).
-macro_rules! instrument_pricing_methods {
+/// Expands to a `#[pymethods]` block with `market_dependencies`,
+/// `default_model`, `attributes` and `to_dict`. Pricing is not a method: a
+/// typed instrument is priced by `price_instrument`. The wrapper must expose
+/// `pub(crate) inner` (the Rust instrument); `$name` is its Python class name
+/// and `module` the stub module holding its docstrings (the private fragment
+/// that mirrors the wrapper's Rust file).
+macro_rules! instrument_trait_methods {
     ($ty:ident, $name:literal, module = $module:literal) => {
         #[pymethods]
         impl $ty {
-            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".price"))]
-            #[pyo3(signature = (market, as_of, model="default", metrics=None, extras=None))]
-            #[pyo3(text_signature = "($self, market, as_of, model='default', metrics=None, extras=None)")]
-            fn price(
-                &self,
-                py: Python<'_>,
-                market: &Bound<'_, PyAny>,
-                as_of: &Bound<'_, PyAny>,
-                model: &str,
-                metrics: Option<Vec<String>>,
-                extras: Option<&Bound<'_, PyAny>>,
-            ) -> PyResult<$crate::bindings::valuations::PyValuationResult> {
-                let extras = $crate::bindings::valuations::pricing::price_extras_from_py(py, extras)?;
-                $crate::bindings::valuations::pricing::price_typed(
-                    py,
-                    Box::new(self.inner.clone()),
-                    market,
-                    as_of,
-                    model,
-                    metrics,
-                    extras,
-                )
-            }
-
-            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".metric"))]
-            #[pyo3(signature = (market, as_of, metric_id, model="default", extras=None))]
-            #[pyo3(text_signature = "($self, market, as_of, metric_id, model='default', extras=None)")]
-            fn metric(
-                &self,
-                py: Python<'_>,
-                market: &Bound<'_, PyAny>,
-                as_of: &Bound<'_, PyAny>,
-                metric_id: &str,
-                model: &str,
-                extras: Option<&Bound<'_, PyAny>>,
-            ) -> PyResult<f64> {
-                $crate::bindings::valuations::pricing::metric_typed(
-                    py,
-                    Box::new(self.inner.clone()),
-                    market,
-                    as_of,
-                    metric_id,
-                    model,
-                    $crate::bindings::valuations::pricing::price_extras_from_py(py, extras)?,
-                )
-            }
-
             #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".market_dependencies"))]
             #[pyo3(text_signature = "($self)")]
             fn market_dependencies<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -101,31 +55,8 @@ macro_rules! instrument_pricing_methods {
         }
     };
 }
-/// Bind named option Greeks to the same scalar metric pipeline as `metric()`.
-macro_rules! instrument_greek_methods {
-    ($ty:ident, $name:literal, $module:literal, [$($metric:ident),+ $(,)?]) => {
-        #[pymethods]
-        impl $ty {
-            $(
-                #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".", stringify!($metric)))]
-                #[pyo3(signature = (market, as_of, model="default", extras=None))]
-                fn $metric(
-                    &self,
-                    py: Python<'_>,
-                    market: &Bound<'_, PyAny>,
-                    as_of: &Bound<'_, PyAny>,
-                    model: &str,
-                    extras: Option<&Bound<'_, PyAny>>,
-                ) -> PyResult<f64> {
-                    self.metric(py, market, as_of, stringify!($metric), model, extras)
-                }
-            )+
-        }
-    };
-}
 
-pub(crate) use instrument_greek_methods;
-pub(crate) use instrument_pricing_methods;
+pub(crate) use instrument_trait_methods;
 
 /// Stamp the envelope and builder surface of a typed instrument wrapper.
 ///
@@ -420,7 +351,7 @@ macro_rules! py_future_option {
             builder = $builder($builder_name, no_fields),
             seed = <$rust_ty>::builder(),
         );
-        $crate::bindings::valuations::typed_macros::instrument_pricing_methods!(
+        $crate::bindings::valuations::typed_macros::instrument_trait_methods!(
             $ty,
             $name,
             module = $module

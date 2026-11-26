@@ -45,7 +45,7 @@ by the same path on both sides:
   PortfolioResult`) and shared aliases from the public module, and keeps
   private typing helpers next to their first user.
 - The `pydoc!` key, and the `module =` argument of doc-keyed macros such as
-  `wire_methods!` and `instrument_pricing_methods!`, name the fragment
+  `wire_methods!` and `instrument_trait_methods!`, name the fragment
   (`pydoc!("finstack_quant.portfolio._brinson", "BrinsonPeriodResult")`). The
   `#[pyclass(module = ...)]` attribute stays the public module, which is what
   `__module__`, `repr` and pickling see.

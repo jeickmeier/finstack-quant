@@ -16,7 +16,7 @@ use pyo3::prelude::*;
 use super::convert::{
     attributes_from_py, enum_from_str, enum_to_py_string, instrument_expiry, money_from_py,
 };
-use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
+use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_trait_methods};
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_bond", "InflationLinkedBond")]
 #[pyclass(
@@ -39,7 +39,7 @@ instrument_envelope_methods!(
     builder = PyInflationLinkedBondBuilder("InflationLinkedBondBuilder", no_fields),
     seed = InflationLinkedBond::builder(),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyInflationLinkedBond,
     "InflationLinkedBond",
     module = "finstack_quant.valuations.instruments._typed_inflation_bond"

@@ -1388,7 +1388,7 @@ export type CreditModelConfig = Pick<
 export type CompositeHistoryResult = CompositeHistoryRow[];
 
 /**
- * Members shared by every FX instrument handle (`id`, `toJson`, `price`, `metric`).
+ * Members shared by every FX instrument handle (`id`, `toJson`, `price`).
  */
 export interface FxHandle extends WasmOwned {
   /**
@@ -1418,96 +1418,14 @@ export interface FxHandle extends WasmOwned {
     metrics?: string[] | null,
     extras?: generated.valuations.PriceExtras | JsonInput | null
   ): ValuationResult;
-  /**
-   * Compute one metric of this FX instrument against the supplied market.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param metricId - Fully qualified metric identifier, e.g. `"delta"` or `"dv01"`.
-   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns The metric value in the metric's documented unit.
-   * @throws Error - Throws if an input is invalid, the metric is not defined for this instrument, required market data is missing (kind `not_found`), or the computation fails.
-   */
-  metric(marketJson: JsonInput, asOf: string, metricId: string, model?: string | null): number;
 }
 
 /**
- * FX vanilla option handle with first-order greeks.
+ * FX option handle with the Greek bundle of the selected model.
  */
 export interface FxOptionGreeks extends FxHandle {
   /**
-   * Spot delta of the option under the selected model.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Cash delta `dPV/dS`: PV change per unit move in the spot rate, including notional scaling.
-   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
-   */
-  delta(marketJson: JsonInput, asOf: string, model?: string | null): number;
-  /**
-   * Spot gamma of the option under the selected model.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Cash gamma `d²PV/dS²`: PV per unit-spot squared, including notional scaling.
-   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
-   */
-  gamma(marketJson: JsonInput, asOf: string, model?: string | null): number;
-  /**
-   * Vega of the option under the selected model.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Cash vega: PV change for a 1 vol-point (0.01 absolute) move in implied volatility.
-   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
-   */
-  vega(marketJson: JsonInput, asOf: string, model?: string | null): number;
-  /**
-   * Theta of the option under the selected model.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Model theta per day: annual analytic theta divided by the `metric_pricing_overrides.theta_day_basis` day count (default 365 calendar days); not annualized.
-   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
-   */
-  theta(marketJson: JsonInput, asOf: string, model?: string | null): number;
-  /**
-   * Domestic-rate rho of the option under the selected model.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Domestic rho: PV change for a 1bp (0.0001) move in the domestic discount rate.
-   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
-   */
-  rho(marketJson: JsonInput, asOf: string, model?: string | null): number;
-  /**
-   * Foreign-rate rho of the option under the selected model.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Foreign rho: PV change for a 1bp (0.0001) move in the foreign discount rate.
-   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
-   */
-  foreignRho(marketJson: JsonInput, asOf: string, model?: string | null): number;
-  /**
-   * Vanna of the option under the selected model.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Vanna `d²PV/(dS dσ)`: PV per unit spot per vol point (0.01 absolute vol).
-   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
-   */
-  vanna(marketJson: JsonInput, asOf: string, model?: string | null): number;
-  /**
-   * Volga of the option under the selected model.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Volga `d²PV/dσ²`: PV per vol-point squared (0.01 absolute vol).
-   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
-   */
-  volga(marketJson: JsonInput, asOf: string, model?: string | null): number;
-  /**
-   * Named first-order greeks produced by the selected model.
+   * Named Greeks produced by the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.

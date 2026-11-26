@@ -55,7 +55,9 @@ def test_fx_swap_reverses_base_cash_at_explicit_settlement_dates() -> None:
         .foreign_discount_curve_id("EUR-OIS")
         .build()
     )
-    assert instrument.price(market, as_of).value == price_instrument(instrument.to_json(), market, as_of).value
+    assert (
+        price_instrument(instrument, market, as_of).value == price_instrument(instrument.to_json(), market, as_of).value
+    )
     assert instrument.near_date == near
     assert instrument.far_date == far
     assert instrument.far_rate - instrument.near_rate == pytest.approx(0.02)

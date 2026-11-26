@@ -86,6 +86,4 @@ pub mod variance_swap;
 pub mod xccy_swap;
 pub mod yoy_inflation_swap;
 
-pub(crate) use support::{
-    Staged, arg, envelope_json, get, market_dependencies, metric_value, option_greeks,
-};
+pub(crate) use support::{Staged, arg, envelope_json, get, market_dependencies, option_greeks};

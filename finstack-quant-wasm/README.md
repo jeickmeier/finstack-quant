@@ -113,7 +113,7 @@ const bond = valuations.instruments.Bond.fixed(
 );
 JSON.parse(bond.toJson()).schema; // 'finstack_quant.instrument/1'
 
-// Every typed instrument has one getter per Rust field, `price` / `metric`,
+// Every typed instrument has one getter per Rust field, `price`,
 // and a fluent builder whose setters map one for one onto the Rust builder.
 // `Money`, `Tenor`, `DayCount` and `Currency` are handles; dates are ISO-8601
 // strings; nested specs are plain objects.

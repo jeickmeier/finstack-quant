@@ -877,7 +877,7 @@ def test_asset_pool_exposes_the_rust_collateral_analytics() -> None:
 
 
 def test_structured_credit_has_the_typed_instrument_surface() -> None:
-    """VALB-006: a deal prices itself like every sibling typed instrument."""
+    """VALB-006: a deal carries the surface of every sibling typed instrument."""
     example = StructuredCredit.example()
     assert example.id == "CLO-EXAMPLE"
     deal = _clo()
@@ -886,10 +886,10 @@ def test_structured_credit_has_the_typed_instrument_surface() -> None:
     assert deal.expiry is None or isinstance(deal.expiry, datetime.date)
     assert "USD-OIS" in json.dumps(deal.market_dependencies())
 
-    direct = deal.price(market, CLOSE, metrics=["wal"])
-    generic = price_instrument(deal, market, CLOSE, metrics=["wal"])
-    assert direct.value.amount == pytest.approx(generic.value.amount)
-    assert deal.metric(market, CLOSE, "wal") == pytest.approx(direct.get_metric("wal"))
+    typed = price_instrument(deal, market, CLOSE, metrics=["wal"])
+    wire = price_instrument(deal.to_json(), market, CLOSE, metrics=["wal"])
+    assert typed.value.amount == pytest.approx(wire.value.amount)
+    assert typed.get_metric("wal") == pytest.approx(wire.get_metric("wal"))
 
 
 def test_structured_credit_reports_the_effective_policies() -> None:

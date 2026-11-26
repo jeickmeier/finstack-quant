@@ -3,7 +3,6 @@
 use crate::api::core::currency::JsCurrency;
 use crate::api::core::dates::{JsDayCount, JsTenor};
 use crate::api::core::money::JsMoney;
-use crate::utils::input::js_string;
 use crate::utils::{date_to_iso, parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
@@ -233,38 +232,6 @@ pub(crate) fn envelope_json(instrument: impl Into<InstrumentJson>) -> Result<Str
 /// `Instrument::market_dependencies` as a plain object.
 pub(crate) fn market_dependencies(instrument: &dyn Instrument) -> Js {
     to_js_value(&instrument.market_dependencies().map_err(to_js_err)?)
-}
-
-/// One scalar metric of a typed instrument, through the `metric_value` path
-/// shared with `priceInstrument`.
-pub(crate) fn metric_value(
-    instrument: Box<dyn finstack_quant_valuations::instruments::Instrument>,
-    market_json: &JsValue,
-    as_of: &JsValue,
-    model: Option<&JsValue>,
-    metric_id: &str,
-    extras: Option<&JsValue>,
-) -> Result<f64, JsValue> {
-    let extras: finstack_quant_valuations::pricer::PriceExtras =
-        crate::utils::input::opt_from_js_json(extras, "extras")?.unwrap_or_default();
-    let instrument = finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
-        instrument,
-        extras.metric_pricing_overrides_json().as_deref(),
-        extras.instrument_pricing_overrides.as_ref(),
-    )
-    .map_err(to_js_err)?;
-    let market = super::super::pricing::parse_market(market_json)?;
-    let as_of = js_string(as_of, "asOf")?;
-    let model = crate::utils::input::js_opt_string(model, "model")?;
-    finstack_quant_valuations::pricer::metric_value(
-        &instrument,
-        &market,
-        &as_of,
-        model.as_deref().unwrap_or("default"),
-        metric_id,
-        extras.pricing_options(finstack_quant_calibration::recalibration::pricing_options()),
-    )
-    .map_err(to_js_err)
 }
 
 /// Every standard option Greek that applies to a typed instrument, as a JS

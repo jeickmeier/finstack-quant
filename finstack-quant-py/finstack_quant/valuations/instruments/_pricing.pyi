@@ -746,8 +746,7 @@ class MetricPricingOverrides:
     Metric-time pricing overrides merged into an instrument before pricing.
 
     Typed twin of the ``metric_pricing_overrides`` JSON accepted by
-    :func:`price_instrument`, typed ``.price()`` and
-    :func:`validate_instrument_json`. Every field mirrors the Rust
+    :func:`price_instrument` and :func:`validate_instrument_json`. Every field mirrors the Rust
     ``MetricPricingOverrides`` struct; omitted fields keep the instrument's
     own overrides. Instances are immutable and compare by value.
 

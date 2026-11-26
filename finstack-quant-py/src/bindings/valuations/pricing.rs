@@ -14,7 +14,6 @@ use crate::bindings::module_utils::{
 };
 use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::{core_to_py, display_to_py, value_error};
-use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::cashflow_export::InstrumentCashflowEnvelope;
 use finstack_quant_valuations::instruments::pricing_overrides::MetricPricingOverrides;
 use finstack_quant_valuations::metrics::risk::{MarketHistory, MarketScenario};
@@ -828,42 +827,6 @@ pub(crate) const EXPORTS: &[&str] = &[
     "tranche_solve_field_units",
 ];
 
-/// Price an instrument envelope through the canonical Rust pricer.
-///
-/// Shared by `price_instrument` and every typed wrapper's `.price()`, so all
-/// Python pricing entry points coerce their options identically.
-///
-/// # Arguments
-///
-/// * `py` - GIL token; parsing and pricing run with the GIL released.
-/// * `instrument` - Owned native Rust instrument, validated before pricing.
-/// * `market` - `MarketContext` object or market-context JSON string.
-/// * `as_of` - Valuation date (date-like or ISO 8601 string).
-/// * `model` - Model key (`"default"` selects the instrument-native model).
-/// * `metrics` - Metric identifiers to compute; `None` means valuation only.
-/// * `extras` - The parsed `extras` argument: its `metric_pricing_overrides`
-///   patch is merged into `instrument.spec.metric_pricing_overrides` before
-///   validation, and its `market_history` and `explain` go to the price call.
-pub(crate) fn price_typed(
-    py: Python<'_>,
-    instrument: Box<dyn Instrument>,
-    market: &Bound<'_, PyAny>,
-    as_of: &Bound<'_, PyAny>,
-    model: &str,
-    metrics: Option<Vec<String>>,
-    extras: PriceExtras,
-) -> PyResult<PyValuationResult> {
-    let overrides = extras.metric_pricing_overrides_json();
-    let instrument = py.detach(|| {
-        finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
-            instrument,
-            overrides.as_deref(),
-            extras.instrument_pricing_overrides.as_ref(),
-        )
-        .map_err(core_to_py)
-    })?;
-    price_prepared(py, instrument, market, as_of, model, metrics, extras)
-}
 /// Price a prepared instrument after host market/date conversion.
 ///
 /// `extras` supplies the market history and the `explain` flag; its
@@ -896,38 +859,6 @@ pub(crate) fn price_prepared(
         })
         .map_err(core_to_py)?;
     Ok(PyValuationResult { inner })
-}
-
-/// Compute one scalar metric for a native Rust instrument.
-pub(crate) fn metric_typed(
-    py: Python<'_>,
-    instrument: Box<dyn Instrument>,
-    market: &Bound<'_, PyAny>,
-    as_of: &Bound<'_, PyAny>,
-    metric_id: &str,
-    model: &str,
-    extras: PriceExtras,
-) -> PyResult<f64> {
-    let market = extract_market(py, market)?;
-    let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
-    let model = model.to_owned();
-    let metric_id = metric_id.to_owned();
-    py.detach(move || {
-        let instrument = finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
-            instrument,
-            extras.metric_pricing_overrides_json().as_deref(),
-            extras.instrument_pricing_overrides.as_ref(),
-        )?;
-        finstack_quant_valuations::pricer::metric_value(
-            &instrument,
-            &market,
-            &as_of,
-            &model,
-            &metric_id,
-            extras.pricing_options(finstack_quant_calibration::recalibration::pricing_options()),
-        )
-    })
-    .map_err(core_to_py)
 }
 
 /// Compute the standard option Greek set for a native Rust instrument.

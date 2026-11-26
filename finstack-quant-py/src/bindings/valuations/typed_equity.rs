@@ -14,7 +14,7 @@ use super::convert::{
     attributes_from_py, bool_repr, date_repr, day_count_from_py, enum_to_py_string, float_repr,
 };
 use super::pricing::typed_option_greeks;
-use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
+use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_trait_methods};
 
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOptionBuilder;
 
@@ -40,7 +40,7 @@ instrument_envelope_methods!(
     builder = PyEquityOptionBuilder("EquityOptionBuilder", fields),
     seed = finstack_quant_valuations::instruments::equity::equity_option::EquityOption::builder(),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyEquityOption,
     "EquityOption",
     module = "finstack_quant.valuations.instruments._typed_equity"

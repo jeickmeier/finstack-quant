@@ -20,7 +20,7 @@ use super::super::convert::{
 };
 use super::super::convert::{enum_from_str, stub_kind_from_py};
 use super::super::typed_macros::{
-    builder_set, instrument_envelope_methods, instrument_pricing_methods,
+    builder_set, instrument_envelope_methods, instrument_trait_methods,
 };
 use crate::bindings::extract::extract_basis_points;
 
@@ -161,7 +161,7 @@ instrument_envelope_methods!(
     builder = PyCdsTrancheBuilder("CdsTrancheBuilder", fields),
     seed = finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche::builder(),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyCdsTranche,
     "CdsTranche",
     module = "finstack_quant.valuations.instruments._typed_credit.cds_tranche"

@@ -546,7 +546,7 @@ class TestEquityOption:
         implied = option.implied_vol(market, "2024-01-15", result.price)
         assert implied == pytest.approx(0.2, abs=2e-3)
 
-    def test_typed_pricing_routes_share_extras(self) -> None:
+    def test_price_instrument_and_greeks_share_extras(self) -> None:
         from finstack_quant.core.config import FinstackConfig
         from finstack_quant.valuations.instruments import MetricPricingOverrides, PriceExtras
 
@@ -560,10 +560,8 @@ class TestEquityOption:
         )
         assert extras.config.output_scale("USD") == 0
 
-        value = price_instrument(option, market, "2024-01-15", metrics=["theta"], extras=extras)
-        theta = option.metric(market, "2024-01-15", "theta", extras=extras)
+        theta = price_instrument(option, market, "2024-01-15", metrics=["theta"], extras=extras)["theta"]
         greeks = option.greeks(market, "2024-01-15", extras=extras)
-        assert theta == pytest.approx(value["theta"])
         assert theta == pytest.approx(greeks["theta"])
         assert theta != pytest.approx(price_instrument(option, market, "2024-01-15", metrics=["theta"])["theta"])
 

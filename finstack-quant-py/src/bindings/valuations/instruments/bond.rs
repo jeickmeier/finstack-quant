@@ -15,7 +15,7 @@ use super::super::convert::{
     money_to_py, opt_repr, opt_serde_to_py, rate_from_py, stub_kind_from_py,
 };
 use super::super::typed_macros::{
-    builder_set, instrument_envelope_methods, instrument_pricing_methods,
+    builder_set, instrument_envelope_methods, instrument_trait_methods,
 };
 
 use finstack_quant_valuations::instruments::fixed_income::bond::BondBuilder;
@@ -42,7 +42,7 @@ instrument_envelope_methods!(
     builder = PyBondBuilder("BondBuilder", fields),
     seed = finstack_quant_valuations::instruments::fixed_income::bond::Bond::builder(),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyBond,
     "Bond",
     module = "finstack_quant.valuations.instruments._instruments.bond"

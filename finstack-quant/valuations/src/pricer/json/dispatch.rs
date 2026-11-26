@@ -604,51 +604,6 @@ pub fn price_instrument(
         .map_err(Into::into)
 }
 
-/// Price a parsed instrument and return one requested scalar metric.
-///
-/// Fails when the selected model does not produce `metric`.
-///
-/// # Arguments
-///
-/// * `instrument` - Validated instrument already accepted by
-///   [`price_instrument`].
-/// * `market` - Market context supplying model-required curves, quotes, and FX
-///   data.
-/// * `as_of` - ISO-8601 valuation date passed to the pricing lifecycle.
-/// * `model` - Canonical model key, or `"default"` to use the instrument's
-///   registered default model.
-/// * `metric` - Scalar metric name that must be produced by the selected model.
-/// * `pricing_options` - Pricing services and configuration supplied by the
-///   caller, including any host-attached recalibration provider.
-///
-/// # Errors
-///
-/// Propagates pricing and input-validation failures from [`price_instrument`],
-/// and returns `Error::Validation` when the selected model does not produce
-/// `metric`.
-pub fn metric_value(
-    instrument: &ParsedInstrument,
-    market: &MarketContext,
-    as_of: &str,
-    model: &str,
-    metric: &str,
-    pricing_options: crate::instruments::PricingOptions,
-) -> finstack_quant_core::Result<f64> {
-    let metrics = [metric.to_string()];
-    let result = price_instrument(
-        instrument,
-        market,
-        as_of,
-        model,
-        &metrics,
-        None,
-        pricing_options,
-    )?;
-    result
-        .metric_str(metric)
-        .ok_or_else(|| Error::Validation(format!("metric `{metric}` was not returned")))
-}
-
 /// Price a parsed option instrument and return the standard sparse option
 /// Greek set produced by the selected model.
 ///

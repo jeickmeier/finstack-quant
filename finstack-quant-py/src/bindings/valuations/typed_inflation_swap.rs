@@ -11,7 +11,7 @@ use finstack_quant_valuations::instruments::rates::inflation_swap::{
 use pyo3::prelude::*;
 
 use super::convert::{attributes_from_py, instrument_expiry};
-use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
+use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_trait_methods};
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_swap", "InflationSwap")]
 #[pyclass(
@@ -34,7 +34,7 @@ instrument_envelope_methods!(
     builder = PyInflationSwapBuilder("InflationSwapBuilder", no_fields),
     seed = InflationSwap::builder(),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyInflationSwap,
     "InflationSwap",
     module = "finstack_quant.valuations.instruments._typed_inflation_swap"

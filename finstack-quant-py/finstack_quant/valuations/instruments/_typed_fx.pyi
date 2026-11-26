@@ -11,7 +11,6 @@ from finstack_quant.core.dates import BusinessDayConvention, DayCount, Tenor
 from finstack_quant.core.market_data import FxPairConvention, MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.core.types import Attributes
-from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments._pricing import MarketHistory, MetricPricingOverrides
 
 class FxForward:
@@ -25,8 +24,7 @@ class FxForward:
     (spot-lag and tenor roll from a trade date), :meth:`FxForward.example` or
     :meth:`FxForward.from_json`; fix the rate with
     :meth:`FxForward.with_forward_points` / :meth:`FxForward.with_forward_pips`.
-    Every public Rust field is readable as a property and
-    :meth:`FxForward.price` / :meth:`FxForward.metric` run the same pricer as
+    Every public Rust field is readable as a property; price it with
     :func:`price_instrument`.
 
     Examples
@@ -134,100 +132,6 @@ class FxForward:
             If the value cannot be serialized to JSON.
         """
         ...
-    def price(
-        self,
-        market: MarketContext | str,
-        as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
-        model: str = "default",
-        metrics: list[str] | None = None,
-        extras: PriceExtras | dict[str, Any] | str | None = None,
-    ) -> ValuationResult:
-        """
-        Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
-
-        Same pipeline and keyword surface as :func:`price_instrument`.
-
-        Parameters
-        ----------
-        market : MarketContext | str
-            Market context object or its JSON string.
-        as_of : datetime.date | datetime.datetime | pd.Timestamp | str
-            Valuation date (ISO 8601 strings accepted).
-        model : str, default "default"
-            Model key (``"discounting"`` is the native model).
-        metrics : list[str], optional
-            Metric identifiers to compute (see :func:`list_standard_metrics`).
-        extras : PriceExtras or dict[str, Any] or str, optional
-            The rarer pricing inputs, as a dict or JSON text in the shape of the
-            Rust ``PriceExtras``; every key is optional and an unknown key raises
-            ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
-            or dict) is merged into ``instrument.spec.metric_pricing_overrides``
-            before pricing (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``):
-            only the keys present replace stored controls, ``bump_config`` keys
-            merge into the stored bump configuration and an explicit ``None``
-            clears a control; omitted keeps the instrument's overrides. ``market_history`` (a ``MarketHistory`` or dict)
-            holds the historical scenarios ``hvar`` and ``expected_shortfall``
-            require; omitted prices without history. ``explain`` (bool, default
-            ``False``) attaches a step trace as ``result.explanation`` when
-            ``True``. ``None`` (the default) means no extras.
-
-        Returns
-        -------
-        ValuationResult
-            Typed valuation envelope with price, currency and metrics.
-
-        Raises
-        ------
-        ValueError
-            If an input cannot be interpreted or the instrument fails validation.
-        KeyError
-            If a required curve, surface or metric is missing from ``market``.
-        RuntimeError
-            If pricing or a metric computation fails.
-        """
-        ...
-    def metric(
-        self,
-        market: MarketContext | str,
-        as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
-        metric_id: str,
-        model: str = "default",
-        extras: PriceExtras | dict[str, Any] | str | None = None,
-    ) -> float:
-        """
-        Compute one scalar metric for this instrument (e.g. ``"dv01"`` or ``"fx01"``).
-
-        Parameters
-        ----------
-        market : MarketContext | str
-            Market context object or its JSON string.
-        as_of : datetime.date | datetime.datetime | pd.Timestamp | str
-            Valuation date.
-        metric_id : str
-            Registered metric identifier (see :func:`list_standard_metrics`).
-        model : str, default "default"
-            Model key.
-        extras : PriceExtras or dict or str, optional
-            Request configuration and overrides accepted by ``price``.
-            Omit to use the stored instrument controls.
-
-        Returns
-        -------
-        float
-            The metric value in the metric's native unit (decimal for rates and
-            yields, currency units for DV01/CS01-style sensitivities, basis
-            points for spreads).
-
-        Raises
-        ------
-        ValueError
-            If ``metric_id`` is unknown or an input cannot be interpreted.
-        KeyError
-            If a required curve or surface is missing from ``market``.
-        RuntimeError
-            If the metric computation fails.
-        """
-        ...
     def market_dependencies(self) -> dict[str, object]:
         """
         Market-data dependencies declared by the Rust ``Instrument`` trait.
@@ -263,7 +167,7 @@ class FxForward:
     @property
     def default_model(self) -> str:
         """
-        Canonical model key used when ``model="default"`` is passed to ``price``.
+        Canonical model key used when ``model="default"`` is passed to ``price_instrument``.
 
         Returns
         -------
@@ -1106,7 +1010,7 @@ class FxForwardBuilder:
         Build the validated FX forward.
 
         Runs only the Rust ``FxForwardBuilder::build`` validation (structural
-        invariants); pricing-time checks run in :meth:`FxForward.price`.
+        invariants); pricing-time checks run in :func:`price_instrument`.
 
         Returns
         -------
@@ -1133,10 +1037,8 @@ class FxOption:
 
     Construct via :meth:`FxOption.builder`, :meth:`FxOption.european`,
     :meth:`FxOption.example` or :meth:`FxOption.from_json`. Every public Rust
-    field is readable as a property; ``greeks`` / ``delta`` / ``gamma`` /
-    ``vega`` / ``theta`` / ``rho`` / ``foreign_rho`` / ``vanna`` / ``volga`` /
-    ``implied_vol`` mirror the Rust accessors and :meth:`FxOption.price` /
-    :meth:`FxOption.metric` run the same pricer as :func:`price_instrument`.
+    field is readable as a property; ``greeks`` and ``implied_vol`` mirror the
+    Rust accessors. Price it with :func:`price_instrument`.
 
     Examples
     --------
@@ -1256,100 +1158,6 @@ class FxOption:
             If the value cannot be serialized to JSON.
         """
         ...
-    def price(
-        self,
-        market: MarketContext | str,
-        as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
-        model: str = "default",
-        metrics: list[str] | None = None,
-        extras: PriceExtras | dict[str, Any] | str | None = None,
-    ) -> ValuationResult:
-        """
-        Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
-
-        Same pipeline and keyword surface as :func:`price_instrument`.
-
-        Parameters
-        ----------
-        market : MarketContext | str
-            Market context object or its JSON string.
-        as_of : datetime.date | datetime.datetime | pd.Timestamp | str
-            Valuation date (ISO 8601 strings accepted).
-        model : str, default "default"
-            Model key (``"black76"`` (Garman–Kohlhagen) is the native model).
-        metrics : list[str], optional
-            Metric identifiers to compute (see :func:`list_standard_metrics`).
-        extras : PriceExtras or dict[str, Any] or str, optional
-            The rarer pricing inputs, as a dict or JSON text in the shape of the
-            Rust ``PriceExtras``; every key is optional and an unknown key raises
-            ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
-            or dict) is merged into ``instrument.spec.metric_pricing_overrides``
-            before pricing (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``):
-            only the keys present replace stored controls, ``bump_config`` keys
-            merge into the stored bump configuration and an explicit ``None``
-            clears a control; omitted keeps the instrument's overrides. ``market_history`` (a ``MarketHistory`` or dict)
-            holds the historical scenarios ``hvar`` and ``expected_shortfall``
-            require; omitted prices without history. ``explain`` (bool, default
-            ``False``) attaches a step trace as ``result.explanation`` when
-            ``True``. ``None`` (the default) means no extras.
-
-        Returns
-        -------
-        ValuationResult
-            Typed valuation envelope with price, currency and metrics.
-
-        Raises
-        ------
-        ValueError
-            If an input cannot be interpreted or the instrument fails validation.
-        KeyError
-            If a required curve, surface or metric is missing from ``market``.
-        RuntimeError
-            If pricing or a metric computation fails.
-        """
-        ...
-    def metric(
-        self,
-        market: MarketContext | str,
-        as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
-        metric_id: str,
-        model: str = "default",
-        extras: PriceExtras | dict[str, Any] | str | None = None,
-    ) -> float:
-        """
-        Compute one scalar metric for this instrument (e.g. ``"delta"`` or ``"vega"``).
-
-        Parameters
-        ----------
-        market : MarketContext | str
-            Market context object or its JSON string.
-        as_of : datetime.date | datetime.datetime | pd.Timestamp | str
-            Valuation date.
-        metric_id : str
-            Registered metric identifier (see :func:`list_standard_metrics`).
-        model : str, default "default"
-            Model key.
-        extras : PriceExtras or dict or str, optional
-            Request configuration and overrides accepted by ``price``.
-            Omit to use the stored instrument controls.
-
-        Returns
-        -------
-        float
-            The metric value in the metric's native unit (decimal for rates and
-            yields, currency units for DV01/CS01-style sensitivities, basis
-            points for spreads).
-
-        Raises
-        ------
-        ValueError
-            If ``metric_id`` is unknown or an input cannot be interpreted.
-        KeyError
-            If a required curve or surface is missing from ``market``.
-        RuntimeError
-            If the metric computation fails.
-        """
-        ...
     def market_dependencies(self) -> dict[str, object]:
         """
         Market-data dependencies declared by the Rust ``Instrument`` trait.
@@ -1385,7 +1193,7 @@ class FxOption:
     @property
     def default_model(self) -> str:
         """
-        Canonical model key used when ``model="default"`` is passed to ``price``.
+        Canonical model key used when ``model="default"`` is passed to ``price_instrument``.
 
         Returns
         -------
@@ -1568,7 +1376,8 @@ class FxOption:
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date.
         target_price : float
-            Observed option PV in quote currency (same scaling as ``price``).
+            Observed option PV in quote currency (same scaling as the value
+            :func:`price_instrument` returns).
 
         Returns
         -------
@@ -1605,7 +1414,7 @@ class FxOption:
         model : str, default "default"
             Model key.
         extras : PriceExtras or dict or str, optional
-            Request configuration and overrides accepted by ``price``.
+            Request configuration and overrides accepted by ``price_instrument``.
             Omit to use the stored instrument controls.
 
         Returns
@@ -2255,7 +2064,7 @@ class FxOptionBuilder:
         Build the validated FX option.
 
         Runs only the Rust ``FxOptionBuilder::build`` validation (structural
-        invariants); pricing-time checks run in :meth:`FxOption.price`.
+        invariants); pricing-time checks run in :func:`price_instrument`.
 
         Returns
         -------

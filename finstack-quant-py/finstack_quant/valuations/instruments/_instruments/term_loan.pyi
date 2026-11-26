@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-from finstack_quant.valuations.instruments._pricing import PriceExtras
 from finstack_quant.cashflows.builder import CashFlowSchedule
 import datetime
 from typing import Any, Literal
 import pandas as pd
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, StubKind, Tenor
-from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.core.types import Attributes, Bps, Rate
-from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments._merton_mc import MertonMcConfig, MertonMcResult
 from finstack_quant.valuations.instruments._pricing import MarketHistory, MetricPricingOverrides
 
@@ -23,8 +20,7 @@ class TermLoan:
     Construct via :meth:`TermLoan.builder` (a bare decimal ``rate`` builds a
     fixed-rate loan; a serde ``dict`` builds a floating one), the
     ``TermLoan.example*`` presets or :meth:`TermLoan.from_json`. Every
-    public Rust field is readable as a property; :meth:`TermLoan.price` /
-    :meth:`TermLoan.metric` run the same pricer as :func:`price_instrument`.
+    public Rust field is readable as a property.
     Instances are accepted directly by :func:`price_instrument` and
     :func:`instrument_cashflows`.
 
@@ -205,100 +201,6 @@ class TermLoan:
         >>> tl = TermLoan.example().to_builder().id("TL-EDIT").build()
         >>> tl.id
         'TL-EDIT'
-        """
-        ...
-    def price(
-        self,
-        market: MarketContext | str,
-        as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
-        model: str = "default",
-        metrics: list[str] | None = None,
-        extras: PriceExtras | dict[str, Any] | str | None = None,
-    ) -> ValuationResult:
-        """
-        Price this term loan and return a :class:`~finstack_quant.valuations.ValuationResult`.
-
-        Same pipeline and keyword surface as :func:`price_instrument`.
-
-        Parameters
-        ----------
-        market : MarketContext | str
-            Market context object or its JSON string.
-        as_of : datetime.date | datetime.datetime | pd.Timestamp | str
-            Valuation date (ISO 8601 strings accepted).
-        model : str, default "default"
-            Model key (``"discounting"``, ``"hazard_rate"``, ``"tree"``).
-        metrics : list[str], optional
-            Metric identifiers to compute (see :func:`list_standard_metrics`).
-        extras : PriceExtras or dict[str, Any] or str, optional
-            The rarer pricing inputs, as a dict or JSON text in the shape of the
-            Rust ``PriceExtras``; every key is optional and an unknown key raises
-            ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
-            or dict) is merged into ``instrument.spec.metric_pricing_overrides``
-            before pricing (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``):
-            only the keys present replace stored controls, ``bump_config`` keys
-            merge into the stored bump configuration and an explicit ``None``
-            clears a control; omitted keeps the instrument's overrides. ``market_history`` (a ``MarketHistory`` or dict)
-            holds the historical scenarios ``hvar`` and ``expected_shortfall``
-            require; omitted prices without history. ``explain`` (bool, default
-            ``False``) attaches a step trace as ``result.explanation`` when
-            ``True``. ``None`` (the default) means no extras.
-
-        Returns
-        -------
-        ValuationResult
-            Typed valuation envelope with price, currency and metrics.
-
-        Raises
-        ------
-        ValueError
-            If an input cannot be interpreted or the instrument fails validation.
-        KeyError
-            If a required curve, surface or metric is missing from ``market``.
-        RuntimeError
-            If pricing or a metric computation fails.
-        """
-        ...
-    def metric(
-        self,
-        market: MarketContext | str,
-        as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
-        metric_id: str,
-        model: str = "default",
-        extras: PriceExtras | dict[str, Any] | str | None = None,
-    ) -> float:
-        """
-        Compute one scalar metric for this term loan (e.g. ``"dv01"``).
-
-        Parameters
-        ----------
-        market : MarketContext | str
-            Market context object or its JSON string.
-        as_of : datetime.date | datetime.datetime | pd.Timestamp | str
-            Valuation date.
-        metric_id : str
-            Registered metric identifier (see :func:`list_standard_metrics`).
-        model : str, default "default"
-            Model key.
-        extras : PriceExtras or dict or str, optional
-            Request configuration and overrides accepted by ``price``.
-            Omit to use the stored instrument controls.
-
-        Returns
-        -------
-        float
-            The metric value in the metric's native unit (decimal for rates and
-            yields, currency units for DV01-style sensitivities, basis points for
-            spreads).
-
-        Raises
-        ------
-        ValueError
-            If ``metric_id`` is unknown or an input cannot be interpreted.
-        KeyError
-            If a required curve or surface is missing from ``market``.
-        RuntimeError
-            If the metric computation fails.
         """
         ...
     def market_dependencies(self) -> dict[str, object]:
@@ -676,7 +578,7 @@ class TermLoan:
     @property
     def default_model(self) -> str:
         """
-        Canonical model key used when ``model="default"`` is passed to ``price``.
+        Canonical model key used when ``model="default"`` is passed to ``price_instrument``.
 
         Returns
         -------
@@ -1415,7 +1317,7 @@ class TermLoanBuilder:
         Build the validated term loan.
 
         Runs the same validation as the Rust ``TermLoanBuilder::build`` (structural
-        invariants only); pricing-time checks run in ``TermLoan.price``.
+        invariants only); pricing-time checks run in :func:`price_instrument`.
 
         Returns
         -------

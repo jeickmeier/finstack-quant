@@ -10,7 +10,7 @@ use finstack_quant_valuations::instruments::exotics::asian_option::{
 use pyo3::prelude::*;
 
 use super::convert::attributes_from_py;
-use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
+use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_trait_methods};
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_asian_option", "AsianOption")]
 #[pyclass(
@@ -33,7 +33,7 @@ instrument_envelope_methods!(
     builder = PyAsianOptionBuilder("AsianOptionBuilder", no_fields),
     seed = AsianOption::builder(),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyAsianOption,
     "AsianOption",
     module = "finstack_quant.valuations.instruments._typed_asian_option"

@@ -1,7 +1,7 @@
 //! Typed FX instrument classes and their fluent builders.
 //!
-//! Every FX class exposes `fromJson` / `toJson`, `price`, `metric` and
-//! Greeks; `FxForward` and `FxOption` add one getter per public Rust field,
+//! Every FX class exposes `fromJson` / `toJson` and `price`; `FxForward` and
+//! `FxOption` add one getter per public Rust field,
 //! the `Instrument` trait surface, Rust presets and the `FinancialBuilder`
 //! setters. A bare spec becomes a class through
 //! `fromJson(instrumentEnvelopeFromSpec(type, spec))`.
@@ -216,8 +216,6 @@ factories!(JsFxOption, "FxOption", instruments::fx::fx_option::FxOption, {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_valuations::metrics::MetricId;
-    use finstack_quant_valuations::pricer::{InstrumentType, STANDARD_OPTION_GREEKS};
 
     #[test]
     fn public_json_routes_validate_instrument_before_market_json() {
@@ -236,55 +234,6 @@ mod tests {
             )
             .is_err()
         );
-    }
-
-    /// The Greeks the registry computes for `instrument_type`, in
-    /// `STANDARD_OPTION_GREEKS` order.
-    fn registry_greeks(instrument_type: InstrumentType) -> Vec<String> {
-        let menu: Vec<MetricId> = STANDARD_OPTION_GREEKS
-            .iter()
-            .map(|metric| MetricId::parse_strict(metric).expect("standard greek"))
-            .collect();
-        finstack_quant_valuations::pricer::STANDARD
-            .metrics()
-            .applicable_subset(&menu, instrument_type)
-            .iter()
-            .map(|id| id.as_str().to_string())
-            .collect()
-    }
-
-    #[test]
-    fn option_greek_methods_match_the_metric_registry() {
-        use super::super::{
-            fx_barrier_option::JsFxBarrierOption, fx_digital_option::JsFxDigitalOption,
-            fx_touch_option::JsFxTouchOption, quanto_option::JsQuantoOption,
-        };
-
-        let classes: [(&[&str], InstrumentType); 4] = [
-            (
-                JsQuantoOption::GREEK_METHODS,
-                JsQuantoOption::INSTRUMENT_TYPE,
-            ),
-            (
-                JsFxDigitalOption::GREEK_METHODS,
-                JsFxDigitalOption::INSTRUMENT_TYPE,
-            ),
-            (
-                JsFxTouchOption::GREEK_METHODS,
-                JsFxTouchOption::INSTRUMENT_TYPE,
-            ),
-            (
-                JsFxBarrierOption::GREEK_METHODS,
-                JsFxBarrierOption::INSTRUMENT_TYPE,
-            ),
-        ];
-        for (methods, instrument_type) in classes {
-            assert_eq!(
-                methods.to_vec(),
-                registry_greeks(instrument_type),
-                "{instrument_type:?} Greek methods drifted from the metric registry"
-            );
-        }
     }
 }
 

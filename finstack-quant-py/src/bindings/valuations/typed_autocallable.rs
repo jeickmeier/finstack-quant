@@ -11,7 +11,7 @@ use finstack_quant_valuations::instruments::equity::autocallable::{
 use pyo3::prelude::*;
 
 use super::convert::attributes_from_py;
-use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
+use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_trait_methods};
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable")]
 #[pyclass(
@@ -34,7 +34,7 @@ instrument_envelope_methods!(
     builder = PyAutocallableBuilder("AutocallableBuilder", no_fields),
     seed = Autocallable::builder(),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyAutocallable,
     "Autocallable",
     module = "finstack_quant.valuations.instruments._typed_autocallable"

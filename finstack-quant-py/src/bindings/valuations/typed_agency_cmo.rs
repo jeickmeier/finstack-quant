@@ -8,7 +8,7 @@ use finstack_quant_valuations::instruments::fixed_income::cmo::{AgencyCmo, Agenc
 use pyo3::prelude::*;
 
 use super::convert::{attributes_from_py, instrument_expiry};
-use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
+use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_trait_methods};
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_cmo", "AgencyCmo")]
 #[pyclass(
@@ -31,7 +31,7 @@ instrument_envelope_methods!(
     builder = PyAgencyCmoBuilder("AgencyCmoBuilder", no_fields),
     seed = AgencyCmo::builder(),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyAgencyCmo,
     "AgencyCmo",
     module = "finstack_quant.valuations.instruments._typed_agency_cmo"

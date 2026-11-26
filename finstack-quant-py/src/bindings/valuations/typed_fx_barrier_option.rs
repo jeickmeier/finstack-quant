@@ -13,7 +13,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use super::convert::attributes_from_py;
-use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
+use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_trait_methods};
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption")]
 #[pyclass(
@@ -36,17 +36,10 @@ instrument_envelope_methods!(
     builder = PyFxBarrierOptionBuilder("FxBarrierOptionBuilder", no_fields),
     seed = FxBarrierOption::builder(),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyFxBarrierOption,
     "FxBarrierOption",
     module = "finstack_quant.valuations.instruments._typed_fx_barrier_option"
-);
-
-super::typed_macros::instrument_greek_methods!(
-    PyFxBarrierOption,
-    "FxBarrierOption",
-    "finstack_quant.valuations.instruments._typed_fx_barrier_option",
-    [delta, gamma, vega, theta, rho, foreign_rho, vanna, volga]
 );
 
 #[pymethods]

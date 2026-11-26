@@ -1,7 +1,6 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/valuations/typed_asset_backed_facility/facility.rs``."""
 
 from __future__ import annotations
-from finstack_quant.valuations.instruments._pricing import PriceExtras
 
 import datetime
 from typing import Any
@@ -13,7 +12,6 @@ from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.core.table import ArrowTable
 from finstack_quant.core.types import Attributes, Bps, Rate
-from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments._pricing import MarketHistory, MetricPricingOverrides
 from finstack_quant.valuations.instruments._typed_asset_backed_facility.facility_terms import TermOutSpec
 from finstack_quant.valuations.instruments._typed_structured_credit.asset_pool import AssetPool
@@ -164,106 +162,6 @@ class AssetBackedFacility:
         ------
         ValueError
             If serialization fails.
-        """
-        ...
-    def price(
-        self,
-        market: MarketContext | str,
-        as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
-        model: str = "default",
-        metrics: list[str] | None = None,
-        extras: PriceExtras | dict[str, Any] | str | None = None,
-    ) -> ValuationResult:
-        """
-        Price the lender's projected flows (interest, principal and commitment fees) and return a :class:`~finstack_quant.valuations.ValuationResult`.
-
-        Same pipeline and keyword surface as :func:`price_instrument`.
-
-        Parameters
-        ----------
-        market : MarketContext | str
-            Market context (discount and index curves plus fixings for the
-            note and the collateral) or its JSON string.
-        as_of : datetime.date | datetime.datetime | pd.Timestamp | str
-            Valuation date (ISO 8601 strings accepted).
-        model : str, default "default"
-            Model key; ``"default"`` selects discounting.
-        metrics : list[str], optional
-            Metric identifiers to compute alongside the value (for example
-            ``"abf_borrowing_base_cushion"``, ``"abf_facility_irr"`` or
-            ``"dv01"``).
-        extras : PriceExtras or dict[str, Any] or str, optional
-            The rarer pricing inputs, as a dict or JSON text in the shape of the
-            Rust ``PriceExtras``; every key is optional and an unknown key raises
-            ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
-            or dict) is merged into ``instrument.spec.metric_pricing_overrides``
-            before pricing (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``):
-            only the keys present replace stored controls, ``bump_config`` keys
-            merge into the stored bump configuration and an explicit ``None``
-            clears a control; omitted keeps the instrument's overrides. ``market_history`` (a ``MarketHistory`` or dict)
-            holds the historical scenarios ``hvar`` and ``expected_shortfall``
-            require; omitted prices without history. ``explain`` (bool, default
-            ``False``) attaches a step trace as ``result.explanation`` when
-            ``True``. ``None`` (the default) means no extras.
-
-        Returns
-        -------
-        ValuationResult
-            Typed valuation envelope with price, currency and metrics.
-
-        Raises
-        ------
-        ValueError
-            If an input cannot be interpreted, the facility fails validation
-            or a metric cannot be computed.
-        KeyError
-            If a required curve or metric is missing from ``market``.
-        RuntimeError
-            If pricing fails.
-        """
-        ...
-    def metric(
-        self,
-        market: MarketContext | str,
-        as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
-        metric_id: str,
-        model: str = "default",
-        extras: PriceExtras | dict[str, Any] | str | None = None,
-    ) -> float:
-        """
-        Compute one scalar metric for this facility (e.g. ``"abf_borrowing_base"``, ``"abf_advance_rate_utilization"`` or ``"dv01"``).
-
-        Parameters
-        ----------
-        market : MarketContext | str
-            Market context object or its JSON string.
-        as_of : datetime.date | datetime.datetime | pd.Timestamp | str
-            Valuation date.
-        metric_id : str
-            Registered metric identifier (``"abf_borrowing_base"``,
-            ``"abf_borrowing_base_cushion"``, ``"abf_advance_rate_utilization"``,
-            ``"abf_facility_irr"``, ``"abf_residual_irr"``, ``"dv01"``,
-            ``"cs01"`` ...).
-        model : str, default "default"
-            Model key.
-        extras : PriceExtras or dict or str, optional
-            Request configuration and overrides accepted by ``price``.
-            Omit to use the stored instrument controls.
-
-        Returns
-        -------
-        float
-            The metric value.
-
-        Raises
-        ------
-        ValueError
-            If ``metric_id`` is unknown for this instrument or an input cannot
-            be interpreted.
-        KeyError
-            If a required curve is missing from ``market``.
-        RuntimeError
-            If the metric computation fails.
         """
         ...
     def borrowing_base(self) -> dict[str, Any]:

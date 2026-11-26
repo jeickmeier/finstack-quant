@@ -17,7 +17,7 @@ use crate::bindings::valuations::convert::{
 };
 use crate::bindings::valuations::convert::{instrument_expiry, stub_kind_from_py};
 use crate::bindings::valuations::typed_macros::{
-    builder_set, instrument_envelope_methods, instrument_pricing_methods,
+    builder_set, instrument_envelope_methods, instrument_trait_methods,
 };
 use crate::errors::core_to_py;
 use finstack_quant_cashflows::CashflowScheduleSource;
@@ -54,7 +54,7 @@ instrument_envelope_methods!(
     builder = PyRevolvingCreditBuilder("RevolvingCreditBuilder", fields),
     seed = RevolvingCredit::builder(),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyRevolvingCredit,
     "RevolvingCredit",
     module = "finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit"

@@ -183,11 +183,10 @@ def test_projection_reconciles_with_the_lender_cashflows_and_the_price() -> None
     assert 0.055 < irr < 0.075
     assert _metric(facility, "abf_facility_irr") == pytest.approx(irr)
 
-    typed = facility.price(_market(), CLOSE, metrics=["dv01"])
-    for instrument in (facility, facility.to_json()):
-        generic = price_instrument(instrument, _market(), CLOSE, metrics=["dv01"])
-        assert float(typed.price) == pytest.approx(float(generic.price))
-        assert typed.metrics["dv01"] == pytest.approx(generic.metrics["dv01"])
+    typed = price_instrument(facility, _market(), CLOSE, metrics=["dv01"])
+    wire = price_instrument(facility.to_json(), _market(), CLOSE, metrics=["dv01"])
+    assert float(typed.price) == pytest.approx(float(wire.price))
+    assert typed.metrics["dv01"] == pytest.approx(wire.metrics["dv01"])
     assert float(typed.price) > 0.0
 
 

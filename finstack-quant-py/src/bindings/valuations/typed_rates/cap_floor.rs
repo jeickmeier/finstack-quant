@@ -19,7 +19,7 @@ use crate::bindings::valuations::convert::{
     decimal_from_f64, enum_from_str, instrument_expiry, opt_serde_to_py, stub_kind_from_py,
 };
 use crate::bindings::valuations::typed_macros::{
-    builder_set, instrument_envelope_methods, instrument_pricing_methods,
+    builder_set, instrument_envelope_methods, instrument_trait_methods,
 };
 
 use finstack_quant_valuations::instruments::rates::cap_floor::CapFloorBuilder;
@@ -46,7 +46,7 @@ instrument_envelope_methods!(
     builder = PyCapFloorBuilder("CapFloorBuilder", fields),
     seed = finstack_quant_valuations::instruments::rates::cap_floor::CapFloor::builder(),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyCapFloor,
     "CapFloor",
     module = "finstack_quant.valuations.instruments._typed_rates.cap_floor"

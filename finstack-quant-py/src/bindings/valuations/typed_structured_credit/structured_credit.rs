@@ -22,7 +22,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
 
 use super::super::convert::{enum_from_str, instrument_expiry};
 use super::super::typed_macros::{
-    builder_set, instrument_envelope_methods, instrument_pricing_methods,
+    builder_set, instrument_envelope_methods, instrument_trait_methods,
 };
 use super::{
     PyAssetPool, PyCallAssumption, PyCoverageRules, PyEquityMetrics, PyHedgeSwap, PySimulationRun,
@@ -53,7 +53,7 @@ instrument_envelope_methods!(
     builder = PyStructuredCreditBuilder("StructuredCreditBuilder", no_fields),
     seed = StructuredCredit::builder(),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyStructuredCredit,
     "StructuredCredit",
     module = "finstack_quant.valuations.instruments._typed_structured_credit.structured_credit"

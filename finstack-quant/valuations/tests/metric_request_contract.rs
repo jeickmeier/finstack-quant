@@ -12,9 +12,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_valuations::instruments::PricingOptions;
-use finstack_quant_valuations::pricer::{
-    metric_value, parse_boxed_instrument_from_json, price_instrument,
-};
+use finstack_quant_valuations::pricer::{parse_boxed_instrument_from_json, price_instrument};
 use finstack_quant_valuations::results::ValuationResult;
 use std::sync::Arc;
 
@@ -104,21 +102,6 @@ fn price_with_model(
     )
 }
 
-fn single(instrument_json: &str, as_of: &str, metric: &str) -> finstack_quant_core::Result<f64> {
-    let parsed = parse_boxed_instrument_from_json(instrument_json, None, None)
-        .expect("canonical fixture parses and validates");
-    metric_value(
-        &parsed,
-        &market(
-            finstack_quant_core::dates::parse_iso_date(as_of).expect("valid ISO valuation date"),
-        ),
-        as_of,
-        "default",
-        metric,
-        PricingOptions::default(),
-    )
-}
-
 /// Assert the batch path rejects `metric` and the message names both the
 /// metric and the instrument type.
 fn assert_rejected(instrument_json: &str, as_of: &str, instrument_type: &str, metric: &str) {
@@ -167,43 +150,6 @@ fn fx_forward_still_computes_its_supported_metrics() {
             .metric_str(metric)
             .unwrap_or_else(|| panic!("supported metric `{metric}` must be present"));
         assert!(value.is_finite(), "`{metric}` must be finite, got {value}");
-    }
-}
-
-#[test]
-fn single_metric_path_agrees_with_batch_path() {
-    let cases: [(&str, &str, &str, bool); 7] = [
-        (TERM_LOAN, TERM_LOAN_AS_OF, "duration_mod", false),
-        (TERM_LOAN, TERM_LOAN_AS_OF, "accrued", false),
-        (TERM_LOAN, TERM_LOAN_AS_OF, "clean_price", false),
-        (FX_FORWARD, FX_FORWARD_AS_OF, "spot_rate", false),
-        (FX_FORWARD, FX_FORWARD_AS_OF, "base_amount", false),
-        (TERM_LOAN, TERM_LOAN_AS_OF, "ytm", true),
-        (FX_FORWARD, FX_FORWARD_AS_OF, "fx01", true),
-    ];
-    for (json, as_of, metric, expected_ok) in cases {
-        let batch = price(json, as_of, &[metric]).map(|result| result.metric_str(metric));
-        let scalar = single(json, as_of, metric);
-        match (batch, scalar) {
-            (Ok(Some(batch_value)), Ok(scalar_value)) => {
-                assert!(expected_ok, "`{metric}` was expected to be rejected");
-                assert_eq!(
-                    batch_value, scalar_value,
-                    "batch and single-metric paths disagree on `{metric}`"
-                );
-            }
-            (Ok(None), _) => panic!("`{metric}` must never be silently absent from the batch path"),
-            (Err(batch_error), Err(_)) => {
-                assert!(
-                    !expected_ok,
-                    "`{metric}` was expected to compute, got: {batch_error}"
-                );
-            }
-            (batch, scalar) => panic!(
-                "batch and single-metric paths disagree on `{metric}`: \
-                 batch={batch:?}, scalar={scalar:?}"
-            ),
-        }
     }
 }
 

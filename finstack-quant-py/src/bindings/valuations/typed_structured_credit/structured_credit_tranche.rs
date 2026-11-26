@@ -6,7 +6,7 @@ use crate::bindings::pydoc::pydoc;
 use crate::bindings::valuations::convert::{
     parse_typed_instrument_json, serialize_typed_instrument_json,
 };
-use crate::bindings::valuations::typed_macros::instrument_pricing_methods;
+use crate::bindings::valuations::typed_macros::instrument_trait_methods;
 use crate::errors::core_to_py;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCreditTranche;
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
@@ -24,7 +24,7 @@ pub struct PyStructuredCreditTranche {
     pub(crate) inner: StructuredCreditTranche,
 }
 
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyStructuredCreditTranche,
     "StructuredCreditTranche",
     module =

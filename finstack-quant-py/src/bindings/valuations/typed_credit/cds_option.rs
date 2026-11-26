@@ -17,7 +17,7 @@ use super::super::convert::{
     money_to_py,
 };
 use super::super::typed_macros::{
-    builder_set, instrument_envelope_methods, instrument_pricing_methods,
+    builder_set, instrument_envelope_methods, instrument_trait_methods,
 };
 use crate::bindings::module_utils::spec_from_py;
 
@@ -48,7 +48,7 @@ instrument_envelope_methods!(
         finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption::builder(
         ),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyCdsOption,
     "CdsOption",
     module = "finstack_quant.valuations.instruments._typed_credit.cds_option"

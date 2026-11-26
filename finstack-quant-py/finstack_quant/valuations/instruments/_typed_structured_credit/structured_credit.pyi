@@ -1,7 +1,6 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/valuations/typed_structured_credit/structured_credit.rs``."""
 
 from __future__ import annotations
-from finstack_quant.valuations.instruments._pricing import PriceExtras
 
 import datetime
 from typing import Any, Literal
@@ -10,7 +9,6 @@ from finstack_quant.cashflows.builder import DefaultModelSpec, PrepaymentModelSp
 from finstack_quant.core.dates import Tenor
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.types import Attributes
-from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments._pricing import MarketHistory, MetricPricingOverrides
 from finstack_quant.valuations.instruments._typed_structured_credit.asset_pool import AssetPool
 from finstack_quant.valuations.instruments._typed_structured_credit.call_assumption import CallAssumption
@@ -1108,107 +1106,6 @@ class StructuredCredit:
         >>> from finstack_quant.valuations.instruments import StandardDealParams, StructuredCredit
         >>> StructuredCredit.example().id
         'CLO-EXAMPLE'
-        """
-        ...
-
-    def price(
-        self,
-        market: MarketContext | str,
-        as_of: datetime.date | str,
-        model: str = "default",
-        metrics: list[str] | None = None,
-        extras: PriceExtras | dict[str, Any] | str | None = None,
-    ) -> ValuationResult:
-        """
-        Price this deal and return a typed ``ValuationResult``.
-
-        Delegates to the same canonical Rust pricer entry point as
-        ``price_instrument(self, market, as_of, model)``.
-
-        Parameters
-        ----------
-        market : MarketContext | str
-            Market context object or JSON string supplying the discount and
-            forward curves.
-        as_of : datetime.date | str
-            Valuation date, either a date-like object or an ISO 8601 string.
-        model : str, default "default"
-            Model key; ``"default"`` is the deal's ``default_model``, the
-            deterministic ``"discounting"`` waterfall.
-        metrics : list[str], optional
-            Metric identifiers to compute (e.g. ``["wal", "clo_warf"]``);
-            omitted means valuation only.
-        extras : PriceExtras or dict[str, Any] or str, optional
-            The rarer pricing inputs, as a dict or JSON text in the shape of the
-            Rust ``PriceExtras``; every key is optional and an unknown key raises
-            ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
-            or dict) is merged into ``instrument.spec.metric_pricing_overrides``
-            before pricing (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``):
-            only the keys present replace stored controls, ``bump_config`` keys
-            merge into the stored bump configuration and an explicit ``None``
-            clears a control; omitted keeps the instrument's overrides. ``market_history`` (a ``MarketHistory`` or dict)
-            holds the historical scenarios ``hvar`` and ``expected_shortfall``
-            require; omitted prices without history. ``explain`` (bool, default
-            ``False``) attaches a step trace as ``result.explanation`` when
-            ``True``. ``None`` (the default) means no extras.
-
-        Returns
-        -------
-        ValuationResult
-            Typed valuation envelope carrying value, currency and metrics.
-
-        Raises
-        ------
-        ValueError
-            If an input cannot be interpreted or the deal fails validation.
-        KeyError
-            If a required curve or metric is missing.
-        RuntimeError
-            If pricing or a metric computation fails.
-        """
-        ...
-
-    def metric(
-        self,
-        market: MarketContext | str,
-        as_of: datetime.date | str,
-        metric_id: str,
-        model: str = "default",
-        extras: PriceExtras | dict[str, Any] | str | None = None,
-    ) -> float:
-        """
-        Compute one scalar metric (e.g. ``"wal"`` or ``"clo_warf"``).
-
-        Mirrors Rust ``pricer::metric_value``: the deal is priced under
-        ``model`` and the single metric ``metric_id`` is returned.
-
-        Parameters
-        ----------
-        market : MarketContext | str
-            Market context object or JSON string.
-        as_of : datetime.date | str
-            Valuation date, either a date-like object or an ISO 8601 string.
-        metric_id : str
-            Registered metric identifier.
-        model : str, default "default"
-            Model key.
-        extras : PriceExtras or dict or str, optional
-            Request configuration and overrides accepted by ``price``.
-            Omit to use the stored instrument controls.
-
-        Returns
-        -------
-        float
-            The metric value in the metric's documented unit.
-
-        Raises
-        ------
-        ValueError
-            If ``metric_id`` is unknown or an input cannot be interpreted.
-        KeyError
-            If a required curve is missing.
-        RuntimeError
-            If the metric computation fails.
         """
         ...
 

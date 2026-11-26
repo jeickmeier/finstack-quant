@@ -2,6 +2,24 @@
 
 ## Itemized changes
 
+### Valuations: `price_instrument` is the one pricing verb
+
+A typed instrument is priced by `price_instrument`, which already took a typed
+object, an envelope dict or JSON text. Its per-instrument duplicates are
+removed. Results are unchanged. Old → new:
+
+- Python `inst.price(market, as_of, model, metrics, extras)` on the 77 typed instrument classes → `price_instrument(inst, market, as_of, model, metrics, extras)`
+- Python `inst.metric(market, as_of, metric_id, model, extras)` → `price_instrument(inst, market, as_of, model, metrics=[metric_id], extras=extras)[metric_id]`
+- Python `delta`, `gamma`, `vega`, `theta`, `rho` and `foreign_rho` on `FxBarrierOption`, `FxDigitalOption`, `FxTouchOption` and `QuantoOption`, and `vanna` and `volga` on `FxBarrierOption` and `QuantoOption` → the same metric id through `price_instrument`, or the `greeks()` bundle
+- WASM `inst.metric(marketJson, asOf, metricId, model?, extras?)` and the camelCase Greek methods on the same four classes → `inst.price(marketJson, asOf, model, [metricId], extras).measures[metricId]`
+- Rust `pricer::metric_value(...)` → `pricer::price_instrument(...)` and `ValuationResult::metric_str`
+
+WASM keeps the typed `price`: `priceInstrument` takes JSON only, so `price` is
+the handle form of that call and avoids serializing and re-parsing the
+instrument. A metric the selected model does not return is now a missing key
+on the result (`KeyError` from `result[id]` in Python, `undefined` in
+JavaScript) rather than the `metric ... was not returned` validation error.
+
 ### DCF: dated receipts and terminal horizon
 
 DCF instruments carry signed cash flows in their own currency, an authored
@@ -185,7 +203,7 @@ can stand where the wire values go; the wire values still work.
 
 ### Valuations: pricing calls take `model`, `metrics` and one `extras` object
 
-`price_instrument` and every typed instrument's `price` keep `model` and
+`price_instrument` and the typed WASM `price` keep `model` and
 `metrics` and take the three rarer inputs as one optional `extras` object, the
 serde form of the new Rust `pricer::PriceExtras` (a new `valuations` schema):
 `metric_pricing_overrides` (the same JSON patch as before: present keys
@@ -199,7 +217,7 @@ Rust `pricer::price_instrument` takes `market_history: Option<&MarketHistory>`
 instead of `Option<&str>` JSON. Results are unchanged. Old → new:
 
 - `price_instrument(instrument, market, as_of, model, metrics, metric_pricing_overrides=None, market_history=None, explain=False)` → `price_instrument(instrument, market, as_of, model="default", metrics=None, extras=None)`
-- `Instrument.price(market, as_of, model, metrics, metric_pricing_overrides=None, market_history=None, explain=False)` → `Instrument.price(market, as_of, model="default", metrics=None, extras=None)`
+- `Instrument.price(market, as_of, model, metrics, metric_pricing_overrides=None, market_history=None, explain=False)` → removed in Python; use `price_instrument(instrument, market, as_of, model="default", metrics=None, extras=None)` (see "`price_instrument` is the one pricing verb")
 - WASM `priceInstrument(instrumentJson, marketJson, asOf, model?, metrics?, metricPricingOverrides?, marketHistory?, explain?)` → `priceInstrument(instrumentJson, marketJson, asOf, model?, metrics?, extras?)`; the same for `priceInstrumentWithMarket(instrumentJson, market, asOf, …)` and the typed `price(marketJson, asOf, model?, metrics?, extras?)`
 
 ### Statements: capital-structure swap and convention-bond setters take the Rust params objects

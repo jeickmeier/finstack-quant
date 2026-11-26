@@ -10,7 +10,7 @@ use finstack_quant_valuations::instruments::equity::real_estate::{
 use pyo3::prelude::*;
 
 use super::convert::{attributes_from_py, instrument_expiry};
-use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
+use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_trait_methods};
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_levered_real_estate_equity", "LeveredRealEstateEquity")]
 #[pyclass(
@@ -33,7 +33,7 @@ instrument_envelope_methods!(
     builder = PyLeveredRealEstateEquityBuilder("LeveredRealEstateEquityBuilder", no_fields),
     seed = LeveredRealEstateEquity::builder(),
 );
-instrument_pricing_methods!(
+instrument_trait_methods!(
     PyLeveredRealEstateEquity,
     "LeveredRealEstateEquity",
     module = "finstack_quant.valuations.instruments._typed_levered_real_estate_equity"

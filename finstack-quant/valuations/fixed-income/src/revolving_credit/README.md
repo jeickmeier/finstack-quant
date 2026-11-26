@@ -424,8 +424,7 @@ Registered for `InstrumentType::RevolvingCredit` in `metrics/mod.rs`:
 
 - **Python**: the typed `finstack_quant.valuations.instruments.RevolvingCredit`
   class (`builder()`, `example()`, `from_json` / `to_json` / `to_dict`,
-  one getter per Rust field, `price` / `metric` on the `price_instrument`
-  pipeline, `expected_cashflows(market, as_of)` returning a
+  one getter per Rust field, `expected_cashflows(market, as_of)` returning a
   `CashFlowSchedule`, and `price_with_paths(market, as_of)` returning an
   `EnhancedMonteCarloResult` with the per-path PVs, draw option costs and
   factor trajectories plus `to_dataframe()`). Instances are accepted by

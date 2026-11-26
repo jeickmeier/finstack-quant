@@ -288,7 +288,6 @@ as-of date and model key, dispatch through the standard registry.
 | `list_standard_metrics`, `list_standard_metrics_grouped` | same shapes |
 | `metrics_for_instrument` | `Result<BTreeMap<String, Vec<String>>>`: every metric the standard registry holds for one instrument type, by display group, with ungrouped ids under `MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME` |
 | `price_instrument` | `ValuationResult` from a `ParsedInstrument` |
-| `metric_value` | `f64` from a `ParsedInstrument` |
 | `present_standard_option_greeks` | `Vec<(&'static str, f64)>` from a `ParsedInstrument` |
 | `instrument_cashflows` | `InstrumentCashflowEnvelope` from a parsed instrument |
 
