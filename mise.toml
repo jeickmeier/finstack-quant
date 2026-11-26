@@ -177,11 +177,18 @@ depends = ["rust-doc", "wasm-doc"]
 run = "scripts/materialization_bench.sh doc-check"
 
 [tasks.all-audit]
-description = "Audit dependencies: cargo deny, then OSV-Scanner over the Cargo, uv and npm lockfiles"
+description = "Audit dependencies: cargo deny, then OSV-Scanner over all tracked Cargo, uv, and npm lockfiles"
 run = [
   { task = "rust-audit" },
   # The default Maven pom.xml resolver warns on every run; this workspace has no Maven manifests.
-  "osv-scanner scan --experimental-disable-plugins=transitivedependency/pomxml --lockfile=Cargo.lock --lockfile=uv.lock --lockfile=finstack-quant-wasm/package-lock.json",
+  '''
+osv-scanner scan --experimental-disable-plugins=transitivedependency/pomxml \
+  --lockfile=Cargo.lock \
+  --lockfile=uv.lock \
+  --lockfile=docs-site/package-lock.json \
+  --lockfile=finstack-quant-ui/package-lock.json \
+  --lockfile=finstack-quant-wasm/package-lock.json
+''',
 ]
 
 [tasks.all-clean]

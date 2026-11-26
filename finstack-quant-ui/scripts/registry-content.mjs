@@ -114,7 +114,7 @@ export async function registryContent(cwd = defaultRoot) {
       "Lossless JSON codec and JSON Schema validator construction for the generated contracts.",
       ["codec.mjs", "codec.d.mts", "schema.mjs", "schema.d.mts"],
       [],
-      ["lossless-json@4.3.1", "zod@4.6.5"],
+      ["lossless-json@4.3.1", "zod@4.6.6"],
     ),
     ...contracts,
     item(

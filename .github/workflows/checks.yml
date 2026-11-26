@@ -60,7 +60,7 @@ jobs:
 
   # ============================================
   # Supply-chain security: cargo-deny (advisories, licenses, bans), then
-  # OSV-Scanner over Cargo.lock, uv.lock and package-lock.json. Runs in
+  # OSV-Scanner over all tracked Cargo, uv, and npm lockfiles. Runs in
   # parallel with the other checks and fails the run on its own.
   # ============================================
   supply-chain:
