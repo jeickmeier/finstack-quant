@@ -30,7 +30,8 @@ from .short_rate import (
 )
 
 CAPTURED_ON = "2026-11-25"
-PATHS = 50_000
+# Sized for the 60 s test cap: the theta sweep prices this fixture several times.
+PATHS = 12_500
 DEVIATION_SAMPLES = 1 << 16
 DEVIATION_SEED = 42
 SWAP_END = date(2032, 4, 30)

@@ -29,7 +29,7 @@
           "model_config": {
             "hw1f_mean_reversion": 0.03,
             "hw1f_sigma": 0.01,
-            "mc_paths": 50000
+            "mc_paths": 12500
           }
         },
         "notional": {
@@ -136,12 +136,12 @@
   "schema": "finstack_quant.golden/1",
   "tolerances": {
     "dv01": {
-      "abs": 21.468050521266807,
-      "tolerance_reason": "Three standard errors of a plain 50000-path estimator, from the dispersion of the largest discounted positive swap value over the exercise dates (which bounds any exercise policy's payoff), plus the finite-difference reference's 1e-6 relative error. The regression's exercise-policy bias is not in the bound. DV01 is a 1bp parallel shift on common paths, so the dispersion is that of the per-path central difference."
+      "abs": 42.93430310526479,
+      "tolerance_reason": "Three standard errors of a plain 12500-path estimator, from the dispersion of the largest discounted positive swap value over the exercise dates (which bounds any exercise policy's payoff), plus the finite-difference reference's 1e-6 relative error. The regression's exercise-policy bias is not in the bound. DV01 is a 1bp parallel shift on common paths, so the dispersion is that of the per-path central difference."
     },
     "npv": {
-      "abs": 3622.644821016803,
-      "tolerance_reason": "Three standard errors of a plain 50000-path estimator, from the dispersion of the largest discounted positive swap value over the exercise dates (which bounds any exercise policy's payoff), plus the finite-difference reference's 1e-6 relative error. The regression's exercise-policy bias is not in the bound."
+      "abs": 7245.074944566462,
+      "tolerance_reason": "Three standard errors of a plain 12500-path estimator, from the dispersion of the largest discounted positive swap value over the exercise dates (which bounds any exercise policy's payoff), plus the finite-difference reference's 1e-6 relative error. The regression's exercise-policy bias is not in the bound."
     }
   }
 }
