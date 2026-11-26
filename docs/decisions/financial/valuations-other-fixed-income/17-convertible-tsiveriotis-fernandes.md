@@ -3,7 +3,7 @@
 - **Decision status:** Proposed 2026-11-24 — not yet accepted. Record 02 requires a distinct methodology for a split-discount model; this record describes the one that is implemented and the choices an owner must accept or change.
 - **Audit date/source:** 2026-11-25; `master` at `9ce9435bba`, which replaced the conversion-probability blend with a separate cash component.
 - **Implementation status:** Implemented and registered as an optional model. The default convertible model is unchanged.
-- **Validation status:** Limiting-case unit tests and registry tests run. No external reference: QuantLib prices a different formulation (see "Departure from QuantLib").
+- **Validation status:** Limiting-case unit tests, registry tests and three fixtures referenced to an independent two-component lattice run. QuantLib prices a different formulation (see "Departure from QuantLib").
 - **Scope inventory:** [README](README.md); [default lattice record](02-convertible-lattice.md).
 
 ## Proposed decision
@@ -34,10 +34,17 @@ QuantLib's `BinomialConvertibleEngine` discounts each node at one blended rate, 
 
 - Unit tests beside the engine, the `tf_` tests in [pricing tests](../../../../finstack-quant/valuations/fixed-income/src/convertible/pricing/tests.rs): credit-free price equal to `tree` bit for bit for coupon, zero-coupon, mandatory, hard-call, soft-call and dividend-protected bonds; deep out-of-the-money price equal to the spread-discounted bond floor; deep in-the-money price independent of the spread; price falling as the spread widens for every bond with a cash flow, including the coupons of a mandatory convertible; a zero-coupon mandatory convertible independent of the spread.
 - Registry tests in [test_tsiveriotis_fernandes.rs](../../../../finstack-quant/valuations/tests/instruments/convertible/test_tsiveriotis_fernandes.rs).
-- Three fixtures under `finstack-quant/valuations/tests/golden/data/pricing/quantlib/convertible/` hold this lattice's own 1096-step values. They are regression values, not QuantLib references; `scripts/golden/quantlib/convertible.py` still computes the QuantLib price.
+- Three fixtures under `finstack-quant/valuations/tests/golden/data/pricing/regression_goldens/convertible/` (`usd_convertible_tf_*_3y.json`), referenced to a two-component lattice at 35072 steps written in `scripts/golden/quantlib/convertible.py`, independent of this implementation:
+
+  | Fixture | NPV difference | DV01 difference |
+  |---|---|---|
+  | At the money | 1.2e-5 | 0.18% |
+  | Deep out of the money | 1.0e-5 | 0.005% |
+  | Deep in the money | 0 | 0 |
+
+  The reference DV01 is a 10bp central difference with a 2% bound.
 - Reference: [Tsiveriotis–Fernandes 1998](../../../REFERENCES.md#tsiveriotis-fernandes-1998).
 
 ## Open questions for acceptance
 
 1. Keep the coupon on conversion, consistent with `tree`, or drop it under this model?
-2. With no QuantLib reference left, what independent reference should the three fixtures carry?

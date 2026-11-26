@@ -1,7 +1,7 @@
 {
   "expected": {
     "dv01": 0.0,
-    "npv": 2500000.0
+    "npv": 2499999.9999999893
   },
   "instrument": {
     "instrument": {
@@ -9,8 +9,7 @@
         "attributes": {
           "meta": {},
           "tags": [
-            "golden",
-            "quantlib"
+            "golden"
           ]
         },
         "cashflow_spec": {
@@ -35,7 +34,7 @@
         "credit_curve_id": "ACME-HAZARD",
         "discount_curve_id": "USD-OIS",
         "div_yield_id": "ACME-DIVYIELD",
-        "id": "USD-CONVERTIBLE-TF-ITM-3Y-QUANTLIB",
+        "id": "USD-CONVERTIBLE-TF-ITM-3Y",
         "instrument_pricing_overrides": {
           "model_config": {
             "tree_steps": 1096
@@ -151,16 +150,16 @@
   "metadata": {
     "captured_by": "finstack-quant",
     "captured_on": "2026-11-23",
-    "description": "QuantLib Tsiveriotis-Fernandes three-year zero-coupon convertible, spot at 250% of the conversion price.",
+    "description": "Tsiveriotis-Fernandes three-year zero-coupon convertible, spot at 250% of the conversion price.",
     "domain": "fixed_income.convertible",
     "last_reviewed_by": "finstack-quant",
-    "last_reviewed_on": "2026-11-24",
-    "name": "usd_convertible_tf_itm_3y_quantlib",
+    "last_reviewed_on": "2026-11-23",
+    "name": "usd_convertible_tf_itm_3y",
     "regen_command": "uv run python -m scripts.golden.quantlib.generate --product tf_convertible_in_the_money",
     "review_interval_months": 6,
     "screenshots": [],
-    "source": "quantlib",
-    "source_detail": "Canonical Tsiveriotis-Fernandes (1998) two-component (total U, cash V) binomial lattice on 1096 CRR steps (equity U-V discounted at r_f, cash V discounted at r_f + s; spot 250.0, vol 0.3, q 0.03, r 0.04, s 0.02). Deep ITM claim converts immediately at parity 2500000.0, matching both QuantLib 1.43 BinomialCRRConvertibleEngine and Python TF98 reference.",
+    "source": "formula",
+    "source_detail": "Tsiveriotis-Fernandes (1998) two-component CRR lattice (35072 steps) coded in scripts/golden/quantlib/convertible.py, independent of Finstack: each node carries the total value and its cash part, the cash part is discounted at the risk-free rate plus the spread and the remainder at the risk-free rate, and conversion leaves no cash part. Zero-coupon bond with American conversion, spot 250.0, flat 0.3 volatility, 0.03 continuous dividend yield, flat 0.04 continuous Act/365F curve and a flat 0.02 spread. The Finstack bond carries a flat 0.02 hazard curve with zero recovery, which is the same spread. QuantLib's BinomialCRRConvertibleEngine is not the reference: it discounts each node at one blended rate and converges about 0.25% lower at the money.",
     "valuation_date": "2026-04-30"
   },
   "model": "tsiveriotis_fernandes",
@@ -168,11 +167,11 @@
   "tolerances": {
     "dv01": {
       "rel": 0.02,
-      "tolerance_reason": "Both sides price the Tsiveriotis-Fernandes convertible on a binomial lattice: QuantLib at 17536 steps and Finstack at 1096 steps. The reference DV01 is a central difference over 10bp either side, per bp: QuantLib's lattice price is not smooth in the rate at 1bp, and its own 1bp DV01 moves by 1.6% between 1096, 4384 and 17536 steps, while the 10bp estimate is stable to 0.1%. Finstack's DV01 is a 1bp bump on a 1096-step lattice, so the bound is the 1bp estimator's dispersion."
+      "tolerance_reason": "The reference is an independent two-component binomial lattice at 35072 steps, written in the generator; Finstack prices at 1096 steps. The reference DV01 is a central difference over 10bp either side, per bp, because a lattice price is not smooth in the rate at 1bp. Finstack's DV01 is a 1bp bump on a 1096-step lattice, so the bound is the 1bp estimator's dispersion: 1.6% between step counts when measured on QuantLib's convertible lattice."
     },
     "npv": {
       "rel": 0.0001,
-      "tolerance_reason": "Canonical Tsiveriotis-Fernandes (1998) two-component (U, V) regression target matching both QuantLib 1.43 and Python TF98 reference (2500000.0 parity). Tight 1e-4 relative band locks exact TF98 regression."
+      "tolerance_reason": "The reference is an independent two-component binomial lattice at 35072 steps, written in the generator; Finstack prices at 1096 steps. The reference lattice moves by 1.3e-6 at the money and 2.4e-5 deep out of the money between 17536 and 35072 steps, and by 1.3e-5 from there to 70144 steps, so it is within about 2.5e-5 of its limit. The bound adds the 1e-4 band the credit-free convertible fixture allows a 1096-step lattice."
     }
   }
 }

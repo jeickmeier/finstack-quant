@@ -1,9 +1,12 @@
-"""Native QuantLib convertible-bond golden builders."""
+"""Convertible-bond golden builders: QuantLib without credit, an independent lattice with it."""
 
 from __future__ import annotations
 
+from datetime import date
+import math
 from typing import Any
 
+import numpy as np
 import QuantLib as ql  # type: ignore[import-not-found]  # noqa: N813
 
 from .bonds import _hazard_curve
@@ -181,6 +184,39 @@ def build_zero_coupon_convertible() -> dict[str, Any]:
 
 
 CREDIT_SPREAD = 0.02
+# Steps of the independent two-component lattice that supplies the reference.
+TWO_COMPONENT_STEPS = 35_072
+
+
+def _two_component_lattice(rate: float = FLAT_RATE, *, spot: float = SPOT, steps: int = TWO_COMPONENT_STEPS) -> float:
+    """Price the zero-coupon convertible on a Tsiveriotis-Fernandes (1998) two-component CRR lattice.
+
+    Each node carries the total value and its cash part. Over one step the cash
+    part is discounted at the risk-free rate plus the credit spread and the
+    remainder at the risk-free rate. The holder converts where the conversion
+    value exceeds the total, which leaves no cash part.
+    """
+    years = (date.fromisoformat(MATURITY) - date.fromisoformat(VALUATION_DATE)).days / 365.0
+    dt = years / steps
+    up = math.exp(VOLATILITY * math.sqrt(dt))
+    prob_up = (math.exp((rate - DIVIDEND_YIELD) * dt) - 1.0 / up) / (up - 1.0 / up)
+    risk_free = math.exp(-rate * dt)
+    risky = math.exp(-(rate + CREDIT_SPREAD) * dt)
+    spots = spot * up ** (2.0 * np.arange(steps + 1) - steps)
+    conversion = CONVERSION_RATIO * spots
+    total = np.maximum(conversion, NOTIONAL)
+    cash = np.where(conversion > NOTIONAL, 0.0, NOTIONAL)
+    for _ in range(steps):
+        spots = spots[:-1] * up
+        expected_total = prob_up * total[1:] + (1.0 - prob_up) * total[:-1]
+        expected_cash = prob_up * cash[1:] + (1.0 - prob_up) * cash[:-1]
+        hold_cash = expected_cash * risky
+        hold_total = (expected_total - expected_cash) * risk_free + hold_cash
+        conversion = CONVERSION_RATIO * spots
+        converts = conversion > hold_total
+        total = np.where(converts, conversion, hold_total)
+        cash = np.where(converts, 0.0, hold_cash)
+    return float(total[0])
 
 
 def _credit_convertible(
@@ -193,23 +229,23 @@ def _credit_convertible(
     """Build a credit-risky zero-coupon convertible fixture on the Tsiveriotis-Fernandes model."""
 
     def price(rate: float = FLAT_RATE) -> float:
-        return _zero_coupon_convertible(rate, spot=spot, credit_spread=CREDIT_SPREAD)
+        return _two_component_lattice(rate, spot=spot)
 
     lattice = (
-        f"Both sides price the Tsiveriotis-Fernandes convertible on a binomial lattice: QuantLib at "
-        f"{REFERENCE_STEPS} steps and Finstack at {TREE_STEPS} steps."
+        f"The reference is an independent two-component binomial lattice at {TWO_COMPONENT_STEPS} steps, "
+        f"written in the generator; Finstack prices at {TREE_STEPS} steps."
     )
     npv_reason = (
-        f"{lattice} With a credit spread QuantLib's lattice converges more slowly than the credit-free "
-        "one: its at-the-money price moves by 2.1e-4 from 1096 to 4384 steps and 8.5e-5 from 4384 to "
-        f"{REFERENCE_STEPS}, so the reference is within about 1e-4 of its own limit. QuantLib compounds "
-        "the blended rate simply per step and Finstack continuously, a difference of order one step."
+        f"{lattice} The reference lattice moves by 1.3e-6 at the money and 2.4e-5 deep out of the money "
+        f"between 17536 and {TWO_COMPONENT_STEPS} steps, and by 1.3e-5 from there to 70144 steps, so it is "
+        "within about 2.5e-5 of its limit. The bound adds the 1e-4 band the credit-free convertible fixture "
+        "allows a 1096-step lattice."
     )
     dv01_reason = (
-        f"{lattice} The reference DV01 is a central difference over 10bp either side, per bp: QuantLib's "
-        "lattice price is not smooth in the rate at 1bp, and its own 1bp DV01 moves by 1.6% between "
-        "1096, 4384 and 17536 steps, while the 10bp estimate is stable to 0.1%. Finstack's DV01 is a 1bp "
-        f"bump on a {TREE_STEPS}-step lattice, so the bound is the 1bp estimator's dispersion."
+        f"{lattice} The reference DV01 is a central difference over 10bp either side, per bp, because a "
+        f"lattice price is not smooth in the rate at 1bp. Finstack's DV01 is a 1bp bump on a {TREE_STEPS}-step "
+        "lattice, so the bound is the 1bp estimator's dispersion: 1.6% between step counts when measured "
+        "on QuantLib's convertible lattice."
     )
     spec: dict[str, Any] = {
         "id": name.upper().replace("_", "-"),
@@ -239,7 +275,7 @@ def _credit_convertible(
             }
         },
         "instrument_pricing_overrides": {"model_config": {"tree_steps": TREE_STEPS}},
-        "attributes": {"tags": ["golden", "quantlib"], "meta": {}},
+        "attributes": {"tags": ["golden"], "meta": {}},
     }
     return {
         "schema": SCHEMA,
@@ -250,17 +286,18 @@ def _credit_convertible(
                 description=description,
                 product=product,
                 source_detail=(
-                    f"QuantLib {ql.__version__} BinomialCRRConvertibleEngine ({REFERENCE_STEPS} steps) on a "
-                    f"ConvertibleZeroCouponBond with American conversion and a flat credit spread of "
-                    f"{CREDIT_SPREAD}: spot {spot}, flat {VOLATILITY} volatility, {DIVIDEND_YIELD} continuous "
-                    f"dividend yield, flat {FLAT_RATE} continuous Act/365F curve. The Finstack bond carries a "
-                    f"flat {CREDIT_SPREAD} hazard curve with zero recovery, which is the same spread. The bond "
-                    "pays no coupon because QuantLib forfeits a coupon on conversion and Finstack retains it. Issuer "
-                    "calls and holder puts are not compared: on a cash redemption Finstack resets the "
-                    "conversion probability to zero, as the model's cash-only component requires, and "
-                    "QuantLib leaves it unchanged."
+                    f"Tsiveriotis-Fernandes (1998) two-component CRR lattice ({TWO_COMPONENT_STEPS} steps) coded in "
+                    "scripts/golden/quantlib/convertible.py, independent of Finstack: each node carries the total "
+                    "value and its cash part, the cash part is discounted at the risk-free rate plus the spread and "
+                    "the remainder at the risk-free rate, and conversion leaves no cash part. Zero-coupon bond with "
+                    f"American conversion, spot {spot}, flat {VOLATILITY} volatility, {DIVIDEND_YIELD} continuous "
+                    f"dividend yield, flat {FLAT_RATE} continuous Act/365F curve and a flat {CREDIT_SPREAD} spread. "
+                    f"The Finstack bond carries a flat {CREDIT_SPREAD} hazard curve with zero recovery, which is the "
+                    "same spread. QuantLib's BinomialCRRConvertibleEngine is not the reference: it discounts each "
+                    "node at one blended rate and converges about 0.25% lower at the money."
                 ),
             )
+            | {"source": "formula"}
         ),
         "kind": "pricing",
         "model": "tsiveriotis_fernandes",
@@ -288,8 +325,8 @@ def build_tf_convertible_at_the_money() -> dict[str, Any]:
     """Build a credit-risky at-the-money zero-coupon convertible fixture."""
     return _credit_convertible(
         product="tf_convertible_at_the_money",
-        name="usd_convertible_tf_atm_3y_quantlib",
-        description="QuantLib Tsiveriotis-Fernandes three-year zero-coupon convertible, at the money, 2% credit spread.",
+        name="usd_convertible_tf_atm_3y",
+        description="Tsiveriotis-Fernandes three-year zero-coupon convertible, at the money, 2% credit spread.",
     )
 
 
@@ -297,8 +334,8 @@ def build_tf_convertible_out_of_the_money() -> dict[str, Any]:
     """Build a credit-risky deep out-of-the-money zero-coupon convertible fixture."""
     return _credit_convertible(
         product="tf_convertible_out_of_the_money",
-        name="usd_convertible_tf_otm_3y_quantlib",
-        description="QuantLib Tsiveriotis-Fernandes three-year zero-coupon convertible, spot at 40% of the conversion price.",
+        name="usd_convertible_tf_otm_3y",
+        description="Tsiveriotis-Fernandes three-year zero-coupon convertible, spot at 40% of the conversion price.",
         spot=40.0,
     )
 
@@ -307,7 +344,7 @@ def build_tf_convertible_in_the_money() -> dict[str, Any]:
     """Build a credit-risky deep in-the-money zero-coupon convertible fixture."""
     return _credit_convertible(
         product="tf_convertible_in_the_money",
-        name="usd_convertible_tf_itm_3y_quantlib",
-        description="QuantLib Tsiveriotis-Fernandes three-year zero-coupon convertible, spot at 250% of the conversion price.",
+        name="usd_convertible_tf_itm_3y",
+        description="Tsiveriotis-Fernandes three-year zero-coupon convertible, spot at 250% of the conversion price.",
         spot=250.0,
     )

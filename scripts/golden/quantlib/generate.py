@@ -260,15 +260,15 @@ PRODUCTS: dict[str, tuple[str, Callable[[], dict[str, Any]]]] = {
         build_yoy_inflation_floor_normal,
     ),
     "tf_convertible_at_the_money": (
-        "convertible/usd_convertible_tf_atm_3y_quantlib.json",
+        "../regression_goldens/convertible/usd_convertible_tf_atm_3y.json",
         build_tf_convertible_at_the_money,
     ),
     "tf_convertible_out_of_the_money": (
-        "convertible/usd_convertible_tf_otm_3y_quantlib.json",
+        "../regression_goldens/convertible/usd_convertible_tf_otm_3y.json",
         build_tf_convertible_out_of_the_money,
     ),
     "tf_convertible_in_the_money": (
-        "convertible/usd_convertible_tf_itm_3y_quantlib.json",
+        "../regression_goldens/convertible/usd_convertible_tf_itm_3y.json",
         build_tf_convertible_in_the_money,
     ),
     "quanto_option": (
