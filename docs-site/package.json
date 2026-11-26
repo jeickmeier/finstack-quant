@@ -26,7 +26,7 @@
     "cn": "0.3.0",
     "comlink": "4.4.2",
     "culori": "4.0.2",
-    "d3-scale": "4.0.2",
+    "d3-scale": "4.0.3",
     "date-fns": "4.4.0",
     "finstack-quant-ui": "file:../finstack-quant-ui",
     "finstack-quant-wasm": "file:../finstack-quant-wasm",
