@@ -31,7 +31,7 @@
     "finstack-quant-ui": "file:../finstack-quant-ui",
     "finstack-quant-wasm": "file:../finstack-quant-wasm",
     "fumadocs-core": "16.15.5",
-    "fumadocs-mdx": "15.4.0",
+    "fumadocs-mdx": "15.6.4",
     "fumadocs-ui": "npm:@fumadocs/base-ui@16.15.5",
     "katex": "0.18.5",
     "lossless-json": "4.3.1",
