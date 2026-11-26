@@ -37,7 +37,7 @@ from finstack_quant.scenarios import (
     parallel_bp_many,
     validate_scenario_spec,
 )
-from finstack_quant.valuations.instruments import Bond
+from finstack_quant.valuations.instruments import Bond, price_instrument
 from tests.tests_typed_helpers import projection_curve
 
 AS_OF = "2025-01-15"
@@ -398,10 +398,12 @@ def test_floating_horizons_preserve_opening_and_crossed_fixings(method: str, iss
     instrument_before = instrument.to_json()
     market_before = market.to_json()
     scenario = ScenarioSpec("crossed-reset", [OperationSpec.time_roll_forward("4D", False, "calendar_days")])
-    opening = instrument.price(market, origin).value
+    opening = price_instrument(instrument, market, origin).value
     rolled = apply_scenario(scenario, market, origin, instruments=[instrument])
     assert rolled.instruments is not None
-    closing = Bond.from_json(rolled.instruments[0]).price(rolled.market, rolled.report.time_roll["new_date"]).value
+    closing = price_instrument(
+        Bond.from_json(rolled.instruments[0]), rolled.market, rolled.report.time_roll["new_date"]
+    ).value
 
     result = compute_horizon_return(instrument, market, origin, scenario, method=method)
     payload = json.loads(result.to_json())

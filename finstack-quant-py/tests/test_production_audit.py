@@ -182,7 +182,7 @@ def test_zero_rate_bond_risk_can_cross_into_negative_rates() -> None:
     payload["instrument"]["spec"]["cashflow_spec"]["fixed"]["business_day_convention"] = "unadjusted"
     bond = Bond.from_json(json.dumps(payload))
     market = MarketContext().insert(DiscountCurve.flat("FLAT", as_of, 0.0, "act_365f"))
-    result = bond.price(market, as_of, metrics=["dv01"])
+    result = price_instrument(bond, market, as_of, metrics=["dv01"])
     assert result.get_metric("dv01") == pytest.approx(-100.0 * math.sinh(0.0001), abs=1e-9)
 
 

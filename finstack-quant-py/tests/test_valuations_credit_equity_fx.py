@@ -46,6 +46,7 @@ from finstack_quant.valuations.instruments import (
     FxOption,
     PremiumLegSpec,
     ProtectionLegSpec,
+    price_instrument,
 )
 
 USD = Currency("USD")
@@ -157,7 +158,7 @@ class TestCreditDefaultSwap:
         assert "curves" in deps
         assert cds.to_dict()["id"] == "CDS-CORP-5Y"
 
-        result = cds.price(_credit_market(), "2024-06-20", "hazard_rate")
+        result = price_instrument(cds, _credit_market(), "2024-06-20", "hazard_rate")
         assert isinstance(result, ValuationResult)
         assert math.isfinite(result.price)
 
@@ -185,10 +186,10 @@ class TestCreditDefaultSwap:
         assert cds.attributes.get_meta("desk") == "credit"
         assert json.loads(cds.to_json())["instrument"]["spec"]["upfront"] is not None
 
-        result = cds.price(_credit_market(), "2024-06-20", "hazard_rate", metrics=["cs01"])
+        result = price_instrument(cds, _credit_market(), "2024-06-20", "hazard_rate", metrics=["cs01"])
         keys = list(result.metrics)
         assert any(key.startswith("cs01") for key in keys), keys
-        cs01 = cds.metric(_credit_market(), "2024-06-20", "cs01", "hazard_rate")
+        cs01 = price_instrument(cds, _credit_market(), "2024-06-20", "hazard_rate", metrics=["cs01"])["cs01"]
         assert math.isfinite(cs01)
 
     def test_par_spread_is_close_to_flat_hazard_spread(self) -> None:
@@ -267,7 +268,7 @@ class TestCdsIndex:
         assert isinstance(index.premium_leg, PremiumLegSpec)
 
         market = _credit_market()
-        result = index.price(market, "2024-06-20")
+        result = price_instrument(index, market, "2024-06-20")
         assert math.isfinite(result.price)
         assert index.risky_pv01(market, "2024-06-20") > 0.0
         assert 40.0 < index.par_spread(market, "2024-06-20") < 80.0
@@ -275,7 +276,7 @@ class TestCdsIndex:
     def test_example_prices(self) -> None:
         index = CdsIndex.example()
         assert index.id == "CDX-IG-42"
-        result = index.price(_credit_market(), "2024-06-20", "hazard_rate")
+        result = price_instrument(index, _credit_market(), "2024-06-20", "hazard_rate")
         assert math.isfinite(result.price)
 
     def test_constituents_accept_typed_dict_and_json(self) -> None:
@@ -534,12 +535,14 @@ class TestEquityOption:
         assert option.exercise_dates is None
 
         market = _equity_market()
-        result = option.price(market, "2024-01-15")
+        result = price_instrument(option, market, "2024-01-15")
         assert result.price > 0.0
         greeks = option.greeks(market, "2024-01-15")
         # Greeks are quantity-scaled; per-unit delta lies in (0, 1) for a call.
         assert 0.0 < greeks["delta"] / option.quantity < 1.0
-        assert option.metric(market, "2024-01-15", "delta") == pytest.approx(greeks["delta"])
+        assert price_instrument(option, market, "2024-01-15", metrics=["delta"])["delta"] == pytest.approx(
+            greeks["delta"]
+        )
         implied = option.implied_vol(market, "2024-01-15", result.price)
         assert implied == pytest.approx(0.2, abs=2e-3)
 
@@ -557,12 +560,12 @@ class TestEquityOption:
         )
         assert extras.config.output_scale("USD") == 0
 
-        value = option.price(market, "2024-01-15", metrics=["theta"], extras=extras)
+        value = price_instrument(option, market, "2024-01-15", metrics=["theta"], extras=extras)
         theta = option.metric(market, "2024-01-15", "theta", extras=extras)
         greeks = option.greeks(market, "2024-01-15", extras=extras)
         assert theta == pytest.approx(value["theta"])
         assert theta == pytest.approx(greeks["theta"])
-        assert theta != pytest.approx(option.metric(market, "2024-01-15", "theta"))
+        assert theta != pytest.approx(price_instrument(option, market, "2024-01-15", metrics=["theta"])["theta"])
 
     @pytest.mark.parametrize("style", ["european", "american", "bermudan"])
     def test_equity_iv_uses_active_exercise_and_day_count(self, style: str) -> None:
@@ -586,7 +589,7 @@ class TestEquityOption:
             .build()
         )
         market = _equity_market()
-        price = option.price(market, "2024-01-15").price
+        price = price_instrument(option, market, "2024-01-15").price
         assert option.implied_vol(market, "2024-01-15", price) == pytest.approx(0.2, abs=1e-7)
         for invalid in [-1.0, float("nan"), float("inf")]:
             with pytest.raises(ValueError, match="non-negative PV"):
@@ -617,7 +620,7 @@ class TestEquityOption:
                 interpolation_mode="vol",
             )
         )
-        price = option.price(market, BASE)
+        price = price_instrument(option, market, BASE)
         assert price.currency == "EUR"
         assert price.price > 0.0
         put = EquityOption.european("AAPL-P", "AAPL", 180.0, "2025-06-20", 100.0, "USD", "put")
@@ -655,7 +658,7 @@ class TestFxForward:
         assert fwd.maturity == datetime.date(2025, 6, 15)
         assert fwd.quoted_spot is None
         market = _fx_market()
-        result = fwd.price(market, "2025-01-15")
+        result = price_instrument(fwd, market, "2025-01-15")
         assert math.isfinite(result.price)
         forward = fwd.market_forward_rate(market, "2025-01-15")
         assert 1.10 < forward < 1.13
@@ -716,7 +719,7 @@ class TestFxOption:
         assert opt.domestic_discount_curve_id == "USD-OIS"
         assert opt.foreign_discount_curve_id == "EUR-OIS"
         market = _fx_market()
-        result = opt.price(market, "2025-01-15")
+        result = price_instrument(opt, market, "2025-01-15")
         assert result.price > 0.0
         greeks = opt.greeks(market, "2025-01-15")
         # Greeks are quantity-scaled; per-unit delta lies in (0, 1) for a call.

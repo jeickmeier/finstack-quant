@@ -511,7 +511,7 @@ def test_term_loan_cs01_uses_the_quote_anchor(quote_field: str, low_quote: float
 
 
 def test_every_pricing_entry_point_accepts_the_same_metric_pricing_overrides_types() -> None:
-    """``price_instrument``, typed ``.price()`` and ``validate_instrument_json`` share one coercion."""
+    """``price_instrument``, on a typed object or its JSON, and ``validate_instrument_json`` share one coercion."""
     from finstack_quant.valuations.instruments import PriceExtras
 
     market = _market()
@@ -528,7 +528,7 @@ def test_every_pricing_entry_point_accepts_the_same_metric_pricing_overrides_typ
         {"metric_pricing_overrides": as_dict},
         json.dumps({"metric_pricing_overrides": as_dict}),
     ):
-        assert bond.price(market, AS_OF, metrics=["theta"], extras=extras)["theta"] == expected
+        assert price_instrument(bond, market, AS_OF, metrics=["theta"], extras=extras)["theta"] == expected
         assert price_instrument(bond.to_json(), market, AS_OF, metrics=["theta"], extras=extras)["theta"] == expected
     for value in (typed, as_dict, json.dumps(as_dict)):
         prepared = json.loads(validate_instrument_json(bond.to_json(), metric_pricing_overrides=value))
@@ -544,18 +544,19 @@ def test_call_time_market_quote_overrides_match_typed_and_wire_pricing() -> None
     extras = {"instrument_pricing_overrides": {"market_quotes": {"quoted_clean_price_pct": 98.25}}}
     metrics = ["clean_price", "ytm"]
 
-    typed = bond.price(market, AS_OF, metrics=metrics, extras=PriceExtras(**extras))
+    typed = price_instrument(bond, market, AS_OF, metrics=metrics, extras=PriceExtras(**extras))
     assert typed["clean_price"] == pytest.approx(float(bond.notional.amount) * 0.9825)
     assert price_instrument(bond, market, AS_OF, metrics=metrics, extras=extras)["ytm"] == typed["ytm"]
     assert price_instrument(wire, market, AS_OF, metrics=metrics, extras=json.dumps(extras))["ytm"] == typed["ytm"]
     assert bond.to_json() == wire
-    original = bond.price(market, AS_OF, metrics=metrics)
+    original = price_instrument(bond, market, AS_OF, metrics=metrics)
     assert original["clean_price"] != typed["clean_price"]
     marked = json.loads(wire)
     marked["instrument"]["spec"]["instrument_pricing_overrides"] = extras["instrument_pricing_overrides"]
     stored = Bond.from_json(json.dumps(marked))
     before = stored.to_json()
-    cleared = stored.price(
+    cleared = price_instrument(
+        stored,
         market,
         AS_OF,
         metrics=metrics,
@@ -581,11 +582,11 @@ def test_price_extras_rejects_unknown_keys_and_the_retired_keywords() -> None:
     with pytest.raises(ValueError, match="PriceExtras"):
         price_instrument(bond, market, AS_OF, extras={"explian": True})  # schema-rejection-test: unknown extras key
     with pytest.raises(ValueError, match="PriceExtras"):
-        bond.price(market, AS_OF, extras='{"history": {}}')  # schema-rejection-test: unknown extras key
+        price_instrument(bond, market, AS_OF, extras='{"history": {}}')  # schema-rejection-test: unknown extras key
     with pytest.raises(TypeError):
         price_instrument(bond, market, AS_OF, explain=True)  # schema-rejection-test: retired kwarg explain
     with pytest.raises(TypeError):
-        bond.price(market, AS_OF, market_history={})  # schema-rejection-test: retired kwarg market_history
+        price_instrument(bond, market, AS_OF, market_history={})  # schema-rejection-test: retired kwarg market_history
 
 
 def test_pricing_entry_points_reject_retired_pricing_options_keyword() -> None:

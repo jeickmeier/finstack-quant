@@ -18,6 +18,7 @@ from finstack_quant.valuations.instruments import (
     MertonMcConfig,
     PikMode,
     PikSchedule,
+    price_instrument,
 )
 
 
@@ -118,8 +119,8 @@ def test_merton_mc_config_typed_calibration_drives_registry_pricer() -> None:
     assert base.to_dict()["calibration"] is None
     assert "calibration=true" in repr(calibrated).lower()
 
-    plain = _merton_bond_with_config(base, as_of).price(market, as_of, model="merton_mc")
-    solved = _merton_bond_with_config(calibrated, as_of).price(market, as_of, model="merton_mc")
+    plain = price_instrument(_merton_bond_with_config(base, as_of), market, as_of, model="merton_mc")
+    solved = price_instrument(_merton_bond_with_config(calibrated, as_of), market, as_of, model="merton_mc")
     measures = json.loads(solved.to_json())["measures"]
     assert measures["calibration_iterations"] > 0
     assert measures["calibrated_asset_vol"] != pytest.approx(0.25)

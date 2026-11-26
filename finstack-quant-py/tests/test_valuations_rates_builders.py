@@ -107,7 +107,7 @@ def test_swap_from_legs_prices_on_start_date_without_fixings() -> None:
         .build()
     )
     assert swap.float_leg.reset_lag_days == 0
-    result = swap.price(_market(), AS_OF, metrics=["dv01"])
+    result = price_instrument(swap, _market(), AS_OF, metrics=["dv01"])
     assert isinstance(result, ValuationResult)
     assert result.currency == "USD"
     assert result.get_metric("dv01") is not None
@@ -133,7 +133,7 @@ def test_swap_from_conventions_prices_on_start_date_without_fixings() -> None:
     assert swap.float_leg.reset_lag_days == 0
     assert swap.float_leg.compounding != "simple"
     assert swap.fixed_leg.rate == pytest.approx(0.035)
-    result = swap.price(_market(), AS_OF)
+    result = price_instrument(swap, _market(), AS_OF)
     assert result.currency == "USD"
 
 
@@ -462,10 +462,10 @@ def test_bond_builder_credit_models_preserve_explicit_model_contract() -> None:
     bond_models = set(list_models_grouped()["bond"])
     assert {"discounting", "hazard_rate", "tree", "rates_credit"} <= bond_models
 
-    bullet_result = bullet.price(market, AS_OF, model="rates_credit")
-    callable_result = callable_bond.price(market, AS_OF, model="rates_credit")
-    puttable_result = puttable_bond.price(market, AS_OF, model="rates_credit")
-    hazard_result = bullet.price(market, AS_OF, model="hazard_rate")
+    bullet_result = price_instrument(bullet, market, AS_OF, model="rates_credit")
+    callable_result = price_instrument(callable_bond, market, AS_OF, model="rates_credit")
+    puttable_result = price_instrument(puttable_bond, market, AS_OF, model="rates_credit")
+    hazard_result = price_instrument(bullet, market, AS_OF, model="hazard_rate")
     # The rates-only tree needs an explicit Hull-White pair.
     tree_document = json.loads(callable_bond.to_json())
     tree_document["instrument"]["spec"]["instrument_pricing_overrides"] = {
@@ -477,11 +477,11 @@ def test_bond_builder_credit_models_preserve_explicit_model_contract() -> None:
     assert 0.0 < hazard_result.price < 1_500_000.0
     assert 0.0 < tree_result.price < 1_500_000.0
     with pytest.raises(ValueError, match="non-callable"):
-        callable_bond.price(market, AS_OF, model="hazard_rate")
+        price_instrument(callable_bond, market, AS_OF, model="hazard_rate")
 
     # Explicit discounting is rates-only even when the bond carries a credit
     # curve identifier; it must not silently switch to the hazard kernel.
-    risk_free = bullet.price(market, AS_OF, model="discounting")
+    risk_free = price_instrument(bullet, market, AS_OF, model="discounting")
     assert hazard_result.price < risk_free.price
     assert bullet_result.price < risk_free.price
 
@@ -514,7 +514,8 @@ def test_bond_getters_and_pricing_helpers() -> None:
     assert isinstance(bond.attributes, Attributes)
     assert bond.default_model == "discounting"
     assert "curves" in bond.market_dependencies()
-    result = bond.price(
+    result = price_instrument(
+        bond,
         _market(),
         AS_OF,
         metrics=["ytm", "dv01"],
@@ -579,7 +580,7 @@ def test_term_loan_builder_and_getters() -> None:
     assert loan.to_dict()["rate"] == example.to_dict()["rate"]
     assert TermLoan.example_floating_with_ddtl().ddtl is not None
     assert TermLoan.example_callable().call_schedule is not None
-    result = example.price(_market(), AS_OF)
+    result = price_instrument(example, _market(), AS_OF)
     assert result.currency == "USD"
     floating = (
         TermLoan
@@ -699,7 +700,7 @@ def test_metric_keys_are_human_readable_not_escaped() -> None:
         .float_leg(_float_leg())
         .build()
     )
-    result = swap.price(_market(), AS_OF, metrics=["pv01", "bucketed_dv01"])
+    result = price_instrument(swap, _market(), AS_OF, metrics=["pv01", "bucketed_dv01"])
 
     keys = list(result.metrics)
     assert keys, "expected pv01 / bucketed_dv01 measures"
@@ -805,9 +806,9 @@ def test_bond_builder_quoted_price_drives_ytm_like_the_wire_field() -> None:
     envelope = json.loads(plain.to_json())
     envelope["instrument"]["spec"]["instrument_pricing_overrides"] = quote
     wire = Bond.from_json(json.dumps(envelope))
-    ytm_quoted = quoted.price(market, AS_OF, metrics=["ytm"]).metrics["ytm"]
-    ytm_wire = wire.price(market, AS_OF, metrics=["ytm"]).metrics["ytm"]
-    ytm_plain = plain.price(market, AS_OF, metrics=["ytm"]).metrics["ytm"]
+    ytm_quoted = price_instrument(quoted, market, AS_OF, metrics=["ytm"]).metrics["ytm"]
+    ytm_wire = price_instrument(wire, market, AS_OF, metrics=["ytm"]).metrics["ytm"]
+    ytm_plain = price_instrument(plain, market, AS_OF, metrics=["ytm"]).metrics["ytm"]
     assert ytm_quoted == ytm_wire
     assert abs(ytm_quoted - ytm_plain) > 1e-4
 

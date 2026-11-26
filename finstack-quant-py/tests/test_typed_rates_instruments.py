@@ -374,8 +374,8 @@ def test_bond_future_uses_typed_terms_and_live_and_final_marks() -> None:
     initial = BondFuture.example()
     terms = ListedFutureTerms(2, 1000, "USD", 112.25, "2025-09-19", "2025-09-30", "long")
     edited = initial.to_builder().terms(terms.with_marks(112.75, 112.50)).build()
-    assert edited.price(MarketContext(), "2025-09-01").value.amount == 1000.0
-    assert edited.price(MarketContext(), "2025-09-23").value.amount == 500.0
+    assert price_instrument(edited, MarketContext(), "2025-09-01").value.amount == 1000.0
+    assert price_instrument(edited, MarketContext(), "2025-09-23").value.amount == 500.0
     assert json.loads(initial.terms.to_json())["contracts"] == 10.0
     assert BondFuture.from_json(edited.to_json()).to_json() == edited.to_json()
     assert pickle.loads(pickle.dumps(edited.terms)).to_json() == edited.terms.to_json()  # noqa: S301
@@ -413,9 +413,9 @@ def test_listed_options_use_native_typed_terms_and_preserve_price() -> None:
         edited = option.to_builder().id("EDITED").terms(terms).build()
         assert option.id != edited.id
         assert option.terms.to_dict() == edited.terms.to_dict()
-        price = edited.price(market, as_of).value
+        price = price_instrument(edited, market, as_of).value
         wire_price = price_instrument(edited.to_json(), market, as_of).value
-        assert price == wire_price == option.price(market, as_of).value
+        assert price == wire_price == price_instrument(option, market, as_of).value
 
 
 def test_other_listed_futures_roundtrip_typed_terms_at_exchange_marks() -> None:

@@ -1048,7 +1048,7 @@ def test_standalone_tranche_prices_the_same_cashflows_inside_a_portfolio() -> No
     note = StructuredCreditTranche.from_deal(deal, "B")
     assert note.id != deal.id
     assert note.tranche_id == "B"
-    price = note.price(market, CLOSE, metrics=["wal", "dv01"])
+    price = price_instrument(note, market, CLOSE, metrics=["wal", "dv01"])
     standalone = tranche_metrics(deal, "B", market, CLOSE, metrics=["wal", "dv01"])
     flows = deal.tranche_cashflows("B", market, CLOSE).cashflows
     curve = market.get_discount("USD-OIS")

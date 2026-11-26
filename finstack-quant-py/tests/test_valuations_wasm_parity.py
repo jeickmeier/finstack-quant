@@ -67,6 +67,11 @@ def _json(value: Any) -> Any:
     return json.loads(value.to_json())
 
 
+def _metric(instrument: Any, market: MarketContext | str, as_of: datetime.date | str, metric_id: str) -> float:
+    """One metric of a typed instrument, read off ``price_instrument``."""
+    return ins.price_instrument(instrument, market, as_of, metrics=[metric_id])[metric_id]
+
+
 def _pinned_timestamp(result_json: str) -> str:
     """A valuation result with its wall-clock stamp replaced by a fixed one."""
     document = json.loads(result_json)
@@ -184,9 +189,9 @@ def _g_spread_case() -> dict[str, Any]:
         "bond": govt.to_json(),
         "plain_bond": plain.to_json(),
         "own_curve_bond": own_curve.to_json(),
-        "g_spread": govt.metric(market, as_of, "g_spread"),
-        "g_spread_over_own_curve": own_curve.metric(market, as_of, "g_spread"),
-        "i_spread": own_curve.metric(market, as_of, "i_spread"),
+        "g_spread": _metric(govt, market, as_of, "g_spread"),
+        "g_spread_over_own_curve": _metric(own_curve, market, as_of, "g_spread"),
+        "i_spread": _metric(own_curve, market, as_of, "i_spread"),
     }
 
 
@@ -210,8 +215,8 @@ def _default_risk_case() -> dict[str, Any]:
         instrument = getattr(ins, name).from_json(json.dumps(spec))
         cases[name] = {
             "json": json.dumps(spec),
-            "recovery01": instrument.metric(market, as_of, "recovery01"),
-            "jump_to_default": instrument.metric(market, as_of, "jump_to_default"),
+            "recovery01": _metric(instrument, market, as_of, "recovery01"),
+            "jump_to_default": _metric(instrument, market, as_of, "jump_to_default"),
         }
     return {
         "market": market.to_json(),
@@ -295,7 +300,7 @@ def build_cases() -> dict[str, Any]:
     # -- rates -------------------------------------------------------------
     swap = build_irs()
     rates_market = rates_cases._market_json()
-    swap_result = swap.price(rates_market, "2024-01-15", metrics=["dv01"])
+    swap_result = ins.price_instrument(swap, rates_market, "2024-01-15", metrics=["dv01"])
     conventions_swap = ins.InterestRateSwap.from_conventions({
         "id": "IRS-CONV",
         "notional": Money(10_000_000.0, USD),
@@ -312,7 +317,7 @@ def build_cases() -> dict[str, Any]:
         "market": rates_market,
         "swap": swap.to_json(),
         "price": swap_result.price,
-        "dv01": swap.metric(rates_market, "2024-01-15", "dv01"),
+        "dv01": _metric(swap, rates_market, "2024-01-15", "dv01"),
         "result_json": _pinned_timestamp(swap_result.to_json()),
         "get_metric": swap_result.get_metric("dv01"),
         "metric_units": swap_result.metric_units(),
@@ -346,7 +351,7 @@ def build_cases() -> dict[str, Any]:
     tranche = ins.CdsTranche.standard("CDX-42-3X7", tranche_params, "USD-OIS", "CDX.NA.IG.HAZARD", "pay")
     cases["credit"] = {
         "market": credit_market.to_json(),
-        "cds_price": cds.price(credit_market, AS_OF, "hazard_rate").price,
+        "cds_price": ins.price_instrument(cds, credit_market, AS_OF, "hazard_rate").price,
         "cds_par_spread": cds.par_spread(credit_market, AS_OF),
         "index": index.to_json(),
         "index_par_spread": index.par_spread(credit_market, AS_OF),
@@ -358,14 +363,14 @@ def build_cases() -> dict[str, Any]:
     # -- equity ------------------------------------------------------------
     equity_market = cef_cases._equity_market()
     option = ins.EquityOption.example()
-    option_price = option.price(equity_market, "2024-01-15").price
+    option_price = ins.price_instrument(option, equity_market, "2024-01-15").price
     european = ins.EquityOption.european("SPX-CALL", "SPX", 4500.0, "2024-06-21", 100.0, USD, "call")
     convertible = ins.ConvertibleBond.example()
     cases["equity"] = {
         "market": equity_market.to_json(),
         "price": option_price,
         "greeks": option.greeks(equity_market, "2024-01-15"),
-        "delta": option.metric(equity_market, "2024-01-15", "delta"),
+        "delta": _metric(option, equity_market, "2024-01-15", "delta"),
         "implied_vol": option.implied_vol(equity_market, "2024-01-15", option_price),
         "european": european.to_json(),
     }
@@ -419,8 +424,8 @@ def build_cases() -> dict[str, Any]:
         "stochastic_npv": stochastic_result.npv.amount,
         "stochastic_paths": stochastic_result.num_paths,
         "coverage_tests": deal.create_waterfall().coverage_tests(),
-        "price": deal.price(sc_market, close, metrics=["wal"]).value.amount,
-        "wal": deal.metric(sc_market, close, "wal"),
+        "price": ins.price_instrument(deal, sc_market, close, metrics=["wal"]).value.amount,
+        "wal": _metric(deal, sc_market, close, "wal"),
         "effective": {
             "loss_allocation": deal.effective_loss_allocation,
             "loss_recognition": deal.effective_loss_recognition,
@@ -697,7 +702,7 @@ def test_g_spread_with_no_government_curve_is_a_value_error() -> None:
     bond = ins.Bond.from_json(case["plain_bond"])
     market = MarketContext.from_json(case["market"])
     with pytest.raises(ValueError, match="government_curve_id"):
-        bond.metric(market, case["as_of"], "g_spread")
+        _metric(bond, market, case["as_of"], "g_spread")
 
 
 def test_default_risk_off_a_hazard_curve_is_a_value_error() -> None:
@@ -706,7 +711,7 @@ def test_default_risk_off_a_hazard_curve_is_a_value_error() -> None:
     market = MarketContext.from_json(case["market"])
     for metric in ("recovery01", "jump_to_default"):
         with pytest.raises(ValueError, match="requires hazard pricing"):
-            bond.metric(market, case["as_of"], metric)
+            _metric(bond, market, case["as_of"], metric)
 
 
 def test_unknown_tranche_is_a_lookup_miss() -> None:
@@ -726,6 +731,6 @@ def test_tranche_loss_metrics_report_missing_index_data_as_a_lookup_miss() -> No
     tranche = ins.CdsTranche.example()
     market = cef_cases._equity_market()
     with pytest.raises(KeyError):
-        tranche.metric(market, AS_OF, "expected_loss")
+        _metric(tranche, market, AS_OF, "expected_loss")
     with pytest.raises(KeyError):
-        tranche.metric(market, AS_OF, "jump_to_default")
+        _metric(tranche, market, AS_OF, "jump_to_default")

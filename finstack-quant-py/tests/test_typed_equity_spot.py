@@ -22,13 +22,13 @@ def test_equity_builder_prices_short_and_preserves_quote_choice() -> None:
         .discount_curve_id("USD-OIS")
         .build()
     )
-    assert asset.price(market, as_of).price == -48.5
+    assert price_instrument(asset, market, as_of).price == -48.5
     assert price_instrument(asset.to_json(), market, as_of).value == asset.price(market, as_of).value
     assert asset.discrete_dividends == [(date(2025, 2, 3), 0.38)]
     edited = asset.to_builder().quoted_spot(None).build()
     assert edited.spot_id == "EXPLICIT-QUOTE"
     assert asset.quoted_spot == 12.125
     with pytest.raises(KeyError, match="EXPLICIT-QUOTE"):
-        edited.price(market, as_of)
+        price_instrument(edited, market, as_of)
     with pytest.raises(ValueError, match="quantity"):
         asset.to_builder().quantity(float("inf")).build()

@@ -35,6 +35,10 @@ def _market() -> MarketContext:
     return MarketContext().insert(DiscountCurve.flat("USD-OIS", CLOSE, 0.04, "act_365f"))
 
 
+def _metric(facility: AssetBackedFacility, metric_id: str) -> float:
+    return price_instrument(facility, _market(), CLOSE, metrics=[metric_id])[metric_id]
+
+
 def _facility(drawn: float = 60_000_000.0) -> AssetBackedFacility:
     return (
         AssetBackedFacility
@@ -143,11 +147,9 @@ def test_borrowing_base_report_matches_the_registry_metric() -> None:
     base = float(report["borrowing_base"]["amount"])
     assert base > 0.0
     assert float(report["eligible_collateral"]["amount"]) >= base
-    assert facility.metric(_market(), CLOSE, "abf_borrowing_base") == pytest.approx(base)
-    assert facility.metric(_market(), CLOSE, "abf_advance_rate_utilization") == pytest.approx(60_000_000.0 / base)
-    assert facility.metric(_market(), CLOSE, "abf_borrowing_base_cushion") == pytest.approx(
-        (base - 60_000_000.0) / base * 100.0
-    )
+    assert _metric(facility, "abf_borrowing_base") == pytest.approx(base)
+    assert _metric(facility, "abf_advance_rate_utilization") == pytest.approx(60_000_000.0 / base)
+    assert _metric(facility, "abf_borrowing_base_cushion") == pytest.approx((base - 60_000_000.0) / base * 100.0)
 
 
 def test_projection_reconciles_with_the_lender_cashflows_and_the_price() -> None:
@@ -179,7 +181,7 @@ def test_projection_reconciles_with_the_lender_cashflows_and_the_price() -> None
 
     irr = facility.facility_irr(_market(), CLOSE)
     assert 0.055 < irr < 0.075
-    assert facility.metric(_market(), CLOSE, "abf_facility_irr") == pytest.approx(irr)
+    assert _metric(facility, "abf_facility_irr") == pytest.approx(irr)
 
     typed = facility.price(_market(), CLOSE, metrics=["dv01"])
     for instrument in (facility, facility.to_json()):

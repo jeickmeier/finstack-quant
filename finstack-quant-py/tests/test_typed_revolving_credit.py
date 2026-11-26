@@ -192,7 +192,7 @@ def test_deterministic_facility_prices_like_price_instrument() -> None:
     assert typed.value.amount == pytest.approx(via_json.value.amount, rel=1e-12)
     assert facility.metric(ctx, AS_OF, "dv01") == pytest.approx(via_json.metrics["dv01"], rel=1e-9)
     # A deterministic schedule has no simulated draws, hence no draw option cost.
-    assert facility.metric(ctx, AS_OF, "draw_option_cost") == 0.0
+    assert price_instrument(facility, ctx, AS_OF, metrics=["draw_option_cost"])["draw_option_cost"] == 0.0
     with pytest.raises(ValueError, match="stochastic"):
         facility.price_with_paths(ctx, AS_OF)
 
@@ -243,7 +243,7 @@ def test_price_with_paths_returns_every_path_and_the_option_cost() -> None:
     assert "EnhancedMonteCarloResult" in repr(result)
 
     # The metric reports the same Monte Carlo mean.
-    metric = facility.metric(ctx, AS_OF, "draw_option_cost")
+    metric = price_instrument(facility, ctx, AS_OF, metrics=["draw_option_cost"])["draw_option_cost"]
     assert metric == pytest.approx(result.draw_option_cost.amount, rel=1e-9)
 
 
@@ -325,14 +325,12 @@ def test_builder_accepts_percentage_upfront_scheduled_fees_and_oid_switch() -> N
     assert facility.scheduled_fees[0]["amount"]["amount"] == "100000"
     assert facility.oid_eir == {"include_fees": False}
     assert builder().oid_eir(None).build().oid_eir is None
-    without_fees = facility.price(market(), AS_OF, metrics=["oid_eir_amortization"]).metrics["oid_eir_rate"]
-    with_fees = (
-        builder()
-        .fees(fees)
-        .oid_eir({"include_fees": True})
-        .build()
-        .price(market(), AS_OF, metrics=["oid_eir_amortization"])
-        .metrics["oid_eir_rate"]
-    )
+    without_fees = price_instrument(facility, market(), AS_OF, metrics=["oid_eir_amortization"]).metrics["oid_eir_rate"]
+    with_fees = price_instrument(
+        builder().fees(fees).oid_eir({"include_fees": True}).build(),
+        market(),
+        AS_OF,
+        metrics=["oid_eir_amortization"],
+    ).metrics["oid_eir_rate"]
     # The 2% upfront fee and the running fees lift the origination effective rate.
     assert with_fees > without_fees
