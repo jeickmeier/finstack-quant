@@ -335,7 +335,7 @@ macro_rules! builder_class {
             /// Runs the Rust `build()` validation and consumes the builder;
             /// create a new builder for the next instrument.
             /// @returns The validated instrument.
-            /// @throws Error - Throws with kind `validation` if the builder was already consumed, a required field is missing (the message names the field), or validation fails.
+            /// @throws Error - Throws with kind `validation` if the builder was already consumed, a required field is missing (the message names every missing field), or validation fails.
             pub fn build(&self) -> Result<$target, JsValue> {
                 let $b = self.inner.take()?;
                 let inner = $finish.map_err(crate::utils::to_js_err)?;

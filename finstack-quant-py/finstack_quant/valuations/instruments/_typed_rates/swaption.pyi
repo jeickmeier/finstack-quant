@@ -907,7 +907,7 @@ class SwaptionBuilder:
         ------
         ValueError
             If the builder was already consumed, a required field is missing
-            (the message names the builder and the field, e.g.
+            (the message names the builder and every missing field, e.g.
             ``SwaptionBuilder: missing required field 'id'``), or the instrument
             fails validation.
         """

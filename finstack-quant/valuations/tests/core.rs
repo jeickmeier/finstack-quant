@@ -14,6 +14,8 @@ mod dv01;
 mod enrichment;
 #[path = "core/fd_greeks.rs"]
 mod fd_greeks;
+#[path = "core/financial_builder.rs"]
+mod financial_builder;
 #[path = "core/generic_pricer.rs"]
 mod generic_pricer;
 #[path = "core/hvar.rs"]

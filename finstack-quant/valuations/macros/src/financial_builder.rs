@@ -251,21 +251,59 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
     let setter_req = required_fields.iter().map(|(id, ty)| setter(id, ty));
     let setter_opt = optional_fields.iter().map(|(id, ty)| setter(id, ty));
 
-    // Build expression: required fields unwrap, optional fields carry through
-    // (unwrap_or(None)) and initialize attributes if present. A missing required
-    // field fails with a validation error naming the builder and the field.
+    // Required fields without a default must all be set before anything else is
+    // resolved. `build()` reports every unset one in a single validation error:
+    // the first in declaration order in the text
+    // `"<Builder>: missing required field '<field>'"`, the others appended as
+    // `" (also missing: '<field>', ...)"`.
     let builder_name_str = builder_name.to_string();
-    let missing_error = |field: &syn::Ident| {
-        let message = format!("{builder_name_str}: missing required field '{field}'");
-        quote! { finstack_quant_core::Error::Validation(::std::string::String::from(#message)) }
+    let checked_fields: Vec<&syn::Ident> = required_fields
+        .iter()
+        .map(|(id, _)| id)
+        .filter(|id| !defaults.contains_key(*id))
+        .collect();
+    let checked_names: Vec<String> = checked_fields.iter().map(|id| id.to_string()).collect();
+    // Prefixed so a binding cannot shadow a name a default expression refers to.
+    let checked_binding = |id: &syn::Ident| format_ident!("__required_{}", id);
+    let checked_bindings = checked_fields.iter().map(|id| checked_binding(id));
+    let missing_prefix = format!("{builder_name_str}: missing required field");
+    let require_fields = if checked_fields.is_empty() {
+        quote! {}
+    } else {
+        quote! {
+            let __missing: ::std::vec::Vec<&'static str> =
+                [#((#checked_names, self.#checked_fields.is_none())),*]
+                    .into_iter()
+                    .filter(|(_, unset)| *unset)
+                    .map(|(name, _)| name)
+                    .collect();
+            let (#(::core::option::Option::Some(#checked_bindings),)*) = (#(self.#checked_fields,)*)
+            else {
+                let mut __names = __missing.iter();
+                let mut __message = ::std::string::String::from(#missing_prefix);
+                if let ::core::option::Option::Some(__first) = __names.next() {
+                    __message.push_str(&::std::format!(" '{}'", __first));
+                }
+                let __others: ::std::vec::Vec<::std::string::String> =
+                    __names.map(|__name| ::std::format!("'{}'", __name)).collect();
+                if !__others.is_empty() {
+                    __message.push_str(&::std::format!(" (also missing: {})", __others.join(", ")));
+                }
+                return ::core::result::Result::Err(finstack_quant_core::Error::Validation(__message));
+            };
+        }
     };
+
+    // Build expression: checked required fields are already unwrapped, defaulted
+    // ones fall back to their expression, optional fields carry through and
+    // `attributes` initializes when absent.
     let assign_req = required_fields.iter().map(|(id, _)| {
         if let Some(expr) = defaults.get(id) {
             let expr_clone = expr.clone();
             quote! { #id: self.#id.unwrap_or_else(|| #expr_clone) }
         } else {
-            let missing = missing_error(id);
-            quote! { #id: self.#id.ok_or_else(|| #missing)? }
+            let binding = checked_binding(id);
+            quote! { #id: #binding }
         }
     });
 
@@ -308,7 +346,7 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
     };
 
     let builder_doc = format!("Builder for `{}`.", struct_name);
-    let build_doc = "Builds the final instance.";
+    let build_doc = "Builds the final instance.\n\n# Errors\n\nReturns a validation error naming every required field that was not set, or the validator's error for the assembled value.";
     let builder_method_doc = "Creates a new builder.";
     let validation = if let Some(validator) = custom_validator {
         quote! { #validator(&__built)?; }
@@ -331,6 +369,7 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
             #(#setter_opt)*
             #[doc = #build_doc]
             pub fn build(self) -> finstack_quant_core::Result<#struct_name> {
+                #require_fields
                 let __built = #struct_name {
                     #(#assign_req,)*
                     #(#assign_opt,)*

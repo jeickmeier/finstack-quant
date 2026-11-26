@@ -1516,6 +1516,6 @@ class RevolvingCreditBuilder:
         ------
         ValueError
             If the builder was already consumed, a required field is missing
-            (the message names the field), or the facility fails validation.
+            (the message names every missing field), or the facility fails validation.
         """
         ...

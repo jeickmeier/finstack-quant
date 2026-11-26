@@ -527,6 +527,18 @@ def test_bond_builder_missing_field_is_named() -> None:
         Bond.builder().id("B").build()
 
 
+def test_builder_names_every_missing_required_field() -> None:
+    notional = Money(1_000_000.0, "USD")
+    with pytest.raises(
+        ValueError,
+        match=r"InterestRateSwapBuilder: missing required field 'id' \(also missing: 'side', 'fixed_leg', 'float_leg'\)$",
+    ):
+        InterestRateSwap.builder().notional(notional).build()
+    # One missing field keeps the message with no suffix.
+    with pytest.raises(ValueError, match=r"InterestRateSwapBuilder: missing required field 'float_leg'$"):
+        InterestRateSwap.builder().id("IRS").notional(notional).side("pay").fixed_leg(_fixed_leg()).build()
+
+
 def test_bond_builder_requires_contractual_issue_date() -> None:
     base = Bond.example().to_dict()
     builder = (

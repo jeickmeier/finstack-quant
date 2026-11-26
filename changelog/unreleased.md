@@ -2,6 +2,14 @@
 
 ## Itemized changes
 
+### Valuations: a builder names every missing required field
+
+`build()` on an instrument builder reports all unset required fields in one
+validation error, in Rust, Python and WASM. The first in declaration order
+keeps the existing text and the others are appended:
+`BondBuilder: missing required field 'notional' (also missing: 'issue_date', 'maturity')`.
+One missing field gives the same message as before.
+
 ### Valuations: `price_instrument` is the one pricing verb
 
 A typed instrument is priced by `price_instrument`, which already took a typed

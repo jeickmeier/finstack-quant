@@ -506,6 +506,21 @@ test('CdsOption is a typed class matching the Python wrapper', () => {
   );
 });
 
+test('a builder names every missing required field', () => {
+  const { InterestRateSwap } = valuations.instruments;
+  assert.throws(
+    () =>
+      InterestRateSwap.builder()
+        .notional(new core.Money(1_000_000, new core.Currency('USD')))
+        .build(),
+    (error) =>
+      error.kind === 'validation' &&
+      error.message.endsWith(
+        "InterestRateSwapBuilder: missing required field 'id' (also missing: 'side', 'fixed_leg', 'float_leg')"
+      )
+  );
+});
+
 test('VaR inventory applies the whole-input byte limit', () => {
   assert.throws(
     () =>
