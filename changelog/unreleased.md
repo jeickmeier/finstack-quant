@@ -24,9 +24,9 @@ removed. Results are unchanged. Old → new:
 
 WASM keeps the typed `price`: `priceInstrument` takes JSON only, so `price` is
 the handle form of that call and avoids serializing and re-parsing the
-instrument. A metric the selected model does not return is now a missing key
-on the result (`KeyError` from `result[id]` in Python, `undefined` in
-JavaScript) rather than the `metric ... was not returned` validation error.
+instrument. The removed methods also carried the error
+`metric ... was not returned`. Pricing already rejects a requested metric the
+instrument cannot produce, so no request on these classes reached it.
 
 ### DCF: dated receipts and terminal horizon
 
