@@ -138,29 +138,16 @@ print(settle)            # 2025-01-06
 Pricing an instrument against a market context:
 
 ```python
-import datetime
-
-from finstack_quant.core.currency import Currency
-from finstack_quant.core.dates import StubKind
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
 from finstack_quant.core.money import Money
-from finstack_quant.core.types import Rate
 from finstack_quant.valuations.instruments import Bond, price_instrument
 
-as_of = datetime.date(2024, 1, 1)
-bond = Bond.fixed(
-    "B",
-    Money(1000.0, Currency("USD")),
-    Rate(0.05),
-    as_of,
-    datetime.date(2026, 1, 1),
-    StubKind.NONE,
-    "USD-OIS",
-)
+as_of = "2024-01-01"
+bond = Bond.fixed("B", Money(1000, "USD"), 0.05, as_of, "2026-01-01", "none", "USD-OIS")
 market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04, "act_365f"))
 
 result = price_instrument(bond, market, as_of, metrics=["dv01"])
-print(result.instrument_id, round(result.price, 2), result.currency)  # B 1017.07 USD
+print(result.instrument_id, round(result.price, 2), result.currency)  # B 1018.05 USD
 frame = result.to_pandas()
 ```
 
