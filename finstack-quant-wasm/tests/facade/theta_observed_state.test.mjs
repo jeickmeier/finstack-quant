@@ -25,6 +25,9 @@ const AS_OF = '2026-04-30';
 const ROLLED = '2026-05-01';
 const MARKET = JSON.stringify(golden.market.data);
 
+/** Theta of a typed option as of `AS_OF`, read off its `price` result. */
+const thetaOf = (option, market) => option.price(market, AS_OF, null, ['theta']).measures.theta;
+
 /** Copy of an instrument envelope with extra spec fields. */
 function withSpec(envelope, fields) {
   const copy = structuredClone(envelope);
@@ -60,9 +63,9 @@ function touchEnvelope(fields = {}) {
   };
 }
 
-test('FxBarrierOption.theta rolls the barrier state with spot held fixed', () => {
+test('FxBarrierOption theta rolls the barrier state with spot held fixed', () => {
   const option = valuations.instruments.FxBarrierOption.fromJson(JSON.stringify(golden.instrument));
-  const theta = option.theta(MARKET, AS_OF);
+  const theta = thetaOf(option, MARKET);
   assert.ok(Number.isFinite(theta));
   assert.ok(theta < 0, `a long up-and-out call far from its barrier decays, got ${theta}`);
 
@@ -70,7 +73,7 @@ test('FxBarrierOption.theta rolls the barrier state with spot held fixed', () =>
   const observed = valuations.instruments.FxBarrierOption.fromJson(
     withSpec(golden.instrument, { observed_barrier_breached: false })
   );
-  assert.equal(theta, observed.theta(MARKET, AS_OF));
+  assert.equal(theta, thetaOf(observed, MARKET));
   assert.equal(
     theta,
     valuations.instruments.priceInstrument(JSON.stringify(golden.instrument), MARKET, AS_OF, null, [
@@ -81,14 +84,14 @@ test('FxBarrierOption.theta rolls the barrier state with spot held fixed', () =>
   assert.throws(() => option.price(MARKET, ROLLED), /observed_barrier_breached/);
 });
 
-test('FxTouchOption.theta rolls the touch state with spot held fixed', () => {
+test('FxTouchOption theta rolls the touch state with spot held fixed', () => {
   const option = valuations.instruments.FxTouchOption.fromJson(JSON.stringify(touchEnvelope()));
-  const theta = option.theta(MARKET, AS_OF);
+  const theta = thetaOf(option, MARKET);
   assert.ok(Number.isFinite(theta));
   const observed = valuations.instruments.FxTouchOption.fromJson(
     JSON.stringify(touchEnvelope({ observed_barrier_breached: false }))
   );
-  assert.equal(theta, observed.theta(MARKET, AS_OF));
+  assert.equal(theta, thetaOf(observed, MARKET));
   assert.throws(() => option.price(MARKET, ROLLED), /observed_barrier_breached/);
 });
 
@@ -113,5 +116,5 @@ test('FxBarrierOption.greeks includes theta for an option quoted through fx_spot
   for (const [name, value] of Object.entries(greeks)) {
     assert.ok(Number.isFinite(value), `${name} must be finite`);
   }
-  assert.equal(greeks.theta, option.theta(marketJson, AS_OF));
+  assert.equal(greeks.theta, thetaOf(option, marketJson));
 });

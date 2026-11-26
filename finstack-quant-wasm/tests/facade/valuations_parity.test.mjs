@@ -48,6 +48,10 @@ const CLASSES = {
 const TIGHT = 1e-9;
 const LOOSE = 1e-6;
 
+/** One metric of a typed instrument, read off its `price` result. */
+const metricOf = (instrument, market, asOf, id) =>
+  instrument.price(market, asOf, null, [id]).measures[id];
+
 function close(actual, expected, tol, label) {
   const scale = Math.max(1, Math.abs(expected));
   assert.ok(Math.abs(actual - expected) <= tol * scale, `${label}: ${actual} vs ${expected}`);
@@ -234,7 +238,7 @@ test('interest-rate swap pricing and ValuationResult functions match Python', ()
   const swap = instruments.InterestRateSwap.fromJson(rates.swap);
   const result = swap.price(rates.market, '2024-01-15', null, ['dv01']);
   close(Number(result.value.amount), rates.price, TIGHT, 'price');
-  close(swap.metric(rates.market, '2024-01-15', 'dv01'), rates.dv01, TIGHT, 'dv01');
+  close(metricOf(swap, rates.market, '2024-01-15', 'dv01'), rates.dv01, TIGHT, 'dv01');
   const canonical = rates.result_json;
   close(valuations.valuationResultGetMetric(canonical, 'dv01'), rates.get_metric, TIGHT, 'metric');
   assert.equal(valuations.valuationResultGetMetric(canonical, 'not_a_metric'), undefined);
@@ -325,11 +329,11 @@ test('credit instruments match Python', () => {
   // Without the credit index data both loss metrics are lookup misses, as in Python.
   const example = instruments.CdsTranche.example();
   assert.throws(
-    () => example.metric(golden.equity.market, '2024-06-20', 'expected_loss'),
+    () => metricOf(example, golden.equity.market, '2024-06-20', 'expected_loss'),
     (e) => e.kind === 'not_found'
   );
   assert.throws(
-    () => example.metric(golden.equity.market, '2024-06-20', 'jump_to_default'),
+    () => metricOf(example, golden.equity.market, '2024-06-20', 'jump_to_default'),
     (e) => e.kind === 'not_found'
   );
 });
@@ -340,7 +344,7 @@ test('equity option and convertible analytics match Python', () => {
   const price = Number(option.price(equity.market, '2024-01-15').value.amount);
   close(price, equity.price, TIGHT, 'price');
   same(plain(option.greeks(equity.market, '2024-01-15')), equity.greeks, 'greeks', LOOSE);
-  close(option.metric(equity.market, '2024-01-15', 'delta'), equity.delta, LOOSE, 'delta');
+  close(metricOf(option, equity.market, '2024-01-15', 'delta'), equity.delta, LOOSE, 'delta');
   close(
     option.impliedVol(equity.market, '2024-01-15', equity.price),
     equity.implied_vol,
@@ -453,7 +457,7 @@ test('structured-credit deal analytics match Python', () => {
 
   const result = deal.price(sc.market, sc.as_of, null, ['wal']);
   close(Number(result.value.amount), sc.price, LOOSE, 'price');
-  close(deal.metric(sc.market, sc.as_of, 'wal'), sc.wal, LOOSE, 'wal');
+  close(metricOf(deal, sc.market, sc.as_of, 'wal'), sc.wal, LOOSE, 'wal');
   assert.equal(deal.effectiveLossAllocation, sc.effective.loss_allocation);
   assert.equal(deal.effectiveLossRecognition, sc.effective.loss_recognition);
   assert.equal(
@@ -953,7 +957,7 @@ test('g_spread by metric id matches Python and errors with no government curve n
   const metric = (json, id) => {
     const instrument = instruments.Bond.fromJson(json);
     try {
-      return instrument.metric(market, asOf, id);
+      return metricOf(instrument, market, asOf, id);
     } finally {
       instrument.free();
     }
@@ -976,7 +980,7 @@ test('recovery01 and jump_to_default match Python and error off a hazard curve',
     const instrument = instruments[name].fromJson(expected.json);
     try {
       for (const id of ['recovery01', 'jump_to_default']) {
-        close(instrument.metric(market, asOf, id), expected[id], TIGHT, `${name} ${id}`);
+        close(metricOf(instrument, market, asOf, id), expected[id], TIGHT, `${name} ${id}`);
       }
     } finally {
       instrument.free();
@@ -986,7 +990,7 @@ test('recovery01 and jump_to_default match Python and error off a hazard curve',
   try {
     for (const id of ['recovery01', 'jump_to_default']) {
       assert.throws(
-        () => bond.metric(market, asOf, id),
+        () => metricOf(bond, market, asOf, id),
         (e) => e.kind === 'validation' && e.message.includes('requires hazard pricing')
       );
     }

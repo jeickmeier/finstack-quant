@@ -315,7 +315,12 @@ test('FxForward presets and the CIP market forward match Python', () => {
   const { FxForward } = valuations.instruments;
   const forward = FxForward.example();
   close(forward.marketForwardRate(FX_MARKET, '2025-01-15'), 1.109139126165159, 1e-12, 'fwd');
-  close(forward.metric(FX_MARKET, '2025-01-15', 'dv01'), 0.44193883896969055, 1e-9, 'dv01');
+  close(
+    forward.price(FX_MARKET, '2025-01-15', null, ['dv01']).measures.dv01,
+    0.44193883896969055,
+    1e-9,
+    'dv01'
+  );
   const forwardParams = {
     id: 'EURUSD-3M',
     base_currency: 'EUR',
@@ -369,7 +374,12 @@ test('FxOption.european and impliedVol recover the surface vol', () => {
   const price = Number(option.price(FX_MARKET, '2025-01-15').value.amount);
   close(price, 23106.07324729069, 1e-6, 'price');
   close(option.impliedVol(FX_MARKET, '2025-01-15', price), 0.1, 1e-9, 'iv');
-  close(option.metric(FX_MARKET, '2025-01-15', 'delta'), 448773.4593981477, 1e-6, 'delta');
+  close(
+    option.price(FX_MARKET, '2025-01-15', null, ['delta']).measures.delta,
+    448773.4593981477,
+    1e-6,
+    'delta'
+  );
   assert.throws(
     () =>
       FxOption.european({

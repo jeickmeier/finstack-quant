@@ -109,7 +109,7 @@ test('typed FX Greeks use volatility points, basis points, and daily theta', () 
   try {
     const marketJson = JSON.stringify(market());
     for (const [metric, expectedValue] of Object.entries(expected)) {
-      const actual = typed.metric(marketJson, asOf, metric, model);
+      const actual = typed.price(marketJson, asOf, model, [metric]).measures[metric];
       assert.ok(Math.abs(expectedValue) > 1, `${metric} probe must have material exposure`);
       assert.ok(
         Math.abs(actual - expectedValue) < Math.abs(expectedValue) * 1e-5,
@@ -169,7 +169,10 @@ test('typed quanto theta preserves configured period P&L and the capped horizon'
     assert.ok(Math.abs(generic.measures.theta - expected) < Math.abs(expected) * 1e-10);
     const typed = valuations.instruments.QuantoOption.fromJson(JSON.stringify(configured));
     try {
-      assert.equal(typed.theta(JSON.stringify(quantoMarket(asOf)), asOf), generic.measures.theta);
+      assert.equal(
+        typed.price(JSON.stringify(quantoMarket(asOf)), asOf, null, ['theta']).measures.theta,
+        generic.measures.theta
+      );
       assert.equal(
         typed.greeks(JSON.stringify(quantoMarket(asOf)), asOf).theta,
         generic.measures.theta
