@@ -184,8 +184,13 @@ Independent oracle values and their sealed accuracy bounds are separate from
 target-specific implementation bit pins. Derived error-bound calculations admit
 at most eight ULPs of arithmetic noise; pricing checks always use the sealed
 bounds. The implementation pins reflect compensated cumulative-hazard evaluation,
-verified against the unchanged independent raw-cap, Student-t conditional-cap,
-loss, writedown, PV and correlation-delta bounds.
+the normalized binomial PMF recurrence, the checked Student-t quantile with
+compensated rule summation and checked Simpson quadrature, verified against the
+unchanged independent raw-cap, Student-t conditional-cap, loss, writedown, PV and
+correlation-delta bounds. They are checked only on the sealed target
+(`aarch64-macos`); other targets skip them and run the independent gates, so a
+change that moves them is caught only by running the slow regression on that
+target.
 
 The [independent oracle generator](../scripts/golden/valuation_tranche_reference.py)
 documents its pinned NumPy/SciPy invocation. It consumes a reviewed Rust

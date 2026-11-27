@@ -32,7 +32,7 @@
   },
   "regression_fixture": {
     "path": "finstack-quant/valuations/credit/tests/fixtures/valuation_b4_tranche_reference.json",
-    "canonical_sha256": "902be200503b66847a36b66fd74f63547afbd8e591ebf9730d0b866beaedac2b",
+    "canonical_sha256": "3dcfe116952cbec06595dc2bab5f7078d288bb076f56f5355b9fe629b271010d",
     "canonical_encoding": "UTF-8 json.dumps(value, sort_keys=True, separators=(',', ':'), allow_nan=False), without a trailing newline",
     "removed_report_fields": [
       "baseline_errors_with_uncertainty",
@@ -45,7 +45,7 @@
       "periods": 504,
       "conditional_nodes": 20958
     },
-    "provenance": "Original independent expected values, uncertainties and tolerances are preserved. Target-specific conditioning hashes and implementation bit pins were refreshed after compensated cumulative-hazard evaluation, with all independent raw-cap, Student-t conditional-cap, loss, writedown, PV and correlation-delta gates passing. The projection removes only the named report fields."
+    "provenance": "Original independent expected values, uncertainties and tolerances are preserved. Target-specific conditioning hashes and implementation bit pins were refreshed after compensated cumulative-hazard evaluation, and again after the normalized binomial PMF recurrence, the checked Student-t quantile and compensated Student-t rule summation (11ed8978f8) and the checked Simpson quadrature (6d39a15acd), each time with all independent raw-cap, Student-t conditional-cap, loss, writedown, PV and correlation-delta gates passing. The projection removes only the named report fields."
   },
   "historical_measurement_limit": "Raw timing archives, historical binaries and command ledgers were not retained. Their stale references are removed from the summary. Reported performance acceptance cannot be independently replayed from this repository; current oracle regressions use checked-in inputs and pins."
 }
