@@ -373,9 +373,9 @@ def compute_horizon_return(
     instrument: Any,
     market: MarketContext | str,
     as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
-    scenario: ScenarioSpec | str,
+    scenario: ScenarioSpec,
     method: str | Mapping[str, Any] | None = None,
-    config: FinstackConfig | str | None = None,
+    config: FinstackConfig | None = None,
     calendar_id: str | None = None,
 ) -> HorizonResult:
     """
@@ -391,8 +391,8 @@ def compute_horizon_return(
         ``MarketContext`` object or JSON string; never mutated.
     as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
         Valuation date (ISO 8601 accepted).
-    scenario : ScenarioSpec | str
-        Typed scenario or JSON-serialized ``ScenarioSpec``.
+    scenario : ScenarioSpec
+        Scenario to apply. Load JSON text with ``ScenarioSpec.from_json``.
     method : str | dict | None, default None
         ``AttributionMethod`` wire value: ``"parallel"``,
         ``"metrics_based"``, ``{"waterfall": [...factors]}`` (for example
@@ -410,7 +410,7 @@ def compute_horizon_return(
         P&L flows to the residual. Other selected metric failures raise
         ``ValueError`` for invalid inputs, ``KeyError`` for missing data, or
         ``RuntimeError`` for computation failures.
-    config : FinstackConfig | str | None, default None
+    config : FinstackConfig | None, default None
         Library configuration threaded into both the scenario engine and the
         attribution pricing; ``None`` uses the default.
     calendar_id : str, optional

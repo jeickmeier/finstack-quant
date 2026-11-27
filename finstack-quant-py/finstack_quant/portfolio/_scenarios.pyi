@@ -104,7 +104,7 @@ class ScenarioAttributionView:
 
 def attribute_scenario_pnl(
     portfolio: Portfolio | str,
-    scenario: ScenarioSpec | str,
+    scenario: ScenarioSpec,
     market: MarketContext | str,
     *,
     method: str | dict[str, object] | None = None,
@@ -565,7 +565,8 @@ class ScenarioRevalueView:
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.portfolio import Portfolio, apply_scenario_and_revalue
     >>> book = Portfolio.builder("empty", "USD", "2025-01-01").build()
-    >>> result = apply_scenario_and_revalue(book, '{"id": "zero", "operations": []}', MarketContext())
+    >>> from finstack_quant.scenarios import ScenarioSpec
+    >>> result = apply_scenario_and_revalue(book, ScenarioSpec("zero", []), MarketContext())
     >>> result.report.operations_applied
     0
     """
@@ -602,7 +603,7 @@ class ScenarioRevalueView:
 
 def apply_scenario_and_revalue(
     portfolio: Portfolio | str,
-    scenario: ScenarioSpec | str,
+    scenario: ScenarioSpec,
     market: MarketContext | str,
     *,
     options: dict[str, object] | str | None = None,
@@ -614,9 +615,9 @@ def apply_scenario_and_revalue(
     ----------
     portfolio : Portfolio or str
         Built portfolio or canonical ``PortfolioSpec`` JSON to revalue.
-    scenario : ScenarioSpec | str
-        Typed :class:`~finstack_quant.scenarios.ScenarioSpec` or its canonical
-        JSON string describing market-data shocks.
+    scenario : ScenarioSpec
+        :class:`~finstack_quant.scenarios.ScenarioSpec` describing market-data
+        shocks. Load JSON text with ``ScenarioSpec.from_json``.
     market : MarketContext or str
         Base market context object or JSON to shock before revaluation.
     options : dict[str, object] | str | None
@@ -644,7 +645,8 @@ def apply_scenario_and_revalue(
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.portfolio import Portfolio, apply_scenario_and_revalue
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> scenario = '{"id":"s","name":"S","operations":[]}'
+    >>> from finstack_quant.scenarios import ScenarioSpec
+    >>> scenario = ScenarioSpec("s", [], name="S")
     >>> result = apply_scenario_and_revalue(Portfolio.from_spec(spec), scenario, MarketContext())
     >>> (result.valuation.total_value, result.report.operations_applied)
     (0.0, 0)
@@ -653,7 +655,7 @@ def apply_scenario_and_revalue(
 
 def scenario_pnl(
     portfolio: Portfolio | str,
-    scenario: ScenarioSpec | str,
+    scenario: ScenarioSpec,
     market: MarketContext | str,
 ) -> ScenarioPnlBatchItem:
     """
@@ -670,10 +672,10 @@ def scenario_pnl(
     portfolio : Portfolio or str
         Built portfolio or canonical ``PortfolioSpec`` JSON valued on both the
         unshocked and shocked legs.
-    scenario : ScenarioSpec | str
-        Typed :class:`~finstack_quant.scenarios.ScenarioSpec` or its canonical
-        JSON string describing the market-data shocks whose profit-and-loss
-        impact is measured.
+    scenario : ScenarioSpec
+        :class:`~finstack_quant.scenarios.ScenarioSpec` describing the
+        market-data shocks whose profit-and-loss impact is measured. Load JSON
+        text with ``ScenarioSpec.from_json``.
     market : MarketContext or str
         Unshocked market context object or JSON used as the base leg and as the
         source the scenario operations are applied to.
@@ -703,7 +705,8 @@ def scenario_pnl(
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.portfolio import Portfolio, scenario_pnl
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> item = scenario_pnl(Portfolio.from_spec(spec), '{"id":"s","name":"S","operations":[]}', MarketContext())
+    >>> from finstack_quant.scenarios import ScenarioSpec
+    >>> item = scenario_pnl(Portfolio.from_spec(spec), ScenarioSpec("s", [], name="S"), MarketContext())
     >>> (item.scenario_id, item.pnl.total, item.pnl.currency, item.pnl.by_position)
     ('s', 0.0, 'USD', {})
     """
@@ -711,7 +714,7 @@ def scenario_pnl(
 
 def scenario_pnl_batch(
     portfolio: Portfolio | str,
-    scenarios: list[ScenarioSpec | str] | str,
+    scenarios: list[ScenarioSpec],
     market: MarketContext | str,
 ) -> list[ScenarioPnlBatchItem]:
     """
@@ -719,7 +722,7 @@ def scenario_pnl_batch(
 
     The Rust portfolio engine values the unshocked portfolio once, applies
     each scenario independently, and returns results in the same order as the
-    input JSON array. It is the batch counterpart to :func:`scenario_pnl`;
+    input list. It is the batch counterpart to :func:`scenario_pnl`;
     use it when more than one scenario is evaluated against one portfolio and
     market snapshot.
 
@@ -728,11 +731,10 @@ def scenario_pnl_batch(
     portfolio : Portfolio or str
         Built portfolio or canonical ``PortfolioSpec`` JSON. The typed form
         avoids rebuilding the portfolio for the batch.
-    scenarios : list[ScenarioSpec | str] | str
-        Ordered scenarios as a sequence of typed ``ScenarioSpec`` objects or
-        canonical JSON strings, or one canonical JSON array string. Order is
-        preserved exactly; an empty batch returns an empty list without
-        valuation.
+    scenarios : list[ScenarioSpec]
+        Ordered ``ScenarioSpec`` objects. Order is preserved exactly; an empty
+        batch returns an empty list without valuation. Load JSON text with
+        ``ScenarioSpec.from_json``.
     market : MarketContext or str
         Unshocked market context or canonical market JSON used for the shared
         base valuation and each scenario application.
@@ -747,9 +749,8 @@ def scenario_pnl_batch(
 
     Raises
     ------
-    ValueError
-        If ``scenarios`` is malformed or cannot deserialize to an ordered
-        array of valid ``ScenarioSpec`` values.
+    TypeError
+        If ``scenarios`` is not a list of ``ScenarioSpec`` objects.
     PortfolioError
         If scenario application, valuation, or base-currency P&L differencing
         fails. The reported error is for the earliest failing input scenario.
@@ -760,7 +761,7 @@ def scenario_pnl_batch(
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.portfolio import Portfolio, scenario_pnl_batch
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> scenario_pnl_batch(Portfolio.from_spec(spec), "[]", MarketContext())
+    >>> scenario_pnl_batch(Portfolio.from_spec(spec), [], MarketContext())
     []
     """
     ...

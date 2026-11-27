@@ -20,6 +20,7 @@ import pytest
 from finstack_quant.scenarios import (
     Compounding,
     CurveKind,
+    HierarchyTarget,
     OperationSpec,
     RateBindingSpec,
     ScenarioSpec,
@@ -45,7 +46,7 @@ def python_args(name: str, args: list[Any]) -> list[Any]:
         if name == "rate_binding":
             return RateBindingSpec.from_json(json.dumps(arg))
         if isinstance(arg, dict) and "path" in arg:
-            return json.dumps(arg)
+            return HierarchyTarget.from_json(json.dumps(arg))
         if isinstance(arg, list) and arg and isinstance(arg[0], list):
             return [tuple(pair) for pair in arg]
         return arg
@@ -121,7 +122,7 @@ def test_horizon_explain_and_factor_contribution_match_the_shared_golden() -> No
         json.dumps(golden["instrument"]),
         json.dumps(golden["market"]),
         golden["as_of"],
-        json.dumps(golden["scenario"]),
+        ScenarioSpec.from_json(json.dumps(golden["scenario"])),
     )
     assert result.explain() == golden["explain"]
     for factor, expected in golden["factor_contribution"].items():

@@ -171,9 +171,9 @@ class TestScenarioInputs:
         item = scenario_pnl(pf, spec, mkt)
         assert item.scenario_id == "s"
         assert item.pnl.total == pytest.approx(0.0)
-        batch = scenario_pnl_batch(pf, [spec, spec.to_json()], mkt)
+        batch = scenario_pnl_batch(pf, [spec, spec], mkt)
         assert [item.scenario_id for item in batch] == ["s", "s"]
-        assert scenario_pnl_batch(pf, "[]", mkt) == []
+        assert scenario_pnl_batch(pf, [], mkt) == []
 
     def test_pv_only_revaluation_uses_options_and_keeps_market_unchanged(self) -> None:
         shock = OperationSpec.curve_parallel_bp(CurveKind.discount(), "USD-OIS", 37.0)

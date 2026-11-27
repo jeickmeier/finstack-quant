@@ -1458,15 +1458,14 @@ class TestPortfolioReleaseControls:
     def test_scenario_pnl_batch_500_deposits(self, benchmark, n_scenarios: int) -> None:
         """Batched scenarios over a typed 500-deposit portfolio."""
         portfolio = Portfolio.from_spec(_BENCH_SPEC_JSON_500)
-        scenarios_json = _build_curve_scenario_jsons(n_scenarios)
-        batch_json = f"[{','.join(scenarios_json)}]"
-        preflight = scenario_pnl_batch(portfolio, batch_json, _BENCH_MARKET)
+        scenarios = [ScenarioSpec.from_json(text) for text in _build_curve_scenario_jsons(n_scenarios)]
+        preflight = scenario_pnl_batch(portfolio, scenarios, _BENCH_MARKET)
         assert len(preflight) == n_scenarios
         for item in preflight:
             _assert_deposit_scenario_pnl(item.pnl, 500)
         result = benchmark.pedantic(
             scenario_pnl_batch,
-            args=(portfolio, batch_json, _BENCH_MARKET),
+            args=(portfolio, scenarios, _BENCH_MARKET),
             rounds=5,
             warmup_rounds=1,
         )
@@ -1482,10 +1481,10 @@ class TestPortfolioReleaseControls:
     def test_scenario_pnl_repeated_500_deposits(self, benchmark, n_scenarios: int) -> None:
         """Repeated single-scenario control for the corresponding batch shape."""
         portfolio = Portfolio.from_spec(_BENCH_SPEC_JSON_500)
-        scenarios_json = _build_curve_scenario_jsons(n_scenarios)
+        scenarios = [ScenarioSpec.from_json(text) for text in _build_curve_scenario_jsons(n_scenarios)]
 
         def _run_repeated():
-            return tuple(scenario_pnl(portfolio, scenario_json, _BENCH_MARKET) for scenario_json in scenarios_json)
+            return tuple(scenario_pnl(portfolio, scenario, _BENCH_MARKET) for scenario in scenarios)
 
         preflight = _run_repeated()
         assert len(preflight) == n_scenarios

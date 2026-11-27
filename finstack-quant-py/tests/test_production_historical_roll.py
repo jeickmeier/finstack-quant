@@ -10,7 +10,7 @@ from finstack_quant.cashflows.fixings import ProjectedFixing, materialize_fixing
 from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
-from finstack_quant.scenarios import apply_scenario
+from finstack_quant.scenarios import ScenarioSpec, apply_scenario
 from finstack_quant.valuations.instruments import Bond
 
 FIXTURES = Path(__file__).resolve().parents[2] / "finstack-quant/valuations/tests/fixtures"
@@ -53,14 +53,14 @@ def test_direct_hazard_shock_and_retired_mode_rejection() -> None:
         "operations": [{"kind": "curve_parallel_bp", "curve_kind": "par_cds", "curve_id": hazard["id"], "bp": 10}],
     }
     with pytest.raises(ValueError, match=r"unknown field.*hazard_bump_mode"):
-        apply_scenario(json.dumps(legacy), json.dumps(fixture["market"]), fixture["as_of"])
+        ScenarioSpec.from_json(json.dumps(legacy))
 
     par_cds = {
         "id": "par-cds",
         "operations": [{"kind": "curve_parallel_bp", "curve_kind": "par_cds", "curve_id": hazard["id"], "bp": 10}],
     }
     with pytest.raises(ValueError, match=r"(?i)calibration|recipe"):
-        apply_scenario(json.dumps(par_cds), json.dumps(fixture["market"]), fixture["as_of"])
+        apply_scenario(ScenarioSpec.from_json(json.dumps(par_cds)), json.dumps(fixture["market"]), fixture["as_of"])
 
     with pytest.raises((ValueError, RuntimeError), match=r"(?i)calibration|recipe"):
         price_instrument(
@@ -109,7 +109,13 @@ def test_frn_time_roll_preserves_raw_index_excluding_coupon_spread() -> None:
             {"kind": "time_roll_forward", "period": "4D", "apply_shocks": False, "roll_mode": "calendar_days"}
         ],
     }
-    result = apply_scenario(json.dumps(scenario), json.dumps(market), fixture["as_of"], None, [json.dumps(instrument)])
+    result = apply_scenario(
+        ScenarioSpec.from_json(json.dumps(scenario)),
+        json.dumps(market),
+        fixture["as_of"],
+        None,
+        [json.dumps(instrument)],
+    )
     assert result.report.time_roll["failed_instruments"] == []
     series = next(
         series for series in json.loads(result.market.to_json())["series"] if series["id"] == "FIXING:USD-SOFR-3M"
@@ -117,7 +123,11 @@ def test_frn_time_roll_preserves_raw_index_excluding_coupon_spread() -> None:
     assert series["observations"] == [["2025-01-03", pytest.approx(0.03, abs=1e-12)]]
     scenario["operations"][0]["period"] = "1D"
     repeated = apply_scenario(
-        json.dumps(scenario), result.market, result.report.time_roll["new_date"], None, result.instruments
+        ScenarioSpec.from_json(json.dumps(scenario)),
+        result.market,
+        result.report.time_roll["new_date"],
+        None,
+        result.instruments,
     )
     assert repeated.report.time_roll["failed_instruments"] == []
     assert json.loads(repeated.market.to_json())["series"] == json.loads(result.market.to_json())["series"]

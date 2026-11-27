@@ -654,20 +654,20 @@ class ApplicationResult:
         ...
 
 def apply_scenario(
-    scenario: ScenarioSpec | str,
+    scenario: ScenarioSpec,
     market: MarketContext | str,
     as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
     model: FinancialModelSpec | str | None = None,
     instruments: Sequence[Any] | None = None,
-    config: FinstackConfig | str | None = None,
+    config: FinstackConfig | None = None,
 ) -> ApplicationResult:
     """
     Apply a scenario to copied market data and an optional financial model.
 
     Parameters
     ----------
-    scenario : ScenarioSpec | str
-        Typed scenario or JSON-serialized ``ScenarioSpec``.
+    scenario : ScenarioSpec
+        Scenario to apply. Load JSON text with ``ScenarioSpec.from_json``.
     market : MarketContext | str
         ``MarketContext`` object or JSON ``MarketContext`` string. Never
         mutated; the result carries a modified copy.
@@ -681,7 +681,7 @@ def apply_scenario(
         instrument-scoped operations; also used for carry under
         ``time_roll_forward``. Shocked copies are returned as canonical envelope JSON strings in
         ``ApplicationResult.instruments``.
-    config : FinstackConfig | str | None, default None
+    config : FinstackConfig | None, default None
         Library configuration (rounding policy stamped into ``report.meta``);
         ``None`` uses the library default.
 
@@ -700,7 +700,7 @@ def apply_scenario(
     Raises
     ------
     TypeError
-        If scenario is neither a ScenarioSpec nor canonical JSON.
+        If ``scenario`` is not a ``ScenarioSpec``.
     ValueError
         If an input fails to parse or validate, or the scenario contains
         instrument-scoped operations and ``instruments`` is ``None`` (the Rust

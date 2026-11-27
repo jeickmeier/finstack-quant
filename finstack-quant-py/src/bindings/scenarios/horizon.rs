@@ -10,7 +10,8 @@ use crate::errors::{core_to_py, display_to_py, scenarios_to_py};
 use pyo3::prelude::*;
 
 use super::engine::PyApplicationReport;
-use super::extract::extract_config;
+use super::spec::PyScenarioSpec;
+use crate::bindings::core::config::PyFinstackConfig;
 
 /// Compute horizon total return under a scenario.
 ///
@@ -28,8 +29,8 @@ use super::extract::extract_config;
 ///     is applied to an internal copy.
 /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
 ///     Valuation date (ISO 8601 accepted, e.g. ``"2025-01-15"``).
-/// scenario : ScenarioSpec | str
-///     Typed scenario or JSON-serialized ``ScenarioSpec``.
+/// scenario : ScenarioSpec
+///     Scenario to apply. Load JSON text with ``ScenarioSpec.from_json``.
 /// method : str | dict | None, default None
 ///     ``AttributionMethod`` wire value: ``"parallel"``, ``"metrics_based"``,
 ///     ``{"waterfall": [...factors]}`` (for example
@@ -47,7 +48,7 @@ use super::extract::extract_config;
 ///     P&L flows to the residual. Other selected metric failures raise
 ///     ``ValueError`` for invalid inputs, ``KeyError`` for missing data, or
 ///     ``RuntimeError`` for computation failures.
-/// config : FinstackConfig | str | None, default None
+/// config : FinstackConfig | None, default None
 ///     Library configuration (rounding, tolerances, bump sizes) threaded
 ///     into both the scenario engine and the attribution pricing.
 /// calendar_id : str | None, default None
@@ -87,9 +88,9 @@ pub(crate) fn compute_horizon_return<'py>(
     instrument: &Bound<'py, PyAny>,
     market: &Bound<'py, PyAny>,
     as_of: &Bound<'py, PyAny>,
-    scenario: &Bound<'py, PyAny>,
+    scenario: PyRef<'py, PyScenarioSpec>,
     method: Option<&Bound<'py, PyAny>>,
-    config: Option<&Bound<'py, PyAny>>,
+    config: Option<PyRef<'py, PyFinstackConfig>>,
     calendar_id: Option<&str>,
 ) -> PyResult<PyHorizonResult> {
     let py = instrument.py();
@@ -104,7 +105,7 @@ pub(crate) fn compute_horizon_return<'py>(
     // Owned copy so the compute can run without the GIL.
     let market_ctx = extract_market(py, market)?;
     let date = crate::bindings::date_utils::py_to_date(as_of)?;
-    let scenario = crate::bindings::extract::extract_scenario_spec(py, scenario)?;
+    let scenario = scenario.inner.clone();
     let attribution_method: finstack_quant_attribution::AttributionMethod = method
         .map(|method| -> PyResult<_> {
             let json = crate::bindings::module_utils::py_to_json_string(py, method, "method")?;
@@ -113,7 +114,9 @@ pub(crate) fn compute_horizon_return<'py>(
         })
         .transpose()?
         .unwrap_or_default();
-    let finstack_config = extract_config(config)?;
+    let finstack_config = config
+        .map(|config| config.inner.clone())
+        .unwrap_or_default();
 
     // Run analysis with the GIL released: horizon attribution revalues the
     // instrument multiple times (potentially rayon-parallel) and can run for

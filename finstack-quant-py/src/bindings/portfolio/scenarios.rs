@@ -3,11 +3,10 @@
 use crate::bindings::core::table::{PyArrowTable, PyLabeledSeries};
 use crate::bindings::extract::extract_market_ref;
 use crate::bindings::extract::extract_portfolio_ref;
-use crate::bindings::extract::extract_scenario_spec;
-use crate::bindings::extract::extract_scenario_specs;
 use crate::bindings::macros::tabular_methods;
 use crate::bindings::portfolio::valuation::PyPortfolioValuation;
 use crate::bindings::scenarios::engine::PyApplicationReport;
+use crate::bindings::scenarios::spec::PyScenarioSpec;
 use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::portfolio_to_py;
 use pyo3::prelude::*;
@@ -50,12 +49,12 @@ impl PyScenarioRevalueView {
 fn apply_scenario_and_revalue(
     py: Python<'_>,
     portfolio: &Bound<'_, PyAny>,
-    scenario: &Bound<'_, PyAny>,
+    scenario: PyRef<'_, PyScenarioSpec>,
     market: &Bound<'_, PyAny>,
     options: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyScenarioRevalueView> {
     let portfolio = extract_portfolio_ref(py, portfolio)?;
-    let scenario = extract_scenario_spec(py, scenario)?;
+    let scenario = scenario.inner.clone();
     let market = extract_market_ref(py, market)?;
     let options = crate::bindings::module_utils::opt_spec_from_py::<
         finstack_quant_portfolio::valuation::PortfolioValuationOptions,
@@ -135,12 +134,12 @@ impl PyScenarioAttributionView {
 fn attribute_scenario_pnl(
     py: Python<'_>,
     portfolio: &Bound<'_, PyAny>,
-    scenario: &Bound<'_, PyAny>,
+    scenario: PyRef<'_, PyScenarioSpec>,
     market: &Bound<'_, PyAny>,
     method: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyScenarioAttributionView> {
     let portfolio = extract_portfolio_ref(py, portfolio)?;
-    let scenario = extract_scenario_spec(py, scenario)?;
+    let scenario = scenario.inner.clone();
     let market = extract_market_ref(py, market)?;
     let method: finstack_quant_attribution::AttributionMethod = method
         .filter(|value| !value.is_none())
@@ -169,9 +168,9 @@ fn attribute_scenario_pnl(
 /// ----------
 /// portfolio : Portfolio | str
 ///     Built portfolio or canonical ``PortfolioSpec`` JSON.
-/// scenario : ScenarioSpec | str
-///     Typed :class:`~finstack_quant.scenarios.ScenarioSpec` or its canonical
-///     JSON string.
+/// scenario : ScenarioSpec
+///     :class:`~finstack_quant.scenarios.ScenarioSpec` to apply. Load JSON text
+///     with ``ScenarioSpec.from_json``.
 /// market : MarketContext | str
 ///     Unshocked base market.
 ///
@@ -187,11 +186,11 @@ fn attribute_scenario_pnl(
 fn scenario_pnl(
     py: Python<'_>,
     portfolio: &Bound<'_, PyAny>,
-    scenario: &Bound<'_, PyAny>,
+    scenario: PyRef<'_, PyScenarioSpec>,
     market: &Bound<'_, PyAny>,
 ) -> PyResult<PyScenarioPnlBatchItem> {
     let portfolio = extract_portfolio_ref(py, portfolio)?;
-    let scenario = extract_scenario_spec(py, scenario)?;
+    let scenario = scenario.inner.clone();
     let market = extract_market_ref(py, market)?;
     let config = finstack_quant_core::config::FinstackConfig::default();
     let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
@@ -216,11 +215,10 @@ fn scenario_pnl(
 ///     A built :class:`Portfolio` or canonical JSON-serialized
 ///     ``PortfolioSpec``. The Rust batch engine values its unstressed base leg
 ///     once for the complete request.
-/// scenarios : list[ScenarioSpec | str] | str
-///     Ordered scenarios: a Python sequence whose items are typed
-///     ``ScenarioSpec`` objects or canonical JSON strings, or one canonical
-///     JSON array string. Output order matches input order. An empty batch
-///     returns ``[]`` without a valuation.
+/// scenarios : list[ScenarioSpec]
+///     Ordered ``ScenarioSpec`` objects. Output order matches input order. An
+///     empty batch returns ``[]`` without a valuation. Load JSON text with
+///     ``ScenarioSpec.from_json``.
 /// market : MarketContext | str
 ///     The unshocked market snapshot, supplied as a typed object or canonical
 ///     JSON string.
@@ -235,8 +233,8 @@ fn scenario_pnl(
 ///
 /// Raises
 /// ------
-/// ValueError
-///     If ``scenarios`` contains JSON that is not a valid ``ScenarioSpec``.
+/// TypeError
+///     If ``scenarios`` is not a list of ``ScenarioSpec`` objects.
 /// PortfolioError
 ///     If scenario application, valuation, or base-currency P&L differencing
 ///     fails. The error identifies the earliest failing input scenario.
@@ -245,11 +243,12 @@ fn scenario_pnl(
 fn scenario_pnl_batch(
     py: Python<'_>,
     portfolio: &Bound<'_, PyAny>,
-    scenarios: &Bound<'_, PyAny>,
+    scenarios: Vec<PyRef<'_, PyScenarioSpec>>,
     market: &Bound<'_, PyAny>,
 ) -> PyResult<Vec<crate::bindings::portfolio::scenarios::PyScenarioPnlBatchItem>> {
     let portfolio = extract_portfolio_ref(py, portfolio)?;
-    let scenarios = extract_scenario_specs(py, scenarios)?;
+    let scenarios: Vec<finstack_quant_scenarios::ScenarioSpec> =
+        scenarios.iter().map(|spec| spec.inner.clone()).collect();
     let market = extract_market_ref(py, market)?;
     let config = finstack_quant_core::config::FinstackConfig::default();
 

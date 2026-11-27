@@ -728,7 +728,7 @@ class OperationSpec:
     def hierarchy_curve_parallel_bp(
         cls,
         curve_kind: CurveKind | str,
-        target: HierarchyTarget | str,
+        target: HierarchyTarget,
         bp: float,
         discount_curve_id: str | None = None,
     ) -> OperationSpec:
@@ -739,9 +739,9 @@ class OperationSpec:
         ----------
         curve_kind : CurveKind | str
             Curve family, typed or as its wire label.
-        target : HierarchyTarget | str
-            Typed target or its JSON string
-            (``{"path": [...], "tag_filter": {...}}``).
+        target : HierarchyTarget
+            Hierarchy subtree to shock. Load JSON text with
+            ``HierarchyTarget.from_json``.
         bp : float
             Additive basis-point shift applied to every node of every curve
             in the targeted subtree.
@@ -768,14 +768,15 @@ class OperationSpec:
         ...
 
     @classmethod
-    def hierarchy_commodity_curve_parallel_pct(cls, target: HierarchyTarget | str, pct: float) -> OperationSpec:
+    def hierarchy_commodity_curve_parallel_pct(cls, target: HierarchyTarget, pct: float) -> OperationSpec:
         """
         Hierarchy-targeted commodity price-curve percent shift.
 
         Parameters
         ----------
-        target : HierarchyTarget | str
-            Typed target or its JSON string.
+        target : HierarchyTarget
+            Hierarchy subtree to shock. Load JSON text with
+            ``HierarchyTarget.from_json``.
         pct : float
             Relative percentage price change for each matched commodity forward curve.
 
@@ -791,21 +792,22 @@ class OperationSpec:
 
         Examples
         --------
-        >>> from finstack_quant.scenarios import OperationSpec
-        >>> OperationSpec.hierarchy_commodity_curve_parallel_pct('{"path":["Equity"]}', 10.0).kind
+        >>> from finstack_quant.scenarios import HierarchyTarget, OperationSpec
+        >>> OperationSpec.hierarchy_commodity_curve_parallel_pct(HierarchyTarget(["Equity"]), 10.0).kind
         'hierarchy_commodity_curve_parallel_pct'
         """
         ...
 
     @classmethod
-    def hierarchy_vol_surface_parallel_pct(cls, target: HierarchyTarget | str, pct: float) -> OperationSpec:
+    def hierarchy_vol_surface_parallel_pct(cls, target: HierarchyTarget, pct: float) -> OperationSpec:
         """
         Hierarchy-targeted vol-surface percent shift.
 
         Parameters
         ----------
-        target : HierarchyTarget | str
-            Typed target or its JSON string.
+        target : HierarchyTarget
+            Hierarchy subtree to shock. Load JSON text with
+            ``HierarchyTarget.from_json``.
         pct : float
             Percent shift applied to matched vol quotes.
 
@@ -821,21 +823,22 @@ class OperationSpec:
 
         Examples
         --------
-        >>> from finstack_quant.scenarios import OperationSpec
-        >>> OperationSpec.hierarchy_vol_surface_parallel_pct('{"path":["Equity"]}', 10.0).kind
+        >>> from finstack_quant.scenarios import HierarchyTarget, OperationSpec
+        >>> OperationSpec.hierarchy_vol_surface_parallel_pct(HierarchyTarget(["Equity"]), 10.0).kind
         'hierarchy_vol_surface_parallel_pct'
         """
         ...
 
     @classmethod
-    def hierarchy_equity_price_pct(cls, target: HierarchyTarget | str, pct: float) -> OperationSpec:
+    def hierarchy_equity_price_pct(cls, target: HierarchyTarget, pct: float) -> OperationSpec:
         """
         Hierarchy-targeted equity price percent shift.
 
         Parameters
         ----------
-        target : HierarchyTarget | str
-            Typed target or its JSON string.
+        target : HierarchyTarget
+            Hierarchy subtree to shock. Load JSON text with
+            ``HierarchyTarget.from_json``.
         pct : float
             Percent shift applied to matched equity prices.
 
@@ -851,21 +854,22 @@ class OperationSpec:
 
         Examples
         --------
-        >>> from finstack_quant.scenarios import OperationSpec
-        >>> OperationSpec.hierarchy_equity_price_pct('{"path":["Equity"]}', -5.0).kind
+        >>> from finstack_quant.scenarios import HierarchyTarget, OperationSpec
+        >>> OperationSpec.hierarchy_equity_price_pct(HierarchyTarget(["Equity"]), -5.0).kind
         'hierarchy_equity_price_pct'
         """
         ...
 
     @classmethod
-    def hierarchy_base_corr_parallel_pts(cls, target: HierarchyTarget | str, points: float) -> OperationSpec:
+    def hierarchy_base_corr_parallel_pts(cls, target: HierarchyTarget, points: float) -> OperationSpec:
         """
         Hierarchy-targeted base-correlation parallel shift.
 
         Parameters
         ----------
-        target : HierarchyTarget | str
-            Typed target or its JSON string.
+        target : HierarchyTarget
+            Hierarchy subtree to shock. Load JSON text with
+            ``HierarchyTarget.from_json``.
         points : float
             Additive decimal correlation shift (``0.02`` = +0.02).
 
@@ -881,8 +885,8 @@ class OperationSpec:
 
         Examples
         --------
-        >>> from finstack_quant.scenarios import OperationSpec
-        >>> OperationSpec.hierarchy_base_corr_parallel_pts('{"path":["Credit"]}', 0.01).kind
+        >>> from finstack_quant.scenarios import HierarchyTarget, OperationSpec
+        >>> OperationSpec.hierarchy_base_corr_parallel_pts(HierarchyTarget(["Credit"]), 0.01).kind
         'hierarchy_base_corr_parallel_pts'
         """
         ...

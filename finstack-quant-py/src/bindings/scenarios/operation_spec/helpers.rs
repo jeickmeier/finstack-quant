@@ -6,7 +6,6 @@
 
 use std::str::FromStr;
 
-use finstack_quant_core::market_data::hierarchy::HierarchyTarget;
 use finstack_quant_core::math::Compounding;
 use finstack_quant_scenarios::{CurveKind, TenorMatchMode, TimeRollMode};
 use finstack_quant_valuations::pricer::InstrumentType;
@@ -16,7 +15,6 @@ use pyo3::types::PyDict;
 
 use crate::bindings::macros::typed_or_label;
 
-use super::hierarchy::PyHierarchyTarget;
 use super::kinds::{PyCompounding, PyCurveKind, PyTenorMatchMode, PyTimeRollMode};
 
 pub(super) fn parse_instrument_type(name: &str) -> PyResult<InstrumentType> {
@@ -82,18 +80,4 @@ pub(super) fn extract_attrs(obj: &Bound<'_, PyAny>) -> PyResult<IndexMap<String,
         map.insert(k, v);
     }
     Ok(map)
-}
-
-/// Accept a `HierarchyTarget` or its JSON string.
-pub(super) fn extract_hierarchy_target(obj: &Bound<'_, PyAny>) -> PyResult<HierarchyTarget> {
-    if let Ok(target) = obj.cast::<PyHierarchyTarget>() {
-        return Ok(target.borrow().inner.clone());
-    }
-    let json: String = obj.extract().map_err(|_| {
-        crate::errors::value_error(format!(
-            "target must be a HierarchyTarget or a JSON string; got {}",
-            obj.get_type()
-        ))
-    })?;
-    HierarchyTarget::from_json(&json).map_err(crate::errors::core_to_py)
 }

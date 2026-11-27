@@ -75,6 +75,7 @@ from finstack_quant.portfolio import (
     scenario_pnl,
     twrr_linked,
 )
+from finstack_quant.scenarios import ScenarioSpec
 from finstack_quant.statements import ModelBuilder
 from finstack_quant.statements_analytics import PeerSet
 
@@ -122,8 +123,7 @@ def test_scenario_pnl_empty_dataframe_has_float64_schema() -> None:
             "positions": [],
         })
     )
-    scenario = json.dumps({"id": "flat", "operations": []})
-    frame = scenario_pnl(empty_book, scenario, MarketContext()).pnl.to_pandas()
+    frame = scenario_pnl(empty_book, ScenarioSpec("flat", []), MarketContext()).pnl.to_pandas()
     assert frame.empty
     assert list(frame.columns) == ["position_id", "pnl"]
     assert str(frame["pnl"].dtype) == "float64"

@@ -13,7 +13,9 @@ use finstack_quant_valuations::instruments::Instrument;
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
 
-use super::extract::{extract_config, extract_instruments};
+use super::extract::extract_instruments;
+use super::spec::PyScenarioSpec;
+use crate::bindings::core::config::PyFinstackConfig;
 
 /// Report describing what a scenario application changed.
 ///
@@ -388,8 +390,8 @@ tabular_methods!(PyApplicationResult);
 ///
 /// Parameters
 /// ----------
-/// scenario : ScenarioSpec | str
-///     Typed scenario or JSON-serialized ``ScenarioSpec``.
+/// scenario : ScenarioSpec
+///     Scenario to apply. Load JSON text with ``ScenarioSpec.from_json``.
 /// market : MarketContext | str
 ///     A ``MarketContext`` object or a JSON string. Never mutated; the result
 ///     carries a modified copy.
@@ -402,7 +404,7 @@ tabular_methods!(PyApplicationResult);
 ///     instrument-envelope JSON strings. Required when the scenario contains
 ///     instrument-scoped operations; also used for carry when the scenario
 ///     contains ``time_roll_forward``. Shocked copies are returned in ``ApplicationResult.instruments``.
-/// config : FinstackConfig | str | None, default None
+/// config : FinstackConfig | None, default None
 ///     Library configuration (rounding policy stamped into ``report.meta``).
 ///     ``None`` uses the library default.
 ///
@@ -414,7 +416,7 @@ tabular_methods!(PyApplicationResult);
 /// Raises
 /// ------
 /// TypeError
-///     If scenario is neither a ScenarioSpec nor canonical JSON.
+///     If ``scenario`` is not a ``ScenarioSpec``.
 /// ValueError
 ///     If any input fails to parse or validate, or the scenario contains
 ///     instrument-scoped operations and ``instruments`` is ``None`` (the Rust
@@ -428,21 +430,23 @@ tabular_methods!(PyApplicationResult);
 #[pyo3(signature = (scenario, market, as_of, model=None, instruments=None, config=None))]
 fn apply_scenario(
     py: Python<'_>,
-    scenario: &Bound<'_, PyAny>,
+    scenario: PyRef<'_, PyScenarioSpec>,
     market: &Bound<'_, PyAny>,
     as_of: &Bound<'_, PyAny>,
     model: Option<&Bound<'_, PyAny>>,
     instruments: Option<Vec<Bound<'_, PyAny>>>,
-    config: Option<&Bound<'_, PyAny>>,
+    config: Option<PyRef<'_, PyFinstackConfig>>,
 ) -> PyResult<PyApplicationResult> {
-    let spec = crate::bindings::extract::extract_scenario_spec(py, scenario)?;
+    let spec = scenario.inner.clone();
     let mut market = extract_market(py, market)?;
     let mut model = model
         .map(|value| extract_model_ref(value).map(|model| model.into_owned()))
         .transpose()?;
     let date = crate::bindings::date_utils::py_to_date(as_of)?;
     let mut instruments = extract_instruments(instruments)?;
-    let config = extract_config(config)?;
+    let config = config
+        .map(|config| config.inner.clone())
+        .unwrap_or_default();
 
     // Release the GIL for scenario application: shifts + re-pricing can run for seconds.
     let report = py.detach(|| {

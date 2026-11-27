@@ -2,6 +2,21 @@
 
 ## Itemized changes
 
+### Python: a string argument is a value, not a JSON document
+
+Python parameters that took a typed object or the same object as JSON text
+take the typed object only. A `str` there now raises
+`TypeError: 'str' object is not an instance of '<Class>'`. JSON text enters
+through a named loader. WASM is unchanged. Results are unchanged. Old → new:
+
+- Scenarios: `apply_scenario(scenario_json, ...)`, `compute_horizon_return(..., scenario_json)` and the portfolio functions `apply_scenario_and_revalue`, `attribute_scenario_pnl` and `scenario_pnl` → pass `ScenarioSpec.from_json(scenario_json)`
+- `scenario_pnl_batch(portfolio, "[...]", market)` or a list holding JSON strings → a list of `ScenarioSpec` objects
+- `config=config_json` on `apply_scenario` and `compute_horizon_return` → `config=FinstackConfig.from_json(config_json)`; a wrong type there is now `TypeError`, not `ValueError`
+- `OperationSpec.hierarchy_*(target_json, ...)` → `HierarchyTarget.from_json(target_json)`
+
+`validate_scenario_spec` still takes JSON text, because it reports on a spec
+that `ScenarioSpec.from_json` would reject.
+
 ### Valuations: a builder names every missing required field
 
 `build()` on an instrument builder reports all unset required fields in one

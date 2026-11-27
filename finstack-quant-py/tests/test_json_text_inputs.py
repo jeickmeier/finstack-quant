@@ -829,12 +829,14 @@ CASES = [
         lambda scenario: apply_scenario(scenario, _market(), AS_OF),
         ScenarioSpec.from_json,
         lambda: _scenario().to_json(),
+        rejects_text=TypeError,
     ),
     Case(
         "hierarchy_target",
         lambda target: OperationSpec.hierarchy_curve_parallel_bp("par_cds", target, 50.0),
         HierarchyTarget.from_json,
         lambda: _hierarchy_target().to_json(),
+        rejects_text=TypeError,
     ),
     Case(
         "structured_credit",
@@ -847,6 +849,7 @@ CASES = [
         lambda config: apply_scenario(_scenario(), _market(), AS_OF, config=config),
         FinstackConfig.from_json,
         lambda: FinstackConfig().with_output_scale("USD", 4).to_json(),
+        rejects_text=TypeError,
     ),
     Case(
         "calibration_envelope_calibrate",

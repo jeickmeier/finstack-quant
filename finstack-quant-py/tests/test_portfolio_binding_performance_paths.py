@@ -116,22 +116,22 @@ def test_value_portfolio_metrics_select_pv_only_or_explicit_risk() -> None:
 def test_scenario_pnl_batch_matches_standalone_and_accepts_json_or_typed_inputs() -> None:
     portfolio = Portfolio.from_spec(_portfolio_json())
     market = _market()
-    scenarios_json = _scenario_batch_json()
-    scenarios = json.loads(scenarios_json)
+    scenarios = [ScenarioSpec.from_json(json.dumps(scenario)) for scenario in json.loads(_scenario_batch_json())]
 
     # Batch items and the standalone results are compared through their
     # canonical JSON.
-    batch = [json.loads(item.to_json()) for item in scenario_pnl_batch(portfolio, scenarios_json, market)]
-    expected = [json.loads(scenario_pnl(portfolio, json.dumps(scenario), market).to_json()) for scenario in scenarios]
+    batch = [json.loads(item.to_json()) for item in scenario_pnl_batch(portfolio, scenarios, market)]
+    expected = [json.loads(scenario_pnl(portfolio, scenario, market).to_json()) for scenario in scenarios]
 
     assert batch == expected
     assert [item["scenario_id"] for item in batch] == ["up_10bp", "down_15bp"]
     # JSON portfolio/market inputs reach the same answer as the typed handles.
-    from_json = scenario_pnl_batch(_portfolio_json(), scenarios_json, market.to_json())
+    from_json = scenario_pnl_batch(_portfolio_json(), scenarios, market.to_json())
     assert [json.loads(item.to_json()) for item in from_json] == batch
-    assert scenario_pnl_batch(portfolio, "[]", market) == []
-    with pytest.raises(ValueError, match="invalid type"):
-        scenario_pnl_batch(portfolio, "{}", market)
+    assert scenario_pnl_batch(portfolio, [], market) == []
+    # Scenarios are a list of `ScenarioSpec`; JSON text is not one.
+    with pytest.raises(TypeError):
+        scenario_pnl_batch(portfolio, _scenario_batch_json(), market)
 
 
 def test_numpy_position_pnls_match_nested_lists() -> None:

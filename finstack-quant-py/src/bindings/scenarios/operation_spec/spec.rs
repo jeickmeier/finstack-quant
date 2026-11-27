@@ -8,9 +8,10 @@ use pyo3::prelude::*;
 use pyo3::types::PyType;
 
 use super::helpers::{
-    extract_attrs, extract_curve_kind, extract_hierarchy_target, extract_tenor_match_mode,
-    extract_time_roll_mode, parse_instrument_types,
+    extract_attrs, extract_curve_kind, extract_tenor_match_mode, extract_time_roll_mode,
+    parse_instrument_types,
 };
+use super::hierarchy::PyHierarchyTarget;
 use super::rate_binding::PyRateBindingSpec;
 use crate::bindings::module_utils::parse_currency;
 
@@ -202,12 +203,12 @@ impl PyOperationSpec {
     #[classmethod]
     fn hierarchy_commodity_curve_parallel_pct(
         _cls: &Bound<'_, PyType>,
-        target: &Bound<'_, PyAny>,
+        target: PyRef<'_, PyHierarchyTarget>,
         pct: f64,
     ) -> PyResult<Self> {
         Ok(Self::from_inner(
             OperationSpec::HierarchyCommodityCurveParallelPct {
-                target: extract_hierarchy_target(target)?,
+                target: target.inner.clone(),
                 pct,
             },
         ))
@@ -397,69 +398,68 @@ impl PyOperationSpec {
 
     /// Hierarchy-targeted parallel rate shift in basis points.
     ///
-    /// ``target`` is a ``HierarchyTarget`` or its JSON string
-    /// (``{"path": [...], "tag_filter": {...}}``).
+    /// ``target`` is a ``HierarchyTarget``.
     #[classmethod]
     #[pyo3(signature = (curve_kind, target, bp, discount_curve_id=None))]
     fn hierarchy_curve_parallel_bp(
         _cls: &Bound<'_, PyType>,
         curve_kind: &Bound<'_, PyAny>,
-        target: &Bound<'_, PyAny>,
+        target: PyRef<'_, PyHierarchyTarget>,
         bp: f64,
         discount_curve_id: Option<String>,
     ) -> PyResult<Self> {
         Ok(Self::from_inner(OperationSpec::HierarchyCurveParallelBp {
             curve_kind: extract_curve_kind(curve_kind)?,
-            target: extract_hierarchy_target(target)?,
+            target: target.inner.clone(),
             bp,
             discount_curve_id: discount_curve_id.map(CurveId::from),
         }))
     }
 
     /// Hierarchy-targeted vol-surface percent shift. ``target`` is a
-    /// ``HierarchyTarget`` or its JSON string.
+    /// ``HierarchyTarget``.
     #[classmethod]
     #[pyo3(signature = (target, pct))]
     fn hierarchy_vol_surface_parallel_pct(
         _cls: &Bound<'_, PyType>,
-        target: &Bound<'_, PyAny>,
+        target: PyRef<'_, PyHierarchyTarget>,
         pct: f64,
     ) -> PyResult<Self> {
         Ok(Self::from_inner(
             OperationSpec::HierarchyVolSurfaceParallelPct {
-                target: extract_hierarchy_target(target)?,
+                target: target.inner.clone(),
                 pct,
             },
         ))
     }
 
     /// Hierarchy-targeted equity price percent shift. ``target`` is a
-    /// ``HierarchyTarget`` or its JSON string.
+    /// ``HierarchyTarget``.
     #[classmethod]
     #[pyo3(signature = (target, pct))]
     fn hierarchy_equity_price_pct(
         _cls: &Bound<'_, PyType>,
-        target: &Bound<'_, PyAny>,
+        target: PyRef<'_, PyHierarchyTarget>,
         pct: f64,
     ) -> PyResult<Self> {
         Ok(Self::from_inner(OperationSpec::HierarchyEquityPricePct {
-            target: extract_hierarchy_target(target)?,
+            target: target.inner.clone(),
             pct,
         }))
     }
 
     /// Hierarchy-targeted base-correlation parallel shift in decimal
-    /// correlation. ``target`` is a ``HierarchyTarget`` or its JSON string.
+    /// correlation. ``target`` is a ``HierarchyTarget``.
     #[classmethod]
     #[pyo3(signature = (target, points))]
     fn hierarchy_base_corr_parallel_pts(
         _cls: &Bound<'_, PyType>,
-        target: &Bound<'_, PyAny>,
+        target: PyRef<'_, PyHierarchyTarget>,
         points: f64,
     ) -> PyResult<Self> {
         Ok(Self::from_inner(
             OperationSpec::HierarchyBaseCorrParallelPts {
-                target: extract_hierarchy_target(target)?,
+                target: target.inner.clone(),
                 points,
             },
         ))

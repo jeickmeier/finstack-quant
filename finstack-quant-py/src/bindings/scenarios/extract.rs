@@ -1,39 +1,14 @@
 //! Input extraction shared by the scenario entry points.
 //!
-//! Every entry point accepts the typed wrapper or its canonical JSON string:
-//! `ScenarioSpec | str`, `FinstackConfig | str | None`, and typed instrument
-//! wrappers or envelope JSON. The Rust scenario engine attaches its own
-//! recalibration provider, so the bindings only thread the configuration.
+//! Instruments arrive as typed instrument wrappers or envelope JSON. The Rust
+//! scenario engine attaches its own recalibration provider, so the bindings
+//! only thread the configuration.
 
-use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_valuations::instruments::Instrument;
 use pyo3::prelude::*;
 
-use crate::bindings::core::config::PyFinstackConfig;
 use crate::bindings::extract::extract_instrument;
-use crate::errors::{core_to_py, value_error};
-
-/// Extract a [`FinstackConfig`] from a `FinstackConfig` object, a JSON string,
-/// or `None` (library default).
-pub(crate) fn extract_config(obj: Option<&Bound<'_, PyAny>>) -> PyResult<FinstackConfig> {
-    let Some(obj) = obj else {
-        return Ok(FinstackConfig::default());
-    };
-    if obj.is_none() {
-        return Ok(FinstackConfig::default());
-    }
-    if let Ok(config) = obj.cast::<PyFinstackConfig>() {
-        return Ok(config.borrow().inner.clone());
-    }
-    let json: String = obj.extract().map_err(|_| {
-        value_error(format!(
-            "config must be a FinstackConfig, a JSON string, or None, got {}",
-            obj.get_type()
-        ))
-    })?;
-    serde_json::from_str(&json)
-        .map_err(|error| value_error(format!("Failed to parse FinstackConfig JSON: {error}")))
-}
+use crate::errors::core_to_py;
 
 /// Extract an optional instrument collection from typed instrument wrappers
 /// or canonical envelope JSON strings.

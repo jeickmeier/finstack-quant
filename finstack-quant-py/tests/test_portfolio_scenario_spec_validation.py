@@ -1,8 +1,9 @@
-"""Portfolio scenario entry points validate the ScenarioSpec in Rust.
+"""Portfolio scenario entry points take a validated ``ScenarioSpec``.
 
-JSON scenarios go through ``ScenarioSpec::from_json`` (serde plus
-``validate``), exactly as the scenarios namespace and the WASM portfolio
-exports do, so an invalid spec is rejected before any revaluation.
+JSON text becomes a scenario through ``ScenarioSpec.from_json`` (serde plus
+``validate``), exactly as in the scenarios namespace, so an invalid spec is
+rejected before it reaches a portfolio entry point. The entry points
+themselves refuse JSON text.
 """
 
 from __future__ import annotations
@@ -13,8 +14,10 @@ import pytest
 
 from finstack_quant import portfolio
 from finstack_quant.core.market_data import MarketContext
+from finstack_quant.scenarios import ScenarioSpec
 
 BLANK_ID = json.dumps({"id": "", "operations": []})
+VALID = json.dumps({"id": "ok", "operations": []})
 
 
 def _portfolio() -> portfolio.Portfolio:
@@ -22,12 +25,23 @@ def _portfolio() -> portfolio.Portfolio:
     return portfolio.Portfolio.from_spec(json.dumps(spec))
 
 
-def test_apply_scenario_and_revalue_rejects_an_invalid_spec() -> None:
+def test_the_loader_rejects_an_invalid_spec() -> None:
     with pytest.raises(ValueError, match="Scenario ID cannot be empty"):
-        portfolio.apply_scenario_and_revalue(_portfolio(), BLANK_ID, MarketContext())
+        ScenarioSpec.from_json(BLANK_ID)
+    with pytest.raises(ValueError, match="Scenario ID cannot be empty"):
+        ScenarioSpec.from_json(json.dumps({"id": " ", "operations": []}))
 
 
-def test_scenario_pnl_batch_validates_every_spec() -> None:
-    specs = json.dumps([{"id": "ok", "operations": []}, {"id": " ", "operations": []}])
-    with pytest.raises(ValueError, match="Scenario ID cannot be empty"):
-        portfolio.scenario_pnl_batch(_portfolio(), specs, MarketContext())
+def test_portfolio_scenario_entry_points_refuse_json_text() -> None:
+    book = _portfolio()
+    with pytest.raises(TypeError, match="ScenarioSpec"):
+        portfolio.apply_scenario_and_revalue(book, VALID, MarketContext())
+    with pytest.raises(TypeError, match="ScenarioSpec"):
+        portfolio.scenario_pnl(book, VALID, MarketContext())
+    with pytest.raises(TypeError, match="ScenarioSpec"):
+        portfolio.scenario_pnl_batch(book, [VALID], MarketContext())
+    with pytest.raises(TypeError):
+        portfolio.scenario_pnl_batch(book, f"[{VALID}]", MarketContext())
+    loaded = ScenarioSpec.from_json(VALID)
+    assert portfolio.apply_scenario_and_revalue(book, loaded, MarketContext()).report.operations_applied == 0
+    assert [item.scenario_id for item in portfolio.scenario_pnl_batch(book, [loaded], MarketContext())] == ["ok"]

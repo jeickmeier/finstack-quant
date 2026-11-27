@@ -41,6 +41,7 @@ from finstack_quant.portfolio import (
     twrr_linked,
     value_portfolio,
 )
+from finstack_quant.scenarios import ScenarioSpec
 
 FIXTURE = Path(__file__).parents[2] / "finstack-quant/portfolio/tests/fixtures/host_parity.json"
 AS_OF_T0 = "2025-01-15"
@@ -244,7 +245,9 @@ def _compute(inputs: dict[str, Any]) -> dict[str, Any]:
         "allocate_weights": json.loads(allocate_weights(allocation).to_json()),
         "scenario_pnl_batch": [
             json.loads(item.to_json())
-            for item in scenario_pnl_batch(portfolio, json.dumps(inputs["scenarios"]), market_t0)
+            for item in scenario_pnl_batch(
+                portfolio, [ScenarioSpec.from_json(json.dumps(spec)) for spec in inputs["scenarios"]], market_t0
+            )
         ],
         "attribute_portfolio_pnl": json.loads(attribution.to_json()),
         "attribution_explain": attribution.explain(),

@@ -86,10 +86,10 @@ def _up_25() -> ScenarioSpec:
 # ---------------------------------------------------------------------------
 
 
-def test_apply_scenario_accepts_spec_or_json_and_date_like_as_of() -> None:
+def test_apply_scenario_accepts_a_loaded_spec_and_date_like_as_of() -> None:
     spec = _up_25()
     typed = apply_scenario(spec, _market(), AS_OF)
-    from_json = apply_scenario(spec.to_json(), _market(), date(2025, 1, 15))
+    from_json = apply_scenario(ScenarioSpec.from_json(spec.to_json()), _market(), date(2025, 1, 15))
     from_datetime = apply_scenario(spec, _market(), datetime(2025, 1, 15, 9, 30))
     from_timestamp = apply_scenario(spec, _market(), pd.Timestamp("2025-01-15"))
 
@@ -101,23 +101,28 @@ def test_apply_scenario_accepts_spec_or_json_and_date_like_as_of() -> None:
     assert typed.market.to_json() == from_json.market.to_json()
 
 
-def test_apply_scenario_accepts_config_object_string_or_none() -> None:
+def test_apply_scenario_accepts_config_object_or_none() -> None:
     spec = _up_25()
     default = apply_scenario(spec, _market(), AS_OF)
     typed = apply_scenario(spec, _market(), AS_OF, config=FinstackConfig())
-    from_json = apply_scenario(spec, _market(), AS_OF, config=FinstackConfig().to_json())
+    from_json = apply_scenario(spec, _market(), AS_OF, config=FinstackConfig.from_json(FinstackConfig().to_json()))
     assert default.report.meta is not None
     assert typed.report.meta == default.report.meta
     assert from_json.report.meta == default.report.meta
-    with pytest.raises(ValueError, match="config"):
+    with pytest.raises(TypeError, match="FinstackConfig"):
         apply_scenario(spec, _market(), AS_OF, config=42)
+    with pytest.raises(TypeError, match="FinstackConfig"):
+        apply_scenario(spec, _market(), AS_OF, config=FinstackConfig().to_json())
 
 
 def test_apply_scenario_rejects_non_spec_scenario_argument() -> None:
     with pytest.raises(TypeError, match="ScenarioSpec"):
         apply_scenario(123, _market(), AS_OF)
+    # JSON text is not a scenario: it goes through the loader, which reports malformed text.
+    with pytest.raises(TypeError, match="ScenarioSpec"):
+        apply_scenario(_up_25().to_json(), _market(), AS_OF)
     with pytest.raises(ValueError, match="Failed to parse ScenarioSpec JSON"):
-        apply_scenario("{not json", _market(), AS_OF)
+        ScenarioSpec.from_json("{not json")
 
 
 # ---------------------------------------------------------------------------
@@ -140,11 +145,8 @@ def test_validation_report_lists_semantic_errors_without_running_market_effects(
     assert "Scenario ID cannot be empty" in report.errors[0]
     assert not report.requires_instruments
     assert not report.mutates_instruments
-    with pytest.raises(ValueError, match=r"Scenario ID cannot be empty") as from_from_json:
+    with pytest.raises(ValueError, match=r"Scenario ID cannot be empty"):
         ScenarioSpec.from_json(bad_json)
-    with pytest.raises(ValueError, match=r"Scenario ID cannot be empty") as from_apply:
-        apply_scenario(bad_json, _market(), AS_OF)
-    assert str(from_from_json.value) == str(from_apply.value)
     with pytest.raises(ValueError, match="Failed to parse"):
         validate_scenario_spec("{")
     assert validate_scenario_spec(ScenarioSpec("base", [])).valid
@@ -172,7 +174,7 @@ def test_instrument_mutating_scenario_without_instruments_raises_value_error() -
         apply_scenario(spec, _market(), AS_OF)
     blank = json.dumps({"id": "", "operations": [json.loads(spec.to_json())["operations"][0]]})
     with pytest.raises(ValueError, match="Scenario ID cannot be empty"):
-        apply_scenario(blank, _market(), AS_OF)
+        ScenarioSpec.from_json(blank)
 
 
 def test_bare_instrument_payloads_use_the_shared_envelope_loader() -> None:
@@ -286,7 +288,9 @@ def test_compute_horizon_return_typed_inputs_and_result_surface() -> None:
         ],
     )
     result = compute_horizon_return(_deposit_json(), _market(), AS_OF, spec)
-    from_json = compute_horizon_return(_deposit_json(), _market(), date(2025, 1, 15), spec.to_json())
+    from_json = compute_horizon_return(
+        _deposit_json(), _market(), date(2025, 1, 15), ScenarioSpec.from_json(spec.to_json())
+    )
     assert isinstance(result, HorizonResult)
     assert result.to_json() == from_json.to_json()
     payload = json.loads(result.to_json())
@@ -424,7 +428,7 @@ def test_compute_horizon_return_config_and_method_handling() -> None:
     default = compute_horizon_return(_deposit_json(), _market(), AS_OF, spec)
     with_config = compute_horizon_return(_deposit_json(), _market(), AS_OF, spec, config=FinstackConfig())
     with_json_config = compute_horizon_return(
-        _deposit_json(), _market(), AS_OF, spec, config=FinstackConfig().to_json()
+        _deposit_json(), _market(), AS_OF, spec, config=FinstackConfig.from_json(FinstackConfig().to_json())
     )
     assert with_config.total_return == pytest.approx(default.total_return)
     assert with_json_config.total_return == pytest.approx(default.total_return)
@@ -556,13 +560,17 @@ def test_hierarchy_target_pyclass_roundtrip() -> None:
     assert HierarchyTarget(target.path, target.tag_filter) == target
     assert HierarchyTarget.from_json(target.to_json()) == target
     typed = OperationSpec.hierarchy_curve_parallel_bp("par_cds", target, 50.0)
-    from_json = OperationSpec.hierarchy_curve_parallel_bp(CurveKind.par_cds(), target.to_json(), 50.0)
+    from_json = OperationSpec.hierarchy_curve_parallel_bp(
+        CurveKind.par_cds(), HierarchyTarget.from_json(target.to_json()), 50.0
+    )
     assert typed == from_json
     assert OperationSpec.hierarchy_equity_price_pct(HierarchyTarget(["Equity"]), -5.0).kind == (
         "hierarchy_equity_price_pct"
     )
     with pytest.raises(ValueError, match="validation failed"):
-        OperationSpec.hierarchy_equity_price_pct("{bad", -5.0)
+        HierarchyTarget.from_json("{bad")
+    with pytest.raises(TypeError, match="HierarchyTarget"):
+        OperationSpec.hierarchy_equity_price_pct(target.to_json(), -5.0)
 
 
 def test_rate_binding_spec_equality_and_validation() -> None:

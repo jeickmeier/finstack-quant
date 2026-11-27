@@ -641,61 +641,6 @@ pub(crate) fn label<T: serde::Serialize>(value: &T) -> PyResult<String> {
     finstack_quant_core::wire::serde_label(value).map_err(crate::errors::core_to_py)
 }
 
-// ScenarioSpec — typed-or-JSON extraction
-
-/// Extract a [`finstack_quant_scenarios::ScenarioSpec`] from a typed
-/// `ScenarioSpec` Python object (fast path, clone) or a canonical
-/// `ScenarioSpec` JSON string (parsed while the GIL is released).
-///
-/// # Errors
-///
-/// Returns `TypeError` when `obj` is neither, and `ValueError` when the
-/// JSON string does not deserialize as a `ScenarioSpec` or fails
-/// `ScenarioSpec::validate` (both through `ScenarioSpec::from_json`).
-pub fn extract_scenario_spec(
-    py: Python<'_>,
-    obj: &Bound<'_, PyAny>,
-) -> PyResult<finstack_quant_scenarios::ScenarioSpec> {
-    if let Ok(spec) = obj.cast::<crate::bindings::scenarios::spec::PyScenarioSpec>() {
-        return Ok(spec.borrow().inner.clone());
-    }
-    let json: String = obj.extract().map_err(|_| {
-        pyo3::exceptions::PyTypeError::new_err(
-            "expected a ScenarioSpec instance or a canonical ScenarioSpec JSON string",
-        )
-    })?;
-    py.detach(move || finstack_quant_scenarios::ScenarioSpec::from_json(&json))
-        .map_err(crate::errors::scenarios_to_py)
-}
-
-/// Extract an ordered batch of scenario specs from either a JSON array string
-/// or a Python sequence whose items are each `ScenarioSpec | str` (see
-/// [`extract_scenario_spec`]).
-///
-/// # Errors
-///
-/// Returns `TypeError` for an item that is neither form and `ValueError` for
-/// malformed JSON or a spec that fails `ScenarioSpec::validate`.
-pub fn extract_scenario_specs(
-    py: Python<'_>,
-    obj: &Bound<'_, PyAny>,
-) -> PyResult<Vec<finstack_quant_scenarios::ScenarioSpec>> {
-    if let Ok(json) = obj.extract::<String>() {
-        let specs: Vec<finstack_quant_scenarios::ScenarioSpec> = py
-            .detach(move || serde_json::from_str(&json))
-            .map_err(to_py)?;
-        for spec in &specs {
-            spec.validate().map_err(crate::errors::scenarios_to_py)?;
-        }
-        return Ok(specs);
-    }
-    let mut specs = Vec::new();
-    for item in obj.try_iter()? {
-        specs.push(extract_scenario_spec(py, &item?)?);
-    }
-    Ok(specs)
-}
-
 // PortfolioCashflows — borrow-preferring access
 
 /// Access to a [`finstack_quant_portfolio::cashflows::PortfolioCashflows`]
