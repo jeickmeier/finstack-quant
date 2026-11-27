@@ -151,6 +151,25 @@ print(result.instrument_id, round(result.price, 2), result.currency)  # B 1018.0
 frame = result.to_pandas()
 ```
 
+## Input forms
+
+A `str` argument is a value: a label (`"USD"`, `"act_365f"`), a date
+(`"2025-01-15"`), a tenor, an id. It is never read as a JSON document. JSON
+text enters through a named loader, and the loaded value is what a function
+takes:
+
+| You hold | Pass |
+|----------|------|
+| JSON text of a class (`MarketContext`, `ScenarioSpec`, `FinancialModelSpec`, a result, …) | `T.from_json(text)` |
+| JSON text of a portfolio spec | `Portfolio.from_spec(text)` |
+| JSON text of an instrument envelope | the typed instrument (`Bond.from_json(text)`) or the envelope `dict` (`json.loads(text)`) |
+| JSON text of a parameter with no typed class (a nested spec on a builder, `price_instrument(extras=)`, …) | `json.loads(text)` |
+
+A string passed where a typed object is expected raises `TypeError`. The
+functions whose subject is the text itself keep it: `from_json`, `from_spec`,
+the `validate_*` and `*_json` functions. `scripts/check_python_input_forms.py`
+and `tests/test_json_text_inputs.py` enforce the rule.
+
 ## Result-return contract
 
 Computation entry points return **typed results**, never JSON strings. The

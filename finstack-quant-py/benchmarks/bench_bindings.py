@@ -1381,12 +1381,13 @@ class TestPortfolioCompoundWorkflow:
     """Deposit-only compound workflows through the Python binding.
 
     These measure the realistic calling pattern (value + metrics + cashflows)
-    with JSON inputs and with the typed :class:`Portfolio` /
-    :class:`MarketContext` fast path.
+    with inputs loaded from JSON on every call (``Portfolio.from_spec``,
+    ``MarketContext.from_json``) and with a prebuilt :class:`Portfolio` /
+    :class:`MarketContext`.
     """
 
     def test_json_path_500_deposits_value_metrics_cashflows(self, benchmark) -> None:
-        """JSON inputs, 500 deposits: every call re-parses + rebuilds."""
+        """Inputs loaded from JSON on every call, 500 deposits: each call parses and rebuilds."""
 
         def _run():
             val = value_portfolio(
@@ -1429,7 +1430,7 @@ class TestPortfolioCompoundWorkflow:
         _assert_deposit_valuation(result, 500)
 
     def test_value_500_deposits_json_inputs(self, benchmark) -> None:
-        """Pure value_portfolio with JSON inputs and typed output, 500 deposits."""
+        """Pure value_portfolio with inputs loaded from JSON on every call, 500 deposits."""
 
         def _run():
             return value_portfolio(

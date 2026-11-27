@@ -487,7 +487,7 @@ rates        = { python = "finstack_quant.models.rates", status = "exists", note
 # is_call` (Rust parameter names == Python kwargs; WASM camelCase). The
 # functions whose Rust signature takes `&OptionMarketParams` (`bs_greeks`, the
 # barrier / Asian / lookback / quanto dispatchers) take its serde form as one
-# `market` argument (OptionMarketParams, dict or JSON in Python, the schema-generated object /
+# `market` argument (OptionMarketParams or dict in Python, the schema-generated object /
 # JSON text in WASM: `spot, strike, rate, dividend_yield, volatility,
 # time_to_expiry, option_type`). The BS COS method uses the same market shape.
 # Variance Gamma and Merton COS use OptionContractParams, with their dynamics
@@ -548,7 +548,7 @@ python_package = "finstack_quant.models.monte_carlo"
 # `finite_diff_delta` / `finite_diff_gamma` bind the Rust
 # `greeks::gbm_european` functions of the same names (the generic kernels are
 # Rust-only `finite_diff_*_from_inputs`). The hosts take the serde form of the
-# Rust `GbmEuropeanFdSpec` as one `spec` argument (dict / JSON text in Python,
+# Rust `GbmEuropeanFdSpec` as one `spec` argument (dict in Python,
 # schema-typed object / JSON text in WASM), and return a typed `Estimate` whose
 # `stderr` is the paired (common-random-number) standard error. The
 # closed-form Black-Scholes reference is `models.bs_price`. Rust-only:
@@ -556,7 +556,7 @@ python_package = "finstack_quant.models.monte_carlo"
 # graph, `PathDependentPricerConfig`
 # / `LsmcConfig` (flattened into constructor kwargs), captured-path datasets,
 # `PathSimulationSpec` / `ProcessSpec` / `SchemeSpec` / `TimeGridSpec` / `FbmSpec` (plain
-# data: `simulate_paths` takes the spec as a dict or JSON text in Python and
+# data: `simulate_paths` takes the spec as a dict in Python and
 # as the schema-typed object in WASM, validated by the Rust deserializer),
 # the registry defaults module, and `monte_carlo::convenience` (the one place
 # that resolves an omitted pricer setting, step count or currency to its
@@ -639,7 +639,7 @@ python_package = "finstack_quant.models.volatility"
 # `check_surface` (on a core `VolSurface`) and `check_surface_grid` return the
 # typed `ArbitrageReport`; the per-check `check_*_grid` functions return serde
 # violation rows. `check_surface` takes the serde shape of the Rust
-# `ArbitrageCheckConfig` (a dict / JSON text in Python, the schema-generated
+# `ArbitrageCheckConfig` (a dict in Python, the schema-generated
 # object / JSON text in WASM; omitted fields take the Rust defaults), so the
 # config has no host class. `convert_atm_volatility`
 # takes the serde form of `VolatilityConvention` (`"normal"`, `"lognormal"`,
@@ -939,7 +939,7 @@ public = [
 # Swaption, CapFloor) carry one getter per public Rust field, the `Instrument`
 # trait surface (`default_model`, `expiry`, `attributes`, `market_dependencies()`)
 # and `to_dict()`. Pricing has one verb, the Rust `pricer::price_instrument`.
-# Python `price_instrument` takes a typed object, an envelope dict or JSON text,
+# Python `price_instrument` takes a typed object or an envelope dict,
 # and no typed Python class has a `price` or `metric` method. WASM
 # `priceInstrument` takes JSON only, so every typed WASM class keeps `price`,
 # the handle form of the same call: pricing a handle through `priceInstrument`
@@ -948,11 +948,11 @@ public = [
 # `model` and `metrics` as Rust `pricer::price_instrument` does, and the rarer
 # inputs as one optional `extras` argument: the serde form of the Rust
 # `pricer::PriceExtras` (`metric_pricing_overrides`, `market_history`,
-# `explain`; a dict / JSON text in Python, the schema-generated object / JSON
+# `explain`; a dict in Python, the schema-generated object / JSON
 # text in WASM, last argument of `priceInstrument`, `priceInstrumentWithMarket`
 # and the typed `price`), so that type has no host class. The instrument
 # convenience constructors take the serde form of their Rust params struct the
-# same way (dict / JSON text in Python, schema-generated object / JSON text in
+# same way (dict in Python, schema-generated object / JSON text in
 # WASM), so these types have no host class either:
 # `InterestRateSwap.from_conventions(params)` binds Rust `ConventionSwapParams`,
 # `Bond.floating(params)` / `Bond.floating_with_convention(params, convention)`
@@ -1430,7 +1430,7 @@ schema = { python = "finstack_quant.attribution.schema", status = "exists", note
 #   - test-only market snapshot support
 #     (MarketSnapshot/MarketRestoreFlags)
 #   - return-contribution value types (spec/position/factor/group structs) —
-#     hosts pass the spec as JSON and read the typed result wrapper
+#     hosts pass the spec in its serde form and read the typed result wrapper
 #   - the long-rows projection (LongDetailRow, pnl_attribution_long_rows and
 #     siblings) — consumed by the Python DataFrame exports; not yet a
 #     standalone host API
@@ -1450,11 +1450,11 @@ public = [
     "validate_return_contribution_json",
 ]
 # Host shape: attribute_pnl(instrument, inputs) / attribute_pnl_many(inputs,
-# instruments) take the AttributionInputs serde form (dict or JSON text; typed
+# instruments) take the AttributionInputs serde form (a dict; typed
 # MarketContext and datetime.date values inside it serialize through the json
 # hook) and keep the instrument positional because typed wrappers serialize to
 # the instrument envelope, not to AttributionSpec's bare InstrumentJson;
-# attribute_return_contribution accepts dict | JSON str | DataFrame (Rust
+# attribute_return_contribution accepts dict | DataFrame (Rust
 # takes the typed spec).
 
 [crates.attribution.module_symbols.schema]

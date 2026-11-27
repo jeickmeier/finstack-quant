@@ -17,6 +17,10 @@ The ``market_datum_*_class_loader`` cases pin a loader that does not apply. A
 datum class ``from_json`` does not read the ``kind``-tagged document that
 ``market_data`` takes, so both routes raise there and ``json.loads`` is the
 loader (ruling E).
+
+The last section probes every builder in the package rather than a chosen
+list: no one-argument builder setter may tell JSON text from text that is not
+JSON.
 """
 
 from __future__ import annotations
@@ -24,7 +28,11 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 import datetime as dt
+import importlib
 import json
+import pkgutil
+import re
+import types
 from typing import Any
 
 import pytest
@@ -749,15 +757,13 @@ class Case:
     ruling: str = ""
 
 
-# The owner's rulings of 2026-11-26 on the differences the sweep found.
+# The owner's rulings of 2026-11-26 that still apply: the three cases that keep
+# their text form, and the datum loader. The other differences the sweep found
+# (C, D, G, I) belonged to text arms that are now removed.
 RULING_A = "A: `net_in_currency_by_date` keeps its text form; a by-date ladder has no loader and no dict form."
-RULING_C = "C: accepted. After `json.loads`, JSON that is not of the expected Python type raises `TypeError`."
-RULING_D = "D: to be fixed. A mapping is iterated as an empty list today; the slice that owns the site rejects it."
 RULING_E = (
     "E: `market_data` takes the `kind`-tagged datum, which the class loader does not read; `json.loads` is its loader."
 )
-RULING_G = "G: accepted. For text that is not JSON, `json.loads` raises `JSONDecodeError` where the text arm raised `PortfolioError`."
-RULING_I = "I: accepted. Text deferred building the portfolio; `Portfolio.from_spec` rejects a spec that does not build at once."
 RULING_J = (
     "J: `validate_scenario_spec` keeps its text form; it reports on a spec that `ScenarioSpec.from_json` rejects."
 )
@@ -963,8 +969,6 @@ CASES = [
         lambda envelope: price_instrument(envelope, _market(), AS_OF, metrics=["dv01", "ytm"]),
         json.loads,
         lambda: _bond().to_json(),
-        differs={"empty-array": ("TypeError", "ValueError"), "number": ("TypeError", "ValueError")},
-        ruling=RULING_C,
         rejects_text=TypeError,
     ),
     Case(
@@ -974,12 +978,6 @@ CASES = [
         lambda: json.dumps([0.01, -0.02, 0.015]),
         # No return periods is a valid input.
         accepted=frozenset({"empty-array"}),
-        differs={
-            "empty-object": ("accepted", "ValueError"),
-            "number": ("TypeError", "ValueError"),
-            "unknown-field": ("TypeError", "ValueError"),
-        },
-        ruling=f"{RULING_D} {RULING_C}",
         rejects_text=TypeError,
     ),
     Case(
@@ -1181,8 +1179,6 @@ CASES = [
         Portfolio.from_spec,
         lambda: _portfolio().to_json(),
         malformed={**MALFORMED, "unknown-entity": _portfolio_text_with_unknown_entity()},
-        differs={"unknown-entity": ("KeyError", "accepted")},
-        ruling=RULING_I,
         rejects_text=TypeError,
     ),
     Case(
@@ -1280,8 +1276,6 @@ CASES = [
         allocate_weights,
         json.loads,
         lambda: json.dumps(WEIGHT_ALLOCATION),
-        differs={"not-json": ("JSONDecodeError", "PortfolioError")},
-        ruling=RULING_G,
         rejects_text=TypeError,
     ),
     Case(
@@ -1296,8 +1290,6 @@ CASES = [
         lambda snapshots: replay_portfolio(_portfolio(), snapshots, {"mode": "pv_and_pnl"}),
         json.loads,
         _snapshots_text,
-        differs={"not-json": ("JSONDecodeError", "PortfolioError"), "number": ("TypeError", "PortfolioError")},
-        ruling=f"{RULING_G} {RULING_C}",
         rejects_text=TypeError,
     ),
     Case(
@@ -1471,3 +1463,120 @@ def test_a_string_is_a_value_not_json_text(instrument: Any, setter: str, text: s
         assert outcome[0] == "accepted"
     else:
         assert outcome[:2] == ("raises", ValueError)
+
+
+# ---------------------------------------------------------------------------
+# Every builder setter
+# ---------------------------------------------------------------------------
+
+# A setter that treats a string as a value cannot tell JSON text from the same
+# text with its last character removed: both are accepted, or both raise the
+# same error. A setter that parses the string answers the two differently.
+_JSON_TEXT = '{"__probe__": 1}'
+_NOT_JSON_TEXT = _JSON_TEXT[:-1]
+
+# The three builders whose constructor takes more than an id.
+_BUILDER_ARGUMENTS: dict[str, tuple[Any, ...]] = {
+    "CsaSpec": ("PROBE", "USD", "USD-OIS"),
+    "Portfolio": ("PROBE", "USD", "2025-01-15"),
+    "Schedule": ("2025-01-15", "2026-01-15"),
+}
+
+
+def _builder_classes() -> dict[str, type]:
+    """Every class in the package that has a ``builder`` constructor, by qualified name."""
+    import finstack_quant
+
+    modules: dict[str, types.ModuleType] = {}
+
+    def walk(module: types.ModuleType) -> None:
+        if module.__name__ in modules:
+            return
+        modules[module.__name__] = module
+        for value in vars(module).values():
+            if isinstance(value, types.ModuleType) and value.__name__.startswith("finstack_quant"):
+                walk(value)
+
+    walk(finstack_quant)
+    for info in pkgutil.walk_packages(finstack_quant.__path__, "finstack_quant."):
+        walk(importlib.import_module(info.name))
+    classes: dict[str, type] = {}
+    for module in modules.values():
+        for value in vars(module).values():
+            if (
+                isinstance(value, type)
+                and value.__module__.startswith("finstack_quant")
+                and callable(getattr(value, "builder", None))
+            ):
+                classes.setdefault(f"{value.__module__}.{value.__qualname__}", value)
+    return classes
+
+
+def _new_builder(cls: type) -> Any:
+    if cls.__name__ in _BUILDER_ARGUMENTS:
+        return cls.builder(*_BUILDER_ARGUMENTS[cls.__name__])
+    try:
+        return cls.builder()
+    except TypeError:
+        return cls.builder("PROBE")
+
+
+def _answer(call: Callable[[str], Any], text: str) -> tuple[str, str]:
+    """The exception type and message of ``call(text)`` with the echoed input removed, or ``("accepted", "")``."""
+    try:
+        call(text)
+    except Exception as error:  # noqa: BLE001 - the error is the result under test
+        message = str(error)
+        for echoed in (text, text.replace('"', '\\"'), repr(text)):
+            message = message.replace(echoed, "<input>")
+        return type(error).__name__, re.sub(r"(line \d+ )?column \d+", "column N", message)
+    return "accepted", ""
+
+
+def _reads_json_text(call: Callable[[str], Any]) -> bool:
+    """Whether ``call`` tells JSON text from text that is not JSON, or looks inside the document."""
+    valid = _answer(call, _JSON_TEXT)
+    return valid != _answer(call, _NOT_JSON_TEXT) or "__probe__" in valid[1]
+
+
+def _one_argument_setters(cls: type) -> list[str]:
+    """Public methods of the class's builder that accept one positional argument."""
+    setters = []
+    for name in sorted(vars(type(_new_builder(cls)))):
+        if name.startswith("_"):
+            continue
+        kind, message = _answer(getattr(_new_builder(cls), name), _JSON_TEXT)
+        if kind == "TypeError" and "positional argument" in message:
+            continue
+        setters.append(name)
+    return setters
+
+
+_BUILDER_CLASSES = _builder_classes()
+
+
+def test_the_probe_tells_a_json_reader_from_a_value() -> None:
+    assert _reads_json_text(ScenarioSpec.from_json)
+    assert _reads_json_text(json.loads)
+    # A label parser, a date parser and an identifier are values.
+    assert not _reads_json_text(lambda text: Money(1.0, text))
+    assert not _reads_json_text(lambda text: DiscountCurve.flat("USD-OIS", text, 0.03, "act_365f"))
+    assert not _reads_json_text(lambda text: Bond.builder().id(text))
+
+
+@pytest.mark.parametrize("name", sorted(_BUILDER_CLASSES), ids=lambda name: name.rsplit(".", 1)[-1])
+def test_no_builder_setter_reads_json_text(name: str) -> None:
+    cls = _BUILDER_CLASSES[name]
+    readers = [
+        setter
+        for setter in _one_argument_setters(cls)
+        if _reads_json_text(lambda text, setter=setter: getattr(_new_builder(cls), setter)(text))
+    ]
+    assert readers == [], f"{cls.__name__} builder setters that parse a string as JSON: {readers}"
+
+
+def test_the_builder_probe_is_not_vacuous() -> None:
+    probed = sum(len(_one_argument_setters(cls)) for cls in _BUILDER_CLASSES.values())
+    # 82 builders and 1,467 one-argument setters when written; a large drop means the probe lost its reach.
+    assert len(_BUILDER_CLASSES) >= 70
+    assert probed >= 1000

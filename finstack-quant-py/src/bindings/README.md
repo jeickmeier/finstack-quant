@@ -41,7 +41,7 @@ for this crate.
 | `schema.rs` | `pub` | The workspace-wide `finstack_quant.schema` namespace: merges all eleven per-domain registries and labels each row with its owning domain |
 | `schema_registry.rs` | `pub(crate)` | `schema_registry_functions!` macro that generates the identical `index` / `get` / `validate` trio for each `finstack_quant.<domain>.schema` |
 | `module_utils.rs` | `pub(crate)` | Submodule registration; also `py_to_json_value`, `py_to_json_string`, `py_to_serde`, `parse_currency`, `parse_date` |
-| `extract.rs` | `pub(crate)` | Polymorphic "typed object **or** canonical JSON string" extraction — the `*Access` enums (`ModelAccess`, `ResultAccess`, `MarketAccess`, `PortfolioAccess`, `ValuationAccess`, `PortfolioResultAccess`) deref to the borrowed Rust type so no clone or re-parse happens on the typed path |
+| `extract.rs` | `pub(crate)` | Shared input extraction: `extract_instrument` (a typed instrument or an envelope `dict`), `envelope_json_text` (the envelope validators, whose subject is the document), `extract_records_json` (list / dict / DataFrame records), `parse_label` and the rate / basis-point coercers. A `str` argument is a value, never JSON text; a class with a typed wrapper is declared as `PyRef<'_, PyX>` and needs no helper |
 | `date_utils.rs` | `pub(crate)` | `py_to_date`, `date_to_py`, `extract_date_iso`, `dates_to_pylist` — accept ISO strings or date-like Python objects and convert Rust dates cleanly |
 | `dataframe_utils.rs` | `pub(crate)` | Polymorphic DataFrame/Series/Arrow PyCapsule extraction (`is_dataframe_like`, `extract_dataframe_panel`, Polars/pandas/Arrow helpers without eager optional imports) |
 | `json_bridge.rs` | `pub(crate)` | GIL-releasing JSON helpers (`deserialize_json`, `serialize_json`) and `serde_to_py` |
@@ -142,9 +142,12 @@ pub struct PyCurrency {
   `TableBuilder` / `serde_rows_to_arrow_table` for every tabular exit. All
   three are already used across a hundred-plus wrappers; a hand-written variant
   is drift.
-- Accept `typed | str` through `extract.rs` where a pipeline function takes a model,
-  market, portfolio, or result. The typed path borrows; the string path deserializes
-  the same serde contract, so both observe identical payloads.
+- Declare a model, market, portfolio, scenario or result parameter as its wrapper
+  (`PyRef<'_, PyX>`). A Python `str` is a value (a label, a code, a date, an id) and
+  is never parsed as a JSON document; JSON text enters through the class's
+  `from_json` (or `Portfolio.from_spec`), and a parameter with no typed class takes
+  its `dict` through `py_to_serde`. `scripts/check_python_input_forms.py` and
+  `tests/test_json_text_inputs.py` enforce this.
 
 ## Errors
 

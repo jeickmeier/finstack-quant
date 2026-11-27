@@ -634,12 +634,13 @@ run = [
 ]
 
 [tasks.python-lint]
-description = "Lint Python (ruff) and the binding docstrings (check-only)"
+description = "Lint Python (ruff), the binding docstrings and the input forms (check-only)"
 run = [
   "uv run --no-sync ruff format . --check",
   "uv run --no-sync ruff check . --no-fix",
   "uv run --no-sync python scripts/check_python_api_input_docs.py",
   "uv run --no-sync python scripts/check_pyo3_doc_placeholders.py",
+  "uv run --no-sync python scripts/check_python_input_forms.py",
 ]
 
 [tasks.python-typecheck]

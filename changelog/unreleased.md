@@ -4,10 +4,16 @@
 
 ### Python: a string argument is a value, not a JSON document
 
-Python parameters that took a typed object or the same object as JSON text
-take the typed object only. A `str` there now raises
-`TypeError: 'str' object is not an instance of '<Class>'`. JSON text enters
-through a named loader. WASM is unchanged. Results are unchanged. Old → new:
+In Python a `str` argument is a value (a label, a code, a date, an id). It is
+no longer read as a JSON document. A parameter that took a typed object or the
+same object as JSON text takes the typed object, and a `str` there raises
+`TypeError: 'str' object is not an instance of '<Class>'`. An instrument
+argument takes the typed instrument or its envelope dict. A parameter with no
+typed class takes its dict. JSON text enters through a named loader:
+`T.from_json(text)`, `Portfolio.from_spec(text)` or `json.loads(text)`.
+`scripts/check_python_input_forms.py` (in `mise run python-lint`) and
+`tests/test_json_text_inputs.py` enforce it. WASM is unchanged. Results are
+unchanged. Old → new:
 
 - Scenarios: `apply_scenario(scenario_json, ...)`, `compute_horizon_return(..., scenario_json)` and the portfolio functions `apply_scenario_and_revalue`, `attribute_scenario_pnl` and `scenario_pnl` → pass `ScenarioSpec.from_json(scenario_json)`
 - `scenario_pnl_batch(portfolio, "[...]", market)` or a list holding JSON strings → a list of `ScenarioSpec` objects
