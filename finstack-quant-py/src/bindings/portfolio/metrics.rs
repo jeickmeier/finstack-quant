@@ -2,9 +2,9 @@
 
 use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::extract::extract_valuation_ref;
 use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::macros::tabular_methods;
+use crate::bindings::portfolio::valuation::PyPortfolioValuation;
 use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::core_to_py;
 use crate::errors::display_to_py;
@@ -278,8 +278,8 @@ tabular_methods!(PyPortfolioMetrics);
 ///
 /// Parameters
 /// ----------
-/// valuation : PortfolioValuation | str
-///     A :class:`PortfolioValuation` object (fast path) or JSON string.
+/// valuation : PortfolioValuation
+///     A :class:`PortfolioValuation`.
 /// market : MarketContext
 ///     A ``MarketContext`` supplying the FX spots used
 ///     to convert out-of-base metrics.
@@ -293,12 +293,12 @@ tabular_methods!(PyPortfolioMetrics);
 #[pyo3(text_signature = "(valuation, market)")]
 pub fn aggregate_metrics(
     py: Python<'_>,
-    valuation: &Bound<'_, PyAny>,
+    valuation: PyRef<'_, PyPortfolioValuation>,
     market: PyRef<'_, PyMarketContext>,
 ) -> PyResult<crate::bindings::portfolio::metrics::PyPortfolioMetrics> {
-    let valuation = extract_valuation_ref(py, valuation)?;
+    let valuation = &valuation.inner;
     let market = &market.inner;
-    let valuation_ref: &finstack_quant_portfolio::valuation::PortfolioValuation = &valuation;
+    let valuation_ref: &finstack_quant_portfolio::valuation::PortfolioValuation = valuation;
     let market_ref: &finstack_quant_core::market_data::context::MarketContext = market;
     let metrics = py
         .detach(|| finstack_quant_portfolio::metrics::aggregate_metrics(valuation_ref, market_ref))

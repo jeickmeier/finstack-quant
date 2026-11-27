@@ -793,12 +793,14 @@ CASES = [
         Portfolio.from_spec,
         lambda: _portfolio().to_json(),
         malformed={**MALFORMED, "unknown-entity": _portfolio_text_with_unknown_entity()},
+        rejects_text=TypeError,
     ),
     Case(
         "portfolio_valuation",
         lambda valuation: aggregate_metrics(valuation, _market()),
         PortfolioValuation.from_json,
         lambda: value_portfolio(_portfolio(), _market()).to_json(),
+        rejects_text=TypeError,
     ),
     # A `str` given to `net_in_currency_by_date` goes to the Rust function
     # `net_in_currency_by_date_json`, which also reads a bare by-date ladder; it
@@ -1143,6 +1145,7 @@ CASES = [
         malformed={**MALFORMED, "unknown-entity": _portfolio_text_with_unknown_entity()},
         differs={"unknown-entity": ("KeyError", "accepted")},
         ruling=RULING_I,
+        rejects_text=TypeError,
     ),
     Case(
         "conversion_spec",

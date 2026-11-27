@@ -114,7 +114,7 @@ def test_attribute_portfolio_pnl_returns_typed_aggregate_money_and_nested_json()
 
 def test_nested_attribution_json_preserves_portfolio_insertion_order() -> None:
     result = attribute_portfolio_pnl(
-        _ordered_two_position_portfolio_json(),
+        Portfolio.from_spec(_ordered_two_position_portfolio_json()),
         _market("USD", AS_OF_T0),
         _market("USD", AS_OF_T1, shift=0.002),
         AS_OF_T0,
@@ -125,12 +125,13 @@ def test_nested_attribution_json_preserves_portfolio_insertion_order() -> None:
     assert list(json.loads(result.by_position_json())) == ["USD-POS-Z", "USD-POS-A"]
 
 
-def test_attribute_portfolio_pnl_accepts_json_extractors_and_tracks_fx_translation() -> None:
+def test_attribute_portfolio_pnl_accepts_loaded_inputs_and_tracks_fx_translation() -> None:
     market_t0 = _market("EUR", AS_OF_T0, fx=1.10)
     market_t1 = _market("EUR", AS_OF_T1, fx=1.12)
+    portfolio = Portfolio.from_spec(_portfolio_json("EUR"))
 
     typed = attribute_portfolio_pnl(
-        Portfolio.from_spec(_portfolio_json("EUR")),
+        portfolio,
         market_t0,
         market_t1,
         AS_OF_T0,
@@ -138,7 +139,7 @@ def test_attribute_portfolio_pnl_accepts_json_extractors_and_tracks_fx_translati
         "parallel",
     )
     from_json = attribute_portfolio_pnl(
-        _portfolio_json("EUR"),
+        Portfolio.from_spec(_portfolio_json("EUR")),
         MarketContext.from_json(market_t0.to_json()),
         MarketContext.from_json(market_t1.to_json()),
         AS_OF_T0,
@@ -149,16 +150,19 @@ def test_attribute_portfolio_pnl_accepts_json_extractors_and_tracks_fx_translati
     assert typed.fx_translation_pnl.currency == Currency("USD")
     assert typed.fx_translation_pnl.amount > 0.0
     assert json.loads(typed.to_json()) == json.loads(from_json.to_json())
+    # Portfolio JSON text is not a portfolio: it goes through `Portfolio.from_spec`.
+    with pytest.raises(TypeError, match="'Portfolio'"):
+        attribute_portfolio_pnl(_portfolio_json("EUR"), market_t0, market_t1, AS_OF_T0, AS_OF_T1, "parallel")
     # Market JSON text is not a market: it goes through the loader.
     with pytest.raises(TypeError, match="MarketContext"):
-        attribute_portfolio_pnl(_portfolio_json("EUR"), market_t0.to_json(), market_t1, AS_OF_T0, AS_OF_T1, "parallel")
+        attribute_portfolio_pnl(portfolio, market_t0.to_json(), market_t1, AS_OF_T0, AS_OF_T1, "parallel")
     with pytest.raises(TypeError, match="MarketContext"):
-        attribute_portfolio_pnl(_portfolio_json("EUR"), market_t0, market_t1.to_json(), AS_OF_T0, AS_OF_T1, "parallel")
+        attribute_portfolio_pnl(portfolio, market_t0, market_t1.to_json(), AS_OF_T0, AS_OF_T1, "parallel")
 
 
 def test_position_dataframe_is_position_id_plus_the_rust_wide_row() -> None:
     result = attribute_portfolio_pnl(
-        _ordered_two_position_portfolio_json(),
+        Portfolio.from_spec(_ordered_two_position_portfolio_json()),
         _market("USD", AS_OF_T0),
         _market("USD", AS_OF_T1, shift=0.002),
         AS_OF_T0,

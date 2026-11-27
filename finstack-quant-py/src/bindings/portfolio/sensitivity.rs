@@ -5,8 +5,9 @@
 
 use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::extract::{extract_portfolio_ref, extract_records_json};
+use crate::bindings::extract::extract_records_json;
 use crate::bindings::macros::tabular_methods;
+use crate::bindings::portfolio::container::PyPortfolio;
 use crate::bindings::table_builders::TableBuilder;
 use crate::errors::{core_to_py, display_to_py, serde_json_to_py};
 use pyo3::exceptions::PyKeyError;
@@ -308,8 +309,8 @@ fn extract_bump_config(
 ///
 /// Parameters
 /// ----------
-/// portfolio : Portfolio | str
-///     Built ``Portfolio`` or ``PortfolioSpec`` JSON.
+/// portfolio : Portfolio
+///     Built ``Portfolio``.
 /// factors : str | list | pandas.DataFrame
 ///     ``FactorDefinition`` array (JSON or records). Every factor must map to
 ///     market data; credit hierarchy factors need ``FactorModel``.
@@ -328,18 +329,18 @@ fn extract_bump_config(
 #[pyo3(signature = (portfolio, factors, market, as_of, bump_config=None))]
 fn compute_factor_sensitivities(
     py: Python<'_>,
-    portfolio: &Bound<'_, PyAny>,
+    portfolio: PyRef<'_, PyPortfolio>,
     factors: &Bound<'_, PyAny>,
     market: PyRef<'_, PyMarketContext>,
     as_of: &Bound<'_, PyAny>,
     bump_config: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PySensitivityMatrix> {
-    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let portfolio = &portfolio.inner;
     let factors = extract_factors(py, factors)?;
     let market = &market.inner;
     let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     let bump_config = extract_bump_config(py, bump_config)?;
-    let (portfolio, market) = (&*portfolio, market);
+    let (portfolio, market) = (portfolio, market);
     let base_currency = portfolio.base_currency;
     py.detach(move || {
         finstack_quant_portfolio::sensitivity::compute_factor_sensitivities(
@@ -358,8 +359,8 @@ fn compute_factor_sensitivities(
 ///
 /// Parameters
 /// ----------
-/// portfolio : Portfolio | str
-///     Built ``Portfolio`` or ``PortfolioSpec`` JSON; its positions are the
+/// portfolio : Portfolio
+///     Built ``Portfolio``; its positions are the
 ///     profile columns and its ``base_currency`` the reporting currency.
 /// factors : str | list | pandas.DataFrame
 ///     ``FactorDefinition`` array (JSON or records).
@@ -381,19 +382,19 @@ fn compute_factor_sensitivities(
 #[pyo3(signature = (portfolio, factors, market, as_of, bump_config=None, n_points=None))]
 fn compute_pnl_profiles(
     py: Python<'_>,
-    portfolio: &Bound<'_, PyAny>,
+    portfolio: PyRef<'_, PyPortfolio>,
     factors: &Bound<'_, PyAny>,
     market: PyRef<'_, PyMarketContext>,
     as_of: &Bound<'_, PyAny>,
     bump_config: Option<&Bound<'_, PyAny>>,
     n_points: Option<usize>,
 ) -> PyResult<Vec<PyFactorPnlProfile>> {
-    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let portfolio = &portfolio.inner;
     let factors = extract_factors(py, factors)?;
     let market = &market.inner;
     let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     let bump_config = extract_bump_config(py, bump_config)?;
-    let (portfolio, market) = (&*portfolio, market);
+    let (portfolio, market) = (portfolio, market);
     py.detach(move || {
         finstack_quant_portfolio::sensitivity::compute_pnl_profiles(
             portfolio,

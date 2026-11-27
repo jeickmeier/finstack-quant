@@ -460,17 +460,23 @@ class PortfolioOptimizationSpec:
 
     Examples
     --------
-    >>> from finstack_quant.portfolio import MetricExpr, Objective, PerPositionMetric, PortfolioOptimizationSpec
+    >>> from finstack_quant.portfolio import (
+    ...     MetricExpr,
+    ...     Objective,
+    ...     PerPositionMetric,
+    ...     Portfolio,
+    ...     PortfolioOptimizationSpec,
+    ... )
     >>> objective = Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.pv_base()))
     >>> spec_json = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> PortfolioOptimizationSpec.new(spec_json, objective).objective.direction
+    >>> PortfolioOptimizationSpec.new(Portfolio.from_spec(spec_json), objective).objective.direction
     'maximize'
     """
 
     @classmethod
     def new(
         cls,
-        portfolio: Portfolio | str,
+        portfolio: Portfolio,
         objective: Objective,
     ) -> PortfolioOptimizationSpec:
         """
@@ -478,10 +484,9 @@ class PortfolioOptimizationSpec:
 
         Parameters
         ----------
-        portfolio : Portfolio | str
-            Built :class:`Portfolio` (its canonical spec is captured) or a
-            ``PortfolioSpec`` JSON string defining positions and starting
-            weights.
+        portfolio : Portfolio
+            Built :class:`Portfolio` defining positions and starting weights; its
+            canonical spec is captured. Load JSON text with ``Portfolio.from_spec``.
         objective : Objective
             Direction and metric expression the optimizer should solve for.
 
@@ -494,17 +499,20 @@ class PortfolioOptimizationSpec:
         Raises
         ------
         TypeError
-            If ``portfolio`` is neither a ``Portfolio`` nor a string.
-        ValueError
-            If the JSON is malformed or does not match the ``PortfolioSpec``
-            schema.
+            If ``portfolio`` is not a ``Portfolio``.
 
         Examples
         --------
-        >>> from finstack_quant.portfolio import MetricExpr, Objective, PerPositionMetric, PortfolioOptimizationSpec
+        >>> from finstack_quant.portfolio import (
+        ...     MetricExpr,
+        ...     Objective,
+        ...     PerPositionMetric,
+        ...     Portfolio,
+        ...     PortfolioOptimizationSpec,
+        ... )
         >>> objective = Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.pv_base()))
         >>> spec_json = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-        >>> PortfolioOptimizationSpec.new(spec_json, objective).weighting.label
+        >>> PortfolioOptimizationSpec.new(Portfolio.from_spec(spec_json), objective).weighting.label
         'value_weight'
         """
         ...
@@ -676,10 +684,16 @@ class PortfolioOptimizationSpec:
 
         Examples
         --------
-        >>> from finstack_quant.portfolio import MetricExpr, Objective, PerPositionMetric, PortfolioOptimizationSpec
+        >>> from finstack_quant.portfolio import (
+        ...     MetricExpr,
+        ...     Objective,
+        ...     PerPositionMetric,
+        ...     Portfolio,
+        ...     PortfolioOptimizationSpec,
+        ... )
         >>> objective = Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.pv_base()))
         >>> spec_json = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-        >>> original = PortfolioOptimizationSpec.new(spec_json, objective)
+        >>> original = PortfolioOptimizationSpec.new(Portfolio.from_spec(spec_json), objective)
         >>> PortfolioOptimizationSpec.from_json(original.to_json()).objective.direction
         'maximize'
         """

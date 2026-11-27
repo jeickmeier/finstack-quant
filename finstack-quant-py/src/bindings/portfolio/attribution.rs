@@ -4,9 +4,9 @@ use crate::bindings::attribution::pnl_attribution::{PyPnlAttribution, WIDE_COLUM
 use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::extract::extract_portfolio_ref;
 use crate::bindings::macros::tabular_methods;
 use crate::bindings::module_utils::py_to_json_string;
+use crate::bindings::portfolio::container::PyPortfolio;
 use crate::bindings::table_builders::{
     serde_object_to_single_row_arrow_table, serde_rows_to_arrow_table,
 };
@@ -387,8 +387,7 @@ tabular_methods!(PyPortfolioAttribution);
 
 /// Attribute portfolio P&L between two market snapshots.
 ///
-/// ``portfolio`` and both markets accept either typed binding objects or their
-/// canonical JSON representations. ``method`` uses the same serde shape as
+/// ``portfolio`` and both markets are typed objects. ``method`` uses the same serde shape as
 /// instrument attribution (for example ``"parallel"`` or
 /// ``{"waterfall": ["carry", "rates_curves"]}``). ``config`` is an optional
 /// canonical ``FinstackConfig`` dictionary or JSON string. ``as_of_t0`` and
@@ -397,7 +396,7 @@ tabular_methods!(PyPortfolioAttribution);
 #[pyfunction]
 #[pyo3(signature = (portfolio, market_t0, market_t1, as_of_t0, as_of_t1, method, config=None))]
 fn attribute_portfolio_pnl(
-    portfolio: &Bound<'_, PyAny>,
+    portfolio: PyRef<'_, PyPortfolio>,
     market_t0: PyRef<'_, PyMarketContext>,
     market_t1: PyRef<'_, PyMarketContext>,
     as_of_t0: &Bound<'_, PyAny>,
@@ -406,7 +405,7 @@ fn attribute_portfolio_pnl(
     config: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyPortfolioAttribution> {
     let py = portfolio.py();
-    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let portfolio = &portfolio.inner;
     let market_t0 = &market_t0.inner;
     let market_t1 = &market_t1.inner;
     let as_of_t0 = crate::bindings::date_utils::py_to_date(as_of_t0)?;
@@ -432,7 +431,7 @@ fn attribute_portfolio_pnl(
         Ok::<_, PyErr>((method, config))
     })?;
 
-    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
+    let portfolio_ref: &finstack_quant_portfolio::Portfolio = portfolio;
     let market_t0_ref: &finstack_quant_core::market_data::context::MarketContext = market_t0;
     let market_t1_ref: &finstack_quant_core::market_data::context::MarketContext = market_t1;
     let result = py

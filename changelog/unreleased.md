@@ -17,9 +17,12 @@ through a named loader. WASM is unchanged. Results are unchanged. Old → new:
 - `replay_portfolio` snapshots given as `(date, market)` pairs take a `MarketContext` in each pair
 - Statements: every `model` argument → a `FinancialModelSpec` (`FinancialModelSpec.from_json(text)`); every statement `results`, `base` and `comparison` argument → a `StatementResult` (`StatementResult.from_json(text)`)
 - `Evaluator.evaluate_monte_carlo(config=)`, `StatementResult.rollup(spec=)`, `run_sensitivity(config=)`, `generate_tornado_entries(result=)`, `run_variance(config=)` and the `scenario_set` argument of the scenario-set functions → the typed `MonteCarloConfig`, `RollupSpec`, `SensitivityConfig`, `SensitivityResult`, `VarianceConfig` and `ScenarioSet`, each with its own `from_json`
+- Portfolios: every `portfolio` argument (`value_portfolio`, `aggregate_full_cashflows`, `attribute_portfolio_pnl`, the scenario P&L functions, `portfolio_margin`, `primitive_exposures`, the sensitivity functions, `replay_portfolio`, the `FactorModel` methods, `PortfolioOptimizationSpec.new`) → a `Portfolio`; for JSON text, `Portfolio.from_spec(spec_json)`. `aggregate_metrics(valuation)` → a `PortfolioValuation` (`PortfolioValuation.from_json(text)`)
 
 `validate_scenario_spec` still takes JSON text, because it reports on a spec
-that `ScenarioSpec.from_json` would reject.
+that `ScenarioSpec.from_json` would reject. `net_in_currency_by_date` still
+takes JSON text, because it also reads a by-date ladder that
+`PortfolioCashflows.from_json` does not.
 
 ### Valuations: a builder names every missing required field
 

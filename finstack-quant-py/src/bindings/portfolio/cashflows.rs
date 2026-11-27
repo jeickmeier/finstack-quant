@@ -5,10 +5,9 @@ use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::py_to_date;
-use crate::bindings::extract::extract_cashflows_ref;
-use crate::bindings::extract::extract_portfolio_ref;
 use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::macros::tabular_methods;
+use crate::bindings::portfolio::container::PyPortfolio;
 use crate::bindings::table_builders::TableBuilder;
 use crate::errors::core_to_py;
 use crate::errors::display_to_py;
@@ -443,9 +442,8 @@ fn extract_discount_curve_map(
 ///
 /// Parameters
 /// ----------
-/// portfolio : Portfolio | str
-///     A :class:`Portfolio` object (fast path, no rebuild) or a
-///     JSON-serialized ``PortfolioSpec`` string.
+/// portfolio : Portfolio
+///     A built :class:`Portfolio`.
 /// market : MarketContext
 ///     A ``MarketContext`` used to build
 ///     instrument schedules.
@@ -473,13 +471,13 @@ fn extract_discount_curve_map(
 #[pyo3(signature = (portfolio, market, allow_partial=None))]
 fn aggregate_full_cashflows(
     py: Python<'_>,
-    portfolio: &Bound<'_, PyAny>,
+    portfolio: PyRef<'_, PyPortfolio>,
     market: PyRef<'_, PyMarketContext>,
     allow_partial: Option<bool>,
 ) -> PyResult<PyPortfolioCashflows> {
-    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let portfolio = &portfolio.inner;
     let market = &market.inner;
-    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
+    let portfolio_ref: &finstack_quant_portfolio::Portfolio = portfolio;
     let market_ref: &finstack_quant_core::market_data::context::MarketContext = market;
     let mut options = finstack_quant_portfolio::cashflows::CashflowAggregationOptions::default();
     if let Some(allow_partial) = allow_partial {
@@ -557,8 +555,15 @@ fn net_in_currency_by_date(
             })
             .map_err(portfolio_to_py);
     }
-    let ladder = extract_cashflows_ref(py, cashflows)?;
+    let ladder = cashflows
+        .extract::<PyRef<'_, PyPortfolioCashflows>>()
+        .map_err(|_| {
+            pyo3::exceptions::PyTypeError::new_err(
+                "expected a PortfolioCashflows instance or a cashflow-ladder JSON string",
+            )
+        })?;
     let rows = ladder
+        .inner
         .net_in_currency_by_date(ccy)
         .map_err(portfolio_to_py)?;
     Ok(rows

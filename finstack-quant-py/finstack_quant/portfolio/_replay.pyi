@@ -601,7 +601,7 @@ class ReplayResult:
         ...
 
 def replay_portfolio(
-    portfolio: Portfolio | str,
+    portfolio: Portfolio,
     snapshots: list[tuple[datetime.date | str, MarketContext]] | list[dict[str, Any]] | str,
     config: ReplayConfig | dict[str, Any] | str,
 ) -> ReplayResult:
@@ -610,8 +610,8 @@ def replay_portfolio(
 
     Parameters
     ----------
-    portfolio : Portfolio or str
-        Typed :class:`Portfolio` or JSON ``PortfolioSpec``.
+    portfolio : Portfolio
+        Built :class:`Portfolio` to replay.
     snapshots : list[tuple[date, MarketContext]] | list[dict] | str
         Dated market snapshots in ascending order: ``(date, market)`` pairs
         (dates as ``datetime.date`` or ISO strings), JSON-shaped
@@ -642,10 +642,10 @@ def replay_portfolio(
 
     Examples
     --------
-    >>> from finstack_quant.portfolio import replay_portfolio
+    >>> from finstack_quant.portfolio import Portfolio, replay_portfolio
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
     >>> try:
-    ...     replay_portfolio(spec, [], {"mode": "pv_only"})
+    ...     replay_portfolio(Portfolio.from_spec(spec), [], {"mode": "pv_only"})
     ... except ValueError as exc:
     ...     print("must be non-empty" in str(exc))
     True

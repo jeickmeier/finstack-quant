@@ -22,9 +22,9 @@ class FactorModel:
     Holds the factor definitions, covariance matrix, dependency matcher and
     sensitivity engine, so repeated assignment, sensitivity, decomposition,
     what-if and stress calls reuse one validated model. Portfolio arguments
-    accept a built :class:`Portfolio` or ``PortfolioSpec`` JSON; market
-    arguments take a ``MarketContext``; ``as_of`` accepts a
-    date-like object or an ISO 8601 string.
+    take a built :class:`Portfolio`; market arguments take a
+    ``MarketContext``; ``as_of`` accepts a date-like object or an ISO 8601
+    string.
 
     Examples
     --------
@@ -145,14 +145,14 @@ class FactorModel:
         """
         ...
 
-    def assign_factors(self, portfolio: Portfolio | str, market: MarketContext) -> FactorAssignmentReport:
+    def assign_factors(self, portfolio: Portfolio, market: MarketContext) -> FactorAssignmentReport:
         """
         Match every position's market dependencies to the configured factors.
 
         Parameters
         ----------
-        portfolio : Portfolio | str
-            Built portfolio or ``PortfolioSpec`` JSON.
+        portfolio : Portfolio
+            Built portfolio.
         market : MarketContext
             Market used to resolve credit-index aggregates into their curve
             dependencies.
@@ -173,7 +173,7 @@ class FactorModel:
 
     def compute_sensitivities(
         self,
-        portfolio: Portfolio | str,
+        portfolio: Portfolio,
         market: MarketContext,
         as_of: datetime.date | str,
     ) -> SensitivityMatrix:
@@ -182,7 +182,7 @@ class FactorModel:
 
         Parameters
         ----------
-        portfolio : Portfolio | str
+        portfolio : Portfolio
             Portfolio whose ``base_currency`` is the reporting currency of
             every sensitivity.
         market : MarketContext
@@ -207,7 +207,7 @@ class FactorModel:
 
     def analyze(
         self,
-        portfolio: Portfolio | str,
+        portfolio: Portfolio,
         market: MarketContext,
         as_of: datetime.date | str,
     ) -> RiskDecomposition:
@@ -216,7 +216,7 @@ class FactorModel:
 
         Parameters
         ----------
-        portfolio : Portfolio | str
+        portfolio : Portfolio
             Portfolio to analyze.
         market : MarketContext
             Market used for sensitivity generation.
@@ -240,7 +240,7 @@ class FactorModel:
 
     def position_what_if(
         self,
-        portfolio: Portfolio | str,
+        portfolio: Portfolio,
         market: MarketContext,
         as_of: datetime.date | str,
         changes: list[dict[str, Any]] | str,
@@ -250,7 +250,7 @@ class FactorModel:
 
         Parameters
         ----------
-        portfolio : Portfolio | str
+        portfolio : Portfolio
             Portfolio the baseline is computed for and the changes apply to.
         market : MarketContext
             Market used to value positions and compute sensitivities.
@@ -277,7 +277,7 @@ class FactorModel:
 
     def factor_stress(
         self,
-        portfolio: Portfolio | str,
+        portfolio: Portfolio,
         market: MarketContext,
         as_of: datetime.date | str,
         stresses: Mapping[str, float] | pd.Series | pd.DataFrame | pl.DataFrame | Sequence[tuple[str, float]] | Any,
@@ -287,7 +287,7 @@ class FactorModel:
 
         Parameters
         ----------
-        portfolio : Portfolio | str
+        portfolio : Portfolio
             Portfolio whose P&L and stressed risk are evaluated.
         market : MarketContext
             Baseline market to shock.
@@ -317,7 +317,7 @@ class FactorModel:
 
     def factor_stress_pnl(
         self,
-        portfolio: Portfolio | str,
+        portfolio: Portfolio,
         market: MarketContext,
         as_of: datetime.date | str,
         stresses: Mapping[str, float] | pd.Series | pd.DataFrame | pl.DataFrame | Sequence[tuple[str, float]] | Any,
@@ -327,7 +327,7 @@ class FactorModel:
 
         Parameters
         ----------
-        portfolio : Portfolio | str
+        portfolio : Portfolio
             Portfolio whose position P&L is evaluated.
         market : MarketContext
             Baseline market to shock.

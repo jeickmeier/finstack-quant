@@ -524,7 +524,7 @@ class PortfolioCashflows:
         ...
 
 def aggregate_full_cashflows(
-    portfolio: Portfolio | str,
+    portfolio: Portfolio,
     market: MarketContext,
     allow_partial: bool | None = None,
 ) -> PortfolioCashflows:
@@ -540,8 +540,8 @@ def aggregate_full_cashflows(
 
     Parameters
     ----------
-    portfolio : Portfolio or str
-        Built portfolio or canonical ``PortfolioSpec`` JSON to expand.
+    portfolio : Portfolio
+        Built portfolio to expand.
     market : MarketContext
         Market context needed for instrument cashflow generation.
     allow_partial : bool or None, default None
@@ -558,14 +558,11 @@ def aggregate_full_cashflows(
     Raises
     ------
     TypeError
-        If ``portfolio`` is neither a ``Portfolio`` nor a JSON string, or
-        ``market`` is not a ``MarketContext``.
+        If ``portfolio`` or ``market`` is not its typed class.
     ValueError
-        If supplied JSON is malformed or cashflow aggregation cannot represent
-        a monetary result.
+        If cashflow aggregation cannot represent a monetary result.
     PortfolioError
-        If a JSON portfolio cannot be constructed from its decoded specification,
-        or if any position fails schedule construction while ``allow_partial``
+        If any position fails schedule construction while ``allow_partial``
         is ``False``.
 
     Examples

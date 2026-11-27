@@ -693,7 +693,7 @@ class PortfolioAttribution:
     def __repr__(self) -> str: ...
 
 def attribute_portfolio_pnl(
-    portfolio: Portfolio | str,
+    portfolio: Portfolio,
     market_t0: MarketContext,
     market_t1: MarketContext,
     as_of_t0: datetime.date | str,
@@ -706,8 +706,8 @@ def attribute_portfolio_pnl(
 
     Parameters
     ----------
-    portfolio : Portfolio or str
-        Built portfolio or canonical ``PortfolioSpec`` JSON being attributed.
+    portfolio : Portfolio
+        Built portfolio being attributed.
     market_t0 : MarketContext
         Opening market context at the start of the P&L interval.
     market_t1 : MarketContext
@@ -734,7 +734,7 @@ def attribute_portfolio_pnl(
         If supplied JSON, either ISO date, or the attribution method or
         configuration is invalid.
     PortfolioError
-        If portfolio construction, valuation, FX conversion, or attribution fails.
+        If valuation, FX conversion, or attribution fails.
 
     Examples
     --------

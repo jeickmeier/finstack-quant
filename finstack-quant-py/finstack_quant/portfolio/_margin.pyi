@@ -743,7 +743,7 @@ class PortfolioMarginResult:
         ...
 
 def portfolio_margin(
-    portfolio: Portfolio | str,
+    portfolio: Portfolio,
     market: MarketContext,
     as_of: datetime.date | str,
     current_im_collateral: dict[str, Money] | None = None,
@@ -759,10 +759,9 @@ def portfolio_margin(
 
     Parameters
     ----------
-    portfolio : Portfolio or str
-        A :class:`Portfolio` object, or a JSON-serialized ``PortfolioSpec``.
-        Its positions that carry margin metadata form the netting sets and its
-        base currency is the reporting currency.
+    portfolio : Portfolio
+        Built :class:`Portfolio`. Its positions that carry margin metadata form
+        the netting sets and its base currency is the reporting currency.
     market : MarketContext
         Market data for VM and SIMM sensitivity extraction,
         including the FX matrix needed to report netting sets in the base
@@ -788,8 +787,7 @@ def portfolio_margin(
     TypeError
         If ``as_of`` is neither a string nor date-like.
     ValueError
-        If ``portfolio`` is a string that is not a valid ``PortfolioSpec``, or
-        ``as_of`` is a string that is not an ISO date.
+        If ``as_of`` is a string that is not an ISO date.
 
     Examples
     --------

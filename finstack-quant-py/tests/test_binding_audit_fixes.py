@@ -135,12 +135,13 @@ def test_value_portfolio_strict_risk_defaults_to_rust_options() -> None:
 def test_replay_portfolio_requires_the_canonical_config() -> None:
     from finstack_quant.portfolio import replay_portfolio
 
+    portfolio = Portfolio.from_spec(_portfolio_json())
     with pytest.raises(TypeError):
-        replay_portfolio(_portfolio_json(), [])  # type: ignore[call-arg]
+        replay_portfolio(portfolio, [])  # type: ignore[call-arg]
     with pytest.raises(TypeError):
-        replay_portfolio(_portfolio_json(), [], mode="pv_only")  # type: ignore[call-arg]
+        replay_portfolio(portfolio, [], mode="pv_only")  # type: ignore[call-arg]
     with pytest.raises(ValueError, match="missing field `mode`"):
-        replay_portfolio(_portfolio_json(), [], {})
+        replay_portfolio(portfolio, [], {})
 
 
 # M4: strict metric parsing in PerPositionMetric.metric

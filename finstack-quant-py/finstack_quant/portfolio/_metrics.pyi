@@ -407,21 +407,20 @@ class PortfolioMetrics:
     def __repr__(self) -> str: ...
 
 def aggregate_metrics(
-    valuation: PortfolioValuation | str,
+    valuation: PortfolioValuation,
     market: MarketContext,
 ) -> PortfolioMetrics:
     """
     Aggregate portfolio metrics from a valuation.
 
-    Accepts a typed :class:`PortfolioValuation` (fast path) or a JSON string.
     Metrics are aggregated in the valuation's base currency, with FX spots
     read at the valuation's ``as_of``.
 
     Parameters
     ----------
-    valuation : PortfolioValuation or str
-        Typed valuation or canonical valuation JSON to aggregate; its base
-        currency and ``as_of`` set the aggregation currency and FX date.
+    valuation : PortfolioValuation
+        Valuation to aggregate; its base currency and ``as_of`` set the
+        aggregation currency and FX date.
     market : MarketContext
         Market context supplying the FX spots that convert
         out-of-base metrics.
@@ -436,10 +435,7 @@ def aggregate_metrics(
     Raises
     ------
     TypeError
-        If ``valuation`` is neither a ``PortfolioValuation`` nor a JSON string,
-        or ``market`` is not a ``MarketContext``.
-    ValueError
-        If supplied JSON is invalid.
+        If ``valuation`` or ``market`` is not its typed class.
     KeyError
         If an FX rate required for base-currency aggregation is unavailable.
 

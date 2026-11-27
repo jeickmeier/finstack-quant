@@ -2,8 +2,8 @@
 
 use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::table::{PyArrowTable, PyLabeledSeries};
-use crate::bindings::extract::extract_portfolio_ref;
 use crate::bindings::macros::tabular_methods;
+use crate::bindings::portfolio::container::PyPortfolio;
 use crate::bindings::portfolio::valuation::PyPortfolioValuation;
 use crate::bindings::scenarios::engine::PyApplicationReport;
 use crate::bindings::scenarios::spec::PyScenarioSpec;
@@ -48,19 +48,19 @@ impl PyScenarioRevalueView {
 #[pyo3(signature = (portfolio, scenario, market, *, options=None))]
 fn apply_scenario_and_revalue(
     py: Python<'_>,
-    portfolio: &Bound<'_, PyAny>,
+    portfolio: PyRef<'_, PyPortfolio>,
     scenario: PyRef<'_, PyScenarioSpec>,
     market: PyRef<'_, PyMarketContext>,
     options: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyScenarioRevalueView> {
-    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let portfolio = &portfolio.inner;
     let scenario = scenario.inner.clone();
     let market = &market.inner;
     let options = crate::bindings::module_utils::opt_spec_from_py::<
         finstack_quant_portfolio::valuation::PortfolioValuationOptions,
     >(py, options, "PortfolioValuationOptions")?;
     let config = finstack_quant_core::config::FinstackConfig::default();
-    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
+    let portfolio_ref: &finstack_quant_portfolio::Portfolio = portfolio;
     let market_ref: &finstack_quant_core::market_data::context::MarketContext = market;
     let inner = py
         .detach(|| {
@@ -133,12 +133,12 @@ impl PyScenarioAttributionView {
 #[pyo3(signature = (portfolio, scenario, market, *, method=None))]
 fn attribute_scenario_pnl(
     py: Python<'_>,
-    portfolio: &Bound<'_, PyAny>,
+    portfolio: PyRef<'_, PyPortfolio>,
     scenario: PyRef<'_, PyScenarioSpec>,
     market: PyRef<'_, PyMarketContext>,
     method: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyScenarioAttributionView> {
-    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let portfolio = &portfolio.inner;
     let scenario = scenario.inner.clone();
     let market = &market.inner;
     let method: finstack_quant_attribution::AttributionMethod = method
@@ -146,7 +146,7 @@ fn attribute_scenario_pnl(
         .map(|value| crate::bindings::module_utils::py_to_serde(py, value, "method"))
         .transpose()?
         .unwrap_or_default();
-    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
+    let portfolio_ref: &finstack_quant_portfolio::Portfolio = portfolio;
     let market_ref: &finstack_quant_core::market_data::context::MarketContext = market;
     let config = finstack_quant_core::config::FinstackConfig::default();
     py.detach(|| {
@@ -166,8 +166,8 @@ fn attribute_scenario_pnl(
 ///
 /// Parameters
 /// ----------
-/// portfolio : Portfolio | str
-///     Built portfolio or canonical ``PortfolioSpec`` JSON.
+/// portfolio : Portfolio
+///     Built portfolio.
 /// scenario : ScenarioSpec
 ///     :class:`~finstack_quant.scenarios.ScenarioSpec` to apply. Load JSON text
 ///     with ``ScenarioSpec.from_json``.
@@ -185,15 +185,15 @@ fn attribute_scenario_pnl(
 #[pyo3(text_signature = "(portfolio, scenario, market)")]
 fn scenario_pnl(
     py: Python<'_>,
-    portfolio: &Bound<'_, PyAny>,
+    portfolio: PyRef<'_, PyPortfolio>,
     scenario: PyRef<'_, PyScenarioSpec>,
     market: PyRef<'_, PyMarketContext>,
 ) -> PyResult<PyScenarioPnlBatchItem> {
-    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let portfolio = &portfolio.inner;
     let scenario = scenario.inner.clone();
     let market = &market.inner;
     let config = finstack_quant_core::config::FinstackConfig::default();
-    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
+    let portfolio_ref: &finstack_quant_portfolio::Portfolio = portfolio;
     let market_ref: &finstack_quant_core::market_data::context::MarketContext = market;
     py.detach(|| {
         finstack_quant_portfolio::scenarios::scenario_pnl(
@@ -211,17 +211,15 @@ fn scenario_pnl(
 ///
 /// Parameters
 /// ----------
-/// portfolio : Portfolio | str
-///     A built :class:`Portfolio` or canonical JSON-serialized
-///     ``PortfolioSpec``. The Rust batch engine values its unstressed base leg
-///     once for the complete request.
+/// portfolio : Portfolio
+///     A built :class:`Portfolio`. The Rust batch engine values its
+///     unstressed base leg once for the complete request.
 /// scenarios : list[ScenarioSpec]
 ///     Ordered ``ScenarioSpec`` objects. Output order matches input order. An
 ///     empty batch returns ``[]`` without a valuation. Load JSON text with
 ///     ``ScenarioSpec.from_json``.
 /// market : MarketContext
-///     The unshocked market snapshot, supplied as a typed object or canonical
-///     JSON string.
+///     The unshocked market snapshot.
 ///
 /// Returns
 /// -------
@@ -242,11 +240,11 @@ fn scenario_pnl(
 #[pyo3(text_signature = "(portfolio, scenarios, market)")]
 fn scenario_pnl_batch(
     py: Python<'_>,
-    portfolio: &Bound<'_, PyAny>,
+    portfolio: PyRef<'_, PyPortfolio>,
     scenarios: Vec<PyRef<'_, PyScenarioSpec>>,
     market: PyRef<'_, PyMarketContext>,
 ) -> PyResult<Vec<crate::bindings::portfolio::scenarios::PyScenarioPnlBatchItem>> {
-    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let portfolio = &portfolio.inner;
     let scenarios: Vec<finstack_quant_scenarios::ScenarioSpec> =
         scenarios.iter().map(|spec| spec.inner.clone()).collect();
     let market = &market.inner;
@@ -256,7 +254,7 @@ fn scenario_pnl_batch(
     // wrappers own PyRefs and are not Ungil, while their Rust inners are
     // Send + Sync. Parsing happens above, so the complete batch evaluation
     // releases the GIL without touching Python state.
-    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
+    let portfolio_ref: &finstack_quant_portfolio::Portfolio = portfolio;
     let market_ref: &finstack_quant_core::market_data::context::MarketContext = market;
     let results = py
         .detach(|| {

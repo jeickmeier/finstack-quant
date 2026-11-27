@@ -95,7 +95,7 @@ def test_portfolio_tearsheet_real_portfolio() -> None:
     from datetime import date
 
     from finstack_quant.core.market_data import DiscountCurve, MarketContext
-    from finstack_quant.portfolio import value_portfolio
+    from finstack_quant.portfolio import Portfolio, value_portfolio
 
     mc = MarketContext()
     mc.insert(
@@ -136,7 +136,7 @@ def test_portfolio_tearsheet_real_portfolio() -> None:
             }
         ],
     }
-    valuation = value_portfolio(json.dumps(spec), mc)
+    valuation = value_portfolio(Portfolio.from_spec(json.dumps(spec)), mc)
     html = portfolio_tearsheet(valuation, generated=dt.date(2026, 6, 23)).to_html()
     assert "Holdings" in html
     assert "POS-1" in html

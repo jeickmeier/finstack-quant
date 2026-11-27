@@ -200,12 +200,16 @@ def test_compatibility_build_spec_path_releases_gil() -> None:
     assert len(json.loads(round_tripped)["positions"]) == 10_000
 
 
-def test_value_portfolio_json_inputs_release_gil_and_preserve_result() -> None:
+def test_value_portfolio_loaded_from_json_releases_gil_and_preserves_result() -> None:
     portfolio_json = _portfolio_spec_json(3_000)
+    portfolio = Portfolio.from_spec(portfolio_json)
     market = _market()
 
-    valuation = _assert_releases_gil(lambda: value_portfolio(portfolio_json, market, metrics=[]))
+    valuation = _assert_releases_gil(lambda: value_portfolio(portfolio, market, metrics=[]))
     result = json.loads(valuation.to_json())
+    # Portfolio JSON text is not a portfolio: it goes through `Portfolio.from_spec`.
+    with pytest.raises(TypeError, match="'Portfolio'"):
+        value_portfolio(portfolio_json, market, metrics=[])
 
     assert len(result["position_values"]) == 3_000
     assert result["as_of"] == AS_OF.isoformat()

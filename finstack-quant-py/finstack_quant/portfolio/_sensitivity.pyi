@@ -548,7 +548,7 @@ class FactorPnlProfile:
         ...
 
 def compute_factor_sensitivities(
-    portfolio: Portfolio | str,
+    portfolio: Portfolio,
     factors: list[FactorDefinition] | str | list[dict[str, Any]] | pd.DataFrame,
     market: MarketContext,
     as_of: datetime.date | str,
@@ -566,9 +566,9 @@ def compute_factor_sensitivities(
 
     Parameters
     ----------
-    portfolio : Portfolio | str
-        Built ``Portfolio`` or ``PortfolioSpec`` JSON. Its positions are the
-        rows and its ``base_currency`` is the reporting currency.
+    portfolio : Portfolio
+        Built ``Portfolio``. Its positions are the rows and its
+        ``base_currency`` is the reporting currency.
     factors : str | list | pandas.DataFrame
         ``FactorDefinition`` array as JSON text, a list of dicts or a records
         ``DataFrame``. Every factor must map to market data; credit hierarchy
@@ -590,10 +590,9 @@ def compute_factor_sensitivities(
     Raises
     ------
     TypeError
-        If ``portfolio`` is neither a handle nor a JSON string, or ``market``
-        is not a ``MarketContext``.
+        If ``portfolio`` or ``market`` is not its typed class.
     ValueError
-        If the portfolio spec, factors, bump configuration or date is malformed,
+        If the factors, bump configuration or date is malformed,
         a factor is a credit hierarchy factor, or a factor cannot be bumped or
         priced.
     KeyError
@@ -611,7 +610,7 @@ def compute_factor_sensitivities(
     ...
 
 def compute_pnl_profiles(
-    portfolio: Portfolio | str,
+    portfolio: Portfolio,
     factors: list[FactorDefinition] | str | list[dict[str, Any]] | pd.DataFrame,
     market: MarketContext,
     as_of: datetime.date | str,
@@ -627,9 +626,9 @@ def compute_pnl_profiles(
 
     Parameters
     ----------
-    portfolio : Portfolio | str
-        Built ``Portfolio`` or ``PortfolioSpec`` JSON. Its positions are the
-        profile columns and its ``base_currency`` is the reporting currency.
+    portfolio : Portfolio
+        Built ``Portfolio``. Its positions are the profile columns and its
+        ``base_currency`` is the reporting currency.
     factors : str | list | pandas.DataFrame
         ``FactorDefinition`` array, in returned profile order (same accepted
         forms and credit-hierarchy restriction as
@@ -652,10 +651,9 @@ def compute_pnl_profiles(
     Raises
     ------
     TypeError
-        If ``portfolio`` is neither a handle nor a JSON string, or ``market``
-        is not a ``MarketContext``.
+        If ``portfolio`` or ``market`` is not its typed class.
     ValueError
-        If the portfolio spec, factors, bump configuration or date is malformed;
+        If the factors, bump configuration or date is malformed;
         a factor is a credit hierarchy factor; ``n_points`` is less than ``3``,
         greater than ``1001`` or even; or a factor cannot be bumped or priced.
     KeyError

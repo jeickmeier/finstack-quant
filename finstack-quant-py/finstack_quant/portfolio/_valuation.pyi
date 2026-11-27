@@ -628,7 +628,7 @@ class PortfolioValuation:
         ...
 
 def value_portfolio(
-    portfolio: Portfolio | str,
+    portfolio: Portfolio,
     market: MarketContext,
     strict_risk: bool | None = None,
     metrics: list[str] | None = None,
@@ -636,13 +636,12 @@ def value_portfolio(
     """
     Value a portfolio and return its typed result.
 
-    Typed ``Portfolio`` and ``MarketContext`` inputs avoid rebuilding runtime
-    state, while the result can be passed directly to :func:`aggregate_metrics`.
+    The result can be passed directly to :func:`aggregate_metrics`.
 
     Parameters
     ----------
-    portfolio : Portfolio or str
-        Built portfolio or canonical ``PortfolioSpec`` JSON to value.
+    portfolio : Portfolio
+        Built portfolio to value.
     market : MarketContext
         Market context supplying curves, quotes, and FX data.
     strict_risk : bool or None, default None
@@ -684,8 +683,8 @@ def value_portfolio(
         If a requested metric name is neither a standard metric identifier
         nor registered in the standard metric registry.
     PortfolioError
-        If portfolio construction, market lookup, FX conversion, pricing, or
-        strict risk evaluation fails.
+        If market lookup, FX conversion, pricing, or strict risk evaluation
+        fails.
 
     Examples
     --------

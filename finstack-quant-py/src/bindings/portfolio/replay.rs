@@ -5,9 +5,9 @@ use super::valuation::PyPortfolioValuation;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::date_to_py;
-use crate::bindings::extract::extract_portfolio_ref;
 use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::macros::tabular_methods;
+use crate::bindings::portfolio::container::PyPortfolio;
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::{display_to_py, portfolio_to_py};
@@ -381,9 +381,8 @@ fn extract_replay_timeline(
 ///
 /// Parameters
 /// ----------
-/// portfolio : Portfolio | str
-///     A :class:`Portfolio` object (fast path) or a JSON-serialized
-///     ``PortfolioSpec`` string.
+/// portfolio : Portfolio
+///     A built :class:`Portfolio`.
 /// snapshots : list[tuple[date, MarketContext]] | list[dict] | str
 ///     Dated market snapshots in ascending date order: ``(date, market)``
 ///     pairs (dates as ``datetime.date`` or ISO strings), JSON-shaped
@@ -413,15 +412,15 @@ fn extract_replay_timeline(
 #[pyo3(text_signature = "(portfolio, snapshots, config)")]
 fn replay_portfolio(
     py: Python<'_>,
-    portfolio: &Bound<'_, PyAny>,
+    portfolio: PyRef<'_, PyPortfolio>,
     snapshots: &Bound<'_, PyAny>,
     config: &Bound<'_, PyAny>,
 ) -> PyResult<PyReplayResult> {
-    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let portfolio = &portfolio.inner;
     let config = extract_replay_config(py, config)?;
     let timeline = extract_replay_timeline(py, snapshots)?;
     let finstack_config = finstack_quant_core::config::FinstackConfig::default();
-    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
+    let portfolio_ref: &finstack_quant_portfolio::Portfolio = portfolio;
     let inner = py
         .detach(|| {
             finstack_quant_portfolio::replay::replay_portfolio(

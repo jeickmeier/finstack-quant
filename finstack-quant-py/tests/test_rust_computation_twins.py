@@ -20,6 +20,7 @@ from finstack_quant.portfolio import (
     MetricExpr,
     Objective,
     PerPositionMetric,
+    Portfolio,
     PortfolioError,
     PortfolioOptimizationResult,
     PortfolioOptimizationSpec,
@@ -185,7 +186,7 @@ def test_rebalance_from_spec_works_on_a_result_rebuilt_from_json() -> None:
     spec = (
         PortfolioOptimizationSpec
         .new(
-            json.dumps(_book()),
+            Portfolio.from_spec(json.dumps(_book())),
             Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.constant(1.0))),
         )
         .with_weighting(WeightingScheme.notional_weight())
@@ -204,10 +205,11 @@ def test_rebalance_from_spec_works_on_a_result_rebuilt_from_json() -> None:
 
 def test_portfolio_input_errors_keep_their_rust_kind() -> None:
     """Constraint and replay-timeline validation raise ``PortfolioError``, as Rust's kind says."""
-    from finstack_quant.portfolio import Portfolio, PositionFilter, replay_portfolio
+    from finstack_quant.portfolio import PositionFilter, replay_portfolio
 
     market = MarketContext().insert(DiscountCurve.flat("USD-OIS", datetime.date(2024, 1, 15), 0.04, "act_365f"))
     objective = Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.constant(1.0)))
+    portfolio = Portfolio.from_spec(json.dumps(_book()))
     # Plain constraint variants are validated by the optimizer, for typed and
     # JSON-built constraints alike.
     for constraint, needle in [
@@ -216,13 +218,11 @@ def test_portfolio_input_errors_keep_their_rust_kind() -> None:
         (Constraint.budget(float("nan")), "budget"),
         (Constraint.from_json('{"budget":{"rhs":-1.0}}'), "budget"),
     ]:
-        spec = PortfolioOptimizationSpec.new(json.dumps(_book()), objective).with_constraint(constraint)
+        spec = PortfolioOptimizationSpec.new(portfolio, objective).with_constraint(constraint)
         with pytest.raises(PortfolioError, match=needle):
             optimize_portfolio(spec, market)
     # UnitScaling never gets a synthesized budget (MO-9).
-    unit_spec = PortfolioOptimizationSpec.new(json.dumps(_book()), objective).with_weighting(
-        WeightingScheme.unit_scaling()
-    )
+    unit_spec = PortfolioOptimizationSpec.new(portfolio, objective).with_weighting(WeightingScheme.unit_scaling())
     with pytest.raises(PortfolioError, match="MO-9"):
         optimize_portfolio(unit_spec, market)
     with pytest.raises(PortfolioError, match="max_share"):
@@ -230,7 +230,6 @@ def test_portfolio_input_errors_keep_their_rust_kind() -> None:
     with pytest.raises(PortfolioError, match="min_share"):
         Constraint.exposure_minimum(key="rating", value="AAA", min_share=-1.0)
 
-    portfolio = Portfolio.from_spec(json.dumps(_book()))
     with pytest.raises(PortfolioError, match="strictly ascending"):
         replay_portfolio(
             portfolio,
@@ -247,7 +246,7 @@ def test_infeasible_rebalance_raises_portfolio_error() -> None:
     spec = (
         PortfolioOptimizationSpec
         .new(
-            json.dumps(_book()),
+            Portfolio.from_spec(json.dumps(_book())),
             Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.constant(1.0))),
         )
         .with_weighting(WeightingScheme.notional_weight())
@@ -266,7 +265,7 @@ def test_rebalanced_portfolio_is_identical_after_result_reconstruction() -> None
     spec = (
         PortfolioOptimizationSpec
         .new(
-            json.dumps(_book()),
+            Portfolio.from_spec(json.dumps(_book())),
             Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.constant(1.0))),
         )
         .with_weighting(WeightingScheme.notional_weight())

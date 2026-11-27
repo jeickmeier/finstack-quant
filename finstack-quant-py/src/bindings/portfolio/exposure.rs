@@ -4,10 +4,11 @@ use crate::bindings::core::config::PyFinstackConfig;
 use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::py_to_date;
-use crate::bindings::extract::{extract_instrument, extract_portfolio_ref};
+use crate::bindings::extract::extract_instrument;
 use crate::bindings::margin::PyExposureProfile;
 use crate::bindings::margin::types::{PyCsaSpec, PyNettingSetId};
 use crate::bindings::module_utils::{parse_currency, py_to_serde};
+use crate::bindings::portfolio::container::PyPortfolio;
 use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, portfolio_to_py};
 use finstack_quant_portfolio::margin::{self, ExposureCashVm, ExposureSimulationConfig};
@@ -85,15 +86,15 @@ impl PyExposureSimulationConfig {
 #[pyfunction]
 #[doc = pydoc!("finstack_quant.portfolio._exposure", "portfolio_exposure_profile")]
 fn portfolio_exposure_profile(
-    portfolio: &Bound<'_, PyAny>,
+    portfolio: PyRef<'_, PyPortfolio>,
     market: PyRef<'_, PyMarketContext>,
     pricing: &PyFinstackConfig,
     spec: &PyExposureSimulationConfig,
 ) -> PyResult<PyExposureProfile> {
     let py = portfolio.py();
-    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let portfolio = &portfolio.inner;
     let market = &market.inner;
-    let portfolio: &finstack_quant_portfolio::Portfolio = &portfolio;
+    let portfolio: &finstack_quant_portfolio::Portfolio = portfolio;
     let market: &finstack_quant_core::market_data::context::MarketContext = market;
     let inner = py
         .detach(|| {

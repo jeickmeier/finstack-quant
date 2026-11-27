@@ -1003,7 +1003,7 @@ def _optimization_result() -> PortfolioOptimizationResult:
     objective = Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.pv_base()))
     spec = (
         PortfolioOptimizationSpec
-        .new(_two_position_portfolio_json(), objective)
+        .new(Portfolio.from_spec(_two_position_portfolio_json()), objective)
         .with_constraint(Constraint.weight_bounds(PositionFilter.all(), 0.0, 1.0, label="position_limits"))
         .with_weighting(WeightingScheme.value_weight())
         .with_missing_metric_policy(MissingMetricPolicy.zero())
@@ -1110,7 +1110,7 @@ def test_portfolio_optimization_trade_dataframe_keeps_schema_when_no_trades() ->
     objective = Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.pv_base()))
     spec = (
         PortfolioOptimizationSpec
-        .new(_portfolio_json(), objective)
+        .new(Portfolio.from_spec(_portfolio_json()), objective)
         .with_constraint(Constraint.weight_bounds(PositionFilter.all(), 0.0, 1.0, label="position_limits"))
         .with_weighting(WeightingScheme.value_weight())
         .with_missing_metric_policy(MissingMetricPolicy.zero())

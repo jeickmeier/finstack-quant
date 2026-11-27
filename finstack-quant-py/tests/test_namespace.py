@@ -366,6 +366,8 @@ class TestPortfolioNamespace:
 
     def test_portfolio_full_cashflows_empty_portfolio(self) -> None:
         """Full cashflow ladder should be exposed and preserve the rich empty shape."""
+        from finstack_quant.portfolio import Portfolio
+
         spec_json = json.dumps({
             "id": "test_portfolio",
             "name": "Test",
@@ -374,7 +376,7 @@ class TestPortfolioNamespace:
             "entities": {},
             "positions": [],
         })
-        cashflows = aggregate_full_cashflows(spec_json, MarketContext())
+        cashflows = aggregate_full_cashflows(Portfolio.from_spec(spec_json), MarketContext())
         assert len(cashflows) == 0
         assert len(cashflows.by_position) == 0
         assert len(cashflows.issues) == 0

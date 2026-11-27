@@ -103,7 +103,7 @@ class ScenarioAttributionView:
         ...
 
 def attribute_scenario_pnl(
-    portfolio: Portfolio | str,
+    portfolio: Portfolio,
     scenario: ScenarioSpec,
     market: MarketContext,
     *,
@@ -113,9 +113,9 @@ def attribute_scenario_pnl(
 
     Parameters
     ----------
-    portfolio : Portfolio or str
-        Opening holdings and valuation date, or their canonical JSON document.
-    scenario : ScenarioSpec or str
+    portfolio : Portfolio
+        Opening holdings and valuation date.
+    scenario : ScenarioSpec
         Ordered shocks, including any explicit date or instrument changes.
     market : MarketContext
         Unshocked inputs.
@@ -602,7 +602,7 @@ class ScenarioRevalueView:
         ...
 
 def apply_scenario_and_revalue(
-    portfolio: Portfolio | str,
+    portfolio: Portfolio,
     scenario: ScenarioSpec,
     market: MarketContext,
     *,
@@ -613,8 +613,8 @@ def apply_scenario_and_revalue(
 
     Parameters
     ----------
-    portfolio : Portfolio or str
-        Built portfolio or canonical ``PortfolioSpec`` JSON to revalue.
+    portfolio : Portfolio
+        Built portfolio to revalue.
     scenario : ScenarioSpec
         :class:`~finstack_quant.scenarios.ScenarioSpec` describing market-data
         shocks. Load JSON text with ``ScenarioSpec.from_json``.
@@ -633,10 +633,9 @@ def apply_scenario_and_revalue(
     Raises
     ------
     TypeError
-        If ``portfolio`` is neither a ``Portfolio`` nor a JSON string, or
-        ``scenario`` or ``market`` is not its typed class.
+        If ``portfolio``, ``scenario`` or ``market`` is not its typed class.
     ValueError
-        If the portfolio JSON is malformed or schema-incompatible.
+        If an option is malformed.
     PortfolioError
         If portfolio construction, scenario application, market lookup, FX
         conversion, or valuation fails.
@@ -655,7 +654,7 @@ def apply_scenario_and_revalue(
     ...
 
 def scenario_pnl(
-    portfolio: Portfolio | str,
+    portfolio: Portfolio,
     scenario: ScenarioSpec,
     market: MarketContext,
 ) -> ScenarioPnlBatchItem:
@@ -670,9 +669,8 @@ def scenario_pnl(
 
     Parameters
     ----------
-    portfolio : Portfolio or str
-        Built portfolio or canonical ``PortfolioSpec`` JSON valued on both the
-        unshocked and shocked legs.
+    portfolio : Portfolio
+        Built portfolio valued on both the unshocked and shocked legs.
     scenario : ScenarioSpec
         :class:`~finstack_quant.scenarios.ScenarioSpec` describing the
         market-data shocks whose profit-and-loss impact is measured. Load JSON
@@ -694,10 +692,7 @@ def scenario_pnl(
     Raises
     ------
     TypeError
-        If ``portfolio`` is neither a ``Portfolio`` nor a JSON string, or
-        ``scenario`` or ``market`` is not its typed class.
-    ValueError
-        If a JSON input is malformed or does not match its serialized schema.
+        If ``portfolio``, ``scenario`` or ``market`` is not its typed class.
     PortfolioError
         If scenario application or either valuation fails, including for
         missing market data or mismatched base and shocked currencies.
@@ -715,7 +710,7 @@ def scenario_pnl(
     ...
 
 def scenario_pnl_batch(
-    portfolio: Portfolio | str,
+    portfolio: Portfolio,
     scenarios: list[ScenarioSpec],
     market: MarketContext,
 ) -> list[ScenarioPnlBatchItem]:
@@ -730,9 +725,8 @@ def scenario_pnl_batch(
 
     Parameters
     ----------
-    portfolio : Portfolio or str
-        Built portfolio or canonical ``PortfolioSpec`` JSON. The typed form
-        avoids rebuilding the portfolio for the batch.
+    portfolio : Portfolio
+        Built portfolio.
     scenarios : list[ScenarioSpec]
         Ordered ``ScenarioSpec`` objects. Order is preserved exactly; an empty
         batch returns an empty list without valuation. Load JSON text with

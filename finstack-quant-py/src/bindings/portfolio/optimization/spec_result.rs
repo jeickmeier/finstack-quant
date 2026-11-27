@@ -274,9 +274,8 @@ impl PyTradeUniverse {
 /// JSON-serializable portfolio optimization specification, mirroring the
 /// Rust builder pattern.
 ///
-/// The portfolio body is held as a ``PortfolioSpec`` JSON payload so this
-/// wrapper does not depend on the larger ``PortfolioSpec`` binding (which
-/// remains JSON-first elsewhere in the portfolio bindings).
+/// The portfolio body is held as a ``PortfolioSpec`` payload captured from the
+/// built :class:`Portfolio` passed to ``new``.
 #[pyclass(
     name = "PortfolioOptimizationSpec",
     module = "finstack_quant.portfolio",
@@ -300,32 +299,20 @@ impl PyPortfolioOptimizationSpec {
     ///
     /// Parameters
     /// ----------
-    /// portfolio : Portfolio | str
-    ///     Built :class:`Portfolio` (its canonical spec is captured) or a
-    ///     ``PortfolioSpec`` JSON string.
+    /// portfolio : Portfolio
+    ///     Built :class:`Portfolio`; its canonical spec is captured. Load JSON
+    ///     text with ``Portfolio.from_spec``.
     /// objective : Objective
     ///     Optimization objective.
     #[classmethod]
     #[pyo3(text_signature = "(cls, portfolio, objective)")]
     fn new(
         _cls: &Bound<'_, PyType>,
-        portfolio: &Bound<'_, PyAny>,
+        portfolio: PyRef<'_, crate::bindings::portfolio::container::PyPortfolio>,
         objective: PyObjective,
     ) -> PyResult<Self> {
-        let portfolio: finstack_quant_portfolio::PortfolioSpec =
-            match portfolio.cast::<crate::bindings::portfolio::container::PyPortfolio>() {
-                Ok(built) => built.borrow().inner.to_spec(),
-                _ => {
-                    let json: String = portfolio.extract().map_err(|_| {
-                        pyo3::exceptions::PyTypeError::new_err(
-                            "expected a Portfolio or a canonical PortfolioSpec JSON string",
-                        )
-                    })?;
-                    deserialize_json(&json)?
-                }
-            };
         Ok(Self::from_inner(PortfolioOptimizationSpec::new(
-            portfolio,
+            portfolio.inner.to_spec(),
             objective.inner,
         )))
     }

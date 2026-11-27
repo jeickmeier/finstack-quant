@@ -15,8 +15,6 @@
 
 use pyo3::prelude::*;
 
-use crate::bindings::portfolio::container::PyPortfolio;
-use crate::bindings::portfolio::valuation::PyPortfolioValuation;
 use crate::bindings::valuations::composite::PyCompositeInstrument;
 use crate::bindings::valuations::convert::serialize_typed_instrument_json;
 use crate::bindings::valuations::instruments::{PyBond, PyTermLoan};
@@ -92,7 +90,6 @@ use crate::bindings::valuations::typed_volatility_index_future::PyVolatilityInde
 use crate::bindings::valuations::typed_volatility_index_future_option::PyVolatilityIndexFutureOption;
 use crate::bindings::valuations::typed_xccy_swap::PyXccySwap;
 use crate::bindings::valuations::typed_yoy_inflation_swap::PyYoYInflationSwap;
-use crate::errors::{display_to_py as to_py, portfolio_to_py};
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use finstack_quant_valuations::pricer::ParsedInstrument;
 
@@ -307,83 +304,6 @@ pub fn envelope_json_text(obj: &Bound<'_, PyAny>) -> PyResult<String> {
     ))
 }
 
-// Portfolio — borrow-preferring access
-
-/// Access to a [`Portfolio`] without rebuilding from spec on the typed path.
-///
-/// Portfolio construction parses positions and rebuilds the position index +
-/// dependency index; doing it once and reusing the typed object across
-/// pipeline calls (value, cashflows, metrics, scenario) is a major win.
-pub enum PortfolioAccess<'py> {
-    Borrowed(PyRef<'py, PyPortfolio>),
-    Owned(Box<finstack_quant_portfolio::Portfolio>),
-}
-
-impl std::ops::Deref for PortfolioAccess<'_> {
-    type Target = finstack_quant_portfolio::Portfolio;
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Borrowed(r) => r.inner.as_ref(),
-            Self::Owned(p) => p.as_ref(),
-        }
-    }
-}
-
-/// Extract a [`Portfolio`] from a `Portfolio` Python object (fast path) or
-/// build one from a JSON spec string (fallback). The JSON path pays the full
-/// `Portfolio::from_spec` cost, which includes position materialization,
-/// index construction, and validation; both stages release the GIL.
-pub fn extract_portfolio_ref<'py>(
-    py: Python<'py>,
-    obj: &Bound<'py, PyAny>,
-) -> PyResult<PortfolioAccess<'py>> {
-    if let Ok(p) = obj.cast::<PyPortfolio>() {
-        return Ok(PortfolioAccess::Borrowed(p.borrow()));
-    }
-    let json: String = obj.extract()?;
-    let spec: finstack_quant_portfolio::PortfolioSpec = py
-        .detach(move || serde_json::from_str(&json))
-        .map_err(to_py)?;
-    let portfolio = py
-        .detach(move || finstack_quant_portfolio::Portfolio::from_spec(spec))
-        .map_err(portfolio_to_py)?;
-    Ok(PortfolioAccess::Owned(Box::new(portfolio)))
-}
-
-// PortfolioValuation — borrow-preferring access
-
-/// Access to a [`PortfolioValuation`] without re-parsing JSON when a typed
-/// Python object is passed.
-pub enum ValuationAccess<'py> {
-    Borrowed(PyRef<'py, PyPortfolioValuation>),
-    Owned(Box<finstack_quant_portfolio::valuation::PortfolioValuation>),
-}
-
-impl std::ops::Deref for ValuationAccess<'_> {
-    type Target = finstack_quant_portfolio::valuation::PortfolioValuation;
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Borrowed(r) => &r.inner,
-            Self::Owned(v) => v.as_ref(),
-        }
-    }
-}
-
-/// Extract a [`PortfolioValuation`] from a typed Python object or a JSON string.
-pub fn extract_valuation_ref<'py>(
-    py: Python<'py>,
-    obj: &Bound<'py, PyAny>,
-) -> PyResult<ValuationAccess<'py>> {
-    if let Ok(v) = obj.cast::<PyPortfolioValuation>() {
-        return Ok(ValuationAccess::Borrowed(v.borrow()));
-    }
-    let json: String = obj.extract()?;
-    let inner: finstack_quant_portfolio::valuation::PortfolioValuation = py
-        .detach(move || serde_json::from_str(&json))
-        .map_err(to_py)?;
-    Ok(ValuationAccess::Owned(Box::new(inner)))
-}
-
 // Rate / spread — typed-or-float unit extraction
 
 /// Extract a decimal rate from a `float | int | Rate | Bps`.
@@ -483,45 +403,6 @@ pub(crate) fn parse_label<T: serde::de::DeserializeOwned>(label: &str) -> PyResu
 /// Returns `RuntimeError` when `value` does not serialize to a string label.
 pub(crate) fn label<T: serde::Serialize>(value: &T) -> PyResult<String> {
     finstack_quant_core::wire::serde_label(value).map_err(crate::errors::core_to_py)
-}
-
-// PortfolioCashflows — borrow-preferring access
-
-/// Access to a [`finstack_quant_portfolio::cashflows::PortfolioCashflows`]
-/// ladder without re-parsing JSON when a typed Python object is passed.
-pub enum CashflowsAccess<'py> {
-    Borrowed(PyRef<'py, crate::bindings::portfolio::cashflows::PyPortfolioCashflows>),
-    Owned(Box<finstack_quant_portfolio::cashflows::PortfolioCashflows>),
-}
-
-impl std::ops::Deref for CashflowsAccess<'_> {
-    type Target = finstack_quant_portfolio::cashflows::PortfolioCashflows;
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Borrowed(r) => &r.inner,
-            Self::Owned(c) => c.as_ref(),
-        }
-    }
-}
-
-/// Extract a `PortfolioCashflows` ladder from a typed Python object or a
-/// full cashflow-ladder JSON string.
-pub fn extract_cashflows_ref<'py>(
-    py: Python<'py>,
-    obj: &Bound<'py, PyAny>,
-) -> PyResult<CashflowsAccess<'py>> {
-    if let Ok(c) = obj.cast::<crate::bindings::portfolio::cashflows::PyPortfolioCashflows>() {
-        return Ok(CashflowsAccess::Borrowed(c.borrow()));
-    }
-    let json: String = obj.extract().map_err(|_| {
-        pyo3::exceptions::PyTypeError::new_err(
-            "expected a PortfolioCashflows instance or a cashflow-ladder JSON string",
-        )
-    })?;
-    let inner: finstack_quant_portfolio::cashflows::PortfolioCashflows = py
-        .detach(move || serde_json::from_str(&json))
-        .map_err(to_py)?;
-    Ok(CashflowsAccess::Owned(Box::new(inner)))
 }
 
 // Records — JSON string | dict | list | pandas.DataFrame → JSON string

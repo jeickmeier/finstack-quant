@@ -5,8 +5,8 @@ use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::date_to_py;
-use crate::bindings::extract::extract_portfolio_ref;
 use crate::bindings::macros::tabular_methods;
+use crate::bindings::portfolio::container::PyPortfolio;
 use crate::bindings::table_builders::TableBuilder;
 use crate::bindings::valuations::PyValuationResult;
 use crate::errors::core_to_py;
@@ -354,9 +354,8 @@ tabular_methods!(PyPortfolioValuation);
 ///
 /// Parameters
 /// ----------
-/// portfolio : Portfolio | str
-///     A :class:`Portfolio` object (fast path, no rebuild) or a
-///     JSON-serialized ``PortfolioSpec`` string.
+/// portfolio : Portfolio
+///     A built :class:`Portfolio`.
 /// market : MarketContext
 ///     A ``MarketContext``.
 /// strict_risk : bool | None
@@ -385,12 +384,12 @@ tabular_methods!(PyPortfolioValuation);
 #[pyo3(signature = (portfolio, market, strict_risk=None, metrics=None))]
 fn value_portfolio(
     py: Python<'_>,
-    portfolio: &Bound<'_, PyAny>,
+    portfolio: PyRef<'_, PyPortfolio>,
     market: PyRef<'_, PyMarketContext>,
     strict_risk: Option<bool>,
     metrics: Option<Vec<String>>,
 ) -> PyResult<PyPortfolioValuation> {
-    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let portfolio = &portfolio.inner;
     let market = &market.inner;
     let config = finstack_quant_core::config::FinstackConfig::default();
     let mut options = finstack_quant_portfolio::valuation::PortfolioValuationOptions {
@@ -410,7 +409,7 @@ fn value_portfolio(
     // contain a `PyRef` (not `Ungil`), so we deref to plain Rust references
     // before entering the closure — these are `Send + Sync` and therefore
     // `Ungil`. No Python state is touched inside.
-    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
+    let portfolio_ref: &finstack_quant_portfolio::Portfolio = portfolio;
     let market_ref: &finstack_quant_core::market_data::context::MarketContext = market;
     let valuation = py
         .detach(|| {

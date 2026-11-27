@@ -8,13 +8,13 @@ use finstack_quant_valuations::metrics::MetricId;
 
 use crate::bindings::core::currency::PyCurrency;
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::extract::extract_portfolio_ref;
 use crate::bindings::macros::tabular_methods;
 use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::{core_to_py, portfolio_to_py};
 
 use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::json_bridge::{deserialize_json, serialize_json};
+use crate::bindings::portfolio::container::PyPortfolio;
 
 const AGGREGATE_COLUMNS: &[(&str, &str)] = &[
     ("instrument_id", "str"),
@@ -177,8 +177,8 @@ tabular_methods!(PyPortfolioPrimitiveExposureReport);
 ///
 /// Parameters
 /// ----------
-/// portfolio : Portfolio | str
-///     Built ``Portfolio`` or ``PortfolioSpec`` JSON; ``base_currency`` is the
+/// portfolio : Portfolio
+///     Built ``Portfolio``; ``base_currency`` is the
 ///     reporting currency.
 /// market : MarketContext
 ///     Complete market for primitive valuation and FX conversion.
@@ -204,18 +204,18 @@ tabular_methods!(PyPortfolioPrimitiveExposureReport);
 #[pyo3(text_signature = "(portfolio, market, metrics)")]
 fn primitive_exposures(
     py: Python<'_>,
-    portfolio: &Bound<'_, PyAny>,
+    portfolio: PyRef<'_, PyPortfolio>,
     market: PyRef<'_, PyMarketContext>,
     metrics: Vec<String>,
 ) -> PyResult<PyPortfolioPrimitiveExposureReport> {
-    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let portfolio = &portfolio.inner;
     let market = &market.inner;
     let metrics = metrics
         .into_iter()
         .map(MetricId::try_from)
         .collect::<Result<Vec<_>, _>>()
         .map_err(core_to_py)?;
-    let (portfolio, market) = (&*portfolio, market);
+    let (portfolio, market) = (portfolio, market);
     py.detach(move || {
         finstack_quant_portfolio::primitive::primitive_exposures(portfolio, market, &metrics)
     })
