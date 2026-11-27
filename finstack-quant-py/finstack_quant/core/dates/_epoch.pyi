@@ -47,39 +47,6 @@ from finstack_quant.core.dates._date_ext import (
     quarter,
 )
 
-def create_date(year: int, month: int, day: int) -> datetime.date:
-    """
-    Create a ``datetime.date`` from year, month (1-12), and day.
-
-    Parameters
-    ----------
-    year : int
-        Calendar year.
-    month : int
-        Calendar month number from ``1`` through ``12``.
-    day : int
-        Day of the month.
-
-    Returns
-    -------
-    datetime.date
-        The calendar date represented by *year*, *month*, and *day*.
-
-    Raises
-    ------
-    ValueError
-        If the date components are invalid.
-
-    Examples
-    --------
-    >>> import datetime
-    >>> from finstack_quant.core.dates import create_date
-    >>> create_date(2025, 2, 28)
-    datetime.date(2025, 2, 28)
-
-    """
-    ...
-
 def days_since_epoch(date: datetime.date | str) -> int:
     """
     Return the number of days since the Unix epoch (1970-01-01).

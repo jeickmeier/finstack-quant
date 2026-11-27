@@ -101,7 +101,7 @@ class PanelTransformSpec:
 
     def to_json(self) -> str:
         """
-        Serialize to the JSON accepted by :func:`transform_panel_json`.
+        Serialize to the canonical ``PanelTransformSpec`` JSON that :meth:`from_json` loads.
 
         Returns
         -------
@@ -216,7 +216,7 @@ class PanelTransformResult:
 
     def to_json(self) -> str:
         """
-        Serialize to the JSON produced by :func:`transform_panel_json`.
+        Serialize to the canonical ``PanelTransformResult`` JSON that :meth:`from_json` loads.
 
         Returns
         -------
@@ -350,7 +350,7 @@ class PanelTransformResult:
 
 def transform_panel(spec: PanelTransformSpec | dict[str, Any]) -> PanelTransformResult:
     """
-    Apply a named panel transform pipeline (typed twin of :func:`transform_panel_json`).
+    Apply a named panel transform pipeline.
 
     Operations run sequentially; each reads the previous column unless
     ``input`` selects ``"values"`` or an earlier operation name.
@@ -383,63 +383,5 @@ def transform_panel(spec: PanelTransformSpec | dict[str, Any]) -> PanelTransform
     ... }
     >>> transform_panel(spec).get_column("r")
     [0.0, 1.0]
-    """
-    ...
-
-def transform_panel_json(spec_json: str) -> str:
-    """
-    Apply a JSON panel transform pipeline and return JSON result columns.
-
-    ``spec_json`` is a JSON object with:
-
-    - ``values``: list of numbers or ``null``.
-    - ``entity`` and ``order``: required when any operation has
-      ``"family": "timeseries"``.
-    - ``time_key``: required when any operation has
-      ``"family": "cross_sectional"``.
-    - ``operations``: list of named operations. Each operation has ``name``,
-      ``family`` (``"timeseries"`` or ``"cross_sectional"``), ``op``,
-      optional ``params``, and optional ``input``.
-
-    Operations run sequentially. ``input`` selects the source column: omit it
-    (default) to read the previous operation output, or the raw ``values``
-    column for the first operation. Set ``input`` to ``"values"`` to branch
-    from the raw column, or to an already evaluated operation name. Forward
-    references are rejected.
-
-    Operation names must be unique, non-empty, and must not be the reserved
-    name ``values``. Unknown fields are rejected by the Rust serde model.
-
-    Parameters
-    ----------
-    spec_json : str
-        JSON-serialized panel transform specification.
-
-    Returns
-    -------
-    str
-        JSON string shaped as
-        ``{"columns": [{"name": name, "values": values}]}``, preserving
-        operation order with every output column aligned to the input values.
-
-    Raises
-    ------
-    ValueError
-        If the JSON is malformed, required keys are missing,
-        operation names are duplicated, empty, or reserved (``values``),
-        ``input`` names an unknown column, or an operation fails
-        validation.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.features import transform_panel_json
-    >>> spec = {
-    ...     "values": [10.0, 12.0, 20.0, 21.0],
-    ...     "time_key": ["1", "2", "1", "2"],
-    ...     "operations": [{"name": "rank", "family": "cross_sectional", "op": "rank"}],
-    ... }
-    >>> json.loads(transform_panel_json(json.dumps(spec)))["columns"][0]["values"]
-    [0.0, 0.0, 1.0, 1.0]
     """
     ...

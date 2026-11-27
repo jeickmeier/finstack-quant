@@ -23,8 +23,7 @@ use pyo3::types::{PyList, PyModule};
 mod operations;
 
 use operations::{
-    evaluate_engine, validate_covenant_engine_json, validate_covenant_report_json,
-    validate_covenant_spec_json,
+    validate_covenant_engine_json, validate_covenant_report_json, validate_covenant_spec_json,
 };
 
 /// Register the `finstack_quant.covenants` Python namespace.
@@ -52,7 +51,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyThresholdSchedule>()?;
     m.add_function(wrap_pyfunction!(forecast::breaches_table, &m)?)?;
     m.add_function(wrap_pyfunction!(engine::covenant_template, &m)?)?;
-    m.add_function(wrap_pyfunction!(evaluate_engine, &m)?)?;
     m.add_function(wrap_pyfunction!(forecast::forecast_breaches, &m)?)?;
     m.add_function(wrap_pyfunction!(forecast::forecast_covenant, &m)?)?;
     m.add_function(wrap_pyfunction!(engine::reports_table, &m)?)?;
@@ -79,7 +77,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "ThresholdSchedule",
             "breaches_table",
             "covenant_template",
-            "evaluate_engine",
             "forecast_breaches",
             "forecast_covenant",
             "reports_table",

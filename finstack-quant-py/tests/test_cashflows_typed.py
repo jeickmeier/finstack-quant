@@ -284,7 +284,7 @@ class TestBuilderSpecs:
         from decimal import Decimal
         import json
 
-        from finstack_quant.cashflows import build_cashflow_schedule_json
+        from finstack_quant.cashflows import build_cashflow_schedule
         from finstack_quant.cashflows.builder import (
             CashFlowSchedule,
             FixedCouponSpec,
@@ -330,7 +330,7 @@ class TestBuilderSpecs:
                 }
             ],
         })
-        json_schedule = build_cashflow_schedule_json(json_spec)
+        json_schedule = build_cashflow_schedule(json.loads(json_spec)).to_json()
 
         # Sanity check that this fixture genuinely exercises the defaults it
         # claims to: a short front stub (5 coupons, not the 4 an exact
@@ -364,7 +364,7 @@ class TestBuilderSpecs:
         from decimal import Decimal
         import json
 
-        from finstack_quant.cashflows import build_cashflow_schedule_json
+        from finstack_quant.cashflows import build_cashflow_schedule
         from finstack_quant.cashflows.builder import (
             CashFlowSchedule,
             FloatingCouponSpec,
@@ -424,7 +424,7 @@ class TestBuilderSpecs:
                 }
             ],
         })
-        json_schedule = build_cashflow_schedule_json(json_spec, market.to_json())
+        json_schedule = build_cashflow_schedule(json.loads(json_spec), market).to_json()
 
         assert json.loads(typed_schedule.to_json()) == json.loads(json_schedule)
 
@@ -446,7 +446,7 @@ class TestBuilderSpecs:
         from decimal import Decimal
         import json
 
-        from finstack_quant.cashflows import build_cashflow_schedule_json
+        from finstack_quant.cashflows import build_cashflow_schedule
         from finstack_quant.cashflows.builder import (
             CashFlowSchedule,
             FloatingCouponSpec,
@@ -527,7 +527,7 @@ class TestBuilderSpecs:
                 }
             ],
         })
-        json_schedule = build_cashflow_schedule_json(json_spec, market.to_json())
+        json_schedule = build_cashflow_schedule(json.loads(json_spec), market).to_json()
 
         # Sanity check that this fixture genuinely exercises the default:
         # explicitly requesting the non-default `Period` application must
@@ -555,7 +555,7 @@ class TestBuilderSpecs:
         from decimal import Decimal
         import json
 
-        from finstack_quant.cashflows import build_cashflow_schedule_json
+        from finstack_quant.cashflows import build_cashflow_schedule
         from finstack_quant.cashflows.builder import (
             CashFlowSchedule,
             FloatingCouponSpec,
@@ -611,7 +611,7 @@ class TestBuilderSpecs:
             ],
         })
         with pytest.raises(KeyError) as json_exc:
-            build_cashflow_schedule_json(json_spec)
+            build_cashflow_schedule(json.loads(json_spec))
 
         assert type(typed_exc.value) is type(json_exc.value)
         assert str(typed_exc.value) == str(json_exc.value)
@@ -1306,15 +1306,12 @@ class TestTypedJsonEquivalence:
         assert str(typed.currency) == "USD"
         assert typed.amount == pytest.approx(12_500.0, abs=1e-6)
 
-    def test_typed_flows_match_dated_flows_json(self) -> None:
-        import json
-
-        from finstack_quant.cashflows import dated_flows_json
+    def test_dated_flows_are_the_cash_settlement_rows(self) -> None:
+        from finstack_quant.cashflows import dated_flows
 
         schedule = TestCashFlowBuilder._quarterly_bond()
-        bridge_rows = json.loads(dated_flows_json(schedule.to_json()))
         typed_cash = [f for f in schedule.get_flows() if f.kind.is_cash_settlement()]
-        assert len(bridge_rows) == len(typed_cash)
+        assert len(dated_flows(schedule)) == len(typed_cash)
 
 
 class TestTypedTwinsAndWire:
@@ -1333,10 +1330,10 @@ class TestTypedTwinsAndWire:
             .build(None)
         )
 
-    def test_build_cashflow_schedule_typed_matches_json(self) -> None:
+    def test_build_cashflow_schedule_from_a_dict_spec(self) -> None:
         import json
 
-        from finstack_quant.cashflows import build_cashflow_schedule, build_cashflow_schedule_json, dated_flows
+        from finstack_quant.cashflows import build_cashflow_schedule, dated_flows
         from finstack_quant.cashflows.builder import CashFlowSchedule
 
         spec = {
@@ -1357,8 +1354,7 @@ class TestTypedTwinsAndWire:
             ],
         }
         typed = build_cashflow_schedule(spec)
-        via_json = json.loads(build_cashflow_schedule_json(json.dumps(spec)))
-        assert len(typed.get_flows()) == len(via_json["flows"])
+        assert len(typed.get_flows()) == len(json.loads(typed.to_json())["flows"])
         flows = dated_flows(typed)
         assert flows
         assert isinstance(flows[0][1], Money)

@@ -22,8 +22,8 @@ caller's reporting currency. The engine tests whenever you call ``evaluate``
 a missing required metric raises ``KeyError``. Net-debt tests also require
 positive earnings, selected by ``denominator_metric_id`` (default ``ebitda``).
 
-The JSON surface shared with WASM is kept: the ``validate_covenant_*_json``
-validators and ``evaluate_engine`` on an engine document.
+The ``validate_covenant_*_json`` validators take a document as JSON text. To
+evaluate an engine held as text, load it with ``CovenantEngine.from_json``.
 
 Examples
 --------
@@ -68,7 +68,6 @@ from finstack_quant.covenants._operations import (
     validate_covenant_spec_json as validate_covenant_spec_json,
     validate_covenant_report_json as validate_covenant_report_json,
     validate_covenant_engine_json as validate_covenant_engine_json,
-    evaluate_engine as evaluate_engine,
 )
 
 __all__ = [
@@ -88,7 +87,6 @@ __all__ = [
     "ThresholdSchedule",
     "breaches_table",
     "covenant_template",
-    "evaluate_engine",
     "forecast_breaches",
     "forecast_covenant",
     "reports_table",

@@ -1,4 +1,4 @@
-//! Cashflow schedule JSON, dated-flow extraction, and construction helpers.
+//! Cashflow schedule construction, validation and dated-flow extraction.
 
 use super::aggregation;
 use super::builder::schedule::{PyCashFlowMeta, PyCashFlowSchedule};
@@ -12,27 +12,6 @@ use crate::bindings::core::cashflow::{PyCashFlow, extract_cf_kind};
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::money::PyMoney;
-
-#[doc = pydoc!("finstack_quant.cashflows._schedule_json", "build_cashflow_schedule_json")]
-#[pyfunction]
-#[pyo3(
-    signature = (spec_json, market_json = None, as_of = None),
-    text_signature = "(spec_json, market_json=None, as_of=None)"
-)]
-pub(super) fn build_cashflow_schedule_json(
-    py: Python<'_>,
-    spec_json: &str,
-    market_json: Option<&str>,
-    as_of: Option<&Bound<'_, PyAny>>,
-) -> PyResult<String> {
-    let as_of = as_of
-        .map(crate::bindings::date_utils::py_to_date)
-        .transpose()?;
-    py.detach(|| {
-        finstack_quant_cashflows::build_cashflow_schedule_json(spec_json, market_json, as_of)
-            .map_err(crate::errors::core_to_py)
-    })
-}
 
 #[doc = pydoc!("finstack_quant.cashflows._schedule_json", "build_cashflow_schedule")]
 #[pyfunction]
@@ -67,15 +46,6 @@ pub(super) fn validate_cashflow_schedule_json(
     py.detach(|| {
         finstack_quant_cashflows::validate_cashflow_schedule_json(schedule_json)
             .map_err(crate::errors::core_to_py)
-    })
-}
-
-#[doc = pydoc!("finstack_quant.cashflows._schedule_json", "dated_flows_json")]
-#[pyfunction]
-#[pyo3(text_signature = "(schedule_json)")]
-pub(super) fn dated_flows_json(py: Python<'_>, schedule_json: &str) -> PyResult<String> {
-    py.detach(|| {
-        finstack_quant_cashflows::dated_flows_json(schedule_json).map_err(crate::errors::core_to_py)
     })
 }
 

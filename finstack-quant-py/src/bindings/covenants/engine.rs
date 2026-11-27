@@ -582,7 +582,7 @@ pub(crate) fn covenant_template(template: PyCovenantTemplate) -> PyResult<Vec<Py
 /// Flatten ``evaluate`` output into an ``ArrowTable`` with one row per covenant.
 ///
 /// ``reports`` is the ``dict[str, CovenantReport]`` returned by
-/// ``CovenantEngine.evaluate`` or ``evaluate_engine``. Columns:
+/// ``CovenantEngine.evaluate``. Columns:
 /// ``covenant`` (dict key), ``covenant_type``, ``passed``, ``actual_value``,
 /// ``threshold``, ``headroom``, ``headroom_raw``, ``details``.
 ///

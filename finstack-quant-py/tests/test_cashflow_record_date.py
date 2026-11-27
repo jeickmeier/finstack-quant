@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from finstack_quant.cashflows import build_cashflow_schedule_json
+from finstack_quant.cashflows import build_cashflow_schedule
 from finstack_quant.cashflows.accrual import AccrualConfig, ExCouponRule, accrued_interest_amount
 from finstack_quant.cashflows.builder import CashFlowSchedule
 
@@ -67,35 +67,33 @@ def test_json_accrual_excludes_coupon_starting_on_ex_date() -> None:
 
 
 def test_ex_coupon_rebates_future_principal_segments() -> None:
-    schedule = build_cashflow_schedule_json(
-        json.dumps({
-            "notional": {"initial": {"amount": "100", "currency": "USD"}, "amort": "none"},
-            "issue_date": "2025-01-01",
-            "maturity": "2025-07-01",
-            "coupon_program": [
-                {
-                    "kind": "fixed",
-                    "spec": {
-                        "coupon_type": "cash",
-                        "rate": "0.12",
-                        "frequency": {"count": 6, "unit": "months"},
-                        "day_count": "act_360",
-                        "business_day_convention": "unadjusted",
-                        "calendar_id": "weekends_only",
-                        "stub": "short_back",
-                    },
-                }
-            ],
-            "principal_events": [
-                {
-                    "date": "2025-06-28",
-                    "payment_date": "2025-06-28",
-                    "kind": "notional",
-                    "delta": {"amount": "100", "currency": "USD"},
-                }
-            ],
-        })
-    )
+    schedule = build_cashflow_schedule({
+        "notional": {"initial": {"amount": "100", "currency": "USD"}, "amort": "none"},
+        "issue_date": "2025-01-01",
+        "maturity": "2025-07-01",
+        "coupon_program": [
+            {
+                "kind": "fixed",
+                "spec": {
+                    "coupon_type": "cash",
+                    "rate": "0.12",
+                    "frequency": {"count": 6, "unit": "months"},
+                    "day_count": "act_360",
+                    "business_day_convention": "unadjusted",
+                    "calendar_id": "weekends_only",
+                    "stub": "short_back",
+                },
+            }
+        ],
+        "principal_events": [
+            {
+                "date": "2025-06-28",
+                "payment_date": "2025-06-28",
+                "kind": "notional",
+                "delta": {"amount": "100", "currency": "USD"},
+            }
+        ],
+    }).to_json()
     config = json.dumps({
         "method": "linear",
         "include_pik": True,

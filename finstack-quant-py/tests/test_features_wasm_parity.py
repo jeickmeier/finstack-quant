@@ -23,7 +23,6 @@ from finstack_quant.features import (
     PanelTransformSpec,
     TimeSeriesOp,
     transform_panel,
-    transform_panel_json,
 )
 
 GOLDEN: dict[str, Any] = json.loads((Path(__file__).parent / "data" / "features_wasm_parity.json").read_text())
@@ -39,7 +38,6 @@ def test_transform_panel_matches_the_shared_golden() -> None:
     spec = GOLDEN["spec"]
     result = transform_panel(spec)
     assert json.loads(result.to_json()) == GOLDEN["expected"]
-    assert json.loads(transform_panel_json(json.dumps(spec))) == GOLDEN["expected"]
     typed = PanelTransformSpec.from_json(json.dumps(spec))
     assert json.loads(transform_panel(typed).to_json()) == GOLDEN["expected"]
     assert result.columns == list(GOLDEN["columns"])

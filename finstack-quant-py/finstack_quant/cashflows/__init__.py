@@ -23,22 +23,18 @@ schema = _cashflows.schema
 
 ScheduleBuildOpts = _cashflows.ScheduleBuildOpts
 build_cashflow_schedule = _cashflows.build_cashflow_schedule
-build_cashflow_schedule_json = _cashflows.build_cashflow_schedule_json
 dated_flows = _cashflows.dated_flows
 schedule_from_classified_flows = _cashflows.schedule_from_classified_flows
 schedule_from_dated_flows = _cashflows.schedule_from_dated_flows
 validate_cashflow_schedule_json = _cashflows.validate_cashflow_schedule_json
-dated_flows_json = _cashflows.dated_flows_json
 
 __all__: list[str] = [
     "ScheduleBuildOpts",
     "accrual",
     "aggregation",
     "build_cashflow_schedule",
-    "build_cashflow_schedule_json",
     "builder",
     "dated_flows",
-    "dated_flows_json",
     "fixings",
     "schedule_from_classified_flows",
     "schedule_from_dated_flows",

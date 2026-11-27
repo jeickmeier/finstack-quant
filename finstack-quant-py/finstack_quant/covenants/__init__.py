@@ -27,7 +27,6 @@ SpringingCondition = _covenants.SpringingCondition
 ThresholdSchedule = _covenants.ThresholdSchedule
 breaches_table = _covenants.breaches_table
 covenant_template = _covenants.covenant_template
-evaluate_engine = _covenants.evaluate_engine
 forecast_breaches = _covenants.forecast_breaches
 forecast_covenant = _covenants.forecast_covenant
 reports_table = _covenants.reports_table
@@ -52,7 +51,6 @@ __all__ = [
     "ThresholdSchedule",
     "breaches_table",
     "covenant_template",
-    "evaluate_engine",
     "forecast_breaches",
     "forecast_covenant",
     "reports_table",

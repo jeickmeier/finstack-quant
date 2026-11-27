@@ -183,14 +183,17 @@ class TestCashflowsNamespace:
     """Verify the cashflows subpackage."""
 
     def test_cashflows_exports(self) -> None:
-        """Cashflows should expose the JSON bridge functions."""
+        """Cashflows exposes the typed schedule functions and the schedule validator."""
         from finstack_quant import cashflows
         from finstack_quant.cashflows import (  # noqa: F401
-            build_cashflow_schedule_json,
-            dated_flows_json,
+            build_cashflow_schedule,
+            dated_flows,
             validate_cashflow_schedule_json,
         )
 
+        # The JSON-text twins of the typed functions are not bound in Python.
+        assert not hasattr(cashflows, "build_cashflow_schedule_json")
+        assert not hasattr(cashflows, "dated_flows_json")
         assert not hasattr(cashflows, "accrued_interest")
         assert "accrued_interest" not in cashflows.__all__
 

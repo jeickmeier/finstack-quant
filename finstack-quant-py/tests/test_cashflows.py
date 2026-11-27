@@ -1,4 +1,4 @@
-"""Cashflow JSON bridge tests."""
+"""Cash-flow schedules built from a JSON spec: load the text, build, serialise."""
 
 from __future__ import annotations
 
@@ -11,14 +11,19 @@ import pytest
 
 from finstack_quant.cashflows import (
     build_cashflow_schedule,
-    build_cashflow_schedule_json,
-    dated_flows_json,
+    dated_flows,
     validate_cashflow_schedule_json,
 )
 from finstack_quant.cashflows.accrual import AccrualConfig, accrued_interest_amount
 from finstack_quant.cashflows.builder import CashFlowSchedule
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.valuations.instruments import Bond, price_instrument
+
+
+def _schedule_json(spec_json: str, market_json: str | None = None, as_of: object = None) -> str:
+    """Build a schedule from JSON text: load the spec and the market, build, serialise."""
+    market = MarketContext.from_json(market_json) if market_json is not None else None
+    return build_cashflow_schedule(json.loads(spec_json), market, as_of).to_json()
 
 
 def accrued_interest(schedule_json: str, as_of: object, config_json: str | None = None) -> float:
@@ -149,12 +154,12 @@ def _floating_market_json() -> str:
 
 
 def test_cashflows_namespace_build_validate_accrual_and_price_bond() -> None:
-    schedule_json = build_cashflow_schedule_json(_cashflow_spec())
+    schedule_json = _schedule_json(_cashflow_spec())
     schedule = json.loads(schedule_json)
     assert schedule["meta"]["issue_date"] == "2024-08-31"
 
     assert json.loads(validate_cashflow_schedule_json(schedule_json)) == schedule
-    flows = json.loads(dated_flows_json(schedule_json))
+    flows = dated_flows(CashFlowSchedule.from_json(schedule_json))
     assert len(flows) == len(schedule["flows"])
     assert accrued_interest(schedule_json, "2025-02-28") > 0.0
 
@@ -171,7 +176,7 @@ def test_cashflows_namespace_build_validate_accrual_and_price_bond() -> None:
 
 
 def test_cashflows_builds_floating_schedule_with_market_json() -> None:
-    schedule_json = build_cashflow_schedule_json(_floating_cashflow_spec(), _floating_market_json())
+    schedule_json = _schedule_json(_floating_cashflow_spec(), _floating_market_json())
     schedule = json.loads(schedule_json)
 
     float_flows = [flow for flow in schedule["flows"] if flow["kind"] == "floating"]
@@ -205,7 +210,7 @@ def test_cashflows_builds_step_up_with_payment_program() -> None:
         }
     ]
 
-    schedule = json.loads(build_cashflow_schedule_json(json.dumps(spec)))
+    schedule = json.loads(_schedule_json(json.dumps(spec)))
     assert any(flow["kind"] == "pik" for flow in schedule["flows"])
 
 
@@ -245,7 +250,7 @@ def test_cashflows_builds_fixed_to_float_and_explicit_windows() -> None:
             }
         ],
     }
-    built = json.loads(build_cashflow_schedule_json(json.dumps(fixed_to_float)))
+    built = json.loads(_schedule_json(json.dumps(fixed_to_float)))
     assert {flow["kind"] for flow in built["flows"]} >= {"fixed", "floating"}
 
     explicit_windows = {
@@ -265,7 +270,7 @@ def test_cashflows_builds_fixed_to_float_and_explicit_windows() -> None:
             },
         ],
     }
-    built = json.loads(build_cashflow_schedule_json(json.dumps(explicit_windows)))
+    built = json.loads(_schedule_json(json.dumps(explicit_windows)))
     assert {flow["kind"] for flow in built["flows"]} >= {"fixed", "floating"}
 
 
@@ -289,11 +294,11 @@ def test_cashflows_reports_overlapping_payment_windows() -> None:
     ]
 
     with pytest.raises(ValueError, match="overlapping payment windows"):
-        build_cashflow_schedule_json(json.dumps(spec))
+        _schedule_json(json.dumps(spec))
 
 
 def test_cashflows_accrued_interest_accepts_config_json() -> None:
-    schedule_json = build_cashflow_schedule_json(_cashflow_spec())
+    schedule_json = _schedule_json(_cashflow_spec())
 
     config_json = json.dumps({
         "method": "linear",
@@ -305,7 +310,7 @@ def test_cashflows_accrued_interest_accepts_config_json() -> None:
 
 
 def test_cashflows_accrued_interest_rejects_unknown_config_json_fields() -> None:
-    schedule_json = build_cashflow_schedule_json(_cashflow_spec())
+    schedule_json = _schedule_json(_cashflow_spec())
     config_json = json.dumps({
         "method": "linear",
         "include_pik": True,
@@ -317,7 +322,7 @@ def test_cashflows_accrued_interest_rejects_unknown_config_json_fields() -> None
 
 
 def test_cashflows_bond_from_cashflows_allows_missing_quoted_clean_price_pct() -> None:
-    schedule_json = build_cashflow_schedule_json(_cashflow_spec())
+    schedule_json = _schedule_json(_cashflow_spec())
     bond = Bond.from_cashflows(
         "CUSTOM-CF-NO-QUOTE", CashFlowSchedule.from_json(schedule_json), "periodic(1)", "USD-OIS"
     )
@@ -328,7 +333,7 @@ def test_cashflows_bond_from_cashflows_allows_missing_quoted_clean_price_pct() -
 
 
 def test_cashflows_reject_malformed_json_and_invalid_dates() -> None:
-    schedule_json = build_cashflow_schedule_json(_cashflow_spec())
+    schedule_json = _schedule_json(_cashflow_spec())
 
     # Validation/parse failures map to ValueError per the binding error contract
     # (finstack-quant-py/src/errors.rs `core_to_py`).
@@ -357,22 +362,22 @@ def test_cashflows_reject_malformed_json_and_invalid_dates() -> None:
 
 
 def test_cashflows_reject_malformed_market_json() -> None:
-    with pytest.raises(ValueError, match="invalid market context JSON"):
-        build_cashflow_schedule_json(_floating_cashflow_spec(), "{not json")
+    with pytest.raises(ValueError, match="JSON parse error"):
+        _schedule_json(_floating_cashflow_spec(), "{not json")
 
 
 def test_cashflows_missing_forward_curve_raises_key_error() -> None:
     # Missing-id lookups (forward curve not in market) map to KeyError per
     # the binding error contract (finstack-quant-py/src/errors.rs `core_to_py`).
     with pytest.raises(KeyError, match="USD-SOFR-3M"):
-        build_cashflow_schedule_json(_floating_cashflow_spec(), _market_json())
+        _schedule_json(_floating_cashflow_spec(), _market_json())
 
 
 def test_cashflows_build_is_deterministic_and_accrual_is_finite() -> None:
     # Cross-language determinism fixture: the same spec is exercised in
     # finstack-quant-wasm/tests/facade/cashflows.test.mjs so the surfaces are comparable.
-    first = build_cashflow_schedule_json(_cashflow_spec())
-    second = build_cashflow_schedule_json(_cashflow_spec())
+    first = _schedule_json(_cashflow_spec())
+    second = _schedule_json(_cashflow_spec())
     assert first == second  # byte-identical canonical JSON
 
     accrued = accrued_interest(first, "2025-02-28")
@@ -381,7 +386,7 @@ def test_cashflows_build_is_deterministic_and_accrual_is_finite() -> None:
 
 
 def test_cashflows_reject_amortization_over_notional() -> None:
-    schedule = json.loads(build_cashflow_schedule_json(_cashflow_spec()))
+    schedule = json.loads(_schedule_json(_cashflow_spec()))
     schedule["flows"].append({
         "date": "2025-03-31",
         "reset_date": None,
@@ -416,7 +421,7 @@ def test_accrual_retains_contractual_day_count_context(
         business_day_convention="unadjusted",
         stub="long_back",
     )
-    raw = validate_cashflow_schedule_json(build_cashflow_schedule_json(json.dumps(spec)))
+    raw = validate_cashflow_schedule_json(_schedule_json(json.dumps(spec)))
     cfg = json.dumps({
         "method": "linear",
         "ex_coupon": None,
@@ -436,7 +441,7 @@ def test_icma_long_back_stub_preserves_february_roll_day_accrual() -> None:
         business_day_convention="unadjusted",
         stub="long_back",
     )
-    raw = validate_cashflow_schedule_json(build_cashflow_schedule_json(json.dumps(spec)))
+    raw = validate_cashflow_schedule_json(_schedule_json(json.dumps(spec)))
     cfg = json.dumps({
         "method": "linear",
         "ex_coupon": None,
@@ -470,22 +475,18 @@ def test_typed_accrual_reference_metadata_roundtrips() -> None:
     assert restored.context.end_is_termination_date is True
 
 
-def test_build_cashflow_schedule_and_json_accept_as_of_cutoff() -> None:
+def test_build_cashflow_schedule_accepts_as_of_cutoff() -> None:
     from finstack_quant.core.cashflow import CFKind
     from finstack_quant.core.market_data import MarketContext, ScalarTimeSeries
 
     spec = json.loads(_floating_cashflow_spec())
-    spec_json = json.dumps(spec)
     market_without_fixing = MarketContext.from_json(_floating_market_json())
     with pytest.raises((KeyError, ValueError), match=r"fixing|FIXING"):
         build_cashflow_schedule(spec, market_without_fixing, as_of="2025-02-01")
-    with pytest.raises((KeyError, ValueError), match=r"fixing|FIXING"):
-        build_cashflow_schedule_json(spec_json, market_without_fixing.to_json(), "2025-02-01")
 
     market = MarketContext.from_json(_floating_market_json())
     market.insert_series(ScalarTimeSeries("FIXING:USD-SOFR-3M", [(datetime.date(2025, 1, 15), 0.06)], "step", "error"))
     typed = build_cashflow_schedule(spec, market, as_of=datetime.date(2025, 2, 1))
-    via_json = json.loads(build_cashflow_schedule_json(spec_json, market.to_json(), "2025-02-01"))
-    assert json.loads(typed.to_json()) == via_json
+    assert typed.to_json() == build_cashflow_schedule(spec, market, as_of="2025-02-01").to_json()
     first_coupon = next(flow for flow in typed.get_flows() if flow.kind == CFKind.FLOATING)
     assert first_coupon.rate == pytest.approx(0.075, abs=1e-12)

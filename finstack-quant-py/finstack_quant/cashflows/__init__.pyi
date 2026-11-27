@@ -37,9 +37,7 @@ from finstack_quant.cashflows._schedule_json import (
     dated_flows as dated_flows,
     schedule_from_dated_flows as schedule_from_dated_flows,
     schedule_from_classified_flows as schedule_from_classified_flows,
-    build_cashflow_schedule_json as build_cashflow_schedule_json,
     validate_cashflow_schedule_json as validate_cashflow_schedule_json,
-    dated_flows_json as dated_flows_json,
 )
 
 __all__ = [
@@ -47,11 +45,9 @@ __all__ = [
     "accrual",
     "aggregation",
     "build_cashflow_schedule",
-    "build_cashflow_schedule_json",
     "builder",
     "fixings",
     "dated_flows",
-    "dated_flows_json",
     "schedule_from_classified_flows",
     "schedule_from_dated_flows",
     "schema",

@@ -114,7 +114,7 @@ public = [
     "next_cds_date", "prev_cds_date", "prev_cds_semiannual_roll",
     "next_semiannual_cds_maturity",
     "next_third_friday",
-    "create_date", "days_since_epoch", "date_from_epoch_days",
+    "days_since_epoch", "date_from_epoch_days",
 ]
 note = "DayCountContext is the sole owned host context; it stores Rust DayCountContextState and resolves the borrowed Rust context during calculation. Rust DayCountContextState is not a separate host class. The Rust dates::fx::fx_forward_date value-date operation is Rust-only (products call it from their own explicit date conventions); calendar construction (rules, generated calendars, composites) is crate-private in Rust, and hosts reach calendars by string id (or `a+b` joint ids, resolved in Rust calendar_by_id_strict) through adjust, HolidayCalendar and the schedule builder. The Rust DateExt trait methods are bound as free functions taking the date first (add_business_days, add_weekdays, add_months, end_of_month, is_weekend, quarter, fiscal_year, months_until); ScheduleBuilder.to_spec / Schedule.from_spec wrap the serde ScheduleSpec; Schedule.builder collects explicit choices (no frequency, stub, grid or payment-convention defaults). Rust-only: dates::canonical_calendar_id (the one id-normalization seam; both host HolidayCalendar constructors take their canonical code from it), DateExt::add_days (checked calendar-day arithmetic shared by Rust curve rolls and tenor/schedule generation; hosts use named financial date shifts or MarketContext.condition), PeriodId::from_date (calendar bucket construction from an already validated Rust Date)."
 
@@ -284,13 +284,13 @@ rust_lib   = "finstack-quant/cashflows/src/lib.rs"
 python_package = "finstack_quant.cashflows"
 visibility = "pub"
 status = "exists"
-note = "Typed submodules (builder/accrual/aggregation/fixings/schema; the CashFlow/CFKind/CashFlowAccrual row types live in finstack_quant.core.cashflow) plus the JSON schedule bridge and its typed twins (build_cashflow_schedule / dated_flows, where dated_flows binds CashFlowSchedule::dated_flows). Rust-only at the crate root (deliberately unbound): the JSON-bridge spec types CashflowScheduleBuildSpec / CouponLegSpec / PaymentProgramSpec / MarginStepSpec / PaymentStepSpec / DatedFlowJson (hosts pass dict/JSON to build_cashflow_schedule), the CashflowProvider / CashflowScheduleSource traits, and the in-place CashFlowSchedule mutators update_flows / retain_flows / push_flow / into_flows (host wrappers are frozen; rebuild via from_flows / scale_amounts instead)."
+note = "Typed submodules (builder/accrual/aggregation/fixings/schema; the CashFlow/CFKind/CashFlowAccrual row types live in finstack_quant.core.cashflow) plus build_cashflow_schedule / dated_flows (dated_flows binds CashFlowSchedule::dated_flows) and the schedule validator. The Rust JSON entry points build_cashflow_schedule_json / dated_flows_json are WASM-only: Python builds from a dict and serializes the typed schedule with to_json(). Rust-only at the crate root (deliberately unbound): the JSON-bridge spec types CashflowScheduleBuildSpec / CouponLegSpec / PaymentProgramSpec / MarginStepSpec / PaymentStepSpec / DatedFlowJson (Python passes a dict to build_cashflow_schedule; WASM passes an object or JSON), the CashflowProvider / CashflowScheduleSource traits, and the in-place CashFlowSchedule mutators update_flows / retain_flows / push_flow / into_flows (host wrappers are frozen; rebuild via from_flows / scale_amounts instead)."
 
 [crates.cashflows.modules]
 fixings     = { python = "finstack_quant.cashflows.fixings",     status = "exists", note = "Typed raw rate/FX observations and atomic crossed-fixing materialization. Scenario rolls invoke the same Rust helper; WASM binds it as cashflows.materializeFixings over CashFlowSchedule handles or schedule JSON." }
 accrual     = { python = "finstack_quant.cashflows.accrual",     status = "exists", note = "Typed accrual engine" }
 aggregation = { python = "finstack_quant.cashflows.aggregation", status = "exists", note = "Typed period rollups and currency-checked totals. In Python, aggregation.calendar_year_ladder returns list[tuple[int, float, float, float]] over parallel arrays while CashFlowSchedule.calendar_year_ladder returns an ArrowTable view alongside to_arrow()/to_pandas()/to_polars(). Rust-only (deliberately unbound): credit_adjusted_cashflow_pvs, the survival-weighted PV kernel consumed by valuations pricers, and weighted_average_life_from_principal, the Act/365F WAL kernel behind CashFlowSchedule.wal and the structured-credit WAL metric." }
-builder     = { python = "finstack_quant.cashflows.builder",     status = "exists", note = "Typed spec + builder + schedule surface; the JSON program bridge remains available on finstack_quant.cashflows" }
+builder     = { python = "finstack_quant.cashflows.builder",     status = "exists", note = "Typed spec + builder + schedule surface; the program spec is built from a dict by finstack_quant.cashflows.build_cashflow_schedule" }
 schema      = { python = "finstack_quant.cashflows.schema",      status = "exists", note = "Compiled-in JSON Schema resources; package_cashflow_schema is private generator plumbing and stays Rust-only" }
 
 [crates.cashflows.module_symbols.builder]
@@ -347,14 +347,14 @@ rust_lib   = "finstack-quant/covenants/src/lib.rs"
 python_package = "finstack_quant.covenants"
 visibility = "pub"
 status = "exists"
-note = "Python binds the typed engine surface flat on finstack_quant.covenants (Covenant, CovenantType, CovenantSpec (with_denominator_metric selects required net-leverage earnings), ThresholdSchedule, CovenantWaiver, SpringingCondition, CovenantConsequence, CovenantEngine, CovenantBreach), the typed templates, DataFrame-backed forecasting, and keeps the JSON wire surface (`_json` twins + validators + evaluate_engine) shared with WASM. WASM binds CovenantEngine as a class; the definition types cross as plain objects whose constructors and methods are free functions (see the [parity] ledger)."
+note = "Python binds the typed engine surface flat on finstack_quant.covenants (Covenant, CovenantType, CovenantSpec (with_denominator_metric selects required net-leverage earnings), ThresholdSchedule, CovenantWaiver, SpringingCondition, CovenantConsequence, CovenantEngine, CovenantBreach), the typed templates, DataFrame-backed forecasting, and keeps the JSON validators shared with WASM. The Rust `evaluate_engine` JSON entry point is WASM-only: Python loads the engine with CovenantEngine.from_json and calls evaluate. WASM binds CovenantEngine as a class; the definition types cross as plain objects whose constructors and methods are free functions (see the [parity] ledger)."
 
 [crates.covenants.modules]
-json = { python = "finstack_quant.covenants", status = "exists", note = "validate_covenant_spec_json, validate_covenant_report_json and validate_covenant_engine_json exposed flat on finstack_quant.covenants, matching the Rust `json` module names. Rust `evaluate_engine` is bound as Python `evaluate_engine` / WASM `evaluateEngine` and returns dict[str, CovenantReport] in spec (IndexMap) order. Documented host-ergonomics deviation: Python takes `metrics` (dict[str, float] or a JSON string passed through unchanged) where Rust/WASM take `metrics_json`; a dict is never serialised but handed to Rust `evaluate_engine_with_source` as a HashMapMetricSource, so it behaves exactly like CovenantEngine.evaluate. A JSON metric map is parsed only by Rust `HashMapMetricSource::from_json`, so both hosts report identical errors." }
-report = { python = "finstack_quant.covenants", status = "flattened", note = "CovenantReport wrapper exposed flat on finstack_quant.covenants (frozen, `__eq__` via Rust PartialEq, Python-style `__repr__`); `evaluate_engine` and `CovenantEngine.evaluate` return dict[str, CovenantReport]. Python-only ergonomic helper `reports_table(dict) -> ArrowTable` flattens that dict. WASM `evaluateEngine` returns a typed plain-object map (keyed by covenant instance key) from the same evaluate_engine kernel — NOT a JSON string; the dts_contract gate pins this. Rust-only: CovenantReport::passed/::failed builder constructors are not bound in Python because the constructor names collide with the `passed` boolean property on the wrapper; construct reports via evaluate_engine or from_json." }
+json = { python = "finstack_quant.covenants", status = "exists", note = "validate_covenant_spec_json, validate_covenant_report_json and validate_covenant_engine_json exposed flat on finstack_quant.covenants, matching the Rust `json` module names. Rust `evaluate_engine` is bound in WASM only (`evaluateEngine`); the Python form is CovenantEngine.from_json(engine_json).evaluate(metrics, as_of), which returns the same dict[str, CovenantReport] in spec (IndexMap) order." }
+report = { python = "finstack_quant.covenants", status = "flattened", note = "CovenantReport wrapper exposed flat on finstack_quant.covenants (frozen, `__eq__` via Rust PartialEq, Python-style `__repr__`); `CovenantEngine.evaluate` returns dict[str, CovenantReport]. Python-only ergonomic helper `reports_table(dict) -> ArrowTable` flattens that dict. WASM `evaluateEngine` returns a typed plain-object map (keyed by covenant instance key) from the same evaluate_engine kernel — NOT a JSON string; the dts_contract gate pins this. Rust-only: CovenantReport::passed/::failed builder constructors are not bound in Python because the constructor names collide with the `passed` boolean property on the wrapper; construct reports via CovenantEngine.evaluate or from_json." }
 engine    = { python = "finstack_quant.covenants", status = "flattened", note = "Typed Covenant / CovenantType (one staticmethod per Rust variant; ThresholdTest is spelled as the string pair (\"maximum\"|\"minimum\", value) in CovenantType.custom and SpringingCondition) / CovenantSpec / CovenantWaiver / SpringingCondition / CovenantConsequence / CovenantEngine (evaluate_and_track requires explicit scope; breaches retain original consequences; new, from_specs, add_spec, add_waiver, validate, evaluate, evaluate_and_track, evaluate_series (Rust CovenantEngine::evaluate_series over DatedMetrics rows; Python reads a tabular DataFrame input and returns an ArrowTable), specs, waivers, breach_history, to_json/from_json) / CovenantBreach exposed flat. `CovenantScope` and `BoundKind` are spelled as strings (\"maintenance\"|\"incurrence\", \"at_most\"|\"at_least\"). Rust-only: CovenantWindow / add_window (reachable through engine JSON only), InstrumentMutator, ConsequenceApplication and apply_consequences (instrument mutation is a Rust trait seam). WASM: CovenantEngine class with the same members; add_spec / add_waiver mutate in place and return nothing." }
 forward   = { python = "finstack_quant.covenants", status = "flattened", note = "CovenantForecastConfig, CovenantForecast (to_arrow/to_pandas/to_polars) and FutureBreach exposed flat; `forecast_covenant(spec, metrics, config)` and `forecast_breaches(engine, metrics, config)` bind Rust forecast_covenant / forecast_breaches, which run forecast_covenant_generic / forecast_breaches_generic over a Rust DatedMetricSeries (each date becomes a daily PeriodId whose period end is the date; empty input and duplicate dates are rejected in Rust; rows carry no period start, so a stochastic forecast requires config.reference_date). Batch forecasts default to maintenance and with_scope selects incurrence; missing required observations fail. Python reads the series from a date-indexed DataFrame or Arrow table (duplicate columns are rejected in the binding); WASM takes DatedMetrics rows (`forecastCovenant` / `forecastBreaches`). ModelTimeSeries itself is a Rust trait and stays Rust-only. Python-only helper: breaches_table. statements-analytics keeps its statement-model adapter." }
-metric    = { python = "finstack_quant.covenants.metric",    status = "missing", note = "CovenantMetricId/CovenantMetricSource/HashMapMetricSource are Rust trait plumbing; hosts pass metrics as a dict / JSON map to CovenantEngine.evaluate or evaluate_engine (a JSON map is parsed by HashMapMetricSource::from_json)" }
+metric    = { python = "finstack_quant.covenants.metric",    status = "missing", note = "CovenantMetricId/CovenantMetricSource/HashMapMetricSource are Rust trait plumbing; Python passes metrics as a dict to CovenantEngine.evaluate; WASM evaluateEngine takes a JSON map parsed by HashMapMetricSource::from_json" }
 schedule  = { python = "finstack_quant.covenants", status = "flattened", note = "ThresholdSchedule (step-down limits) exposed flat: constructor from (date, value) pairs, `entries`, `threshold_for(date)`, to_json/from_json." }
 templates = { python = "finstack_quant.covenants", status = "flattened", note = "CovenantTemplate (Rust tagged enum; one staticmethod per variant: lbo_standard, cov_lite, real_estate, project_finance) and covenant_template(template) -> list[CovenantSpec] exposed flat; WASM covenantTemplate takes the CovenantTemplate wire object. All template thresholds are validated finite and non-negative in Rust (ValueError)." }
 
@@ -376,7 +376,6 @@ public = [
     "ThresholdSchedule",
     "breaches_table",
     "covenant_template",
-    "evaluate_engine",
     "forecast_breaches",
     "forecast_covenant",
     "reports_table",
@@ -1808,7 +1807,6 @@ public = [
     "transform_cross_sectional",
     "transform_cross_sectional_grouped",
     "transform_panel",
-    "transform_panel_json",
     "transform_timeseries",
     "transform_timeseries_pairwise",
 ]
@@ -2538,13 +2536,22 @@ attributePnlEnvelopeJson = "Canonical Rust JSON wire twin of attribute_pnl_envel
 attributePnlJson = "JSON wire twin of attribute_pnl (Python returns the typed PnlAttribution)"
 attributeReturnContributionJson = "JSON wire twin of attribute_return_contribution (Rust attribute_return_contribution_json; Python returns the typed ReturnContributionResult)"
 
+[parity.js."cashflows".wasm_only]
+buildCashflowScheduleJson = "Rust build_cashflow_schedule_json JSON entry point; the Python form is build_cashflow_schedule(spec, market, as_of).to_json()"
+datedFlowsJson = "Rust dated_flows_json JSON entry point; the Python form is dated_flows(CashFlowSchedule.from_json(schedule_json))"
+
+[parity.js."core".wasm_only]
+createDate = "Rust create_date; Python has datetime.date(year, month, day), so the function is not bound there"
+
 [parity.js."covenants".wasm_only]
+evaluateEngine = "Rust evaluate_engine JSON entry point; the Python form is CovenantEngine.from_json(engine_json).evaluate(metrics, as_of)"
 covenantNew = "twin of the Python Covenant(covenant_type, test_frequency, label) constructor (Rust Covenant::new); WASM Covenant values are plain objects"
 covenantSpecNew = "twin of the Python CovenantSpec(covenant) constructor without a metric id (Rust CovenantSpec::new); WASM CovenantSpec values are plain objects"
 covenantSpecWithMetric = "twin of the Python CovenantSpec(covenant, metric_id) constructor (Rust CovenantSpec::with_metric); WASM CovenantSpec values are plain objects"
 
 # Plain CSA data values use canonical Rust free-function bindings; VM uses VmCalculator.
 [parity.js."features".wasm_only]
+transformPanelJson = "Rust transform_panel_json JSON entry point; the Python form is transform_panel(PanelTransformSpec.from_json(spec_json)).to_json()"
 crossSectionalOpParamKeys = "free-function twin of the Python CrossSectionalOp.param_keys property (Rust CrossSectionalOp::param_keys)"
 pairwiseOpParamKeys = "free-function twin of the Python PairwiseOp.param_keys property (Rust PairwiseOp::param_keys)"
 timeSeriesOpParamKeys = "free-function twin of the Python TimeSeriesOp.param_keys property (Rust TimeSeriesOp::param_keys)"

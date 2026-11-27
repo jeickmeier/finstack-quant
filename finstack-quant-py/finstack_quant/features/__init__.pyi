@@ -4,8 +4,8 @@ Feature engineering: panel-data transformations for signal research.
 Bindings for the ``finstack-quant-features`` crate
 (``finstack_quant.features``). Provides time-series, cross-sectional, and
 pairwise transforms (z-score, rank, rolling mean, neutralization, risk-scaled
-weights) plus a general panel dispatcher :func:`transform_panel` (typed) /
-:func:`transform_panel_json` (JSON), and the operation selectors
+weights) plus a general panel dispatcher :func:`transform_panel`, and the
+operation selectors
 :class:`TimeSeriesOp`, :class:`CrossSectionalOp`, :class:`PairwiseOp`.
 
 Key columns (``entity``, ``order``, ``time_key``, ``groups``) accept strings
@@ -61,7 +61,6 @@ from finstack_quant.features._panel import (
     PanelTransformSpec as PanelTransformSpec,
     PanelTransformResult as PanelTransformResult,
     transform_panel as transform_panel,
-    transform_panel_json as transform_panel_json,
 )
 
 __all__ = [
@@ -79,7 +78,6 @@ __all__ = [
     "transform_cross_sectional",
     "transform_cross_sectional_grouped",
     "transform_panel",
-    "transform_panel_json",
     "transform_timeseries",
     "transform_timeseries_pairwise",
 ]

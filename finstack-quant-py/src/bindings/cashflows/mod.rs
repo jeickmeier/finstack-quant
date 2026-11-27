@@ -11,9 +11,8 @@ use crate::bindings::pydoc::pydoc;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 use schedule_json::{
-    PyScheduleBuildOpts, build_cashflow_schedule, build_cashflow_schedule_json, dated_flows,
-    dated_flows_json, schedule_from_classified_flows, schedule_from_dated_flows,
-    validate_cashflow_schedule_json,
+    PyScheduleBuildOpts, build_cashflow_schedule, dated_flows, schedule_from_classified_flows,
+    schedule_from_dated_flows, validate_cashflow_schedule_json,
 };
 
 /// Register the `finstack_quant.cashflows` Python namespace.
@@ -29,9 +28,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
 
     m.add_class::<PyScheduleBuildOpts>()?;
     m.add_function(wrap_pyfunction!(build_cashflow_schedule, &m)?)?;
-    m.add_function(wrap_pyfunction!(build_cashflow_schedule_json, &m)?)?;
     m.add_function(wrap_pyfunction!(dated_flows, &m)?)?;
-    m.add_function(wrap_pyfunction!(dated_flows_json, &m)?)?;
     m.add_function(wrap_pyfunction!(schedule_from_classified_flows, &m)?)?;
     m.add_function(wrap_pyfunction!(schedule_from_dated_flows, &m)?)?;
     m.add_function(wrap_pyfunction!(validate_cashflow_schedule_json, &m)?)?;
@@ -43,10 +40,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "accrual",
             "aggregation",
             "build_cashflow_schedule",
-            "build_cashflow_schedule_json",
             "builder",
             "dated_flows",
-            "dated_flows_json",
             "fixings",
             "schedule_from_classified_flows",
             "schedule_from_dated_flows",

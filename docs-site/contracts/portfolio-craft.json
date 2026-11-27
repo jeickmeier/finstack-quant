@@ -727,7 +727,6 @@
       "finstack_quant.covenants.CovenantEngine",
       "finstack_quant.covenants.CovenantSpec",
       "finstack_quant.covenants.CovenantType",
-      "finstack_quant.covenants.evaluate_engine",
       "finstack_quant.covenants.lbo_standard",
       "finstack_quant.models.credit.MertonModel",
       "finstack_quant.models.credit.lgd",

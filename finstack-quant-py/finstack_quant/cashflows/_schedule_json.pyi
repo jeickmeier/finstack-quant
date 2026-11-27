@@ -87,8 +87,11 @@ def build_cashflow_schedule(
     as_of: datetime.date | str | None = None,
 ) -> CashFlowSchedule:
     """
-    Build a typed ``CashFlowSchedule`` from a build spec (typed twin of
-    :func:`build_cashflow_schedule_json`).
+    Build a typed ``CashFlowSchedule`` from a build spec.
+
+    A holder of JSON text loads the spec with ``json.loads`` and the market
+    with ``MarketContext.from_json``; ``to_json()`` on the result gives the
+    canonical schedule text.
 
     Parameters
     ----------
@@ -150,7 +153,7 @@ def build_cashflow_schedule(
 
 def dated_flows(schedule: CashFlowSchedule) -> list[tuple[datetime.date, Money]]:
     """
-    Settlement cash entries of a schedule (typed twin of :func:`dated_flows_json`).
+    Settlement cash entries of a schedule.
 
     Parameters
     ----------
@@ -271,78 +274,6 @@ def schedule_from_classified_flows(
     """
     ...
 
-def build_cashflow_schedule_json(
-    spec_json: str,
-    market_json: str | None = None,
-    as_of: datetime.date | str | None = None,
-) -> str:
-    """
-    Build a cashflow schedule from a JSON spec and return canonical schedule JSON.
-
-    Parameters
-    ----------
-    spec_json : str
-        JSON-encoded ``CashflowScheduleBuildSpec`` with canonical
-        ``coupon_program`` and ``payment_program`` instructions, principal,
-        fees, and schedule rules.
-    market_json : str, optional
-        JSON-encoded ``MarketContext`` for floating-rate index lookups. Omit
-        when the schedule uses fixed coupons only. Every floating coupon needs
-        its forward curve, even when supplied observations cover it, unless an
-        explicit fallback applies. Explicit fallback covers any failed coupon
-        projection, never supplied historical gaps before a resolved curve's
-        base date.
-    as_of : datetime.date or str, optional
-        Valuation cutoff date overriding ``as_of`` in ``spec_json``; resets
-        before the effective cutoff require historical fixings.
-
-    Returns
-    -------
-    str
-        Canonical JSON-encoded ``CashFlowSchedule``.
-
-    Raises
-    ------
-    ValueError
-        If ``spec_json``, ``market_json``, or ``as_of`` (when supplied) fails
-        schema or semantic validation, including unsupported roll-grid/ICMA
-        anchors, negative lags, supplied historical fixing gaps, or
-        curve/date/day-count/arithmetic failures.
-    KeyError
-        If required market data is unavailable and no eligible fallback resolves it.
-
-    Examples
-    --------
-    >>> import json
-    >>> spec = {
-    ...     "notional": {"initial": {"amount": "1000000", "currency": "USD"}, "amort": "none"},
-    ...     "issue_date": "2024-08-31",
-    ...     "maturity": "2025-08-31",
-    ...     "coupon_program": [
-    ...         {
-    ...             "kind": "fixed",
-    ...             "spec": {
-    ...                 "coupon_type": "cash",
-    ...                 "rate": "0.06",
-    ...                 "frequency": {"count": 12, "unit": "months"},
-    ...                 "day_count": "30_360",
-    ...                 "business_day_convention": "following",
-    ...                 "calendar_id": "weekends_only",
-    ...                 "business_day_convention": "modified_following",
-    ...                 "stub": "none",
-    ...                 "end_of_month": False,
-    ...                 "payment_lag_days": 0,
-    ...             },
-    ...         }
-    ...     ],
-    ... }
-    >>> from finstack_quant.cashflows import build_cashflow_schedule_json
-    >>> schedule_json = build_cashflow_schedule_json(json.dumps(spec))
-    >>> json.loads(schedule_json)["meta"]["issue_date"]
-    '2024-08-31'
-
-    """
-
 def validate_cashflow_schedule_json(schedule_json: str) -> str:
     """
     Validate and canonicalize a ``CashFlowSchedule`` JSON payload.
@@ -379,50 +310,5 @@ def validate_cashflow_schedule_json(schedule_json: str) -> str:
     >>> from finstack_quant.cashflows import validate_cashflow_schedule_json
     >>> json.loads(validate_cashflow_schedule_json(schedule.to_json()))["meta"]["issue_date"]
     '2025-01-15'
-
-    """
-
-def dated_flows_json(schedule_json: str) -> str:
-    """
-    Extract settlement-dated cashflows from a schedule as a compact JSON array.
-
-    Parameters
-    ----------
-    schedule_json : str
-        JSON-encoded ``CashFlowSchedule``.
-
-    Returns
-    -------
-    str
-        JSON array of settlement cash entries. ``PIK`` and
-        ``DefaultedNotional`` state rows and zero-cash principal markers are
-        omitted. Native currencies are retained without conversion or netting;
-        parse the full schedule JSON when flow classification is required.
-
-    Raises
-    ------
-    ValueError
-        If the schedule JSON, amounts, accrual metadata, row currencies, or
-        dates are invalid, or a single-currency principal path fails balance
-        reconciliation. Composite principal paths in multiple currencies
-        receive structural validation without scalar balance reconciliation.
-
-    Examples
-    --------
-    >>> import datetime
-    >>> from decimal import Decimal
-    >>> from finstack_quant.cashflows.builder import CashFlowSchedule, FixedCouponSpec, ScheduleParams
-    >>> from finstack_quant.core.money import Money
-    >>> schedule = (
-    ...     CashFlowSchedule
-    ...     .builder()
-    ...     .principal(Money(1_000_000.0, "USD"), datetime.date(2025, 1, 15), datetime.date(2026, 1, 15))
-    ...     .fixed_cf(FixedCouponSpec(rate=Decimal("0.05"), schedule=ScheduleParams.semiannual_30360()))
-    ...     .build()
-    ... )
-    >>> import json
-    >>> from finstack_quant.cashflows import dated_flows_json
-    >>> len(json.loads(dated_flows_json(schedule.to_json()))) == len(schedule.get_flows())
-    True
 
     """

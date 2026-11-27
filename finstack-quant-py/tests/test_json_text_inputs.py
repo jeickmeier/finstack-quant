@@ -38,6 +38,7 @@ from typing import Any
 
 import pytest
 
+from finstack_quant import cashflows, covenants, features
 from finstack_quant.attribution import attribute_pnl
 from finstack_quant.calibration import (
     CalibrationConfig,
@@ -56,13 +57,9 @@ from finstack_quant.calibration import (
     dry_run,
     validate_calibration,
 )
-from finstack_quant.cashflows import (
-    build_cashflow_schedule,
-    build_cashflow_schedule_json,
-    dated_flows,
-    dated_flows_json,
-)
+from finstack_quant.cashflows import build_cashflow_schedule, dated_flows
 from finstack_quant.cashflows.builder import CashFlowSchedule
+from finstack_quant.core import dates as core_dates
 from finstack_quant.core.config import FinstackConfig
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, Tenor
@@ -72,10 +69,9 @@ from finstack_quant.covenants import (
     CovenantEngine,
     CovenantTemplate,
     covenant_template,
-    evaluate_engine,
     validate_covenant_engine_json,
 )
-from finstack_quant.features import PanelTransformSpec, transform_panel, transform_panel_json
+from finstack_quant.features import PanelTransformSpec, transform_panel
 from finstack_quant.margin import CsaSpec, OtcMarginSpec
 from finstack_quant.models import HestonParams, bs_price, heston_price
 from finstack_quant.models.factor import FactorCovarianceMatrix, FactorModelConfig
@@ -720,7 +716,9 @@ def _covenant_reports(metrics: Any) -> dict[str, str]:
         "windows": [],
         "waivers": [],
     }
-    reports = evaluate_engine(validate_covenant_engine_json(json.dumps(engine)), metrics, "2026-03-31")
+    reports = CovenantEngine.from_json(validate_covenant_engine_json(json.dumps(engine))).evaluate(
+        metrics, "2026-03-31"
+    )
     return {key: report.to_json() for key, report in reports.items()}
 
 
@@ -1613,10 +1611,11 @@ def test_the_builder_probe_is_not_vacuous() -> None:
 # ---------------------------------------------------------------------------
 #
 # A function or member that returns JSON text beside a typed form of the same
-# computation is a second way to do one thing. Each `Twin` runs both forms on
-# valid input and on bad input. `via_text` and `via_typed` return values that
-# compare equal when the two forms carry the same data; `same_text` also
-# compares the raw strings where the typed result has its own `to_json()`.
+# computation is a second way to do one thing. A `Twin` is a pair that is
+# still alive: it runs both forms and they must carry the same data. A
+# `Replacement` is the typed form of a pair whose text form has been removed:
+# it pins the value and the exception types the typed form gives, and the
+# removed name must be gone.
 
 
 @dataclass(frozen=True)
@@ -1628,6 +1627,20 @@ class Twin:
     via_typed: Callable[[], Any]
     # Bad inputs: label -> (text form, typed form). Both must raise the same type.
     bad: Mapping[str, tuple[Callable[[], Any], Callable[[], Any]]] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class Replacement:
+    """The typed form that replaced a removed JSON-text function."""
+
+    id: str
+    # Where the removed name lived, and the name.
+    removed: tuple[Any, str]
+    # The typed form on valid input; `expected` is what it must equal.
+    call: Callable[[], Any]
+    expected: Callable[[], Any]
+    # Bad inputs: label -> (typed form, the exception type it raises).
+    bad: Mapping[str, tuple[Callable[[], Any], type[Exception]]] = field(default_factory=dict)
 
 
 def _fixed_schedule_spec() -> dict[str, Any]:
@@ -1696,14 +1709,6 @@ def _schedule_market(with_forward_curve: bool) -> MarketContext:
     return market
 
 
-def _schedule_twin(spec: dict[str, Any], market: MarketContext | None = None) -> tuple[Callable[[], Any], ...]:
-    market_text = None if market is None else market.to_json()
-    return (
-        lambda: build_cashflow_schedule_json(json.dumps(spec), market_text),
-        lambda: build_cashflow_schedule(spec, market).to_json(),
-    )
-
-
 def _overlapping_windows_spec() -> dict[str, Any]:
     spec = _fixed_schedule_spec()
     spec["issue_date"], spec["maturity"] = "2025-01-01", "2027-01-01"
@@ -1718,8 +1723,14 @@ def _fixed_schedule_text() -> str:
     return build_cashflow_schedule(_fixed_schedule_spec()).to_json()
 
 
-def _flows_as_wire(flows: list[tuple[dt.date, Money]]) -> list[dict[str, Any]]:
-    return [{"date": date.isoformat(), "amount": json.loads(amount.to_json())} for date, amount in flows]
+def _schedule(spec: dict[str, Any], market: MarketContext | None = None) -> Callable[[], str]:
+    """The typed form of the removed `build_cashflow_schedule_json(spec_json, market_json)`."""
+    return lambda: build_cashflow_schedule(spec, market).to_json()
+
+
+def _reloaded_schedule(spec: dict[str, Any], market: MarketContext | None = None) -> Callable[[], str]:
+    """The schedule text after a `from_json` / `to_json` round trip: canonical text is a fixed point."""
+    return lambda: CashFlowSchedule.from_json(build_cashflow_schedule(spec, market).to_json()).to_json()
 
 
 def _covenant_engine_text(**extra: Any) -> str:
@@ -1727,15 +1738,16 @@ def _covenant_engine_text(**extra: Any) -> str:
     return json.dumps({"specs": [json.loads(covenant_template(template)[0].to_json())], **extra})
 
 
-def _reports_as_wire(reports: Mapping[str, Any]) -> list[tuple[str, str]]:
-    return [(key, report.to_json()) for key, report in reports.items()]
+def _engine_reports(engine_text: str, metrics: Any) -> Callable[[], list[tuple[str, bool]]]:
+    """The typed form of the removed `evaluate_engine(engine_json, metrics, as_of)`."""
+    return lambda: [
+        (key, report.passed)
+        for key, report in CovenantEngine.from_json(engine_text).evaluate(metrics, "2026-03-31").items()
+    ]
 
 
-def _engine_twin(engine_text: str, metrics: Any) -> tuple[Callable[[], Any], ...]:
-    return (
-        lambda: _reports_as_wire(evaluate_engine(engine_text, metrics, "2026-03-31")),
-        lambda: _reports_as_wire(CovenantEngine.from_json(engine_text).evaluate(metrics, "2026-03-31")),
-    )
+def _panel_text(**changes: Any) -> str:
+    return json.dumps({**PANEL_TRANSFORM, **changes})
 
 
 def _calibration_result() -> Any:
@@ -1801,89 +1813,97 @@ def _composite_history() -> Any:
     return history_from_spec(spec, [{"date": "2025-01-01", "state": state}, {"date": "2025-01-02", "state": state}])
 
 
-TWINS = [
-    Twin(
+REPLACEMENTS = [
+    Replacement(
         "build_cashflow_schedule_json",
-        *_schedule_twin(_fixed_schedule_spec()),
+        (cashflows, "build_cashflow_schedule_json"),
+        _schedule(_fixed_schedule_spec()),
+        _reloaded_schedule(_fixed_schedule_spec()),
         bad={
-            "overlapping-windows": _schedule_twin(_overlapping_windows_spec()),
-            "missing-forward-curve": _schedule_twin(_floating_schedule_spec(), _schedule_market(False)),
-            "unknown-field": _schedule_twin({**_fixed_schedule_spec(), "zzz": 1}),
-            "invalid-date": _schedule_twin({**_fixed_schedule_spec(), "maturity": "2025-02-30"}),
-            "spec-not-json": (
-                lambda: build_cashflow_schedule_json("{not json"),
-                lambda: build_cashflow_schedule(json.loads("{not json")),
-            ),
+            "overlapping-windows": (_schedule(_overlapping_windows_spec()), ValueError),
+            "missing-forward-curve": (_schedule(_floating_schedule_spec(), _schedule_market(False)), KeyError),
+            "unknown-field": (_schedule({**_fixed_schedule_spec(), "zzz": 1}), ValueError),
+            "invalid-date": (_schedule({**_fixed_schedule_spec(), "maturity": "2025-02-30"}), ValueError),
+            "spec-not-json": (lambda: build_cashflow_schedule(json.loads("{not json")), ValueError),
             "market-not-json": (
-                lambda: build_cashflow_schedule_json(json.dumps(_floating_schedule_spec()), "{not json"),
                 lambda: build_cashflow_schedule(_floating_schedule_spec(), MarketContext.from_json("{not json")),
+                ValueError,
             ),
         },
     ),
-    Twin(
+    Replacement(
         "build_cashflow_schedule_json_floating",
-        *_schedule_twin(_floating_schedule_spec(), _schedule_market(True)),
+        (cashflows, "build_cashflow_schedule_json"),
+        _schedule(_floating_schedule_spec(), _schedule_market(True)),
+        _reloaded_schedule(_floating_schedule_spec(), _schedule_market(True)),
     ),
-    Twin(
+    Replacement(
         "dated_flows_json",
-        lambda: json.loads(dated_flows_json(_fixed_schedule_text())),
-        lambda: _flows_as_wire(dated_flows(CashFlowSchedule.from_json(_fixed_schedule_text()))),
+        (cashflows, "dated_flows_json"),
+        lambda: [
+            (date.isoformat(), json.loads(amount.to_json()))
+            for date, amount in dated_flows(CashFlowSchedule.from_json(_fixed_schedule_text()))
+        ],
+        lambda: [
+            ("2024-08-31", {"amount": "-1000000", "currency": "USD"}),
+            ("2025-09-01", {"amount": "60000", "currency": "USD"}),
+            ("2025-09-01", {"amount": "1000000", "currency": "USD"}),
+        ],
         bad={
-            "not-json": (
-                lambda: dated_flows_json("{not json"),
-                lambda: dated_flows(CashFlowSchedule.from_json("{not json")),
-            ),
-            "not-a-schedule": (
-                lambda: dated_flows_json('{"zzz": 1}'),
-                lambda: dated_flows(CashFlowSchedule.from_json('{"zzz": 1}')),
-            ),
+            "not-json": (lambda: dated_flows(CashFlowSchedule.from_json("{not json")), ValueError),
+            "not-a-schedule": (lambda: dated_flows(CashFlowSchedule.from_json('{"zzz": 1}')), ValueError),
         },
     ),
-    Twin(
+    Replacement(
         "transform_panel_json",
-        lambda: transform_panel_json(json.dumps(PANEL_TRANSFORM)),
-        lambda: transform_panel(PanelTransformSpec.from_json(json.dumps(PANEL_TRANSFORM))).to_json(),
+        (features, "transform_panel_json"),
+        lambda: json.loads(transform_panel(PanelTransformSpec.from_json(_panel_text())).to_json()),
+        lambda: {"columns": [{"name": "rank", "values": [0.0, 0.0, 1.0, 1.0]}]},
         bad={
-            "not-json": (
-                lambda: transform_panel_json("{not json"),
-                lambda: transform_panel(PanelTransformSpec.from_json("{not json")),
-            ),
+            "not-json": (lambda: transform_panel(PanelTransformSpec.from_json("{not json")), ValueError),
             "unknown-operation": (
-                lambda: transform_panel_json(
-                    json.dumps({
-                        **PANEL_TRANSFORM,
-                        "operations": [{"name": "x", "family": "cross_sectional", "op": "zzz"}],
-                    })
-                ),
                 lambda: transform_panel(
                     PanelTransformSpec.from_json(
-                        json.dumps({
-                            **PANEL_TRANSFORM,
-                            "operations": [{"name": "x", "family": "cross_sectional", "op": "zzz"}],
-                        })
+                        _panel_text(operations=[{"name": "x", "family": "cross_sectional", "op": "zzz"}])
                     )
                 ),
+                ValueError,
             ),
             "ragged-columns": (
-                lambda: transform_panel_json(json.dumps({**PANEL_TRANSFORM, "time_key": ["1"]})),
-                lambda: transform_panel(
-                    PanelTransformSpec.from_json(json.dumps({**PANEL_TRANSFORM, "time_key": ["1"]}))
-                ),
+                lambda: transform_panel(PanelTransformSpec.from_json(_panel_text(time_key=["1"]))),
+                ValueError,
             ),
         },
     ),
-    Twin(
+    Replacement(
         "evaluate_engine",
-        *_engine_twin(_covenant_engine_text(breach_history=[], windows=[], waivers=[]), {"debt_to_ebitda": 4.0}),
+        (covenants, "evaluate_engine"),
+        _engine_reports(_covenant_engine_text(breach_history=[], windows=[], waivers=[]), {"debt_to_ebitda": 4.0}),
+        lambda: [("max_debt_ebitda", True)],
         bad={
-            "missing-metric": _engine_twin(_covenant_engine_text(), {}),
-            "not-json": _engine_twin("{", {"debt_to_ebitda": 4.0}),
-            "unknown-field": _engine_twin(_covenant_engine_text(zzz=1), {"debt_to_ebitda": 4.0}),
-            "metrics-as-text": _engine_twin(_covenant_engine_text(), '{"debt_to_ebitda": 4.0}'),
+            "missing-metric": (_engine_reports(_covenant_engine_text(), {}), KeyError),
+            "not-json": (_engine_reports("{", {"debt_to_ebitda": 4.0}), ValueError),
+            "unknown-field": (_engine_reports(_covenant_engine_text(zzz=1), {"debt_to_ebitda": 4.0}), ValueError),
+            "metrics-as-text": (_engine_reports(_covenant_engine_text(), '{"debt_to_ebitda": 4.0}'), TypeError),
         },
     ),
     # A hand-written document may carry only `specs`.
-    Twin("evaluate_engine_specs_only", *_engine_twin(_covenant_engine_text(), {"debt_to_ebitda": 4.0})),
+    Replacement(
+        "evaluate_engine_specs_only",
+        (covenants, "evaluate_engine"),
+        _engine_reports(_covenant_engine_text(), {"debt_to_ebitda": 4.0}),
+        lambda: [("max_debt_ebitda", True)],
+    ),
+    Replacement(
+        "create_date",
+        (core_dates, "create_date"),
+        lambda: dt.date(2025, 2, 28),
+        lambda: dt.date(2025, 2, 28),
+        bad={"invalid-day": (lambda: dt.date(2025, 2, 30), ValueError)},
+    ),
+]
+
+TWINS = [
     Twin(
         "CalibrationResultEnvelope.market_json",
         lambda: _calibration_result().market_json,
@@ -1933,6 +1953,25 @@ TWINS = [
         },
     ),
 ]
+
+
+@pytest.mark.parametrize("replacement", REPLACEMENTS, ids=lambda replacement: replacement.id)
+def test_removed_text_form_is_gone_and_its_typed_form_works(replacement: Replacement) -> None:
+    owner, name = replacement.removed
+    assert not hasattr(owner, name)
+    value = replacement.call()
+    assert value
+    assert value == replacement.expected()
+
+
+@pytest.mark.parametrize(
+    ("replacement", "label"),
+    [pytest.param(item, label, id=f"{item.id}-{label}") for item in REPLACEMENTS for label in item.bad],
+)
+def test_typed_form_rejects_bad_input(replacement: Replacement, label: str) -> None:
+    call, expected = replacement.bad[label]
+    with pytest.raises(expected):
+        call()
 
 
 @pytest.mark.parametrize("twin", TWINS, ids=lambda twin: twin.id)

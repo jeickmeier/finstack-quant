@@ -16,8 +16,7 @@ class CovenantReport:
     human-readable explanation, and the audit stamp in force when the covenant
     was evaluated. Reports compare equal by value.
 
-    Construct via :meth:`CovenantEngine.evaluate`, :func:`evaluate_engine` or
-    :meth:`from_json`.
+    Construct via :meth:`CovenantEngine.evaluate` or :meth:`from_json`.
 
     Examples
     --------

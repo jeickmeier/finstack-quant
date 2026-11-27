@@ -13,7 +13,7 @@ use pyo3::prelude::*;
 /// human-readable explanation, and the audit stamp (numeric mode, rounding
 /// context, FX policy) in force when the covenant was evaluated.
 ///
-/// Construct via ``CovenantEngine.evaluate``, ``evaluate_engine`` or
+/// Construct via ``CovenantEngine.evaluate`` or
 /// ``from_json``. Two reports compare equal when every field, including the
 /// audit stamp, is equal.
 #[pyclass(

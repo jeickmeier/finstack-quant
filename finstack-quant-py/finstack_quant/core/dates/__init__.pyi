@@ -81,7 +81,6 @@ from finstack_quant.core.dates._date_ext import (
 )
 
 from finstack_quant.core.dates._epoch import (
-    create_date as create_date,
     days_since_epoch as days_since_epoch,
     date_from_epoch_days as date_from_epoch_days,
 )
@@ -130,7 +129,6 @@ __all__ = [
     "next_semiannual_cds_maturity",
     "next_third_friday",
     # free functions
-    "create_date",
     "days_since_epoch",
     "date_from_epoch_days",
     # date extensions

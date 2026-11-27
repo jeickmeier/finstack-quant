@@ -6,7 +6,7 @@ import pickle
 
 import pytest
 
-from finstack_quant.cashflows import dated_flows, dated_flows_json
+from finstack_quant.cashflows import dated_flows
 from finstack_quant.cashflows.accrual import AccrualConfig, accrued_interest_amount
 from finstack_quant.cashflows.aggregation import PeriodAggregation
 from finstack_quant.cashflows.builder import CashFlowMeta, CashFlowSchedule, Notional
@@ -55,11 +55,11 @@ def test_dated_flows_rejects_same_invalid_economics_as_json() -> None:
         Notional.par(100, "USD"),
         DayCount.ACT_360,
     )
-    wire = schedule.to_json()
     with pytest.raises(ValueError, match="repayments exceed outstanding"):
         dated_flows(schedule)
+    # The same schedule held as JSON text is refused on the way back in.
     with pytest.raises(ValueError, match="repayments exceed outstanding"):
-        dated_flows_json(wire)
+        dated_flows(CashFlowSchedule.from_json(schedule.to_json()))
 
 
 def test_dated_flows_preserves_cash_and_omits_state_rows() -> None:
@@ -76,9 +76,7 @@ def test_dated_flows_preserves_cash_and_omits_state_rows() -> None:
     )
     assert dated_flows(schedule) == [(date, Money(10, "USD"))]
     assert dated_flows(CashFlowSchedule.from_json(schedule.to_json())) == dated_flows(schedule)
-    assert json.loads(dated_flows_json(schedule.to_json())) == [
-        {"date": "2025-06-15", "amount": {"amount": "10", "currency": "USD"}}
-    ]
+    assert json.loads(dated_flows(schedule)[0][1].to_json()) == {"amount": "10", "currency": "USD"}
 
 
 def _coupon_schedule(flow: CashFlow) -> CashFlowSchedule:

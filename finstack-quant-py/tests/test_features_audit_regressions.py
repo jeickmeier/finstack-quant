@@ -64,12 +64,13 @@ def test_panel_nonfinite_input_and_output_policies_match_direct_calls() -> None:
         "operations": [{"name": "m", "family": "timeseries", "op": "rolling_mean", "params": {"window": 2}}],
     }
     assert f.transform_panel(spec).get_column("m") == [None, 1e308]
-    assert json.loads(f.transform_panel_json(json.dumps(spec)))["columns"][0]["values"] == [None, 1e308]
+    typed = f.transform_panel(f.PanelTransformSpec.from_json(json.dumps(spec)))
+    assert json.loads(typed.to_json())["columns"][0]["values"] == [None, 1e308]
     spec["operations"][0]["op"] = "rolling_sum"
     with pytest.raises(ValueError, match="non-finite"):
         f.transform_panel(spec)
     with pytest.raises(ValueError, match="non-finite"):
-        f.transform_panel_json(json.dumps(spec))
+        f.transform_panel(f.PanelTransformSpec.from_json(json.dumps(spec)))
 
 
 def test_scaled_statistics_and_exact_fit_neutralization() -> None:

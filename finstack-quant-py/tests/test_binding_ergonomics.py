@@ -260,31 +260,29 @@ class TestDateAcceptanceIsUniform:
 
     @staticmethod
     def _schedule() -> str:
-        from finstack_quant.cashflows import build_cashflow_schedule_json
+        from finstack_quant.cashflows import build_cashflow_schedule
 
-        return build_cashflow_schedule_json(
-            json.dumps({
-                "notional": {"initial": {"amount": "1000000", "currency": "USD"}, "amort": "none"},
-                "issue_date": "2024-08-31",
-                "maturity": "2025-08-31",
-                "coupon_program": [
-                    {
-                        "kind": "fixed",
-                        "spec": {
-                            "coupon_type": "cash",
-                            "rate": "0.06",
-                            "frequency": {"count": 12, "unit": "months"},
-                            "day_count": "30_360",
-                            "business_day_convention": "following",
-                            "calendar_id": "weekends_only",
-                            "stub": "none",
-                            "end_of_month": False,
-                            "payment_lag_days": 0,
-                        },
-                    }
-                ],
-            })
-        )
+        return build_cashflow_schedule({
+            "notional": {"initial": {"amount": "1000000", "currency": "USD"}, "amort": "none"},
+            "issue_date": "2024-08-31",
+            "maturity": "2025-08-31",
+            "coupon_program": [
+                {
+                    "kind": "fixed",
+                    "spec": {
+                        "coupon_type": "cash",
+                        "rate": "0.06",
+                        "frequency": {"count": 12, "unit": "months"},
+                        "day_count": "30_360",
+                        "business_day_convention": "following",
+                        "calendar_id": "weekends_only",
+                        "stub": "none",
+                        "end_of_month": False,
+                        "payment_lag_days": 0,
+                    },
+                }
+            ],
+        }).to_json()
 
     def test_cashflows_accrued_interest(self) -> None:
         from finstack_quant.cashflows.accrual import accrued_interest_amount
@@ -296,14 +294,14 @@ class TestDateAcceptanceIsUniform:
             == accrued_interest_amount(schedule, datetime.date(2025, 2, 28)).amount
         )
 
-    def test_covenants_evaluate_engine(self) -> None:
+    def test_covenants_engine_evaluate(self) -> None:
         from finstack_quant import covenants
 
         specs = [
             json.loads(s.to_json())
             for s in covenants.covenant_template(covenants.CovenantTemplate.lbo_standard(6.0, 2.0, 1.1, 50_000_000.0))
         ]
-        engine = covenants.validate_covenant_engine_json(
+        engine = covenants.CovenantEngine.from_json(
             json.dumps({
                 "specs": [specs[0]],
                 "breach_history": [],
@@ -316,8 +314,8 @@ class TestDateAcceptanceIsUniform:
         def as_json(reports: dict[str, object]) -> dict[str, str]:
             return {key: report.to_json() for key, report in reports.items()}
 
-        assert as_json(covenants.evaluate_engine(engine, metrics, "2026-03-31")) == as_json(
-            covenants.evaluate_engine(engine, metrics, datetime.date(2026, 3, 31))
+        assert as_json(engine.evaluate(metrics, "2026-03-31")) == as_json(
+            engine.evaluate(metrics, datetime.date(2026, 3, 31))
         )
 
     def test_a_pandas_timestamp_is_also_accepted(self) -> None:
@@ -334,7 +332,7 @@ class TestDateAcceptanceIsUniform:
     def test_factor_model_decompose_levels(self) -> None:
         """A third, structurally different entry point: takes a `time::Date`.
 
-        `evaluate_engine` forwards an ISO string to
+        `price_instrument` forwards an ISO string to
         the crate; `decompose_levels` converts to a `time::Date` instead, so it
         exercises the other half of the helper pair. Comparing the stamped
         ``date`` catches an off-by-one in the conversion, which comparing only
@@ -386,7 +384,7 @@ class TestDateAcceptanceIsUniform:
             json.loads(s.to_json())
             for s in covenants.covenant_template(covenants.CovenantTemplate.lbo_standard(6.0, 2.0, 1.1, 50_000_000.0))
         ]
-        engine = covenants.validate_covenant_engine_json(
+        engine = covenants.CovenantEngine.from_json(
             json.dumps({
                 "specs": [specs[0]],
                 "breach_history": [],
@@ -395,7 +393,7 @@ class TestDateAcceptanceIsUniform:
             })
         )
         with pytest.raises(TypeError, match="expected a date-like object") as excinfo:
-            covenants.evaluate_engine(engine, {"debt_to_ebitda": 4.0}, 20260331)
+            engine.evaluate({"debt_to_ebitda": 4.0}, 20260331)
         message = str(excinfo.value)
         assert "datetime.date" in message
         assert "ISO-8601" in message

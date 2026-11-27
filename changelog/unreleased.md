@@ -2,6 +2,19 @@
 
 ## Itemized changes
 
+### Python: a typed form replaces its JSON-text twin
+
+Where a Python function or member returned JSON text beside a typed form of
+the same computation, the text form is removed. A holder of JSON text loads
+it first; text of a result comes from `to_json()`. WASM and Rust keep their
+JSON entry points. Results are unchanged. Old → new:
+
+- `cashflows.build_cashflow_schedule_json(spec_json, market_json, as_of)` → `build_cashflow_schedule(json.loads(spec_json), MarketContext.from_json(market_json), as_of).to_json()`
+- `cashflows.dated_flows_json(schedule_json)` → `dated_flows(CashFlowSchedule.from_json(schedule_json))`, a list of `(date, Money)`
+- `features.transform_panel_json(spec_json)` → `transform_panel(PanelTransformSpec.from_json(spec_json)).to_json()`
+- `covenants.evaluate_engine(engine_json, metrics, as_of)` → `CovenantEngine.from_json(engine_json).evaluate(metrics, as_of)`
+- `core.dates.create_date(year, month, day)` → `datetime.date(year, month, day)`
+
 ### Python: a string argument is a value, not a JSON document
 
 In Python a `str` argument is a value (a label, a code, a date, an id). It is
@@ -32,7 +45,7 @@ unchanged. Old → new:
 - `FactorModel.from_config(config_json)` → `FactorModel.from_config(FactorModelConfig.from_json(config_json))`
 - `FactorCovarianceForecast.covariance_at('{"n_steps": 4}')`, and the same on `idiosyncratic_vol` and `factor_model_at` → `VolHorizon.n_steps(4)`, `VolHorizon.years(y)`, or `VolHorizon.parse(text)` for a stored descriptor. The labels `"one_step"` and `"unconditional"` are unchanged
 - A JSON array string or a dict where a list of rows is expected (`with_assets`, `hedge_swaps`, CDS index `constituents`, `relative_value_report(universe=)`) is refused: pass the list
-- Covenant `metrics` take a `dict[str, float]` (`CovenantEngine.evaluate` and `evaluate_and_track` also take a pandas Series; `evaluate_engine` takes the dict only); JSON text raises `TypeError`
+- Covenant `metrics` take a `dict[str, float]` or a pandas Series (`CovenantEngine.evaluate`, `evaluate_and_track`); JSON text raises `TypeError`
 - Reporting tear sheets (`statement_tearsheet`, `credit_tearsheet`, `dcf_tearsheet`, `portfolio_tearsheet`, `portfolio_risk_tearsheet`, `scenario_tearsheet`, `attribution_tearsheet`) and `statements_common.json_or_dict` / `parse_statement` take the typed result or its dict; JSON text raises `TypeError` (load it with the class's `from_json` or `json.loads`). `instrument_tearsheet(definition=)` takes the definition dict; a string there is no longer parsed
 
 `validate_scenario_spec` still takes JSON text, because it reports on a spec

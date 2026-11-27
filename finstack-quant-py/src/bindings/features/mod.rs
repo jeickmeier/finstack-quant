@@ -17,7 +17,7 @@ mod parse;
 mod transforms;
 
 use ops::{PyCrossSectionalOp, PyPairwiseOp, PyTimeSeriesOp};
-use panel::{PyPanelTransformResult, PyPanelTransformSpec, transform_panel, transform_panel_json};
+use panel::{PyPanelTransformResult, PyPanelTransformSpec, transform_panel};
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use transforms::{
@@ -45,7 +45,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(rank_to_weights, &m)?)?;
     m.add_function(wrap_pyfunction!(neutralize_and_zscore, &m)?)?;
     m.add_function(wrap_pyfunction!(transform_panel, &m)?)?;
-    m.add_function(wrap_pyfunction!(transform_panel_json, &m)?)?;
     let all = PyList::new(
         py,
         [
@@ -62,7 +61,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "transform_cross_sectional",
             "transform_cross_sectional_grouped",
             "transform_panel",
-            "transform_panel_json",
             "transform_timeseries",
             "transform_timeseries_pairwise",
         ],

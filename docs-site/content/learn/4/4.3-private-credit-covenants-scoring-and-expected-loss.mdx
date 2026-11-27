@@ -4,7 +4,7 @@ title: "Private Credit: Covenants, Scoring, and Expected Loss"
 description: "Connect native borrower forecasts to contractual tests, compare credit signals, and reconcile staged physical expected loss with the held loan exposure."
 desk_question: "Will this borrower breach its covenants, and what loss estimate belongs beside the loan price?"
 references: ["#ifrs-9-impairment", "#asc-326-cecl", "#bcbs-2015-ecl-guidance", "#altman-1968", "#ohlson-1980", "#zmijewski-1984", "#merton-1974", "#crosbie-bohn-2003-kmv", "#lando-skodeberg-2002", "#israel-rosenthal-wei-2001", "#schuermann-2004-lgd", "#altman-et-al-2005-recovery", "#moodys-rating-symbols"]
-api: ["finstack_quant.covenants.CovenantEngine", "finstack_quant.covenants.CovenantSpec", "finstack_quant.covenants.evaluate_engine", "finstack_quant.models.credit.scoring.altman_z_score", "finstack_quant.models.credit.pd.MasterScale", "finstack_quant.models.credit.migration.GeneratorMatrix", "finstack_quant.models.credit.lgd.WorkoutLgd", "finstack_quant.statements_analytics.compute_ecl", "finstack_quant.statements_analytics.compute_ecl_weighted", "finstack_quant.statements_analytics.compute_impaired_ecl", "finstack_quant.models.credit.MertonModel"]
+api: ["finstack_quant.covenants.CovenantEngine", "finstack_quant.covenants.CovenantSpec", "finstack_quant.models.credit.scoring.altman_z_score", "finstack_quant.models.credit.pd.MasterScale", "finstack_quant.models.credit.migration.GeneratorMatrix", "finstack_quant.models.credit.lgd.WorkoutLgd", "finstack_quant.statements_analytics.compute_ecl", "finstack_quant.statements_analytics.compute_ecl_weighted", "finstack_quant.statements_analytics.compute_impaired_ecl", "finstack_quant.models.credit.MertonModel"]
 status: "published"
 ---
 
@@ -125,7 +125,7 @@ import numpy as np
 import pandas as pd
 from _shared.borrower_model import borrower_model, borrower_data
 from finstack_quant.statements import Evaluator, ModelBuilder, ForecastSpec
-from finstack_quant.covenants import Covenant, CovenantEngine, CovenantSpec, CovenantTemplate, CovenantType, covenant_template, evaluate_engine
+from finstack_quant.covenants import Covenant, CovenantEngine, CovenantSpec, CovenantTemplate, CovenantType, covenant_template
 
 credit_data = borrower_data()
 credit_model = borrower_model()
@@ -153,7 +153,7 @@ for scenario in ("base","downside"):
     for quarter,as_of in zip(PERIODS[4:],forecast_dates):
         metrics = {"net_leverage":values.get("net_leverage",quarter),"dscr":values.get("dscr",quarter),"ebitda":values.get("ebitda",quarter)}
         reports = engine.evaluate(metrics,as_of)
-        bridged = evaluate_engine(CovenantEngine.from_specs(credit_specs).to_json(),metrics,as_of)
+        bridged = CovenantEngine.from_json(CovenantEngine.from_specs(credit_specs).to_json()).evaluate(metrics,as_of)
         for identifier,report in reports.items():
             unit_headroom = 4.5-metrics["net_leverage"] if identifier=="net-leverage" else metrics["dscr"]-1.1
             assert abs(report.headroom-unit_headroom/report.threshold) < 1e-12

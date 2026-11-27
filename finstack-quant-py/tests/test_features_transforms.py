@@ -14,7 +14,6 @@ from finstack_quant.features import (
     rolling_regression_residual,
     transform_cross_sectional,
     transform_cross_sectional_grouped,
-    transform_panel_json,
     transform_timeseries,
     transform_timeseries_pairwise,
 )
@@ -174,7 +173,7 @@ def test_pipeline_helper_entrypoints() -> None:
     ])
 
 
-def test_transform_panel_json_entrypoint() -> None:
+def test_transform_panel_from_spec_text() -> None:
     spec = {
         "values": [10.0, 12.0, 20.0, 21.0],
         "entity": ["A", "A", "B", "B"],
@@ -186,7 +185,9 @@ def test_transform_panel_json_entrypoint() -> None:
         ],
     }
 
-    result = json.loads(transform_panel_json(json.dumps(spec)))
+    from finstack_quant.features import PanelTransformSpec, transform_panel
+
+    result = json.loads(transform_panel(PanelTransformSpec.from_json(json.dumps(spec))).to_json())
     assert result["columns"][0]["name"] == "ret1"
     assert result["columns"][0]["values"][1] == pytest.approx(0.2)
     assert result["columns"][1]["name"] == "rank"

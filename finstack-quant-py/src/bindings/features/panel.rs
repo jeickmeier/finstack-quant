@@ -233,7 +233,7 @@ wire_methods!(
     "PanelTransformResult"
 );
 
-/// Apply a named panel transform pipeline (typed twin of ``transform_panel_json``).
+/// Apply a named panel transform pipeline.
 ///
 /// Operations run sequentially; each reads the previous column unless
 /// ``input`` selects ``"values"`` or an earlier operation name.
@@ -296,36 +296,5 @@ pub(super) fn transform_panel(
     };
     py.detach(move || finstack_quant_features::transform_panel(&spec))
         .map(|inner| PyPanelTransformResult { inner })
-        .map_err(core_to_py)
-}
-
-/// Apply a JSON panel transform pipeline (JSON twin of ``transform_panel``).
-///
-/// Parameters
-/// ----------
-/// spec_json : str
-///     JSON-encoded ``PanelTransformSpec``.
-///
-/// Returns
-/// -------
-/// str
-///     JSON ``{"columns": [{"name", "values"}, ...]}`` in operation order.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If the JSON is malformed or an operation fails.
-///
-/// Examples
-/// --------
-/// >>> import json
-/// >>> from finstack_quant.features import transform_panel_json
-/// >>> spec = {"values": [1.0, 3.0], "time_key": ["d", "d"], "operations": [{"name": "r", "family": "cross_sectional", "op": "rank"}]}
-/// >>> json.loads(transform_panel_json(json.dumps(spec)))["columns"][0]["name"]
-/// 'r'
-#[pyfunction]
-#[pyo3(text_signature = "(spec_json)")]
-pub(super) fn transform_panel_json(py: Python<'_>, spec_json: String) -> PyResult<String> {
-    py.detach(move || finstack_quant_features::transform_panel_json(&spec_json))
         .map_err(core_to_py)
 }

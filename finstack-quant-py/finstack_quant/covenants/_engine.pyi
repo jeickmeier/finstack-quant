@@ -501,7 +501,7 @@ class CovenantEngine:
         Returns
         -------
         str
-            Engine document accepted by ``evaluate_engine`` and
+            Engine document accepted by :meth:`from_json` and
             ``validate_covenant_engine_json``.
 
         Raises
@@ -829,7 +829,7 @@ def reports_table(reports: dict[str, CovenantReport]) -> ArrowTable:
     Parameters
     ----------
     reports : dict[str, CovenantReport]
-        Output of :meth:`CovenantEngine.evaluate` or :func:`evaluate_engine`.
+        Output of :meth:`CovenantEngine.evaluate`.
 
     Returns
     -------

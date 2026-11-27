@@ -21,11 +21,16 @@ def _engine_json(spec: dict[str, object]) -> str:
     return json.dumps({"specs": [spec], "breach_history": [], "windows": [], "waivers": []})
 
 
+def _evaluate(engine_json: str, metrics: object, as_of: object) -> dict[str, covenants.CovenantReport]:
+    """Evaluate an engine held as JSON text: load it, then call the typed method."""
+    return covenants.CovenantEngine.from_json(engine_json).evaluate(metrics, as_of)
+
+
 def test_covenant_template_roundtrip_and_evaluate() -> None:
     specs = _specs(covenants.CovenantTemplate.lbo_standard(5.0, 1.5, 1.2, 10_000_000.0))
 
     canonical_engine = covenants.validate_covenant_engine_json(_engine_json(specs[0]))
-    reports = covenants.evaluate_engine(
+    reports = _evaluate(
         canonical_engine,
         {"debt_to_ebitda": 4.0},
         "2026-03-31",
@@ -41,7 +46,7 @@ def test_covenant_template_roundtrip_and_evaluate() -> None:
     assert "numeric_mode" in report.meta
 
 
-def test_evaluate_engine_accepts_dict_metrics_and_specs_only_document() -> None:
+def test_loaded_engine_accepts_dict_metrics_and_specs_only_document() -> None:
     """`{"specs": [...]}` is a complete engine document and metrics may be a dict."""
     specs = _specs(covenants.CovenantTemplate.lbo_standard(5.0, 1.5, 1.2, 10_000_000.0))
     engine = json.dumps({"specs": specs})
@@ -51,23 +56,23 @@ def test_evaluate_engine_accepts_dict_metrics_and_specs_only_document() -> None:
         "fixed_charge_coverage": 1.5,
         "capex": 5_000_000.0,
     }
-    reports = covenants.evaluate_engine(engine, metrics, "2026-03-31")
+    reports = _evaluate(engine, metrics, "2026-03-31")
     assert list(reports) == ["max_debt_ebitda", "min_interest_coverage", "min_fcc", "max_capex"]
-    assert covenants.evaluate_engine(engine, json.loads(json.dumps(metrics)), "2026-03-31") == reports
+    assert _evaluate(engine, json.loads(json.dumps(metrics)), "2026-03-31") == reports
     with pytest.raises(TypeError, match="metrics must be a dict"):
-        covenants.evaluate_engine(engine, json.dumps(metrics), "2026-03-31")
+        _evaluate(engine, json.dumps(metrics), "2026-03-31")
     assert json.loads(covenants.validate_covenant_engine_json(engine))["waivers"] == []
 
 
-def test_evaluate_engine_missing_metric_raises_key_error() -> None:
+def test_loaded_engine_missing_metric_raises_key_error() -> None:
     specs = _specs(covenants.CovenantTemplate.cov_lite(7.0, 4.5))
     with pytest.raises(KeyError, match="senior_leverage"):
-        covenants.evaluate_engine(json.dumps({"specs": specs}), {"total_leverage": 5.0}, "2026-03-31")
+        _evaluate(json.dumps({"specs": specs}), {"total_leverage": 5.0}, "2026-03-31")
 
 
-def test_evaluate_engine_report_dataframe_and_pickle() -> None:
+def test_loaded_engine_report_dataframe_and_pickle() -> None:
     spec = _specs(covenants.CovenantTemplate.lbo_standard(5.0, 1.5, 1.2, 10_000_000.0))[0]
-    report = covenants.evaluate_engine(
+    report = _evaluate(
         _engine_json(spec),
         {"debt_to_ebitda": 5.5},
         "2026-03-31",
@@ -193,7 +198,7 @@ def test_covenant_template_wire_form_and_packages() -> None:
     ] * 3
 
 
-def test_typed_engine_matches_json_bridge() -> None:
+def test_typed_engine_matches_its_json_round_trip() -> None:
     covenant = (
         covenants
         .Covenant(covenants.CovenantType.max_debt_to_ebitda(4.5), "3M", "max_total_leverage")
@@ -211,7 +216,7 @@ def test_typed_engine_matches_json_bridge() -> None:
     engine = covenants.CovenantEngine().add_spec(covenants.CovenantSpec(covenant, "debt_to_ebitda"))
     assert len(engine) == 1
     typed = engine.evaluate({"debt_to_ebitda": 3.2}, datetime.date(2025, 3, 31))
-    bridged = covenants.evaluate_engine(engine.to_json(), {"debt_to_ebitda": 3.2}, "2025-03-31")
+    bridged = _evaluate(engine.to_json(), {"debt_to_ebitda": 3.2}, "2025-03-31")
     assert typed == bridged
     assert typed["max_total_leverage"].passed is True
     assert typed["max_total_leverage"].threshold == pytest.approx(4.5)
@@ -408,7 +413,7 @@ def test_forecast_rejects_duplicate_columns_and_incomplete_observations() -> Non
         with pytest.raises(ValueError, match="finite"):
             engine.evaluate({"x": value}, "2026-03-31")
         with pytest.raises(ValueError, match="finite"):
-            covenants.evaluate_engine(engine.to_json(), {"x": value}, "2026-03-31")
+            _evaluate(engine.to_json(), {"x": value}, "2026-03-31")
         with pytest.raises(ValueError, match="finite"):
             covenants.forecast_breaches(engine, frame)
     with pytest.raises(KeyError):
@@ -454,7 +459,7 @@ def test_net_cash_and_negative_earnings_have_distinct_outcomes() -> None:
         spot = engine.evaluate(metrics, "2026-03-31")["net"]
         assert spot.passed == (earnings > 0)
         assert (spot.headroom is not None) == (earnings > 0)
-        assert covenants.evaluate_engine(engine.to_json(), metrics, "2026-03-31")["net"] == spot
+        assert _evaluate(engine.to_json(), metrics, "2026-03-31")["net"] == spot
         forecast = covenants.forecast_covenant(spec, pd.DataFrame([metrics], index=pd.to_datetime(["2026-03-31"])))
         assert forecast.breach_probability == [0.0 if earnings > 0 else 1.0]
     with pytest.raises(KeyError):
@@ -504,17 +509,17 @@ def test_forecast_scope_and_mc_boundaries() -> None:
 def test_metric_map_refuses_json_text_and_wrong_shapes(metrics: str, error: type[Exception], message: str) -> None:
     """A metric map is a ``dict``: JSON text is refused, and a wrong shape loaded with ``json.loads`` raises.
 
-    The function and the engine method raise the same error for the same input.
+    An engine loaded from text and the engine it was loaded into raise the same error for the same input.
     """
     specs = _specs(covenants.CovenantTemplate.lbo_standard(5.0, 1.5, 1.2, 10_000_000.0))
     engine_json = _engine_json(specs[0])
     engine = covenants.CovenantEngine.from_json(engine_json)
     with pytest.raises(TypeError, match="metrics must be a dict"):
-        covenants.evaluate_engine(engine_json, metrics, "2026-03-31")
+        _evaluate(engine_json, metrics, "2026-03-31")
     with pytest.raises(TypeError, match="metrics must be a dict"):
         engine.evaluate(metrics, "2026-03-31")
     with pytest.raises(error) as from_function:
-        covenants.evaluate_engine(engine_json, json.loads(metrics), "2026-03-31")
+        _evaluate(engine_json, json.loads(metrics), "2026-03-31")
     assert str(from_function.value).startswith(message)
     with pytest.raises(error) as from_method:
         engine.evaluate(json.loads(metrics), "2026-03-31")
@@ -560,16 +565,16 @@ def test_scope_and_threshold_labels_are_parsed_by_one_rust_parser() -> None:
 
 
 @pytest.mark.parametrize("bad", [math.nan, math.inf, -math.inf])
-def test_evaluate_engine_dict_matches_typed_evaluate_for_non_finite_metrics(bad: float) -> None:
+def test_loaded_engine_matches_typed_evaluate_for_non_finite_metrics(bad: float) -> None:
     """CFCC-016: a metric dict reaches Rust as numbers, never as JSON text."""
     covenant = covenants.Covenant(covenants.CovenantType.max_debt_to_ebitda(4.5), "3M", "lev")
     engine = covenants.CovenantEngine.from_specs([covenants.CovenantSpec(covenant, "lev")])
     engine_json = engine.to_json()
     unread = {"lev": 3.0, "unused": bad}
-    assert covenants.evaluate_engine(engine_json, unread, "2025-03-31") == engine.evaluate(unread, "2025-03-31")
+    assert _evaluate(engine_json, unread, "2025-03-31") == engine.evaluate(unread, "2025-03-31")
     read = {"lev": bad}
     with pytest.raises(ValueError, match="must be finite") as typed:
         engine.evaluate(read, "2025-03-31")
     with pytest.raises(ValueError, match="must be finite") as via_json:
-        covenants.evaluate_engine(engine_json, read, "2025-03-31")
+        _evaluate(engine_json, read, "2025-03-31")
     assert str(via_json.value) == str(typed.value) == "Validation error: metric 'lev' must be finite"

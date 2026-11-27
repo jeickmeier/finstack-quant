@@ -1,21 +1,6 @@
-//! Date creation and epoch-day conversion Python entry points.
+//! Epoch-day conversion Python entry points.
 
 use pyo3::prelude::*;
-
-/// Create a ``datetime.date`` from year, month (1-12), and day.
-#[pyfunction]
-#[pyo3(name = "create_date", text_signature = "(year, month, day)")]
-pub(super) fn py_create_date<'py>(
-    py: Python<'py>,
-    year: i32,
-    month: u8,
-    day: u8,
-) -> PyResult<Bound<'py, PyAny>> {
-    crate::bindings::date_utils::date_to_py(
-        py,
-        crate::bindings::date_utils::date_from_ymd(year, month, day)?,
-    )
-}
 
 /// Return the number of days since the Unix epoch (1970-01-01) for a date.
 ///

@@ -10,7 +10,7 @@ pub mod schedule;
 pub mod sifma;
 pub mod tenor;
 
-use epoch::{py_create_date, py_date_from_epoch_days, py_days_since_epoch};
+use epoch::{py_date_from_epoch_days, py_days_since_epoch};
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 
@@ -31,7 +31,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     imm::register(&m)?;
     date_ext::register(&m)?;
 
-    m.add_function(wrap_pyfunction!(py_create_date, &m)?)?;
     m.add_function(wrap_pyfunction!(py_days_since_epoch, &m)?)?;
     m.add_function(wrap_pyfunction!(py_date_from_epoch_days, &m)?)?;
 
@@ -44,7 +43,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     all_names.extend_from_slice(sifma::EXPORTS);
     all_names.extend_from_slice(imm::EXPORTS);
     all_names.extend_from_slice(date_ext::EXPORTS);
-    all_names.extend_from_slice(&["create_date", "days_since_epoch", "date_from_epoch_days"]);
+    all_names.extend_from_slice(&["days_since_epoch", "date_from_epoch_days"]);
     all_names.sort_unstable();
 
     let all = PyList::new(py, &all_names)?;
