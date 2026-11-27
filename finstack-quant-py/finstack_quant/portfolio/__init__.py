@@ -13,7 +13,7 @@ contract about how disruptive future changes are likely to be.
 * ``Portfolio``, ``PortfolioBuilder``, ``PortfolioValuation``,
   ``PositionValue``, ``PortfolioResult``, ``PortfolioCashflows`` (the typed
   handles)
-* ``parse_portfolio_spec_json`` and ``Portfolio.from_spec``
+* ``parse_portfolio_spec_json``, ``Portfolio.from_json`` and ``Portfolio.from_spec``
 * ``value_portfolio``, ``aggregate_full_cashflows``,
   ``apply_scenario_and_revalue``
 * ``aggregate_metrics`` (scalar reads go through ``PortfolioMetrics``

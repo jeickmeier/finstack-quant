@@ -99,36 +99,34 @@ def _result_doc() -> dict[str, object]:
 
 def _unmargined_portfolio() -> Portfolio:
     """One deposit; deposits carry no margin specification."""
-    return Portfolio.from_spec(
-        json.dumps({
-            "id": "MARGIN-BOOK",
-            "as_of": AS_OF,
-            "base_currency": "USD",
-            "entities": {"FUND": {"id": "FUND"}},
-            "positions": [
-                {
-                    "position_id": "USD-POS",
-                    "entity_id": "FUND",
-                    "instrument_id": "USD-DEP",
-                    "instrument_spec": {
-                        "type": "deposit",
-                        "spec": {
-                            "id": "USD-DEP",
-                            "notional": {"amount": "1000000", "currency": "USD"},
-                            "start_date": AS_OF,
-                            "maturity": "2025-07-15",
-                            "day_count": "act_360",
-                            "fixed_rate": "0.04",
-                            "discount_curve_id": "USD-OIS",
-                            "attributes": {},
-                        },
+    return Portfolio.from_spec({
+        "id": "MARGIN-BOOK",
+        "as_of": AS_OF,
+        "base_currency": "USD",
+        "entities": {"FUND": {"id": "FUND"}},
+        "positions": [
+            {
+                "position_id": "USD-POS",
+                "entity_id": "FUND",
+                "instrument_id": "USD-DEP",
+                "instrument_spec": {
+                    "type": "deposit",
+                    "spec": {
+                        "id": "USD-DEP",
+                        "notional": {"amount": "1000000", "currency": "USD"},
+                        "start_date": AS_OF,
+                        "maturity": "2025-07-15",
+                        "day_count": "act_360",
+                        "fixed_rate": "0.04",
+                        "discount_curve_id": "USD-OIS",
+                        "attributes": {},
                     },
-                    "quantity": 1.0,
-                    "unit": "units",
-                }
-            ],
-        })
-    )
+                },
+                "quantity": 1.0,
+                "unit": "units",
+            }
+        ],
+    })
 
 
 def _market() -> MarketContext:

@@ -23,10 +23,12 @@ use finstack_quant_portfolio::types::AttributeValue;
 use finstack_quant_portfolio::types::DUMMY_ENTITY_ID;
 use finstack_quant_portfolio::types::Entity;
 use indexmap::IndexMap;
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
 use pyo3::types::PyDict;
 use pyo3::types::PyModule;
+use pyo3::types::PyString;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -162,8 +164,9 @@ impl PyPosition {
 /// the derived lookup indices.
 ///
 /// Cheap to clone (wraps an ``Arc``). Build it once — with
-/// ``Portfolio.builder(...)`` for typed construction or ``Portfolio.from_spec``
-/// for a canonical ``PortfolioSpec`` JSON document — and reuse it across
+/// ``Portfolio.builder(...)`` for typed construction, ``Portfolio.from_spec``
+/// for a ``PortfolioSpec`` dict or ``Portfolio.from_json`` for its JSON text —
+/// and reuse it across
 /// ``value_portfolio``, ``aggregate_full_cashflows``, ``aggregate_metrics``
 /// and ``scenario_pnl`` to avoid repeating position materialization and index
 /// construction.
@@ -282,11 +285,27 @@ impl PyPortfolio {
         Ok(Self::from_inner(inner))
     }
 
-    /// Build a portfolio from a JSON ``PortfolioSpec``.
+    /// Build a portfolio from a ``PortfolioSpec`` dict, the form ``to_spec()``
+    /// returns (Rust ``Portfolio::from_spec``).
+    ///
+    /// Positions are materialized, the indices rebuilt and the result
+    /// validated, with the GIL released. JSON text goes through
+    /// ``from_json``; a ``str`` here raises ``TypeError``.
     #[staticmethod]
-    #[pyo3(text_signature = "(spec_json)")]
-    fn from_spec(py: Python<'_>, spec_json: &str) -> PyResult<Self> {
-        Self::from_json(py, spec_json)
+    #[pyo3(text_signature = "(spec)")]
+    fn from_spec(py: Python<'_>, spec: &Bound<'_, PyAny>) -> PyResult<Self> {
+        if spec.is_instance_of::<PyString>() {
+            return Err(PyTypeError::new_err(
+                "Portfolio.from_spec takes the spec dict that to_spec() returns; \
+                 load JSON text with Portfolio.from_json",
+            ));
+        }
+        let spec: finstack_quant_portfolio::PortfolioSpec =
+            py_to_serde(py, spec, "portfolio spec")?;
+        let inner = py
+            .detach(move || finstack_quant_portfolio::Portfolio::from_spec(spec))
+            .map_err(portfolio_to_py)?;
+        Ok(Self::from_inner(inner))
     }
 
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).

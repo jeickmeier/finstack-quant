@@ -186,7 +186,7 @@ def test_rebalance_from_spec_works_on_a_result_rebuilt_from_json() -> None:
     spec = (
         PortfolioOptimizationSpec
         .new(
-            Portfolio.from_spec(json.dumps(_book())),
+            Portfolio.from_spec(_book()),
             Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.constant(1.0))),
         )
         .with_weighting(WeightingScheme.notional_weight())
@@ -209,7 +209,7 @@ def test_portfolio_input_errors_keep_their_rust_kind() -> None:
 
     market = MarketContext().insert(DiscountCurve.flat("USD-OIS", datetime.date(2024, 1, 15), 0.04, "act_365f"))
     objective = Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.constant(1.0)))
-    portfolio = Portfolio.from_spec(json.dumps(_book()))
+    portfolio = Portfolio.from_spec(_book())
     # Plain constraint variants are validated by the optimizer, for typed and
     # JSON-built constraints alike.
     for constraint, needle in [
@@ -246,7 +246,7 @@ def test_infeasible_rebalance_raises_portfolio_error() -> None:
     spec = (
         PortfolioOptimizationSpec
         .new(
-            Portfolio.from_spec(json.dumps(_book())),
+            Portfolio.from_spec(_book()),
             Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.constant(1.0))),
         )
         .with_weighting(WeightingScheme.notional_weight())
@@ -265,7 +265,7 @@ def test_rebalanced_portfolio_is_identical_after_result_reconstruction() -> None
     spec = (
         PortfolioOptimizationSpec
         .new(
-            Portfolio.from_spec(json.dumps(_book())),
+            Portfolio.from_spec(_book()),
             Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.constant(1.0))),
         )
         .with_weighting(WeightingScheme.notional_weight())

@@ -346,7 +346,7 @@ class TestPortfolioNamespace:
         """Portfolio domain failures should expose a portfolio-specific exception."""
         from finstack_quant.portfolio import Portfolio, PortfolioError
 
-        spec_json = json.dumps({
+        spec = {
             "id": "bad_portfolio",
             "name": "Bad",
             "base_currency": "USD",
@@ -362,24 +362,24 @@ class TestPortfolioNamespace:
                     "unit": "units",
                 }
             ],
-        })
+        }
 
         with pytest.raises(PortfolioError):
-            Portfolio.from_spec(spec_json).to_json()
+            Portfolio.from_spec(spec).to_json()
 
     def test_portfolio_full_cashflows_empty_portfolio(self) -> None:
         """Full cashflow ladder should be exposed and preserve the rich empty shape."""
         from finstack_quant.portfolio import Portfolio
 
-        spec_json = json.dumps({
+        spec = {
             "id": "test_portfolio",
             "name": "Test",
             "base_currency": "USD",
             "as_of": "2024-01-15",
             "entities": {},
             "positions": [],
-        })
-        cashflows = aggregate_full_cashflows(Portfolio.from_spec(spec_json), MarketContext())
+        }
+        cashflows = aggregate_full_cashflows(Portfolio.from_spec(spec), MarketContext())
         assert len(cashflows) == 0
         assert len(cashflows.by_position) == 0
         assert len(cashflows.issues) == 0

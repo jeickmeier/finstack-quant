@@ -221,7 +221,7 @@ def _inputs() -> dict[str, Any]:
 
 def _compute(inputs: dict[str, Any]) -> dict[str, Any]:
     """Every host-shared portfolio computation, as JSON-shaped values."""
-    portfolio = Portfolio.from_spec(json.dumps(inputs["portfolio_spec"]))
+    portfolio = Portfolio.from_spec(inputs["portfolio_spec"])
     market_t0 = MarketContext.from_json(json.dumps(inputs["market_t0"]))
     market_t1 = MarketContext.from_json(json.dumps(inputs["market_t1"]))
     config = FactorModelConfig.from_json(json.dumps(inputs["factor_model_config"]))
@@ -318,7 +318,7 @@ def test_python_matches_the_shared_host_parity_fixture() -> None:
 
 def test_require_metric_and_what_if_errors_come_from_rust() -> None:
     fixture = json.loads(FIXTURE.read_text())["inputs"]
-    portfolio = Portfolio.from_spec(json.dumps(fixture["portfolio_spec"]))
+    portfolio = Portfolio.from_spec(fixture["portfolio_spec"])
     market = MarketContext.from_json(json.dumps(fixture["market_t0"]))
     with pytest.raises(PortfolioError):
         FactorModel.from_config(
@@ -330,7 +330,7 @@ def test_factor_model_handle_matches_the_shared_host_parity_fixture() -> None:
     """PORT-007: one FactorModel handle serves every engine method in Rust."""
     fixture = json.loads(FIXTURE.read_text())
     inputs, expected = fixture["inputs"], fixture["expected"]
-    portfolio = Portfolio.from_spec(json.dumps(inputs["portfolio_spec"]))
+    portfolio = Portfolio.from_spec(inputs["portfolio_spec"])
     market = MarketContext.from_json(json.dumps(inputs["market_t0"]))
     as_of = inputs["as_of_t0"]
     stresses = [tuple(pair) for pair in inputs["stresses"]]

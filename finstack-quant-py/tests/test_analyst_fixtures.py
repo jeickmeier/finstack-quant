@@ -95,7 +95,7 @@ def test_calibration_replay_survives_market_serialization(fixtures: SimpleNamesp
     restored = MarketContext.from_json(before)
     spec = fixtures.book.book_spec("base")
     spec["positions"] = [position for position in spec["positions"] if position["instrument_id"] == "ACME-CDS"]
-    cds = Portfolio.from_spec(json.dumps(spec))
+    cds = Portfolio.from_spec(spec)
     first = value_portfolio(cds, market, strict_risk=True, metrics=["cs01", "bucketed_cs01"])
     second = value_portfolio(cds, restored, strict_risk=True, metrics=["cs01", "bucketed_cs01"])
     measures = json.loads(first.to_json())["position_values"]["ACME-CDS"]["valuation_result"]["measures"]
@@ -125,7 +125,7 @@ def test_dated_flow_history_drives_native_performance(fixtures: SimpleNamespace)
     start_date, end_date = fixtures.history.HISTORY_DATES[0], fixtures.history.HISTORY_DATES[-1]
     initial_market = fixtures.history.history_market(start_date)
     initial_spec = fixtures.history.history_spec(start_date)
-    initial_book = Portfolio.from_spec(json.dumps(initial_spec))
+    initial_book = Portfolio.from_spec(initial_spec)
     initial_nav = value_portfolio(initial_book, initial_market, metrics=[]).total_value
     initial_cashflows = json.loads(aggregate_full_cashflows(initial_book, initial_market).to_json())["events"]
     payment_dates = {
@@ -147,7 +147,7 @@ def test_dated_flow_history_drives_native_performance(fixtures: SimpleNamespace)
         if when in payment_dates:
             held = fixtures.history.history_spec(when - timedelta(days=1))
             held["as_of"] = when.isoformat()
-            payments = json.loads(aggregate_full_cashflows(Portfolio.from_spec(json.dumps(held)), market).to_json())
+            payments = json.loads(aggregate_full_cashflows(Portfolio.from_spec(held), market).to_json())
             for payment in payments["events"]:
                 if payment["date"] == when.isoformat():
                     amount = float(payment["amount"]["amount"])
@@ -156,7 +156,7 @@ def test_dated_flow_history_drives_native_performance(fixtures: SimpleNamespace)
                     cash += amount
                     settled_positions.add(payment["position_id"])
         spec = fixtures.history.history_spec(when)
-        valuation = value_portfolio(Portfolio.from_spec(json.dumps(spec)), market, metrics=[])
+        valuation = value_portfolio(Portfolio.from_spec(spec), market, metrics=[])
         wire = json.loads(valuation.to_json())
         for event in (event for event in events if event["date"] == when.isoformat()):
             if event["type"] == "trade":

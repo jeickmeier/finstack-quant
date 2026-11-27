@@ -22,7 +22,7 @@ VALID = json.dumps({"id": "ok", "operations": []})
 
 def _portfolio() -> portfolio.Portfolio:
     spec = {"id": "P", "as_of": "2025-01-15", "base_currency": "USD", "entities": {}, "positions": []}
-    return portfolio.Portfolio.from_spec(json.dumps(spec))
+    return portfolio.Portfolio.from_spec(spec)
 
 
 def test_the_loader_rejects_an_invalid_spec() -> None:

@@ -66,7 +66,7 @@ events = history_events()
 start_date, end_date = history_dates[0], history_dates[-1]
 initial_market = history_market(start_date)
 initial_spec = history_spec(start_date)
-initial_book = Portfolio.from_spec(json.dumps(initial_spec))
+initial_book = Portfolio.from_spec(initial_spec)
 initial_nav = value_portfolio(initial_book, initial_market, metrics=[]).total_value
 initial_cashflows = json.loads(aggregate_full_cashflows(initial_book, initial_market).to_json())["events"]
 payment_dates = {
@@ -90,7 +90,7 @@ for when in timeline:
     if when in payment_dates:
         held = history_spec(when - timedelta(days=1))
         held["as_of"] = when.isoformat()
-        payments = json.loads(aggregate_full_cashflows(Portfolio.from_spec(json.dumps(held)), market).to_json())
+        payments = json.loads(aggregate_full_cashflows(Portfolio.from_spec(held), market).to_json())
         for payment in payments["events"]:
             if payment["date"] == when.isoformat():
                 amount = float(payment["amount"]["amount"])
@@ -99,7 +99,7 @@ for when in timeline:
                 cash += amount
                 settled_positions.add(payment["position_id"])
     spec = history_spec(when)
-    valuation = value_portfolio(Portfolio.from_spec(json.dumps(spec)), market, metrics=[])
+    valuation = value_portfolio(Portfolio.from_spec(spec), market, metrics=[])
     wire = json.loads(valuation.to_json())
     for event in (event for event in events if event["date"] == when.isoformat()):
         if event["type"] == "trade":

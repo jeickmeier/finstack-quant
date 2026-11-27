@@ -130,7 +130,7 @@ def test_scenario_pnl_batch_matches_standalone_and_accepts_loaded_inputs() -> No
         Portfolio.from_json(_portfolio_json()), scenarios, MarketContext.from_json(market.to_json())
     )
     assert [json.loads(item.to_json()) for item in from_json] == batch
-    # Portfolio JSON text is not a portfolio: it goes through `Portfolio.from_spec`.
+    # Portfolio JSON text is not a portfolio: it goes through `Portfolio.from_json`.
     with pytest.raises(TypeError, match="'Portfolio'"):
         scenario_pnl_batch(_portfolio_json(), scenarios, market)
     # Market JSON text is not a market: it goes through the loader.

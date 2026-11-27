@@ -2,7 +2,7 @@
 
 In the Python API a ``str`` argument is a value: a label, a code, a date, an id.
 It is never a JSON document. JSON text enters through a named loader
-(``T.from_json``, ``Portfolio.from_spec``) or ``json.loads``, and the text of a
+(``T.from_json``) or ``json.loads``, and the text of a
 result comes from ``to_json()``.
 
 This check reads the ``.pyi`` stubs under ``finstack-quant-py/finstack_quant``

@@ -14,7 +14,6 @@ by a per-binding table, and at least one of those tables disagreed with Rust.
 from __future__ import annotations
 
 from datetime import date
-import json
 
 import pandas as pd
 import pytest
@@ -120,7 +119,7 @@ class TestPortfolio:
             ],
         }
         with pytest.raises(KeyError, match="NOPE"):
-            portfolio.Portfolio.from_spec(json.dumps(spec))
+            portfolio.Portfolio.from_spec(spec)
 
 
 class TestModels:

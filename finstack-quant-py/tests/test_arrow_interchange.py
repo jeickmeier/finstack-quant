@@ -32,7 +32,7 @@ def _statement_result() -> object:
 
 
 def _portfolio_valuation() -> object:
-    portfolio_json = json.dumps({
+    portfolio_spec = {
         "id": "ARROW-TEST",
         "as_of": AS_OF,
         "base_currency": "USD",
@@ -59,7 +59,7 @@ def _portfolio_valuation() -> object:
                 "unit": "units",
             }
         ],
-    })
+    }
     market = MarketContext()
     market.insert(
         DiscountCurve(
@@ -71,7 +71,7 @@ def _portfolio_valuation() -> object:
             extrapolation="extend",
         )
     )
-    return value_portfolio(Portfolio.from_spec(portfolio_json), market)
+    return value_portfolio(Portfolio.from_spec(portfolio_spec), market)
 
 
 def test_to_arrow_long_returns_arrow_table_with_stream_protocol() -> None:

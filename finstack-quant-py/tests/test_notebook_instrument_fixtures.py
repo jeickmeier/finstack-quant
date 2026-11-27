@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 import importlib.util
-import json
 from pathlib import Path
 from types import ModuleType
 
@@ -66,7 +65,7 @@ def test_notebook_instrument_factory_deserializes(factory_name: str) -> None:
         ],
     }
 
-    loaded = Portfolio.from_spec(json.dumps(portfolio))
+    loaded = Portfolio.from_spec(portfolio)
     assert len(loaded) == 1
 
 
@@ -89,5 +88,5 @@ def test_acme_bond_fixture_deserializes() -> None:
         ],
     }
 
-    loaded = Portfolio.from_spec(json.dumps(portfolio))
+    loaded = Portfolio.from_spec(portfolio)
     assert len(loaded) == 1

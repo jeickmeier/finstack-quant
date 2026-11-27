@@ -394,18 +394,16 @@ def _moving_attribution() -> tuple[PortfolioAttribution, pd.DataFrame]:
         context.insert_fx(fx)
         return context
 
-    portfolio = Portfolio.from_spec(
-        json.dumps({
-            "id": "DF-ATTRIB",
-            "as_of": AS_OF,
-            "base_currency": "USD",
-            "entities": {"FUND": {"id": "FUND"}},
-            "positions": [
-                _deposit_position("USD-POS", "USD-DEP", "USD", "USD-OIS"),
-                _deposit_position("EUR-POS", "EUR-DEP", "EUR", "EUR-OIS"),
-            ],
-        })
-    )
+    portfolio = Portfolio.from_spec({
+        "id": "DF-ATTRIB",
+        "as_of": AS_OF,
+        "base_currency": "USD",
+        "entities": {"FUND": {"id": "FUND"}},
+        "positions": [
+            _deposit_position("USD-POS", "USD-DEP", "USD", "USD-OIS"),
+            _deposit_position("EUR-POS", "EUR-DEP", "EUR", "EUR-OIS"),
+        ],
+    })
     before = market([(0.0, 1.0), (0.5, 0.98), (1.0, 0.95)], [(0.0, 1.0), (0.5, 0.99), (1.0, 0.97)], 1.10)
     after = market([(0.0, 1.0), (0.5, 0.97), (1.0, 0.93)], [(0.0, 1.0), (0.5, 0.985), (1.0, 0.96)], 1.15)
     result = attribute_portfolio_pnl(portfolio, before, after, "2025-01-15", "2025-02-15", "parallel")
@@ -1173,15 +1171,13 @@ def test_position_value_exports_the_fx_rate_applied() -> None:
     fx = FxMatrix(None)
     fx.set_quotes([("EUR", "USD", 1.10)])
     context.insert_fx(fx)
-    portfolio = Portfolio.from_spec(
-        json.dumps({
-            "id": "DF-FX",
-            "as_of": AS_OF,
-            "base_currency": "USD",
-            "entities": {"FUND": {"id": "FUND"}},
-            "positions": [_deposit_position("EUR-POS", "EUR-DEP", "EUR", "EUR-OIS")],
-        })
-    )
+    portfolio = Portfolio.from_spec({
+        "id": "DF-FX",
+        "as_of": AS_OF,
+        "base_currency": "USD",
+        "entities": {"FUND": {"id": "FUND"}},
+        "positions": [_deposit_position("EUR-POS", "EUR-DEP", "EUR", "EUR-OIS")],
+    })
     valuation = value_portfolio(portfolio, context)
 
     position = valuation.get_position_value("EUR-POS")

@@ -1,4 +1,4 @@
-"""``Portfolio`` loads from JSON text with ``from_json``, and a bad spec fails the same way on every route."""
+"""``Portfolio`` loads from JSON text (``from_json``) or its spec dict (``from_spec``), and both reject a bad spec alike."""
 
 from __future__ import annotations
 
@@ -92,13 +92,31 @@ def test_pickling_goes_through_from_json() -> None:
     assert pickle.loads(pickle.dumps(portfolio)) == portfolio  # noqa: S301 - own serialized portfolio
 
 
+def test_from_spec_rebuilds_the_portfolio_that_to_spec_wrote() -> None:
+    portfolio = _portfolio()
+
+    assert Portfolio.from_spec(portfolio.to_spec()) == portfolio
+    assert Portfolio.from_spec(json.loads(portfolio.to_json())) == portfolio
+
+
+def test_from_spec_refuses_json_text_and_names_the_text_loader() -> None:
+    with pytest.raises(TypeError, match=r"load JSON text with Portfolio\.from_json"):
+        Portfolio.from_spec(_portfolio().to_json())
+
+
 @pytest.mark.parametrize(("label", "mutate", "expected"), BAD_SPECS, ids=BAD_IDS)
-def test_from_json_rejects_a_bad_spec(
+def test_a_bad_spec_fails_alike_as_a_dict_and_as_text(
     label: str, mutate: Callable[[dict[str, Any]], Any], expected: type[Exception]
 ) -> None:
-    with pytest.raises(expected) as raised:
-        Portfolio.from_json(json.dumps(_bad(mutate)))
-    assert type(raised.value) is expected, label
+    bad = _bad(mutate)
+
+    with pytest.raises(expected) as from_dict:
+        Portfolio.from_spec(bad)
+    with pytest.raises(expected) as from_text:
+        Portfolio.from_json(json.dumps(bad))
+
+    assert type(from_dict.value) is expected, label
+    assert type(from_text.value) is expected, label
 
 
 def test_from_json_rejects_text_that_is_not_json() -> None:

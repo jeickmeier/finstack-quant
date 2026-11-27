@@ -405,7 +405,7 @@ class TestOptimizationAndResultsAudit:
         spec = _portfolio().to_spec()
         spec["positions"][0]["unit"] = "notional"
         with pytest.raises(ValueError, match=r"invalid type: unit variant"):
-            Portfolio.from_spec(json.dumps(spec))
+            Portfolio.from_spec(spec)
         for unit in ({"notional": "USD"}, {"notional": None}):
             pf = Portfolio.builder("book", "USD", AS_OF).position("P1", _bond(), 1.0, unit=unit).build()
             assert json.loads(pf.positions_table().to_pandas().iloc[0]["unit"]) == unit

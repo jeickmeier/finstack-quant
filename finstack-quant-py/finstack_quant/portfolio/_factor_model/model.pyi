@@ -61,24 +61,22 @@ class FactorModel:
     ...         "attributes": {},
     ...     },
     ... }
-    >>> book = Portfolio.from_spec(
-    ...     json.dumps({
-    ...         "id": "BOOK",
-    ...         "as_of": "2025-01-15",
-    ...         "base_currency": "USD",
-    ...         "entities": {"FUND": {"id": "FUND"}},
-    ...         "positions": [
-    ...             {
-    ...                 "position_id": "POS",
-    ...                 "entity_id": "FUND",
-    ...                 "instrument_id": "DEP",
-    ...                 "instrument_spec": deposit,
-    ...                 "quantity": 1.0,
-    ...                 "unit": "units",
-    ...             }
-    ...         ],
-    ...     })
-    ... )
+    >>> book = Portfolio.from_spec({
+    ...     "id": "BOOK",
+    ...     "as_of": "2025-01-15",
+    ...     "base_currency": "USD",
+    ...     "entities": {"FUND": {"id": "FUND"}},
+    ...     "positions": [
+    ...         {
+    ...             "position_id": "POS",
+    ...             "entity_id": "FUND",
+    ...             "instrument_id": "DEP",
+    ...             "instrument_spec": deposit,
+    ...             "quantity": 1.0,
+    ...             "unit": "units",
+    ...         }
+    ...     ],
+    ... })
     >>> curve = DiscountCurve(
     ...     "USD-OIS",
     ...     "2025-01-15",

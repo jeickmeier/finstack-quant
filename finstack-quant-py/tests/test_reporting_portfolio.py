@@ -138,7 +138,7 @@ def test_portfolio_tearsheet_real_portfolio() -> None:
             }
         ],
     }
-    valuation = value_portfolio(Portfolio.from_spec(json.dumps(spec)), mc)
+    valuation = value_portfolio(Portfolio.from_spec(spec), mc)
     html = portfolio_tearsheet(valuation, generated=dt.date(2026, 6, 23)).to_html()
     assert "Holdings" in html
     assert "POS-1" in html

@@ -63,14 +63,14 @@ history_dates = (date.fromisoformat(history_periods[0]['start']), *(date.fromiso
 ids = ['USD-CORP', 'EUR-GOVT']
 initial = book_spec('base')
 initial['positions'] = [p for p in initial['positions'] if p['instrument_id'] in ids]
-initial_book = Portfolio.from_spec(json.dumps(initial))
+initial_book = Portfolio.from_spec(initial)
 cashflows = json.loads(aggregate_full_cashflows(initial_book, history_market(AS_OF)).to_json())['events']
 brinson_periods, campisi_periods, rows = [], [], []
 for start, end in zip(history_dates[:-1], history_dates[1:], strict=True):
     start_spec, end_spec = dict(initial, as_of=start.isoformat()), dict(initial, as_of=end.isoformat())
     start_market, end_market = history_market(start), history_market(end)
-    begin = json.loads(value_portfolio(Portfolio.from_spec(json.dumps(start_spec)), start_market, metrics=[]).to_json())
-    finish = json.loads(value_portfolio(Portfolio.from_spec(json.dumps(end_spec)), end_market, metrics=[]).to_json())
+    begin = json.loads(value_portfolio(Portfolio.from_spec(start_spec), start_market, metrics=[]).to_json())
+    finish = json.loads(value_portfolio(Portfolio.from_spec(end_spec), end_market, metrics=[]).to_json())
     beginning = {iid: float(begin['position_values'][iid]['value_base']['amount']) for iid in ids}
     ending = {iid: float(finish['position_values'][iid]['value_base']['amount']) for iid in ids}
     receipts = dict.fromkeys(ids, 0.0)

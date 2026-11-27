@@ -64,24 +64,22 @@ def _market_and_portfolio() -> tuple[MarketContext, Portfolio]:
             "attributes": {},
         },
     }
-    portfolio = Portfolio.from_spec(
-        json.dumps({
-            "id": "BOOK",
-            "as_of": "2025-01-15",
-            "base_currency": "USD",
-            "entities": {"FUND": {"id": "FUND"}},
-            "positions": [
-                {
-                    "position_id": "bond_5y",
-                    "entity_id": "FUND",
-                    "instrument_id": "BOND-5Y",
-                    "instrument_spec": bond,
-                    "quantity": 1.0,
-                    "unit": "units",
-                }
-            ],
-        })
-    )
+    portfolio = Portfolio.from_spec({
+        "id": "BOOK",
+        "as_of": "2025-01-15",
+        "base_currency": "USD",
+        "entities": {"FUND": {"id": "FUND"}},
+        "positions": [
+            {
+                "position_id": "bond_5y",
+                "entity_id": "FUND",
+                "instrument_id": "BOND-5Y",
+                "instrument_spec": bond,
+                "quantity": 1.0,
+                "unit": "units",
+            }
+        ],
+    })
     return mc, portfolio
 
 

@@ -2,11 +2,18 @@
 
 ## Itemized changes
 
-### Python: `Portfolio.from_json`
+### Python: `Portfolio.from_json(text)` and `Portfolio.from_spec(dict)`
 
-`Portfolio.from_json(text)` loads a portfolio from `PortfolioSpec` JSON text,
-as every other class does. `to_json()` writes what it reads, and pickling
-rebuilds through it.
+`Portfolio` now has the same two loader pairs as the rest of the package:
+`to_json()` / `from_json(text)` and `to_spec()` / `from_spec(dict)`.
+`from_spec` used to take JSON text; it now takes the spec dict, as Rust
+`Portfolio::from_spec` takes the spec object, and a `str` there raises
+`TypeError` naming `from_json`. A bad spec raises the same exception type on
+both routes. Pickling rebuilds through `from_json`. Old → new:
+
+- `Portfolio.from_spec(json.dumps(spec))` → `Portfolio.from_spec(spec)`
+- `Portfolio.from_spec(text)` → `Portfolio.from_json(text)`
+- `Portfolio.from_spec(portfolio.to_json())` → `Portfolio.from_json(portfolio.to_json())`, or `Portfolio.from_spec(portfolio.to_spec())`
 
 ### Python: a scenario result's instruments are envelope dicts
 
@@ -52,7 +59,7 @@ same object as JSON text takes the typed object, and a `str` there raises
 `TypeError: 'str' object is not an instance of '<Class>'`. An instrument
 argument takes the typed instrument or its envelope dict. A parameter with no
 typed class takes its dict. JSON text enters through a named loader:
-`T.from_json(text)`, `Portfolio.from_spec(text)` or `json.loads(text)`.
+`T.from_json(text)` or `json.loads(text)`.
 `scripts/check_python_input_forms.py` (in `mise run python-lint`) and
 `tests/test_json_text_inputs.py` enforce it. WASM is unchanged. Results are
 unchanged. Old → new:
@@ -65,7 +72,7 @@ unchanged. Old → new:
 - `replay_portfolio` snapshots given as `(date, market)` pairs take a `MarketContext` in each pair
 - Statements: every `model` argument → a `FinancialModelSpec` (`FinancialModelSpec.from_json(text)`); every statement `results`, `base` and `comparison` argument → a `StatementResult` (`StatementResult.from_json(text)`)
 - `Evaluator.evaluate_monte_carlo(config=)`, `StatementResult.rollup(spec=)`, `run_sensitivity(config=)`, `generate_tornado_entries(result=)`, `run_variance(config=)` and the `scenario_set` argument of the scenario-set functions → the typed `MonteCarloConfig`, `RollupSpec`, `SensitivityConfig`, `SensitivityResult`, `VarianceConfig` and `ScenarioSet`, each with its own `from_json`
-- Portfolios: every `portfolio` argument (`value_portfolio`, `aggregate_full_cashflows`, `attribute_portfolio_pnl`, the scenario P&L functions, `portfolio_margin`, `primitive_exposures`, the sensitivity functions, `replay_portfolio`, the `FactorModel` methods, `PortfolioOptimizationSpec.new`) → a `Portfolio`; for JSON text, `Portfolio.from_spec(spec_json)`. `aggregate_metrics(valuation)` → a `PortfolioValuation` (`PortfolioValuation.from_json(text)`)
+- Portfolios: every `portfolio` argument (`value_portfolio`, `aggregate_full_cashflows`, `attribute_portfolio_pnl`, the scenario P&L functions, `portfolio_margin`, `primitive_exposures`, the sensitivity functions, `replay_portfolio`, the `FactorModel` methods, `PortfolioOptimizationSpec.new`) → a `Portfolio`; for JSON text, `Portfolio.from_json(spec_json)`. `aggregate_metrics(valuation)` → a `PortfolioValuation` (`PortfolioValuation.from_json(text)`)
 - Instruments: every instrument argument (`price_instrument`, `instrument_cashflows`, `compute_horizon_return`, `apply_scenario(instruments=)`, the attribution functions, `Position` and `PortfolioBuilder.position`, composite legs, `calculate_var`, `calculate_simm`, `ModelBuilder.add_debt`, the tranche analytics) → a typed instrument or an envelope `dict`. Envelope text is refused with `TypeError: expected a typed instrument instance or a canonical instrument envelope dict`: drop the `json.dumps(...)` around an envelope, pass `inst` in place of `inst.to_json()`, or `json.loads(text)` for stored text
 - Portfolio records: the Brinson, grid-attribution, excess-return, factor-Brinson, performance (`twrr_modified_dietz`, `twrr_linked`, `mwr_xirr`), `allocate_weights`, sensitivity (`factors`, `bump_config`) and `replay_portfolio` (`snapshots`, `config`) inputs take lists, dicts, DataFrames or their typed classes. JSON text is refused with `TypeError: <name> must be a list, a dict or a DataFrame, not a string`: drop the `json.dumps(...)`, or `json.loads(text)` for stored text
 - A `dict` passed where a list is expected is refused instead of being read as an empty list: `twrr_linked({})` and every other float-vector input raise `TypeError`, as does a dict passed as `replay_portfolio` snapshots

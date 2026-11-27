@@ -114,15 +114,13 @@ def test_mwr_xirr_accepts_numpy_datetime64_pairs_and_rejects_nat() -> None:
 
 
 def test_scenario_pnl_empty_dataframe_has_float64_schema() -> None:
-    empty_book = Portfolio.from_spec(
-        json.dumps({
-            "id": "EMPTY",
-            "as_of": "2025-01-15",
-            "base_currency": "USD",
-            "entities": {},
-            "positions": [],
-        })
-    )
+    empty_book = Portfolio.from_spec({
+        "id": "EMPTY",
+        "as_of": "2025-01-15",
+        "base_currency": "USD",
+        "entities": {},
+        "positions": [],
+    })
     frame = scenario_pnl(empty_book, ScenarioSpec("flat", []), MarketContext()).pnl.to_pandas()
     assert frame.empty
     assert list(frame.columns) == ["position_id", "pnl"]
@@ -569,24 +567,22 @@ def test_portfolio_polars_arrow_and_series_paths() -> None:
             "attributes": {},
         },
     }
-    book = Portfolio.from_spec(
-        json.dumps({
-            "id": "BOOK",
-            "as_of": "2025-01-15",
-            "base_currency": "USD",
-            "entities": {"FUND": {"id": "FUND"}},
-            "positions": [
-                {
-                    "position_id": "POS",
-                    "entity_id": "FUND",
-                    "instrument_id": "DEP",
-                    "instrument_spec": deposit,
-                    "quantity": 1.0,
-                    "unit": "units",
-                }
-            ],
-        })
-    )
+    book = Portfolio.from_spec({
+        "id": "BOOK",
+        "as_of": "2025-01-15",
+        "base_currency": "USD",
+        "entities": {"FUND": {"id": "FUND"}},
+        "positions": [
+            {
+                "position_id": "POS",
+                "entity_id": "FUND",
+                "instrument_id": "DEP",
+                "instrument_spec": deposit,
+                "quantity": 1.0,
+                "unit": "units",
+            }
+        ],
+    })
     curve = DiscountCurve(
         "USD-OIS",
         "2025-01-15",

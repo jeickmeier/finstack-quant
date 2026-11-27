@@ -270,24 +270,22 @@ def primitive_exposures(
     ...         "attributes": {},
     ...     },
     ... }
-    >>> book = Portfolio.from_spec(
-    ...     json.dumps({
-    ...         "id": "BOOK",
-    ...         "as_of": "2025-01-02",
-    ...         "base_currency": "USD",
-    ...         "entities": {"FUND": {"id": "FUND"}},
-    ...         "positions": [
-    ...             {
-    ...                 "position_id": "P1",
-    ...                 "entity_id": "FUND",
-    ...                 "instrument_id": "ACME",
-    ...                 "instrument_spec": equity,
-    ...                 "quantity": -2.0,
-    ...                 "unit": "units",
-    ...             }
-    ...         ],
-    ...     })
-    ... )
+    >>> book = Portfolio.from_spec({
+    ...     "id": "BOOK",
+    ...     "as_of": "2025-01-02",
+    ...     "base_currency": "USD",
+    ...     "entities": {"FUND": {"id": "FUND"}},
+    ...     "positions": [
+    ...         {
+    ...             "position_id": "P1",
+    ...             "entity_id": "FUND",
+    ...             "instrument_id": "ACME",
+    ...             "instrument_spec": equity,
+    ...             "quantity": -2.0,
+    ...             "unit": "units",
+    ...         }
+    ...     ],
+    ... })
     >>> report = primitive_exposures(book, MarketContext(), [])
     >>> report.to_pandas()[["instrument_id", "net_quantity", "gross_value"]].values.tolist()
     [['ACME', -2.0, 200.0]]

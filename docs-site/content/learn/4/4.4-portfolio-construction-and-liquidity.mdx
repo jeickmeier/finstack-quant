@@ -90,7 +90,7 @@ for p in opt_spec["positions"]:
  p["attributes"]={"expected_profit_usd":initial_quantity*expected_profit[p["position_id"]]}
 objective=Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.attribute("expected_profit_usd")))
 def optimize_units(cap,turnover=None):
- spec=PortfolioOptimizationSpec.new(Portfolio.from_spec(json.dumps(opt_spec)),objective).with_weighting(WeightingScheme.unit_scaling()).with_missing_metric_policy(MissingMetricPolicy.strict()).with_constraint(Constraint.weight_bounds(PositionFilter.all(),0.,cap/initial_quantity,label="position_cap"))
+ spec=PortfolioOptimizationSpec.new(Portfolio.from_spec(opt_spec),objective).with_weighting(WeightingScheme.unit_scaling()).with_missing_metric_policy(MissingMetricPolicy.strict()).with_constraint(Constraint.weight_bounds(PositionFilter.all(),0.,cap/initial_quantity,label="position_cap"))
  # UnitScaling requires an explicit budget: eight starting multipliers represent one full contract.
  spec=spec.with_constraint(Constraint.budget(float(len(position_ids))))
  if turnover is not None:spec=spec.with_constraint(Constraint.max_turnover(turnover/initial_quantity,label="turnover"))
@@ -132,7 +132,7 @@ print(pd.DataFrame([{"position":x.position_id,"component_VaR_USD":x.component_va
 print("Risk-budget report:",budget.to_json())
 # LVaR's price-spread formula is applied to the cash bonds only.
 # OTC derivative closeout spreads and the unquoted loan need additional conventions/data.
-values=json.loads(value_portfolio(Portfolio.from_spec(json.dumps(book_spec("common"))),build_market("common"),metrics=[]).to_json())
+values=json.loads(value_portfolio(Portfolio.from_spec(book_spec("common")),build_market("common"),metrics=[]).to_json())
 lvar_rows=[]
 for pid in ["USD-CORP","EUR-GOVT"]:
  pv=float(values["position_values"][pid]["value_base"]["amount"])

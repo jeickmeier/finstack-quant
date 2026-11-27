@@ -145,7 +145,7 @@ pub struct PyCurrency {
 - Declare a model, market, portfolio, scenario or result parameter as its wrapper
   (`PyRef<'_, PyX>`). A Python `str` is a value (a label, a code, a date, an id) and
   is never parsed as a JSON document; JSON text enters through the class's
-  `from_json` (or `Portfolio.from_spec`), and a parameter with no typed class takes
+  `from_json`, and a parameter with no typed class takes
   its `dict` through `py_to_serde`. `scripts/check_python_input_forms.py` and
   `tests/test_json_text_inputs.py` enforce this.
 

@@ -139,32 +139,30 @@ def test_portfolio_primitive_exposures_net_composite_legs_against_direct_positio
     resolved = fixed_spec().initialize(market, dt.date(2025, 1, 1)).instrument
     composite = json.loads(resolved.to_json())["instrument"]
     direct = equity_envelope("A", 100.0)["instrument"]
-    book = Portfolio.from_spec(
-        json.dumps({
-            "id": "PRIMITIVE",
-            "as_of": "2025-01-01",
-            "base_currency": "USD",
-            "entities": {"FUND": {"id": "FUND"}},
-            "positions": [
-                {
-                    "position_id": "P-COMPOSITE",
-                    "entity_id": "FUND",
-                    "instrument_id": "A-B",
-                    "instrument_spec": composite,
-                    "quantity": 2.0,
-                    "unit": "units",
-                },
-                {
-                    "position_id": "P-DIRECT",
-                    "entity_id": "FUND",
-                    "instrument_id": "A",
-                    "instrument_spec": direct,
-                    "quantity": -2.0,
-                    "unit": "units",
-                },
-            ],
-        })
-    )
+    book = Portfolio.from_spec({
+        "id": "PRIMITIVE",
+        "as_of": "2025-01-01",
+        "base_currency": "USD",
+        "entities": {"FUND": {"id": "FUND"}},
+        "positions": [
+            {
+                "position_id": "P-COMPOSITE",
+                "entity_id": "FUND",
+                "instrument_id": "A-B",
+                "instrument_spec": composite,
+                "quantity": 2.0,
+                "unit": "units",
+            },
+            {
+                "position_id": "P-DIRECT",
+                "entity_id": "FUND",
+                "instrument_id": "A",
+                "instrument_spec": direct,
+                "quantity": -2.0,
+                "unit": "units",
+            },
+        ],
+    })
 
     report = primitive_exposures(book, market, [])
 

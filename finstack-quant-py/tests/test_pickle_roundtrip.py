@@ -86,8 +86,7 @@ class TestReduceCoverage:
         a new result type that ships without a `from_json` fails here.
 
         A class that defines its own `__reduce__` on another constructor is
-        pickleable by construction (`Portfolio` rebuilds through `from_spec`,
-        the twin of its `to_json`), and
+        pickleable by construction, and
         `test_reduce_is_backed_by_a_working_constructor` checks that route.
 
         The set is currently empty: every other type carrying `to_json` also

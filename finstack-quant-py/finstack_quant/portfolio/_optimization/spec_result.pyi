@@ -486,7 +486,7 @@ class PortfolioOptimizationSpec:
         ----------
         portfolio : Portfolio
             Built :class:`Portfolio` defining positions and starting weights; its
-            canonical spec is captured. Load JSON text with ``Portfolio.from_spec``.
+            canonical spec is captured. Load JSON text with ``Portfolio.from_json``.
         objective : Objective
             Direction and metric expression the optimizer should solve for.
 

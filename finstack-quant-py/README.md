@@ -161,12 +161,13 @@ takes:
 | You hold | Pass |
 |----------|------|
 | JSON text of a class (`MarketContext`, `ScenarioSpec`, `FinancialModelSpec`, a result, …) | `T.from_json(text)` |
-| JSON text of a portfolio spec | `Portfolio.from_spec(text)` |
+| JSON text of a portfolio spec | `Portfolio.from_json(text)` |
+| A portfolio spec as a `dict` (what `to_spec()` returns) | `Portfolio.from_spec(spec)` |
 | JSON text of an instrument envelope | the typed instrument (`Bond.from_json(text)`) or the envelope `dict` (`json.loads(text)`) |
 | JSON text of a parameter that takes a `dict` (a nested spec on a builder, a `CalibrationStep` `params` object, …) | `json.loads(text)` |
 
 A string passed where a typed object is expected raises `TypeError`. The
-functions whose subject is the text itself keep it: `from_json`, `from_spec`
+functions whose subject is the text itself keep it: `from_json`
 and the validators (`validate_*`, `parse_portfolio_spec_json`,
 `pretty_instrument_json`). `scripts/check_python_input_forms.py` and
 `tests/test_json_text_inputs.py` enforce the rule.

@@ -152,7 +152,7 @@ def test_attribute_portfolio_pnl_accepts_loaded_inputs_and_tracks_fx_translation
     assert typed.fx_translation_pnl.currency == Currency("USD")
     assert typed.fx_translation_pnl.amount > 0.0
     assert json.loads(typed.to_json()) == json.loads(from_json.to_json())
-    # Portfolio JSON text is not a portfolio: it goes through `Portfolio.from_spec`.
+    # Portfolio JSON text is not a portfolio: it goes through `Portfolio.from_json`.
     with pytest.raises(TypeError, match="'Portfolio'"):
         attribute_portfolio_pnl(_portfolio_json("EUR"), market_t0, market_t1, AS_OF_T0, AS_OF_T1, "parallel")
     # Market JSON text is not a market: it goes through the loader.

@@ -301,7 +301,7 @@ impl PyPortfolioOptimizationSpec {
     /// ----------
     /// portfolio : Portfolio
     ///     Built :class:`Portfolio`; its canonical spec is captured. Load JSON
-    ///     text with ``Portfolio.from_spec``.
+    ///     text with ``Portfolio.from_json``.
     /// objective : Objective
     ///     Optimization objective.
     #[classmethod]

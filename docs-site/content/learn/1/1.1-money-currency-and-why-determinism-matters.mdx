@@ -221,7 +221,7 @@ extended['positions'].append(gbp)
 gbp_market=build_market('foundations').insert(DiscountCurve.flat('GBP-OIS',AS_OF,0.04,'act_365f'))
 quotes=FxMatrix(None);quotes.set_quotes([(Currency('EUR'),Currency('USD'),1.08)]);quotes.set_quotes([(Currency('GBP'),Currency('USD'),1.25)])
 gbp_market.insert_fx(quotes)
-valuation=value_portfolio(Portfolio.from_spec(json.dumps(extended)),gbp_market,metrics=[])
+valuation=value_portfolio(Portfolio.from_spec(extended),gbp_market,metrics=[])
 wire=json.loads(valuation.to_json());holding=wire['position_values']['GBP-CASH']
 print([{'id':p['position_id'],'currency':p['instrument_spec']['spec']['notional']['currency']} for p in extended['positions']])
 print({'GBP_value':holding['value_native'],'USD_value':holding['value_base']})

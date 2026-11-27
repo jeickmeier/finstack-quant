@@ -444,7 +444,8 @@ class Portfolio:
     """
     Built runtime portfolio. Cheap to clone; pass directly to pipeline functions.
 
-    Build once with :meth:`from_spec` and reuse across ``value_portfolio``,
+    Build once with :meth:`builder`, :meth:`from_spec` (a spec dict) or
+    :meth:`from_json` (its JSON text) and reuse across ``value_portfolio``,
     ``aggregate_full_cashflows``, ``aggregate_metrics``, and
     ``apply_scenario_and_revalue`` to skip the per-call spec parse + index
     rebuild.
@@ -588,36 +589,47 @@ class Portfolio:
         ...
 
     @staticmethod
-    def from_spec(spec_json: str) -> Portfolio:
+    def from_spec(spec: dict[str, Any]) -> Portfolio:
         """
-        Parse a ``PortfolioSpec`` JSON string into a runtime portfolio.
+        Build a portfolio from a ``PortfolioSpec`` dict, the form :meth:`to_spec` returns.
+
+        Mirrors Rust ``Portfolio::from_spec``. Positions are materialized, the
+        lookup indices rebuilt and the result validated, with the GIL released
+        while the portfolio is built. JSON text goes through :meth:`from_json`.
 
         Parameters
         ----------
-        spec_json : str
-            Portfolio specification JSON, including positions, base currency,
-            and as-of date, to validate and compile for reuse.
+        spec : dict[str, Any]
+            ``PortfolioSpec`` wire object: the portfolio id, base currency,
+            as-of date, entities, and positions with their instrument
+            envelopes. Values may be typed wrappers that have a wire form
+            (``Currency``, ``datetime.date``).
 
         Returns
         -------
         Portfolio
-            Validated runtime portfolio built from ``spec_json`` with lookup indices rebuilt.
+            Validated runtime portfolio built from ``spec``.
 
         Raises
         ------
+        TypeError
+            If ``spec`` is a ``str`` (load JSON text with :meth:`from_json`), or
+            holds a value that has no JSON form.
         ValueError
-            If ``spec_json`` is malformed or does not match the ``PortfolioSpec`` schema.
+            If ``spec`` does not match the ``PortfolioSpec`` schema.
         PortfolioError
-            If the decoded positions or portfolio identifiers violate portfolio
+            If the positions or portfolio identifiers violate portfolio
             construction invariants.
 
         Examples
         --------
         >>> from finstack_quant.portfolio import Portfolio
-        >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
+        >>> spec = {"id": "empty", "base_currency": "USD", "as_of": "2025-01-01", "entities": {}, "positions": []}
         >>> portfolio = Portfolio.from_spec(spec)
         >>> (portfolio.id, portfolio.base_currency, len(portfolio))
         ('empty', 'USD', 0)
+        >>> Portfolio.from_spec(portfolio.to_spec()) == portfolio
+        True
         """
         ...
 
@@ -875,8 +887,7 @@ class Portfolio:
         Return the canonical ``PortfolioSpec`` of the portfolio as a plain dict.
 
         Mirrors Rust ``Portfolio::to_spec``. The dict equals
-        ``json.loads(portfolio.to_json())``. :meth:`from_spec` takes the JSON
-        text from :meth:`to_json`, not this dict.
+        ``json.loads(portfolio.to_json())`` and is what :meth:`from_spec` takes.
 
         Returns
         -------
