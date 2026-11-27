@@ -84,6 +84,7 @@ from finstack_quant.portfolio import (
     Objective,
     PerPositionMetric,
     Portfolio,
+    PortfolioAttribution,
     PortfolioCashflows,
     PortfolioOptimizationSpec,
     PortfolioValuation,
@@ -1609,24 +1610,13 @@ def test_the_builder_probe_is_not_vacuous() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Results leave typed: each JSON-text twin against its typed form
+# Results leave typed: the typed form of each removed JSON-text twin
 # ---------------------------------------------------------------------------
 #
-# A function or member that returns JSON text beside a typed form of the same
-# computation is a second way to do one thing. A `Twin` is a pair that is
-# still alive: it runs both forms and they must carry the same data. A
-# `Replacement` is the typed form of a pair whose text form has been removed:
-# it pins the value and the exception types the typed form gives, and the
-# removed name must be gone.
-
-
-@dataclass(frozen=True)
-class Twin:
-    """One JSON-text form and the typed form of the same computation."""
-
-    id: str
-    via_text: Callable[[], Any]
-    via_typed: Callable[[], Any]
+# A function or member that returned JSON text beside a typed form of the same
+# computation was a second way to do one thing, and it is removed. A
+# `Replacement` is the typed form of such a pair: it pins the value and the
+# exception types the typed form gives, and the removed name must be gone.
 
 
 @dataclass(frozen=True)
@@ -1951,14 +1941,11 @@ REPLACEMENTS = [
         lambda: json.loads(_composite_history().to_json()),
         bad={"row-out-of-range": (lambda: _composite_history().row(9), IndexError)},
     ),
-]
-
-# The pair that is still alive: the text member is held for an owner decision.
-TWINS = [
-    Twin(
+    Replacement(
         "PortfolioAttribution.by_position_json",
-        lambda: json.loads(_portfolio_attribution().by_position_json()),
-        lambda: {key: json.loads(value.to_json()) for key, value in _portfolio_attribution().by_position.items()},
+        (PortfolioAttribution, "by_position_json"),
+        lambda: {key: json.loads(entry.to_json()) for key, entry in _portfolio_attribution().by_position.items()},
+        lambda: json.loads(_portfolio_attribution().to_json())["by_position"],
     ),
 ]
 
@@ -1981,13 +1968,6 @@ def test_typed_form_rejects_bad_input(replacement: Replacement, label: str) -> N
     call, expected = replacement.bad[label]
     with pytest.raises(expected):
         call()
-
-
-@pytest.mark.parametrize("twin", TWINS, ids=lambda twin: twin.id)
-def test_text_form_equals_typed_form(twin: Twin) -> None:
-    via_text, via_typed = twin.via_text(), twin.via_typed()
-    assert via_text == via_typed
-    assert via_text
 
 
 def test_collapse_ladder_text_has_no_typed_equal() -> None:

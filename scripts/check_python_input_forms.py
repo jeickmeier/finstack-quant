@@ -101,9 +101,6 @@ JSON_NAMED: dict[tuple[str, str], str] = {
     ("covenants/_operations.pyi", "validate_covenant_engine_json"): _VALIDATES,
     ("covenants/_operations.pyi", "validate_covenant_report_json"): _VALIDATES,
     ("covenants/_operations.pyi", "validate_covenant_spec_json"): _VALIDATES,
-    ("portfolio/_attribution.pyi", "PortfolioAttribution.by_position_json"): (
-        "releases the GIL while it serialises a large book; `by_position` and `to_json` hold it"
-    ),
     ("portfolio/_cashflows.pyi", "PortfolioCashflows.collapse_to_base_by_date_kind_json"): (
         "exact decimal amounts; the typed form is a float64 table"
     ),

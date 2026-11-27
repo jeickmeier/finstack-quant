@@ -19,6 +19,7 @@ JSON entry points. Results are unchanged. Old → new:
 - `CorkscrewReport.data_json()` and `ScorecardReport.data_json()` → the `data` property
 - `ScorecardMetric.thresholds_json()` → the `thresholds` property (each band is a `(lower, upper)` tuple)
 - `CompositeHistoryResult.row_json(index)` → `row(index)`
+- `PortfolioAttribution.by_position_json()` → the `by_position` property, a `dict` of `PnlAttribution`; `json.loads(result.to_json())["by_position"]` gives the same nested JSON
 
 ### Python: a string argument is a value, not a JSON document
 

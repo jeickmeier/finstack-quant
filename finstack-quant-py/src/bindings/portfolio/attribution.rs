@@ -10,7 +10,7 @@ use crate::bindings::portfolio::container::PyPortfolio;
 use crate::bindings::table_builders::{
     serde_object_to_single_row_arrow_table, serde_rows_to_arrow_table,
 };
-use crate::errors::{display_to_py, portfolio_to_py, serde_json_to_py};
+use crate::errors::{portfolio_to_py, serde_json_to_py};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -123,15 +123,6 @@ impl PyPortfolioAttribution {
 
 #[pymethods]
 impl PyPortfolioAttribution {
-    /// Serialize the position-native nested attribution map to compact JSON.
-    ///
-    /// Position keys retain the canonical Rust ``IndexMap`` insertion order.
-    fn by_position_json(&self, py: Python<'_>) -> PyResult<String> {
-        let by_position = &self.inner.by_position;
-        py.detach(|| serde_json::to_string(by_position))
-            .map_err(display_to_py)
-    }
-
     /// Check that aggregate factor P&L reconciles to total P&L.
     ///
     /// Parameters

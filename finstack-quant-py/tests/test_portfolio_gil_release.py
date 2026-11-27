@@ -240,9 +240,9 @@ def test_attribution_nested_serialization_releases_gil() -> None:
         "parallel",
     )
 
-    by_position_json = _assert_releases_gil(result.by_position_json)
+    result_json = _assert_releases_gil(result.to_json)
 
-    assert len(json.loads(by_position_json)) == 256
+    assert len(json.loads(result_json)["by_position"]) == 256
 
 
 def test_replay_parse_and_compute_release_gil() -> None:

@@ -3130,7 +3130,7 @@ excluded = { positions_table = "arrow" }
 wasm_only = { numPositions = "Rust position count; twin of Python len(portfolio) (__len__)" }
 
 [parity.members."finstack_quant.portfolio.PortfolioAttribution"]
-excluded = { by_position_json = "literal", to_position_table = "arrow" }
+excluded = { to_position_table = "arrow" }
 renames = { explain = { js = "portfolio.portfolioAttributionExplainText", reason = "WASM results are plain objects; the Rust PortfolioAttribution::explain method is a free function taking the object" }, pct_of_total_by_bucket = { js = "portfolio.portfolioAttributionPctOfTotalByBucket", reason = "WASM results are plain objects; the Rust PortfolioAttribution::pct_of_total_by_bucket method is a free function taking the object" }, reconciliation_check = { js = "portfolio.portfolioAttributionReconciliationCheck", reason = "WASM results are plain objects; the Rust PortfolioAttribution::reconciliation_check method is a free function taking the object" } }
 
 [parity.members."finstack_quant.portfolio.PortfolioCashflows"]

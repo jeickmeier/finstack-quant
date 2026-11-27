@@ -7844,7 +7844,7 @@ export interface ValuationsCompositeNamespace {
   /**
    * One row of a composite history as canonical JSON.
    *
-   * Twin of Python `CompositeHistoryResult.row_json`.
+   * Python reads the same row with `CompositeHistoryResult.row(index)`.
    * @param rows - `CompositeHistoryRow[]` returned by `history` or `historyFromSpec` (or its JSON).
    * @param index - Zero-based row index.
    * @returns Canonical `CompositeHistoryRow` JSON text.

@@ -98,9 +98,9 @@ def test_attribute_portfolio_pnl_returns_typed_aggregate_money_and_nested_json()
     assert result.rates_curves_pnl.amount != 0.0
     assert result.result_invalid is False
 
-    by_position = json.loads(result.by_position_json())
+    by_position = result.by_position
     assert list(by_position) == ["USD-POS"]
-    assert by_position["USD-POS"]["total_pnl"]["currency"] == "USD"
+    assert by_position["USD-POS"].currency == "USD"
 
     report = result.reconciliation_check(1.0e-8)
     assert report.is_reconciled is True
@@ -108,7 +108,8 @@ def test_attribute_portfolio_pnl_returns_typed_aggregate_money_and_nested_json()
     assert abs(float(report.total_residual)) <= 1.0e-8
 
     restored = json.loads(result.to_json())
-    assert restored["by_position"] == by_position
+    assert restored["by_position"] == {key: json.loads(entry.to_json()) for key, entry in by_position.items()}
+    assert restored["by_position"]["USD-POS"]["total_pnl"]["currency"] == "USD"
     assert restored["total_pnl"]["currency"] == "USD"
 
 
@@ -122,7 +123,8 @@ def test_nested_attribution_json_preserves_portfolio_insertion_order() -> None:
         "parallel",
     )
 
-    assert list(json.loads(result.by_position_json())) == ["USD-POS-Z", "USD-POS-A"]
+    assert list(result.by_position) == ["USD-POS-Z", "USD-POS-A"]
+    assert list(json.loads(result.to_json())["by_position"]) == ["USD-POS-Z", "USD-POS-A"]
 
 
 def test_attribute_portfolio_pnl_accepts_loaded_inputs_and_tracks_fx_translation() -> None:

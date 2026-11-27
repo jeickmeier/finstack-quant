@@ -259,21 +259,6 @@ class PortfolioAttribution:
         """
         ...
 
-    def by_position_json(self) -> str:
-        """
-        Serialize nested attribution in Rust ``IndexMap`` position order.
-
-        Returns
-        -------
-        str
-            Compact position-keyed attribution JSON in canonical insertion order.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
-        """
-        ...
-
     def reconciliation_check(self, tolerance: float) -> ReconciliationReport:
         """
         Check that the factor buckets plus FX translation reconcile to ``total_pnl``.
@@ -390,7 +375,7 @@ class PortfolioAttribution:
 
         Every ``Money`` aggregate is flattened to a float column plus one
         shared ``currency`` column; the per-position nested breakdown stays on
-        :meth:`by_position_json`.
+        :attr:`by_position`.
 
         Columns: ``currency``, ``total_pnl``, ``carry``, ``rates_curves_pnl``,
         ``credit_curves_pnl``, ``inflation_curves_pnl``, ``correlations_pnl``,
