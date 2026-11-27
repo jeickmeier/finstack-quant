@@ -1,4 +1,4 @@
-"""Tests for the Python input-form guard (a ``str`` is a value, not JSON text)."""
+"""Tests for the Python JSON-text guard: a ``str`` is a value, and text leaves through ``to_json``."""
 
 from __future__ import annotations
 
@@ -44,6 +44,7 @@ def _stubs(tmp_path: Path, functions: str) -> Path:
 def _exempt_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(_MODULE, "LABEL_CLASSES", {})
     monkeypatch.setattr(_MODULE, "TEXT_PARAMETERS", {})
+    monkeypatch.setattr(_MODULE, "JSON_NAMED", {})
 
 
 def _reported(diagnostics: list[str]) -> list[str]:
@@ -144,6 +145,7 @@ def mixed(value: Kind | Spec | str) -> None: ...
 def validate(book: Book | str) -> None: ...
 """,
     )
+    monkeypatch.setattr(_MODULE, "JSON_NAMED", {})
     monkeypatch.setattr(_MODULE, "LABEL_CLASSES", {"Kind": "a variant name"})
     monkeypatch.setattr(_MODULE, "TEXT_PARAMETERS", {("api.pyi", "validate", "book"): "the text is the subject"})
     diagnostics = _MODULE.check(root)
@@ -160,6 +162,77 @@ def validate(book: Book | str) -> None: ...
         "LABEL_CLASSES entry 'Gone' matches no parameter; remove it",
         "TEXT_PARAMETERS entry ('api.pyi', 'removed', 'x') matches no parameter; remove it",
     ]
+
+
+def test_a_public_name_ending_in_json_is_reported(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Functions, methods, properties and attributes are read; the two JSON forms and private names are not."""
+    _exempt_nothing(monkeypatch)
+    root = _stubs(
+        tmp_path,
+        """def events_json(book: Book) -> str: ...
+def _private_json(book: Book) -> str: ...
+def jsonify(book: Book) -> str: ...
+
+class Report:
+    data_json: str
+    def to_json(self) -> str: ...
+    @classmethod
+    def from_json(cls, text: str) -> Report: ...
+    def rows_json(self) -> str: ...
+    @property
+    def market_json(self) -> str: ...
+    def data(self) -> dict[str, float]: ...
+
+    class Inner:
+        def row_json(self, index: int) -> str: ...
+
+class _Hidden:
+    def rows_json(self) -> str: ...
+""",
+    )
+
+    diagnostics = _MODULE.check(root)
+
+    assert [line.split(": ", 1)[1].split(" is named ")[0] for line in diagnostics] == [
+        "events_json",
+        "Report.data_json",
+        "Report.rows_json",
+        "Report.market_json",
+        "Report.Inner.row_json",
+    ]
+    assert diagnostics[0].endswith("or list it in JSON_NAMED with its reason")
+
+
+def test_listed_json_names_pass_and_stale_ones_are_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A listed name is exempt in its own stub only; an entry that matches nothing is reported."""
+    _exempt_nothing(monkeypatch)
+    root = _stubs(
+        tmp_path,
+        """def validate_spec_json(text: str) -> str: ...
+
+class Report:
+    def rows_json(self) -> str: ...
+""",
+    )
+    monkeypatch.setattr(
+        _MODULE,
+        "JSON_NAMED",
+        {("api.pyi", "validate_spec_json"): "validates JSON text", ("api.pyi", "Report.rows_json"): "no typed member"},
+    )
+    assert _MODULE.check(root) == []
+
+    monkeypatch.setattr(
+        _MODULE,
+        "JSON_NAMED",
+        {
+            ("api.pyi", "validate_spec_json"): "validates JSON text",
+            ("types.pyi", "Report.rows_json"): "listed under the wrong stub",
+        },
+    )
+    diagnostics = _MODULE.check(root)
+    assert len(diagnostics) == 2
+    assert "Report.rows_json is named `*_json`" in diagnostics[0]
+    assert diagnostics[1] == "JSON_NAMED entry ('types.pyi', 'Report.rows_json') matches no function; remove it"
 
 
 def test_main_reports_and_sets_the_exit_code(

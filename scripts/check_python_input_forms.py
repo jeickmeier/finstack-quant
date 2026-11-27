@@ -1,20 +1,28 @@
-"""Reject a Python parameter that takes a typed object or the same object as text.
+"""Keep JSON text out of the Python API except at its named loaders and ``to_json``.
 
 In the Python API a ``str`` argument is a value: a label, a code, a date, an id.
 It is never a JSON document. JSON text enters through a named loader
-(``T.from_json``, ``Portfolio.from_spec``) or ``json.loads``, so a parameter
-annotated ``Class | str`` offers two ways to pass one value.
+(``T.from_json``, ``Portfolio.from_spec``) or ``json.loads``, and the text of a
+result comes from ``to_json()``.
 
-This check reads the ``.pyi`` stubs under ``finstack-quant-py/finstack_quant``.
-It fails on any parameter whose annotation holds ``str`` in the same union as a
-class the package defines. Module-level type aliases are expanded first. Two
-lists are exempt, each entry with its reason: the classes for which a string
-is a label, and the parameters whose subject is the JSON text itself. An entry
-that no longer matches anything is also an error, so the lists cannot go
-stale.
+This check reads the ``.pyi`` stubs under ``finstack-quant-py/finstack_quant``
+and applies two rules.
 
-The check sees annotations only, and it does not judge ``dict | str``, where
-the string is a label for some parameters.
+Input. A parameter whose annotation holds ``str`` in the same union as a class
+the package defines offers two ways to pass one value, so it fails.
+Module-level type aliases are expanded first. Two lists are exempt: the classes
+for which a string is a label, and the parameters whose subject is the JSON
+text itself.
+
+Output. A public function or member named ``*_json`` (other than ``to_json``
+and ``from_json``) is a text twin of a typed form, so it fails unless it is
+listed in ``JSON_NAMED``.
+
+Every exempt entry carries its reason, and an entry that no longer matches
+anything is also an error, so the lists cannot go stale.
+
+The check sees names and annotations only, and it does not judge
+``dict | str``, where the string is a label for some parameters.
 ``finstack-quant-py/tests/test_json_text_inputs.py`` proves the runtime
 behaviour.
 """
@@ -81,6 +89,39 @@ TEXT_PARAMETERS: dict[tuple[str, str, str], str] = {
         "reports on a spec that ScenarioSpec.from_json rejects"
     ),
 }
+
+_VALIDATES = "validates JSON text; the text is its subject"
+_NO_TYPED_MEMBER = "no typed member holds this field"
+
+# Public functions and members named `*_json`: (stub path under the package, qualified name).
+JSON_NAMED: dict[tuple[str, str], str] = {
+    ("attribution/_entry.pyi", "validate_attribution_json"): _VALIDATES,
+    ("attribution/_entry.pyi", "validate_return_contribution_json"): _VALIDATES,
+    ("cashflows/_schedule_json.pyi", "validate_cashflow_schedule_json"): _VALIDATES,
+    ("covenants/_operations.pyi", "validate_covenant_engine_json"): _VALIDATES,
+    ("covenants/_operations.pyi", "validate_covenant_report_json"): _VALIDATES,
+    ("covenants/_operations.pyi", "validate_covenant_spec_json"): _VALIDATES,
+    ("portfolio/_attribution.pyi", "PortfolioAttribution.by_position_json"): (
+        "releases the GIL while it serialises a large book; `by_position` and `to_json` hold it"
+    ),
+    ("portfolio/_cashflows.pyi", "PortfolioCashflows.collapse_to_base_by_date_kind_json"): (
+        "exact decimal amounts; the typed form is a float64 table"
+    ),
+    ("portfolio/_container.pyi", "parse_portfolio_spec_json"): _VALIDATES,
+    ("portfolio/_factor_model/assignment.pyi", "PositionAssignment.mappings_json"): _NO_TYPED_MEMBER,
+    ("portfolio/_factor_model/assignment.pyi", "UnmatchedEntry.dependency_json"): _NO_TYPED_MEMBER,
+    ("portfolio/_optimization/spec_result.pyi", "PortfolioOptimizationSpec.portfolio_spec_json"): _NO_TYPED_MEMBER,
+    ("valuations/instruments/_json_validation.pyi", "pretty_instrument_json"): (
+        "re-renders instrument JSON text for reading; the text is its subject"
+    ),
+    ("valuations/instruments/_json_validation.pyi", "validate_instrument_json"): _VALIDATES,
+    ("valuations/instruments/_json_validation.pyi", "validate_typed_instrument_json"): _VALIDATES,
+    ("valuations/schema.pyi", "validate_instrument_envelope_json"): _VALIDATES,
+    ("valuations/schema.pyi", "validate_instrument_type_json"): _VALIDATES,
+}
+
+# The two names that carry JSON text for every type.
+_JSON_FORM_NAMES = frozenset({"to_json", "from_json"})
 
 
 @dataclass(frozen=True)
@@ -226,6 +267,17 @@ def _functions(body: Sequence[ast.stmt], owner: tuple[str, ...]) -> Iterator[tup
             yield ".".join((*owner, node.name)), node
 
 
+def _declared_names(body: Sequence[ast.stmt], owner: tuple[str, ...]) -> Iterator[tuple[str, int]]:
+    """Yield ``(qualified name, line)`` for each function and annotated attribute, classes included."""
+    for node in body:
+        if isinstance(node, ast.ClassDef):
+            yield from _declared_names(node.body, (*owner, node.name))
+        elif isinstance(node, ast.FunctionDef):
+            yield ".".join((*owner, node.name)), node.lineno
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            yield ".".join((*owner, node.target.id)), node.lineno
+
+
 def find_typed_or_text(trees: dict[Path, ast.Module], classes: set[str]) -> list[Finding]:
     """List every parameter annotated with ``str`` beside a package class.
 
@@ -261,6 +313,34 @@ def find_typed_or_text(trees: dict[Path, ast.Module], classes: set[str]) -> list
     return findings
 
 
+def find_json_named(trees: dict[Path, ast.Module]) -> list[tuple[Path, int, str]]:
+    """List every public function or member whose name ends in ``_json``.
+
+    Parameters
+    ----------
+    trees : dict[Path, ast.Module]
+        Parsed stub modules keyed by their path.
+
+    Returns:
+    -------
+    list[tuple[Path, int, str]]
+        ``(path, line, qualified name)`` for each function, method, property
+        and annotated attribute, before any exemption is applied.
+        ``to_json``, ``from_json``, names with a leading underscore and
+        members of a class with a leading underscore are not listed.
+    """
+    named: list[tuple[Path, int, str]] = []
+    for path, tree in trees.items():
+        for owner, line in _declared_names(tree.body, ()):
+            parts = owner.split(".")
+            if parts[-1] in _JSON_FORM_NAMES or not parts[-1].endswith("_json"):
+                continue
+            if any(part.startswith("_") for part in parts):
+                continue
+            named.append((path, line, owner))
+    return named
+
+
 def check(stub_root: Path) -> list[str]:
     """Check every stub under ``stub_root`` and return the diagnostics.
 
@@ -291,6 +371,20 @@ def check(stub_root: Path) -> list[str]:
                     stub_root.parent.parent
                 )
             )
+    used_named: set[tuple[str, str]] = set()
+    for path, line, owner in find_json_named(trees):
+        key = (path.relative_to(stub_root).as_posix(), owner)
+        if key in JSON_NAMED:
+            used_named.add(key)
+            continue
+        try:
+            shown = path.relative_to(stub_root.parent.parent)
+        except ValueError:
+            shown = path
+        diagnostics.append(
+            f"{shown}:{line}: {owner} is named `*_json`; return the typed value and let callers take "
+            "text from `to_json()`, or list it in JSON_NAMED with its reason"
+        )
     diagnostics.extend(
         f"LABEL_CLASSES entry {name!r} matches no parameter; remove it"
         for name in sorted(set(LABEL_CLASSES) - used_labels)
@@ -298,6 +392,9 @@ def check(stub_root: Path) -> list[str]:
     diagnostics.extend(
         f"TEXT_PARAMETERS entry {key!r} matches no parameter; remove it"
         for key in sorted(set(TEXT_PARAMETERS) - used_text)
+    )
+    diagnostics.extend(
+        f"JSON_NAMED entry {key!r} matches no function; remove it" for key in sorted(set(JSON_NAMED) - used_named)
     )
     return diagnostics
 

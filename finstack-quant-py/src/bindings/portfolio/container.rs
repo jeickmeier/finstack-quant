@@ -374,7 +374,7 @@ impl PyPortfolio {
     }
 
     /// Canonical ``PortfolioSpec`` of the portfolio as a plain dict (Rust
-    /// ``Portfolio::to_spec``), the input accepted by ``from_spec``.
+    /// ``Portfolio::to_spec``); it equals ``json.loads(to_json())``.
     #[allow(clippy::wrong_self_convention)]
     #[pyo3(text_signature = "(self)")]
     fn to_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {

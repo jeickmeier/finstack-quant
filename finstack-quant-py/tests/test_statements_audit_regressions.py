@@ -145,3 +145,25 @@ def test_correlated_paths_keep_shocks_when_peer_levels_round_flat(method: str, r
     assert all(abs(v / 1e16 - 1.0) < 1e-12 for v in paths(rounded, "peer"))
     for metric in ["follower", "child"]:
         assert paths(rounded, metric) == paths(baseline, metric)
+
+
+def _value_node(method: str, values: list[tuple[str, Any]]) -> dict[str, Any]:
+    builder = s.ModelBuilder("value-forms")
+    builder.periods("2025Q1..Q2", None)
+    getattr(builder, method)("x", values)
+    return json.loads(builder.build().to_json())["nodes"]["x"]
+
+
+def test_value_takes_floats_or_money_and_one_node_holds_one_kind() -> None:
+    floats = [("2025Q1", 1.0), ("2025Q2", 2.0)]
+    money = [("2025Q1", Money(1, Currency("USD"))), ("2025Q2", Money(2, Currency("USD")))]
+
+    assert _value_node("value", floats) == _value_node("value_scalar", floats)
+    assert _value_node("value", floats)["value_type"] == {"type": "scalar"}
+    assert _value_node("value", money) == _value_node("value_money", money)
+    assert _value_node("value", money)["value_type"] == {"type": "monetary", "currency": "USD"}
+
+    with pytest.raises(ValueError, match="Mixed scalar and monetary"):
+        _value_node("value", [floats[0], money[1]])
+    with pytest.raises(TypeError):
+        _value_node("value", [("2025Q1", "1.0")])

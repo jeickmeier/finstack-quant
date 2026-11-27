@@ -166,9 +166,10 @@ takes:
 | JSON text of a parameter that takes a `dict` (a nested spec on a builder, a `CalibrationStep` `params` object, …) | `json.loads(text)` |
 
 A string passed where a typed object is expected raises `TypeError`. The
-functions whose subject is the text itself keep it: `from_json`, `from_spec`,
-the `validate_*` and `*_json` functions. `scripts/check_python_input_forms.py`
-and `tests/test_json_text_inputs.py` enforce the rule.
+functions whose subject is the text itself keep it: `from_json`, `from_spec`
+and the validators (`validate_*`, `parse_portfolio_spec_json`,
+`pretty_instrument_json`). `scripts/check_python_input_forms.py` and
+`tests/test_json_text_inputs.py` enforce the rule.
 
 ## Result-return contract
 
@@ -183,6 +184,11 @@ contract, pinned by `tests/parity/test_return_shapes.py` and mirrored by
 | `series` | `LabeledSeries` |
 | `json` | A JSON `str` — legal **only** on a `*_json`-suffixed wire surface, and every such surface must have a typed twin |
 | `scalar` / `list` / `dict` | Plain Python values |
+
+The text of a result comes from `to_json()`. A typed member has no `*_json`
+twin: the `*_json` names that remain are the validators and the few members
+listed with their reason in `scripts/check_python_input_forms.py`, which fails
+on any other.
 
 Every result wrapper carries:
 

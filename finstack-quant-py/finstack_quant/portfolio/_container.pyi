@@ -834,8 +834,9 @@ class Portfolio:
         """
         Return the canonical ``PortfolioSpec`` of the portfolio as a plain dict.
 
-        Mirrors Rust ``Portfolio::to_spec``. The dict (or its JSON form from
-        :meth:`to_json`) is the input accepted by :meth:`from_spec`.
+        Mirrors Rust ``Portfolio::to_spec``. The dict equals
+        ``json.loads(portfolio.to_json())``. :meth:`from_spec` takes the JSON
+        text from :meth:`to_json`, not this dict.
 
         Returns
         -------

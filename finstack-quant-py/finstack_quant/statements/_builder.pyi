@@ -159,16 +159,21 @@ class ModelBuilder:
         """
         ...
 
-    def value(self, node_id: str, values: list[tuple[str, float]]) -> ModelBuilder:
+    def value(self, node_id: str, values: list[tuple[str, float | Money]]) -> ModelBuilder:
         """
-        Add a value node with explicit per-period scalars.
+        Add a value node with explicit per-period values, all floats or all ``Money``.
+
+        Floats build a scalar node, as :meth:`value_scalar` does. ``Money``
+        values build a monetary node in their currency, as :meth:`value_money` does.
 
         Parameters
         ----------
         node_id:
             Identifier for the new node.
         values:
-            ``(period_id, value)`` pairs, for example ``[("2025Q1", 1.0)]``.
+            ``(period_id, value)`` pairs, for example ``[("2025Q1", 1.0)]`` or
+            ``[("2025Q1", Money(100.0, "USD"))]``. One node holds floats or
+            ``Money``, not both.
 
         Returns
         -------
@@ -179,6 +184,9 @@ class ModelBuilder:
         ------
         ValueError
             If periods were not configured, a period id is invalid, or the builder was consumed.
+            A node that mixes floats and ``Money`` is rejected by :meth:`build`.
+        TypeError
+            If a value is neither a number nor a ``Money``.
 
         """
         ...
