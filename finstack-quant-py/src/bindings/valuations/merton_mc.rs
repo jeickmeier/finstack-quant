@@ -352,11 +352,7 @@ impl PyMertonMcCalibrationSpec {
         seed: Option<u64>,
     ) -> PyResult<Self> {
         let py = target.py();
-        let target = match target.extract::<String>() {
-            Ok(text) => serde_json::from_str(&text)
-                .map_err(|e| crate::errors::serde_json_to_py(e, "invalid BondQuoteInput"))?,
-            Err(_) => crate::bindings::module_utils::py_to_serde(py, target, "BondQuoteInput")?,
-        };
+        let target = crate::bindings::module_utils::py_to_serde(py, target, "BondQuoteInput")?;
         let defaults = MertonMcCalibrationSpec::default();
         Ok(Self {
             inner: MertonMcCalibrationSpec {

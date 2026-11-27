@@ -565,12 +565,12 @@ class CommoditySpotOptionBuilder:
         """
         ...
 
-    def underlying(self, value: dict[str, object] | str) -> CommoditySpotOptionBuilder:
+    def underlying(self, value: dict[str, object]) -> CommoditySpotOptionBuilder:
         """Set the contract's underlying.
 
         Parameters
         ----------
-        value : dict[str, object] | str
+        value : dict[str, object]
             Commodity underlying parameters (commodity_type, underlying_ticker, unit, currency).
 
         Returns
@@ -745,12 +745,12 @@ class CommoditySpotOptionBuilder:
         """
         ...
 
-    def exercise(self, value: dict[str, object] | str | None) -> CommoditySpotOptionBuilder:
+    def exercise(self, value: dict[str, object] | None) -> CommoditySpotOptionBuilder:
         """Set the contract's exercise.
 
         Parameters
         ----------
-        value : dict[str, object] | str | None
+        value : dict[str, object] | None
             Recorded exercise or expiry; required after expiry while settlement remains unpaid.
 
         Returns
@@ -907,15 +907,14 @@ class CommoditySpotOptionBuilder:
         """
         ...
 
-    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> CommoditySpotOptionBuilder:
+    def instrument_pricing_overrides(self, value: dict[str, object]) -> CommoditySpotOptionBuilder:
         """
         Set the instrument-owned pricing inputs.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
-            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+        value : dict[str, object]
+            Rust ``InstrumentPricingOverrides`` in serde form (a ``dict``): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
             ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
 
         Returns
@@ -931,17 +930,14 @@ class CommoditySpotOptionBuilder:
         """
         ...
 
-    def metric_pricing_overrides(
-        self, value: MetricPricingOverrides | dict[str, object] | str
-    ) -> CommoditySpotOptionBuilder:
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object]) -> CommoditySpotOptionBuilder:
         """
         Set the metric-time pricing configuration stored on the instrument.
 
         Parameters
         ----------
-        value : MetricPricingOverrides | dict[str, object] | str
-            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
-            JSON string.
+        value : MetricPricingOverrides | dict[str, object]
+            Rust ``MetricPricingOverrides`` as the typed class or a ``dict``.
 
         Returns
         -------
@@ -956,15 +952,14 @@ class CommoditySpotOptionBuilder:
         """
         ...
 
-    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> CommoditySpotOptionBuilder:
+    def scenario_pricing_overrides(self, value: dict[str, object]) -> CommoditySpotOptionBuilder:
         """
         Set the scenario-only pricing adjustments.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
-            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+        value : dict[str, object]
+            Rust ``ScenarioPricingOverrides`` in serde form (a ``dict``), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
 
         Returns
         -------

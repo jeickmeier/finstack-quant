@@ -1166,7 +1166,7 @@ def tranche_oas(
     market: MarketContext,
     as_of: datetime.date | str,
     market_price_pct: float,
-    config: dict[str, Any] | str | None = None,
+    config: dict[str, Any] | None = None,
 ) -> OasResult:
     """Compute option-adjusted spread for a tranche. Returns an ``OasResult``.
 
@@ -1186,7 +1186,7 @@ def tranche_oas(
         Clean settlement price as a percentage of current balance (100.0 = par).
         Accrued interest is added once at the deal's ``quote_settlement_date``
         (valuation date when omitted); earlier payments belong to the seller.
-    config : dict or str or None, optional
+    config : dict or None, optional
         Serialized ``OasConfig``. All fields are required when supplied.
 
     Returns
@@ -1285,7 +1285,7 @@ def tranche_scenario_table(
     tranche_id: str,
     market: MarketContext,
     as_of: datetime.date | str,
-    grid: dict[str, Any] | str,
+    grid: dict[str, Any],
 ) -> ScenarioTable:
     """Price a tranche across a CPR x CDR x severity grid. Returns a ``ScenarioTable``.
 
@@ -1301,7 +1301,7 @@ def tranche_scenario_table(
         curves and fixings.
     as_of : datetime.date | str
         Valuation date, either a date-like object or an ISO 8601 string.
-    grid : dict or str
+    grid : dict
         Serialized ``ScenarioGrid``. Capped at 10,000 cells because each cell
         reprices the entire deal.
 
@@ -1324,7 +1324,7 @@ def tranche_scenario_table(
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.valuations.instruments import tranche_scenario_table
     >>> try:
-    ...     tranche_scenario_table({}, "A", MarketContext(), "2026-01-01", "{}")
+    ...     tranche_scenario_table({}, "A", MarketContext(), "2026-01-01", {})
     ... except ValueError as exc:
     ...     print("schema" in str(exc))
     True

@@ -83,11 +83,11 @@ pub(crate) fn parse_envelope(py: Python<'_>, json: &str) -> PyResult<Calibration
     validate_api::parse_envelope(json).map_err(|error| envelope_error_to_py(py, error))
 }
 
-/// Extract a typed envelope from `CalibrationEnvelope | dict | str`.
+/// Extract a typed envelope from `CalibrationEnvelope | dict`.
 ///
-/// A `str` goes to the Rust strict loader unchanged, so malformed JSON yields
-/// the same `contract/parse-error` diagnostic as the WASM twin; only other
-/// objects (dicts) are serialized with `json.dumps` first.
+/// A dict is serialized with `json.dumps` and goes through the Rust strict
+/// loader. A `str` is refused: envelope text loads with
+/// `CalibrationEnvelope.from_json`, which is that same loader.
 pub(crate) fn extract_envelope(
     py: Python<'_>,
     obj: &Bound<'_, PyAny>,
@@ -95,8 +95,10 @@ pub(crate) fn extract_envelope(
     if let Ok(envelope) = obj.cast::<PyCalibrationEnvelope>() {
         return Ok(envelope.borrow().inner.clone());
     }
-    if let Ok(json) = obj.extract::<std::borrow::Cow<'_, str>>() {
-        return parse_envelope(py, &json);
+    if obj.is_instance_of::<pyo3::types::PyString>() {
+        return Err(pyo3::exceptions::PyTypeError::new_err(
+            "expected a CalibrationEnvelope or an envelope dict, not a string; load JSON text with CalibrationEnvelope.from_json",
+        ));
     }
     let json = py_to_json_string(py, obj, "calibration envelope")?;
     parse_envelope(py, &json)
@@ -106,8 +108,9 @@ pub(crate) fn extract_envelope(
 ///
 /// Parameters
 /// ----------
-/// envelope : CalibrationEnvelope | dict | str
-///     Typed envelope, plan, dict, or JSON string.
+/// envelope : CalibrationEnvelope | dict
+///     Typed envelope or its dict. Load JSON text with
+///     ``CalibrationEnvelope.from_json``.
 ///
 /// Returns
 /// -------
@@ -135,8 +138,9 @@ pub(super) fn validate_calibration(
 ///
 /// Parameters
 /// ----------
-/// envelope : CalibrationEnvelope | dict | str
-///     Typed envelope, plan, dict, or JSON string.
+/// envelope : CalibrationEnvelope | dict
+///     Typed envelope or its dict. Load JSON text with
+///     ``CalibrationEnvelope.from_json``.
 ///
 /// Returns
 /// -------
@@ -166,8 +170,8 @@ pub(super) fn dry_run(
 ///
 /// Parameters
 /// ----------
-/// envelope : CalibrationEnvelope | dict | str
-///     Typed envelope, dict, or JSON string containing the plan and market data.
+/// envelope : CalibrationEnvelope | dict
+///     Typed envelope or dict containing the plan and market data.
 ///
 /// Returns
 /// -------

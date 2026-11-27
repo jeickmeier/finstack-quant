@@ -857,12 +857,12 @@ class BarrierOptionBuilder:
         """
         ...
 
-    def monitoring(self, value: dict[str, object] | str) -> BarrierOptionBuilder:
+    def monitoring(self, value: dict[str, object]) -> BarrierOptionBuilder:
         """Set the contract's monitoring.
 
         Parameters
         ----------
-        value : dict[str, object] | str
+        value : dict[str, object]
             Contractual monitoring: continuous or an explicit, strictly increasing set of observation dates no later than expiry. Discrete pricing does not interpolate hits between those dates.
 
         Returns
@@ -979,15 +979,14 @@ class BarrierOptionBuilder:
         """
         ...
 
-    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> BarrierOptionBuilder:
+    def instrument_pricing_overrides(self, value: dict[str, object]) -> BarrierOptionBuilder:
         """
         Set the instrument-owned pricing inputs.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
-            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+        value : dict[str, object]
+            Rust ``InstrumentPricingOverrides`` in serde form (a ``dict``): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
             ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
 
         Returns
@@ -1003,15 +1002,14 @@ class BarrierOptionBuilder:
         """
         ...
 
-    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object] | str) -> BarrierOptionBuilder:
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object]) -> BarrierOptionBuilder:
         """
         Set the metric-time pricing configuration stored on the instrument.
 
         Parameters
         ----------
-        value : MetricPricingOverrides | dict[str, object] | str
-            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
-            JSON string.
+        value : MetricPricingOverrides | dict[str, object]
+            Rust ``MetricPricingOverrides`` as the typed class or a ``dict``.
 
         Returns
         -------
@@ -1026,15 +1024,14 @@ class BarrierOptionBuilder:
         """
         ...
 
-    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> BarrierOptionBuilder:
+    def scenario_pricing_overrides(self, value: dict[str, object]) -> BarrierOptionBuilder:
         """
         Set the scenario-only pricing adjustments.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
-            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+        value : dict[str, object]
+            Rust ``ScenarioPricingOverrides`` in serde form (a ``dict``), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
 
         Returns
         -------

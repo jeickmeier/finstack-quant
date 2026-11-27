@@ -9,7 +9,7 @@ use super::budget::PyRiskBudgetResult;
 use super::contributions::PyPositionRiskDecomposition;
 use super::stress::PyStressAttribution;
 use crate::bindings::macros::{py_getters, wire_methods};
-use crate::bindings::module_utils::spec_from_py;
+use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::core_to_py;
@@ -155,7 +155,7 @@ pub(super) fn position_risk_report(
 ) -> PyResult<PyPositionRiskReport> {
     let request = match request.cast::<PyPositionRiskRequest>() {
         Ok(typed) => typed.borrow().inner.clone(),
-        Err(_) => spec_from_py(py, request, "PositionRiskRequest")?,
+        Err(_) => py_to_serde(py, request, "PositionRiskRequest")?,
     };
     let inner = py
         .detach(move || model_risk::position_risk_report(&request))

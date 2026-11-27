@@ -47,7 +47,7 @@ pub(super) fn build_cashflow_schedule(
     as_of: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyCashFlowSchedule> {
     let spec: CashflowScheduleBuildSpec =
-        crate::bindings::module_utils::spec_from_py(py, spec, "CashflowScheduleBuildSpec")?;
+        crate::bindings::module_utils::py_to_serde(py, spec, "CashflowScheduleBuildSpec")?;
     let market = market.map(|market| market.inner.clone());
     let as_of = as_of
         .map(crate::bindings::date_utils::py_to_date)

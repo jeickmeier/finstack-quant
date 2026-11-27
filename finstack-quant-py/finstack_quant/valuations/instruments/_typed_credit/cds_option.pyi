@@ -630,14 +630,14 @@ class CdsOptionBuilder:
             If the builder was already consumed by :meth:`CdsOptionBuilder.build`.
         """
         ...
-    def strike(self, value: dict[str, str] | str) -> CdsOptionBuilder:
+    def strike(self, value: dict[str, str]) -> CdsOptionBuilder:
         """
         Set the option strike as a forward spread or a clean index price.
 
         Parameters
         ----------
-        value : dict[str, str] | str
-            ``{"spread": "0.0325"}`` (decimal forward spread) or ``{"clean_price_pct": "107.0"}`` (clean price points), as a dict or JSON text.
+        value : dict[str, str]
+            ``{"spread": "0.0325"}`` (decimal forward spread) or ``{"clean_price_pct": "107.0"}`` (clean price points), as a dict.
 
         Returns
         -------
@@ -1030,15 +1030,14 @@ class CdsOptionBuilder:
             If ``value`` is not a decimal number.
         """
         ...
-    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> CdsOptionBuilder:
+    def instrument_pricing_overrides(self, value: dict[str, object]) -> CdsOptionBuilder:
         """
         Set the instrument-owned pricing inputs.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
-            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+        value : dict[str, object]
+            Rust ``InstrumentPricingOverrides`` in serde form (a ``dict``): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
             ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
 
         Returns
@@ -1053,15 +1052,14 @@ class CdsOptionBuilder:
             not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object] | str) -> CdsOptionBuilder:
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object]) -> CdsOptionBuilder:
         """
         Set the metric-time pricing configuration stored on the instrument.
 
         Parameters
         ----------
-        value : MetricPricingOverrides | dict[str, object] | str
-            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
-            JSON string.
+        value : MetricPricingOverrides | dict[str, object]
+            Rust ``MetricPricingOverrides`` as the typed class or a ``dict``.
 
         Returns
         -------
@@ -1075,15 +1073,14 @@ class CdsOptionBuilder:
             not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> CdsOptionBuilder:
+    def scenario_pricing_overrides(self, value: dict[str, object]) -> CdsOptionBuilder:
         """
         Set the scenario-only pricing adjustments.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
-            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+        value : dict[str, object]
+            Rust ``ScenarioPricingOverrides`` in serde form (a ``dict``), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
 
         Returns
         -------

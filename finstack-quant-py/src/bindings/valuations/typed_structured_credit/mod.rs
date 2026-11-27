@@ -11,8 +11,8 @@
 //! `CreditModelConfig`'s stochastic specs, `DealFees`,
 //! `MarketConditions`, `DelinquencyModel`,
 //! `CardPortfolioSpec`, the CMBS `PoolAsset` sub-specs, floating
-//! `RateSpec`) stay dict / JSON sub-fields per the nested-spec rule;
-//! every builder setter accepts a dict or JSON string for them.
+//! `RateSpec`) stay dict sub-fields per the nested-spec rule;
+//! every builder setter accepts a dict for them.
 //!
 //! `DealType` and `TrancheSeniority` have no `#[serde(rename_all)]` in Rust —
 //! their wire representation is PascalCase/acronym (`"abs"`, `"clo"`,

@@ -327,15 +327,15 @@ class CovenantEngine:
             expires before it takes effect, or windows overlap.
         """
 
-    def evaluate(self, metrics: dict[str, float] | pd.Series | str, as_of: DateLike) -> dict[str, CovenantReport]:
+    def evaluate(self, metrics: dict[str, float] | pd.Series, as_of: DateLike) -> dict[str, CovenantReport]:
         """
         Evaluate every applicable covenant on a date.
 
         Parameters
         ----------
-        metrics : dict[str, float] | pd.Series | str
+        metrics : dict[str, float] | pd.Series
             Metric values keyed by metric id (dict, ``pandas.Series`` indexed by
-            metric id, or a JSON object string). Ratios in turns, amounts in
+            metric id). Ratios in turns, amounts in
             the reporting currency; ``bool`` values are rejected.
         as_of : datetime.date | str
             Test date (``datetime.date``, ``pandas.Timestamp``, ``numpy.datetime64``,
@@ -357,7 +357,7 @@ class CovenantEngine:
             If the engine is invalid, two specs share a label, a metric value
             is not a number, or the date string is not ISO 8601.
         TypeError
-            If ``metrics`` is not a dict, ``pandas.Series``, or JSON string, or
+            If ``metrics`` is not a dict or ``pandas.Series``, or
             ``as_of`` is neither a string nor date-like.
 
         Examples
@@ -372,7 +372,7 @@ class CovenantEngine:
         """
 
     def evaluate_and_track(
-        self, metrics: dict[str, float] | pd.Series | str, as_of: DateLike, scope: str
+        self, metrics: dict[str, float] | pd.Series, as_of: DateLike, scope: str
     ) -> dict[str, CovenantReport]:
         """
         Evaluate like :meth:`evaluate` and update :attr:`breach_history`.
@@ -385,9 +385,9 @@ class CovenantEngine:
 
         Parameters
         ----------
-        metrics : dict[str, float] | pd.Series | str
+        metrics : dict[str, float] | pd.Series
             Metric values keyed by metric id (dict, ``pandas.Series`` indexed by
-            metric id, or a JSON object string).
+            metric id).
         as_of : datetime.date | str
             Test date.
         scope : str

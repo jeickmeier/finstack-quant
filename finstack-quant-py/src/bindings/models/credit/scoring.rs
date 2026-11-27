@@ -277,7 +277,7 @@ scoring_fn!(
 #[pyo3(text_signature = "(request)")]
 fn credit_score_report(request: &Bound<'_, PyAny>) -> PyResult<PyCreditScoreReport> {
     let request: CreditScoreRequest =
-        crate::bindings::module_utils::spec_from_py(request.py(), request, "CreditScoreRequest")?;
+        crate::bindings::module_utils::py_to_serde(request.py(), request, "CreditScoreRequest")?;
     Ok(PyCreditScoreReport {
         inner: core_credit_score_report(&request).map_err(core_to_py)?,
     })

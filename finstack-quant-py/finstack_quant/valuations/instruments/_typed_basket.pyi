@@ -489,13 +489,13 @@ class BasketBuilder:
         """
         ...
 
-    def expense(self, value: dict[str, object] | str) -> BasketBuilder:
+    def expense(self, value: dict[str, object]) -> BasketBuilder:
         """Set the explicit operating expense to apply at the valuation cut.
 
         Parameters
         ----------
-        value : dict[str, object] or str
-            Wire object or JSON text with type "none", or type "accrued"
+        value : dict[str, object]
+            Wire object with type "none", or type "accrued"
             and reporting-currency money per basket unit.
 
         Returns
@@ -570,12 +570,12 @@ class BasketBuilder:
         """
         ...
 
-    def pricing_config(self, value: dict[str, object] | str) -> BasketBuilder:
+    def pricing_config(self, value: dict[str, object]) -> BasketBuilder:
         """Set the contract's pricing config.
 
         Parameters
         ----------
-        value : dict[str, object] | str
+        value : dict[str, object]
             Pricing configuration
 
         Returns
@@ -612,15 +612,14 @@ class BasketBuilder:
         """
         ...
 
-    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> BasketBuilder:
+    def instrument_pricing_overrides(self, value: dict[str, object]) -> BasketBuilder:
         """
         Set the instrument-owned pricing inputs.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
-            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+        value : dict[str, object]
+            Rust ``InstrumentPricingOverrides`` in serde form (a ``dict``): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
             ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
 
         Returns
@@ -636,15 +635,14 @@ class BasketBuilder:
         """
         ...
 
-    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object] | str) -> BasketBuilder:
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object]) -> BasketBuilder:
         """
         Set the metric-time pricing configuration stored on the instrument.
 
         Parameters
         ----------
-        value : MetricPricingOverrides | dict[str, object] | str
-            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
-            JSON string.
+        value : MetricPricingOverrides | dict[str, object]
+            Rust ``MetricPricingOverrides`` as the typed class or a ``dict``.
 
         Returns
         -------
@@ -659,15 +657,14 @@ class BasketBuilder:
         """
         ...
 
-    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> BasketBuilder:
+    def scenario_pricing_overrides(self, value: dict[str, object]) -> BasketBuilder:
         """
         Set the scenario-only pricing adjustments.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
-            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+        value : dict[str, object]
+            Rust ``ScenarioPricingOverrides`` in serde form (a ``dict``), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
 
         Returns
         -------

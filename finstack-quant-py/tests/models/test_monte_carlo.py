@@ -156,7 +156,9 @@ _GBM_SPEC = {
 
 def test_simulate_paths_is_typed_deterministic_and_shaped() -> None:
     first = simulate_paths(_GBM_SPEC)
-    second = simulate_paths(json.dumps(_GBM_SPEC))
+    second = simulate_paths(json.loads(json.dumps(_GBM_SPEC)))
+    with pytest.raises(ValueError, match="invalid PathSimulationSpec: invalid type: string"):
+        simulate_paths(json.dumps(_GBM_SPEC))
     assert isinstance(first, PathSummary)
     assert first.times == second.times == [0.0, 0.25, 0.5, 0.75, 1.0]
     assert first.values == second.values
@@ -285,7 +287,7 @@ def test_simulate_paths_scheme_changes_the_paths_but_not_the_seeded_draws() -> N
             {**_GBM_SPEC, "process": {"type": "cir", "kappa": 0.5, "theta": 0.04, "sigma": 0.1}, "scheme": "milstein"},
             "scheme 'milstein' is not available for process 'cir'",
         ),
-        ("{bad", "invalid PathSimulationSpec JSON"),
+        ("{bad", "invalid PathSimulationSpec: invalid type: string"),
         (42, "invalid PathSimulationSpec"),
     ],
 )

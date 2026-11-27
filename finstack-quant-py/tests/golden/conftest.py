@@ -395,7 +395,7 @@ def _validate_pricing_body(fixture: GoldenFixture) -> None:
             raise AssertionError(f"market.data is not a valid MarketContext: {exc}") from exc
     elif kind == "envelope":
         try:
-            validate_calibration(json.dumps(market["envelope"]))
+            validate_calibration(market["envelope"])
         except Exception as exc:
             raise AssertionError(f"market.envelope is not a valid CalibrationEnvelope: {exc}") from exc
     else:

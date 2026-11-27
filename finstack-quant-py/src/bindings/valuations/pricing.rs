@@ -10,9 +10,7 @@ use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::extract::extract_instrument;
 use crate::bindings::json_bridge::serde_to_py;
-use crate::bindings::module_utils::{
-    opt_spec_from_py, py_to_json_string, py_to_serde, spec_from_py,
-};
+use crate::bindings::module_utils::{opt_py_to_serde, py_to_json_string, py_to_serde};
 use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::{core_to_py, display_to_py, value_error};
 use finstack_quant_valuations::instruments::cashflow_export::InstrumentCashflowEnvelope;
@@ -20,7 +18,7 @@ use finstack_quant_valuations::instruments::pricing_overrides::MetricPricingOver
 use finstack_quant_valuations::metrics::risk::{MarketHistory, MarketScenario};
 use finstack_quant_valuations::pricer::PriceExtras;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyString};
+use pyo3::types::PyDict;
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MetricPricingOverrides")]
 #[pyclass(
@@ -59,9 +57,9 @@ impl PyMetricPricingOverrides {
             _ => None,
         };
         let inner = MetricPricingOverrides {
-            bump_config: opt_spec_from_py(py, bump_config, "bump_config")?.unwrap_or_default(),
+            bump_config: opt_py_to_serde(py, bump_config, "bump_config")?.unwrap_or_default(),
             theta_period,
-            breakeven_config: opt_spec_from_py(py, breakeven_config, "breakeven_config")?,
+            breakeven_config: opt_py_to_serde(py, breakeven_config, "breakeven_config")?,
             bond_risk_basis: bond_risk_basis
                 .map(|name| {
                     serde_json::from_value(serde_json::Value::String(name.to_string())).map_err(
@@ -84,7 +82,7 @@ impl PyMetricPricingOverrides {
                     )
                 })
                 .transpose()?,
-            var_config: opt_spec_from_py(py, var_config, "var_config")?,
+            var_config: opt_py_to_serde(py, var_config, "var_config")?,
         };
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
@@ -283,7 +281,7 @@ crate::bindings::macros::tabular_methods!(
     module = "finstack_quant.valuations.instruments._pricing"
 );
 
-/// Coerce ``MetricPricingOverrides | dict | str | None`` into the JSON patch
+/// Coerce ``MetricPricingOverrides | dict | None`` into the JSON patch
 /// ``validate_instrument_json`` merges before validation.
 ///
 /// The pricing entry points read the same patch from the
@@ -293,8 +291,8 @@ crate::bindings::macros::tabular_methods!(
 /// # Arguments
 ///
 /// * `py` - GIL token used for ``json.dumps`` on dict inputs.
-/// * `obj` - ``None``, a typed ``MetricPricingOverrides``, a JSON string, or a
-///   dict of override fields.
+/// * `obj` - ``None``, a typed ``MetricPricingOverrides``, or a dict of
+///   override fields.
 pub(crate) fn metric_pricing_overrides_json(
     py: Python<'_>,
     obj: Option<&Bound<'_, PyAny>>,
@@ -308,20 +306,17 @@ pub(crate) fn metric_pricing_overrides_json(
     if let Ok(typed) = obj.cast::<PyMetricPricingOverrides>() {
         return typed.borrow().to_json().map(Some);
     }
-    if let Ok(text) = obj.cast::<PyString>() {
-        return Ok(Some(text.to_str()?.to_owned()));
-    }
     py_to_json_string(py, obj, "metric_pricing_overrides").map(Some)
 }
 
-/// Coerce ``MetricPricingOverrides | dict | str`` into the Rust struct an
+/// Coerce ``MetricPricingOverrides | dict`` into the Rust struct an
 /// instrument builder stores.
 ///
 /// # Arguments
 ///
 /// * `py` - GIL token used for ``json.dumps`` on dict inputs.
-/// * `obj` - A typed ``MetricPricingOverrides``, a JSON string, or a dict of
-///   override fields; unknown fields are rejected.
+/// * `obj` - A typed ``MetricPricingOverrides`` or a dict of override
+///   fields; unknown fields are rejected.
 pub(crate) fn metric_pricing_overrides_from_py(
     py: Python<'_>,
     obj: &Bound<'_, PyAny>,
@@ -329,7 +324,7 @@ pub(crate) fn metric_pricing_overrides_from_py(
     if let Ok(typed) = obj.cast::<PyMetricPricingOverrides>() {
         return Ok(typed.borrow().inner.clone());
     }
-    spec_from_py(py, obj, "metric_pricing_overrides")
+    py_to_serde(py, obj, "metric_pricing_overrides")
 }
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "PriceExtras")]
@@ -398,7 +393,7 @@ impl PyPriceExtras {
 
 /// Read the optional ``extras`` argument of the pricing entry points.
 ///
-/// Accepts ``None`` (no extras), a typed ``PriceExtras``, a dict or JSON text in the shape of the Rust
+/// Accepts ``None`` (no extras), a typed ``PriceExtras``, a dict in the shape of the Rust
 /// `PriceExtras`; typed ``MetricPricingOverrides`` / ``MarketHistory``
 /// wrappers inside a dict serialize through the shared ``json.dumps`` hook.
 ///
@@ -416,7 +411,7 @@ pub(crate) fn price_extras_from_py(
     {
         return Ok(typed.borrow().inner.clone());
     }
-    Ok(opt_spec_from_py(py, extras, "PriceExtras")?.unwrap_or_default())
+    Ok(opt_py_to_serde(py, extras, "PriceExtras")?.unwrap_or_default())
 }
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "price_instrument")]

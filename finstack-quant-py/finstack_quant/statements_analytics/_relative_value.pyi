@@ -1186,9 +1186,9 @@ class RelativeValueReport:
         ...
 
 def relative_value_report(
-    subject: CompanyMetrics | dict[str, Any] | str,
-    universe: Sequence[CompanyMetrics | dict[str, Any] | str] | str,
-    config: dict[str, Any] | str,
+    subject: CompanyMetrics | dict[str, Any],
+    universe: Sequence[CompanyMetrics | dict[str, Any]],
+    config: dict[str, Any],
 ) -> RelativeValueReport:
     """
     Compare one subject with its filtered peers.
@@ -1206,16 +1206,16 @@ def relative_value_report(
 
     Parameters
     ----------
-    subject : CompanyMetrics or dict or str
+    subject : CompanyMetrics or dict
         Company being evaluated, typed or as its serde document. It need not be in
         ``universe``.
-    universe : sequence of CompanyMetrics or dict or str, or str
-        Candidate peers in the order the report returns them: a sequence whose
-        members are typed, serde documents or JSON text, or the whole list as one
-        JSON array text, as WASM accepts. A member with the subject's id is never a
-        peer and does not count as excluded.
-    config : dict or str
-        ``RelativeValueReportConfig`` document, a dict or JSON text: ``filter``
+    universe : sequence of CompanyMetrics or dict
+        Candidate peers in the order the report returns them: a list or tuple whose
+        members are typed or serde documents. JSON text is not read, neither as a
+        member nor as the whole list; load it with ``json.loads`` first. A member
+        with the subject's id is never a peer and does not count as excluded.
+    config : dict
+        ``RelativeValueReportConfig`` document, a dict: ``filter``
         (optional; a ``PeerFilter`` document in which every field is optional, an
         omitted field meaning no constraint and an unknown one rejected; an omitted
         filter makes every other company a peer), ``period_basis`` (required; ``"ltm"``, ``"ntm"`` or

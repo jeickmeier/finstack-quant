@@ -858,14 +858,14 @@ class ConvertibleBondBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def conversion(self, value: ConversionSpec | dict[str, object] | str) -> ConvertibleBondBuilder:
+    def conversion(self, value: ConversionSpec | dict[str, object]) -> ConvertibleBondBuilder:
         """
         Set the conversion terms.
 
         Parameters
         ----------
-        value : ConversionSpec | dict[str, object] | str
-            Typed :class:`ConversionSpec`, a dict, or a JSON object string with ``ratio``, ``price``, ``policy``, ``anti_dilution``, ``dividend_adjustment`` and ``dilution_events``; at least one of ``ratio`` / ``price`` must be set.
+        value : ConversionSpec | dict[str, object]
+            Typed :class:`ConversionSpec` or a dict with ``ratio``, ``price``, ``policy``, ``anti_dilution``, ``dividend_adjustment`` and ``dilution_events``; at least one of ``ratio`` / ``price`` must be set.
 
         Returns
         -------
@@ -941,14 +941,14 @@ class ConvertibleBondBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def call_put(self, value: CallPutSchedule | dict[str, object] | str) -> ConvertibleBondBuilder:
+    def call_put(self, value: CallPutSchedule | dict[str, object]) -> ConvertibleBondBuilder:
         """
         Set the call/put schedule.
 
         Parameters
         ----------
-        value : CallPutSchedule | dict[str, object] | str
-            Typed :class:`CallPutSchedule`, a dict, or a JSON object string with ``calls`` and ``puts`` arrays of windows.
+        value : CallPutSchedule | dict[str, object]
+            Typed :class:`CallPutSchedule` or a dict with ``calls`` and ``puts`` arrays of windows.
 
         Returns
         -------
@@ -961,14 +961,14 @@ class ConvertibleBondBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not match the ``CallPutSchedule`` shape.
         """
         ...
-    def soft_call_trigger(self, value: dict[str, object] | str) -> ConvertibleBondBuilder:
+    def soft_call_trigger(self, value: dict[str, object]) -> ConvertibleBondBuilder:
         """
         Set the soft-call trigger condition.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            ``PriceTrigger`` as a dict or JSON object string with ``threshold_pct`` (percent of conversion price, e.g. ``130.0``), ``observation_days`` and ``required_days_above``.
+        value : dict[str, object]
+            ``PriceTrigger`` as a dict object string with ``threshold_pct`` (percent of conversion price, e.g. ``130.0``), ``observation_days`` and ``required_days_above``.
 
         Returns
         -------
@@ -1021,13 +1021,13 @@ class ConvertibleBondBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def resolved_settlement(self, value: dict[str, object] | str) -> ConvertibleBondBuilder:
+    def resolved_settlement(self, value: dict[str, object]) -> ConvertibleBondBuilder:
         """Record the claim remaining after exercise extinguishes the debt.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Canonical ConvertibleSettlement dict or JSON: ISO ``exercise_date``
+        value : dict[str, object]
+            Canonical ConvertibleSettlement dict: ISO ``exercise_date``
             and ``delivery_date``, nonnegative ``shares``, currency-tagged
             ``cash`` and ``recovery_basis``. Cash includes retained coupons;
             recovery basis excludes uncapitalized accrual. Omission leaves debt
@@ -1044,14 +1044,14 @@ class ConvertibleBondBuilder:
             If the builder was consumed or the record cannot be deserialized.
         """
         ...
-    def cashflow_spec(self, value: dict[str, object] | str) -> ConvertibleBondBuilder:
+    def cashflow_spec(self, value: dict[str, object]) -> ConvertibleBondBuilder:
         """
         Set the coupon/cashflow specification.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``CashflowSpec`` as a dict or JSON object string (the same
+        value : dict[str, object]
+            Rust ``CashflowSpec`` as a dict object string (the same
             shape as ``Bond.cashflow_spec``, e.g. ``{"fixed": {"coupon_type":
             "cash", "rate": "0.05", ...schedule}}``); a zero-coupon convertible
             uses a fixed spec with rate ``"0"``.
@@ -1067,15 +1067,14 @@ class ConvertibleBondBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as a ``CashflowSpec``.
         """
         ...
-    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> ConvertibleBondBuilder:
+    def instrument_pricing_overrides(self, value: dict[str, object]) -> ConvertibleBondBuilder:
         """
         Set the instrument-owned pricing inputs.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
-            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+        value : dict[str, object]
+            Rust ``InstrumentPricingOverrides`` in serde form (a ``dict``): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
             ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
 
         Returns
@@ -1090,17 +1089,14 @@ class ConvertibleBondBuilder:
             not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def metric_pricing_overrides(
-        self, value: MetricPricingOverrides | dict[str, object] | str
-    ) -> ConvertibleBondBuilder:
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object]) -> ConvertibleBondBuilder:
         """
         Set the metric-time pricing configuration stored on the instrument.
 
         Parameters
         ----------
-        value : MetricPricingOverrides | dict[str, object] | str
-            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
-            JSON string.
+        value : MetricPricingOverrides | dict[str, object]
+            Rust ``MetricPricingOverrides`` as the typed class or a ``dict``.
 
         Returns
         -------
@@ -1114,15 +1110,14 @@ class ConvertibleBondBuilder:
             not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> ConvertibleBondBuilder:
+    def scenario_pricing_overrides(self, value: dict[str, object]) -> ConvertibleBondBuilder:
         """
         Set the scenario-only pricing adjustments.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
-            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+        value : dict[str, object]
+            Rust ``ScenarioPricingOverrides`` in serde form (a ``dict``), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
 
         Returns
         -------
@@ -1224,7 +1219,7 @@ class ConversionSpec:
         policy: str | dict[str, object],
         anti_dilution: Literal["none", "full_ratchet", "weighted_average"],
         dividend_adjustment: Literal["none", "adjust_price", "adjust_ratio"],
-        dilution_events: list[dict[str, object]] | str | None = None,
+        dilution_events: list[dict[str, object]] | None = None,
     ) -> None:
         """
         Describe the conversion terms.
@@ -1247,10 +1242,10 @@ class ConversionSpec:
             Anti-dilution protection (keyword-only, required as in Rust).
         dividend_adjustment : {"none", "adjust_price", "adjust_ratio"}
             Dividend protection (keyword-only, required as in Rust).
-        dilution_events : list[dict[str, object]] | str | None
+        dilution_events : list[dict[str, object]] | None
             Dilution events (``date``, ``new_issue_price``, ``new_shares_issued``,
             ``shares_outstanding_before``) in chronological order; pricing raises
-            ``ValueError`` for out-of-order events. A string must be a JSON array. Default empty.
+            ``ValueError`` for out-of-order events. Default empty.
 
         Raises
         ------
@@ -1456,18 +1451,18 @@ class CallPutSchedule:
 
     def __init__(
         self,
-        calls: list[dict[str, object]] | str | None = None,
-        puts: list[dict[str, object]] | str | None = None,
+        calls: list[dict[str, object]] | None = None,
+        puts: list[dict[str, object]] | None = None,
     ) -> None:
         """
         Describe the call and put windows.
 
         Parameters
         ----------
-        calls : list[dict[str, object]] | str | None
+        calls : list[dict[str, object]] | None
             Issuer call windows (``start``, ``end``,
             ``price_pct_of_par``, optional ``make_whole``); default none.
-        puts : list[dict[str, object]] | str | None
+        puts : list[dict[str, object]] | None
             Holder put windows of the same shape; default none.
 
         Raises

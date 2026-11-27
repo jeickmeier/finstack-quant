@@ -45,12 +45,14 @@ def test_each_field_is_the_priced_metric(bond: Bond, clean: float) -> None:
         assert getattr(quotes, name) == result.get_metric(name), name
 
 
-def test_a_quote_as_text_equals_the_quote_as_a_dict() -> None:
+def test_a_quote_as_text_is_refused_and_its_loaded_dict_equals_the_dict() -> None:
     bond = Bond.example()
     assert (
-        compute_quotes(bond, MARKET, AS_OF, '{"ytm": 0.05}').to_dict()
+        compute_quotes(bond, MARKET, AS_OF, json.loads('{"ytm": 0.05}')).to_dict()
         == compute_quotes(bond, MARKET, AS_OF, {"ytm": 0.05}).to_dict()
     )
+    with pytest.raises(ValueError, match="invalid BondQuoteInput: unknown variant"):
+        compute_quotes(bond, MARKET, AS_OF, '{"ytm": 0.05}')
 
 
 def test_a_price_returns_from_its_yield() -> None:

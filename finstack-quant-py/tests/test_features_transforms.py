@@ -268,7 +268,9 @@ def test_transform_panel_typed_twin() -> None:
     assert isinstance(result, PanelTransformResult)
     assert result.columns == ["rank"]
     assert result.get_column("rank") == [0.0, 0.0, 1.0, 1.0]
-    assert transform_panel(spec.to_json()).to_json() == result.to_json()
+    assert transform_panel(PanelTransformSpec.from_json(spec.to_json())).to_json() == result.to_json()
+    with pytest.raises(TypeError, match="is not an instance of 'dict'"):
+        transform_panel(spec.to_json())
     assert pickle.loads(pickle.dumps(result)).columns == ["rank"]  # noqa: S301 - trusted in-process round trip
     with pytest.raises(KeyError):
         result.get_column("missing")
@@ -282,17 +284,19 @@ def test_transform_panel_typed_twin() -> None:
     assert result.to_arrow().column_names() == ["rank"]
 
 
-def test_transform_panel_dict_and_json_share_rust_validation() -> None:
-    from finstack_quant.features import transform_panel
+def test_transform_panel_dict_and_loader_share_rust_validation() -> None:
+    from finstack_quant.features import PanelTransformSpec, transform_panel
 
     ops = [{"name": "r", "family": "cross_sectional", "op": "rank"}]
     bad = {"values": [1.0, 3.0], "time_key": ["d", "d"], "operations": ops, "bogus": 1}
     with pytest.raises(ValueError, match="unknown field `bogus`") as from_dict:
         transform_panel(bad)
     with pytest.raises(ValueError, match="unknown field `bogus`") as from_json:
+        transform_panel(PanelTransformSpec.from_json(json.dumps(bad)))
+    # Same serde message after each route's own prefix; the JSON-text loader adds the parse position.
+    assert str(from_json.value).split(": ", 1)[1].startswith(str(from_dict.value).split(": ", 1)[1])
+    with pytest.raises(TypeError, match="is not an instance of 'dict'"):
         transform_panel(json.dumps(bad))
-    # Same serde message; the JSON-text path adds the parse position.
-    assert str(from_json.value).startswith(str(from_dict.value))
     with pytest.raises(ValueError, match="missing field `values`"):
         transform_panel({"time_key": ["d"], "operations": ops})
     # NaN still marks a missing value on the dict path.

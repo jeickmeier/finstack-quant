@@ -5,7 +5,7 @@ from typing import Any
 from finstack_quant.models.monte_carlo._results import Estimate
 
 def finite_diff_delta(
-    spec: dict[str, Any] | str,
+    spec: dict[str, Any],
 ) -> Estimate:
     """
     Finite-difference delta for a vanilla European option under GBM.
@@ -17,8 +17,8 @@ def finite_diff_delta(
 
     Parameters
     ----------
-    spec : dict or str
-        Serde form of the Rust ``GbmEuropeanFdSpec``, as a dict or JSON text.
+    spec : dict
+        Serde form of the Rust ``GbmEuropeanFdSpec``, as a dict.
         Required keys: ``spot`` (finite positive spot price; the down-bumped
         state must remain at least ``1e-12``); ``strike`` (same units as
         ``spot``); ``rate`` and ``dividend_yield`` (continuously compounded
@@ -67,7 +67,7 @@ def finite_diff_delta(
     ...
 
 def finite_diff_gamma(
-    spec: dict[str, Any] | str,
+    spec: dict[str, Any],
 ) -> Estimate:
     """
     Finite-difference gamma for a vanilla European option under GBM.
@@ -78,8 +78,8 @@ def finite_diff_gamma(
 
     Parameters
     ----------
-    spec : dict or str
-        Serde form of the Rust ``GbmEuropeanFdSpec``, as a dict or JSON text.
+    spec : dict
+        Serde form of the Rust ``GbmEuropeanFdSpec``, as a dict.
         Required keys: ``spot`` (finite positive spot price; the down-bumped
         state must remain at least ``1e-12``); ``strike`` (same units as
         ``spot``); ``rate`` and ``dividend_yield`` (continuously compounded

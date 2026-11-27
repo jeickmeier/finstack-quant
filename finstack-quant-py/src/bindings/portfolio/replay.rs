@@ -53,7 +53,7 @@ impl PyReplayConfig {
         use crate::bindings::extract::parse_label;
 
         let valuation_options = match valuation_options {
-            Some(options) => crate::bindings::module_utils::spec_from_py(
+            Some(options) => crate::bindings::module_utils::py_to_serde(
                 options.py(),
                 options,
                 "valuation_options",

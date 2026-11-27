@@ -75,7 +75,7 @@ def test_residual_tolerance_boundary_and_signed_dividends() -> None:
             }
         ],
     }
-    report = json.loads(run_checks(b.build(), json.dumps(suite)).to_json())
+    report = json.loads(run_checks(b.build(), suite).to_json())
     assert report["summary"]["failed"] == 1
     assert [f["period"] for r in report["results"] for f in r["findings"]] == ["2025Q4"]
 

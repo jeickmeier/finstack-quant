@@ -271,15 +271,15 @@ class PositionRiskReport:
         """
         ...
 
-def position_risk_report(request: PositionRiskRequest | str | dict[str, Any]) -> PositionRiskReport:
+def position_risk_report(request: PositionRiskRequest | dict[str, Any]) -> PositionRiskReport:
     """
     Decompose position VaR/ES from a parametric or historical source, with an
     optional risk budget and, for scenario P&L, the tail stress attribution.
 
     Parameters
     ----------
-    request : PositionRiskRequest | str | dict[str, Any]
-        ``PositionRiskRequest`` as a dict or JSON text with ``position_ids``,
+    request : PositionRiskRequest | dict[str, Any]
+        ``PositionRiskRequest`` as a dict with ``position_ids``,
         an optional ``confidence`` (decimal strictly inside ``(0.5, 1)``,
         default ``0.95``), a ``source`` tagged by ``kind`` and an optional
         ``budget``. ``{"kind": "parametric", "weights", "covariance",

@@ -2073,14 +2073,14 @@ def multi_factor_greeks(
     """
     ...
 
-def validate_summary(table: dict[str, Any] | str) -> None:
+def validate_summary(table: dict[str, Any]) -> None:
     """
     Validate a complete fixed analytics-summary table and its sample metadata.
 
     Parameters
     ----------
-    table : dict[str, Any] or str
-        TableEnvelope mapping or JSON string containing the fixed 22 metric
+    table : dict[str, Any]
+        TableEnvelope mapping containing the fixed 22 metric
         columns, ordered ticker rows, explicit cash/frequency/MAR/Omega/tail
         inputs and own/paired sample metadata. Result values use canonical
         wire sentinel strings "nan", "inf" and "-inf"; explicit null numeric
@@ -2090,7 +2090,7 @@ def validate_summary(table: dict[str, Any] | str) -> None:
     Raises
     ------
     ValueError
-        If the JSON or mapping cannot be converted into a TableEnvelope,
+        If the mapping cannot be converted into a TableEnvelope,
         including malformed fields, unsupported types or explicit null cells.
     AnalyticsError
         If the report's metric layout, required conventions, sample metadata

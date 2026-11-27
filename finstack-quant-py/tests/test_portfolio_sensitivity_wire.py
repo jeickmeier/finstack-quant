@@ -24,7 +24,7 @@ SENSITIVITY_WIRE = {
     "factor_ids": ["F1", "F2"],
     "data": [[1.0, 2.0], [3.0, -1.0]],
 }
-SENSITIVITY_COVARIANCE = json.dumps({"factor_ids": ["F1", "F2"], "n": 2, "data": [0.04, 0.01, 0.01, 0.09]})
+SENSITIVITY_COVARIANCE = {"factor_ids": ["F1", "F2"], "n": 2, "data": [0.04, 0.01, 0.01, 0.09]}
 
 
 def test_wire_round_trips_exactly_and_decomposes_like_wasm() -> None:

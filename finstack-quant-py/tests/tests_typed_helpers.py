@@ -332,14 +332,14 @@ def build_cds_tranche() -> CdsTranche:
 
 
 def build_convertible() -> ConvertibleBond:
-    conversion = json.dumps({
+    conversion = {
         "ratio": 20.0,
         "price": None,
         "policy": "voluntary",
         "anti_dilution": "full_ratchet",
         "dividend_adjustment": "none",
         "dilution_events": [],
-    })
+    }
     # A zero-coupon convertible is a fixed cashflow spec with rate "0".
     zero_coupon = ConvertibleBond.example().cashflow_spec
     zero_coupon["fixed"]["rate"] = "0"

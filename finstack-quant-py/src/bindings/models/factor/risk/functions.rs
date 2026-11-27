@@ -71,7 +71,7 @@ pub(in crate::bindings::models::factor) fn extract_risk_measure(
                 .extract::<&str>()
                 .is_ok_and(|text| !matches!(text, "variance" | "volatility")) =>
         {
-            crate::bindings::module_utils::spec_from_py(py, value, "risk_measure")
+            crate::bindings::module_utils::py_to_serde(py, value, "risk_measure")
         }
         Err(_) => py_to_serde(py, value, "risk_measure"),
     }
@@ -135,7 +135,7 @@ pub(super) fn decompose_factors(
 ) -> PyResult<PyRiskDecomposition> {
     let covariance = match covariance.cast::<PyFactorCovarianceMatrix>() {
         Ok(matrix) => matrix.borrow().inner.clone(),
-        Err(_) => crate::bindings::module_utils::spec_from_py(py, covariance, "covariance")?,
+        Err(_) => crate::bindings::module_utils::py_to_serde(py, covariance, "covariance")?,
     };
     let measure = extract_risk_measure(py, risk_measure)?;
 

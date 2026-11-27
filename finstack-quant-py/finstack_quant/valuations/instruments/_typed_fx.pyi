@@ -271,7 +271,7 @@ class FxForward:
         """
         ...
     @staticmethod
-    def from_trade_date(params: dict[str, Any] | str) -> FxForward:
+    def from_trade_date(params: dict[str, Any]) -> FxForward:
         """
         Build a forward from a trade date and an FX tenor (mirrors Rust
         ``FxForward::from_trade_date``): spot is ``trade_date`` plus
@@ -282,8 +282,8 @@ class FxForward:
 
         Parameters
         ----------
-        params : dict[str, Any] | str
-            ``FxForwardTradeDateParams`` as a dict or JSON text. Required keys:
+        params : dict[str, Any]
+            ``FxForwardTradeDateParams`` as a dict. Required keys:
 
             - ``id`` (str): unique instrument identifier.
             - ``base_currency`` / ``quote_currency`` (Currency | str): base
@@ -657,13 +657,13 @@ class FxForwardBuilder:
     1.12
     """
 
-    def spot_basis(self, value: dict[str, Any] | str) -> FxForwardBuilder:
+    def spot_basis(self, value: dict[str, Any]) -> FxForwardBuilder:
         """Set the spot basis election.
 
         Parameters
         ----------
-        value : dict[str, Any] or str
-            Wire dict or JSON text containing ``{"type": "cash"}`` or ``{"type": "value_date", "date": "YYYY-MM-DD"}``.
+        value : dict[str, Any]
+            Wire dict containing ``{"type": "cash"}`` or ``{"type": "value_date", "date": "YYYY-MM-DD"}``.
 
         Returns
         -------
@@ -897,15 +897,14 @@ class FxForwardBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> FxForwardBuilder:
+    def instrument_pricing_overrides(self, value: dict[str, object]) -> FxForwardBuilder:
         """
         Set the instrument-owned pricing inputs.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
-            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+        value : dict[str, object]
+            Rust ``InstrumentPricingOverrides`` in serde form (a ``dict``): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
             ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
 
         Returns
@@ -920,15 +919,14 @@ class FxForwardBuilder:
             not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object] | str) -> FxForwardBuilder:
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object]) -> FxForwardBuilder:
         """
         Set the metric-time pricing configuration stored on the instrument.
 
         Parameters
         ----------
-        value : MetricPricingOverrides | dict[str, object] | str
-            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
-            JSON string.
+        value : MetricPricingOverrides | dict[str, object]
+            Rust ``MetricPricingOverrides`` as the typed class or a ``dict``.
 
         Returns
         -------
@@ -942,15 +940,14 @@ class FxForwardBuilder:
             not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> FxForwardBuilder:
+    def scenario_pricing_overrides(self, value: dict[str, object]) -> FxForwardBuilder:
         """
         Set the scenario-only pricing adjustments.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
-            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+        value : dict[str, object]
+            Rust ``ScenarioPricingOverrides`` in serde form (a ``dict``), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
 
         Returns
         -------
@@ -1297,7 +1294,7 @@ class FxOption:
         """
         ...
     @staticmethod
-    def european(params: dict[str, Any] | str) -> FxOption:
+    def european(params: dict[str, Any]) -> FxOption:
         """
         Build a European FX option with currency-derived OIS curves (mirrors Rust
         ``FxOption::european``): discount curves are ``"<QUOTE>-OIS"``
@@ -1306,8 +1303,8 @@ class FxOption:
 
         Parameters
         ----------
-        params : dict[str, Any] | str
-            ``FxOptionParams`` as a dict or JSON text. Every key is required:
+        params : dict[str, Any]
+            ``FxOptionParams`` as a dict. Every key is required:
 
             - ``id`` (str): unique instrument identifier.
             - ``base_currency`` / ``quote_currency`` (Currency | str): base
@@ -1398,7 +1395,7 @@ class FxOption:
         market: MarketContext,
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
-        extras: PriceExtras | dict[str, Any] | str | None = None,
+        extras: PriceExtras | dict[str, Any] | None = None,
     ) -> dict[str, float]:
         """
         Compute the standard option Greek set as a dict (mirrors the WASM
@@ -1413,7 +1410,7 @@ class FxOption:
             Valuation date.
         model : str, default "default"
             Model key.
-        extras : PriceExtras or dict or str, optional
+        extras : PriceExtras or dict, optional
             Request configuration and overrides accepted by ``price_instrument``.
             Omit to use the stored instrument controls.
 
@@ -1665,13 +1662,13 @@ class FxOptionBuilder:
     'desk'
     """
 
-    def delivery(self, value: dict[str, Any] | str) -> FxOptionBuilder:
+    def delivery(self, value: dict[str, Any]) -> FxOptionBuilder:
         """Set the delivery election.
 
         Parameters
         ----------
-        value : dict[str, Any] or str
-            Wire dict or JSON text containing ``{"type": "cash_at_expiry"}`` or ``{"type": "physical", "date": "YYYY-MM-DD", "position": "long", "exercised": None}``. The position can be ``"long"`` or ``"short"``. Use a bool for a confirmed expiry outcome.
+        value : dict[str, Any]
+            Wire dict containing ``{"type": "cash_at_expiry"}`` or ``{"type": "physical", "date": "YYYY-MM-DD", "position": "long", "exercised": None}``. The position can be ``"long"`` or ``"short"``. Use a bool for a confirmed expiry outcome.
 
         Returns
         -------
@@ -1685,13 +1682,13 @@ class FxOptionBuilder:
         """
         ...
 
-    def spot_basis(self, value: dict[str, Any] | str) -> FxOptionBuilder:
+    def spot_basis(self, value: dict[str, Any]) -> FxOptionBuilder:
         """Set the spot basis election.
 
         Parameters
         ----------
-        value : dict[str, Any] or str
-            Wire dict or JSON text containing ``{"type": "cash"}`` or ``{"type": "value_date", "date": "YYYY-MM-DD"}``.
+        value : dict[str, Any]
+            Wire dict containing ``{"type": "cash"}`` or ``{"type": "value_date", "date": "YYYY-MM-DD"}``.
 
         Returns
         -------
@@ -1805,14 +1802,14 @@ class FxOptionBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not a recognized option type.
         """
         ...
-    def delta_convention(self, value: dict[str, Any] | str) -> FxOptionBuilder:
+    def delta_convention(self, value: dict[str, Any]) -> FxOptionBuilder:
         """
         Set the pair/venue delta convention and premium currency.
 
         Parameters
         ----------
-        value : dict[str, Any] | str
-            ``FxDeltaConvention`` serde form, as a ``dict`` or JSON string,
+        value : dict[str, Any]
+            ``FxDeltaConvention`` serde form, as a ``dict``,
             every key required: ``kind`` (``"spot"``, ``"forward"``,
             ``"premium_adjusted_spot"`` or ``"premium_adjusted_forward"``),
             ``premium_currency`` (ISO-4217 code or ``Currency``; must be the
@@ -1951,15 +1948,14 @@ class FxOptionBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> FxOptionBuilder:
+    def instrument_pricing_overrides(self, value: dict[str, object]) -> FxOptionBuilder:
         """
         Set the instrument-owned pricing inputs.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
-            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+        value : dict[str, object]
+            Rust ``InstrumentPricingOverrides`` in serde form (a ``dict``): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
             ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
 
         Returns
@@ -1974,15 +1970,14 @@ class FxOptionBuilder:
             not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object] | str) -> FxOptionBuilder:
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object]) -> FxOptionBuilder:
         """
         Set the metric-time pricing configuration stored on the instrument.
 
         Parameters
         ----------
-        value : MetricPricingOverrides | dict[str, object] | str
-            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
-            JSON string.
+        value : MetricPricingOverrides | dict[str, object]
+            Rust ``MetricPricingOverrides`` as the typed class or a ``dict``.
 
         Returns
         -------
@@ -1996,15 +1991,14 @@ class FxOptionBuilder:
             not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> FxOptionBuilder:
+    def scenario_pricing_overrides(self, value: dict[str, object]) -> FxOptionBuilder:
         """
         Set the scenario-only pricing adjustments.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
-            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+        value : dict[str, object]
+            Rust ``ScenarioPricingOverrides`` in serde form (a ``dict``), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
 
         Returns
         -------

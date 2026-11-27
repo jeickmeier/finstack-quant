@@ -52,7 +52,7 @@ from finstack_quant.models.correlation import (
     simulate_portfolio_loss,
 )
 from finstack_quant.models.credit.migration import RatingScale, TransitionMatrix
-from finstack_quant.models.factor import FactorCovarianceMatrix
+from finstack_quant.models.factor import FactorCovarianceMatrix, FactorModelConfig
 from finstack_quant.models.factor.credit import CreditCalibrator, decompose_levels
 from finstack_quant.models.factor.risk import build_stress_attribution
 from finstack_quant.models.rates.dtsm import YieldPanel
@@ -596,7 +596,7 @@ def test_portfolio_polars_arrow_and_series_paths() -> None:
         day_count="act_365f",
     )
     market = MarketContext().insert(curve)
-    fm = FactorModel.from_config(cfg)
+    fm = FactorModel.from_config(FactorModelConfig.from_json(cfg))
     base_pnl = fm.factor_stress_pnl(book, market, "2025-01-15", [("usd_rates", 1.0)]).total_pnl
     for stresses in (
         {"usd_rates": 1.0},

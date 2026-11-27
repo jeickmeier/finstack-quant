@@ -771,12 +771,12 @@ class AgencyTbaBuilder:
         """
         ...
 
-    def assumed_pool(self, value: dict[str, object] | str | None) -> AgencyTbaBuilder:
+    def assumed_pool(self, value: dict[str, object] | None) -> AgencyTbaBuilder:
         """Set the contract's assumed pool.
 
         Parameters
         ----------
-        value : dict[str, object] | str | None
+        value : dict[str, object] | None
             Optional assumed pool for valuation. Its current and original faces are scaled together to the trade's purchased current face. If absent, generic pool characteristics apply.
 
         Returns
@@ -791,12 +791,12 @@ class AgencyTbaBuilder:
         """
         ...
 
-    def prepayment_spec(self, value: dict[str, object] | str | None) -> AgencyTbaBuilder:
+    def prepayment_spec(self, value: dict[str, object] | None) -> AgencyTbaBuilder:
         """Set the contract's prepayment spec.
 
         Parameters
         ----------
-        value : dict[str, object] | str | None
+        value : dict[str, object] | None
             Prepayment model of the generic assumed pool. Applies only when assumed_pool is absent (an explicit pool carries its own model); None uses the embedded generic PSA assumption. Setting it together with assumed_pool is rejected.
 
         Returns
@@ -853,15 +853,14 @@ class AgencyTbaBuilder:
         """
         ...
 
-    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> AgencyTbaBuilder:
+    def instrument_pricing_overrides(self, value: dict[str, object]) -> AgencyTbaBuilder:
         """
         Set the instrument-owned pricing inputs.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
-            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+        value : dict[str, object]
+            Rust ``InstrumentPricingOverrides`` in serde form (a ``dict``): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
             ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
 
         Returns
@@ -877,15 +876,14 @@ class AgencyTbaBuilder:
         """
         ...
 
-    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object] | str) -> AgencyTbaBuilder:
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object]) -> AgencyTbaBuilder:
         """
         Set the metric-time pricing configuration stored on the instrument.
 
         Parameters
         ----------
-        value : MetricPricingOverrides | dict[str, object] | str
-            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
-            JSON string.
+        value : MetricPricingOverrides | dict[str, object]
+            Rust ``MetricPricingOverrides`` as the typed class or a ``dict``.
 
         Returns
         -------
@@ -900,15 +898,14 @@ class AgencyTbaBuilder:
         """
         ...
 
-    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> AgencyTbaBuilder:
+    def scenario_pricing_overrides(self, value: dict[str, object]) -> AgencyTbaBuilder:
         """
         Set the scenario-only pricing adjustments.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
-            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+        value : dict[str, object]
+            Rust ``ScenarioPricingOverrides`` in serde form (a ``dict``), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
 
         Returns
         -------

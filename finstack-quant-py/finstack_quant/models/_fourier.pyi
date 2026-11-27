@@ -4,15 +4,15 @@ from typing import Any
 
 from finstack_quant.models._closed_form import OptionContractParams, OptionMarketParams
 
-def bs_cos_price(market: OptionMarketParams | dict[str, Any] | str, n_terms: int | None = None) -> float:
+def bs_cos_price(market: OptionMarketParams | dict[str, Any], n_terms: int | None = None) -> float:
     """Price a European call or put under a constant lognormal volatility.
 
     Parameters
     ----------
-    market : OptionMarketParams or dict or str
+    market : OptionMarketParams or dict
         Spot and strike in equal units, continuous annual discount and carry
         rates as decimals, positive expiry in years and strictly positive
-        decimal annual volatility. A dictionary or JSON string uses the same fields.
+        decimal annual volatility. A dictionary uses the same fields.
     n_terms : int or None
         Expansion terms from 1 through 65,536. None uses 128.
 
@@ -48,7 +48,7 @@ def bs_cos_price(market: OptionMarketParams | dict[str, Any] | str, n_terms: int
     ...
 
 def vg_cos_price(
-    contract: OptionContractParams | dict[str, Any] | str,
+    contract: OptionContractParams | dict[str, Any],
     sigma: float,
     theta: float,
     nu: float,
@@ -58,7 +58,7 @@ def vg_cos_price(
 
     Parameters
     ----------
-    contract : OptionContractParams or dict or str
+    contract : OptionContractParams or dict
         Matching spot and strike units, continuous annual decimal discount and
         carry rates, positive expiry in years and call or put direction.
     sigma : float
@@ -101,7 +101,7 @@ def vg_cos_price(
     ...
 
 def merton_jump_cos_price(
-    contract: OptionContractParams | dict[str, Any] | str,
+    contract: OptionContractParams | dict[str, Any],
     sigma: float,
     mu_jump: float,
     sigma_jump: float,
@@ -112,7 +112,7 @@ def merton_jump_cos_price(
 
     Parameters
     ----------
-    contract : OptionContractParams or dict or str
+    contract : OptionContractParams or dict
         Matching spot and strike units, continuous annual decimal discount and
         carry rates, positive expiry in years and call or put direction.
     sigma : float

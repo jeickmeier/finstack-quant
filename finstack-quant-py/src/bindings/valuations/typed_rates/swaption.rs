@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::module_utils::spec_from_py;
+use crate::bindings::module_utils::py_to_serde;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 
@@ -303,7 +303,7 @@ impl PySwaptionBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let sabr_params: finstack_quant_models::volatility::sabr::SabrParameters =
-            spec_from_py(py, value, "sabr_params")?;
+            py_to_serde(py, value, "sabr_params")?;
         builder_set!(
             slf,
             sabr_params,

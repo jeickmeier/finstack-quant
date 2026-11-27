@@ -247,7 +247,7 @@ impl PyFormulaCheckSpec {
     #[pyo3(signature = (spec), text_signature = "(spec)")]
     fn new(spec: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
-            inner: crate::bindings::module_utils::spec_from_py(
+            inner: crate::bindings::module_utils::py_to_serde(
                 spec.py(),
                 spec,
                 "formula check spec",

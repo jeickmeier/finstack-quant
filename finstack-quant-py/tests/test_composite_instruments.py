@@ -105,11 +105,11 @@ def test_fixed_composite_history_reconciles_flat_market() -> None:
     """Flat explicit-price observations produce zero P&L and a flat index."""
     market = MarketContext()
     market_state = json.loads(market.to_json())
-    observations = json.dumps([
+    observations = [
         {"date": "2025-01-01", "state": market_state},
         {"date": "2025-01-02", "state": market_state},
         {"date": "2025-01-03", "state": market_state},
-    ])
+    ]
     result = history_from_spec(fixed_spec(), observations)
     rows = json.loads(result.to_json())
     assert len(rows) == 3
@@ -122,7 +122,7 @@ def test_composite_metric_requests_reject_noncanonical_keys(entry_point: str) ->
     market = MarketContext()
     spec = fixed_spec()
     resolved = spec.initialize(market, dt.date(2025, 1, 1)).instrument
-    observations = json.dumps([{"date": "2025-01-01", "state": json.loads(market.to_json())}])
+    observations = [{"date": "2025-01-01", "state": json.loads(market.to_json())}]
     metrics = ["pv01::USD_x2dOIS"]
     calls = {
         "exposures": partial(resolved.primitive_exposures, market, dt.date(2025, 1, 1), metrics),
@@ -242,7 +242,7 @@ def _hazard_market(base: dt.date) -> MarketContext:
     for quote in envelope["market_data"]:
         if quote["kind"] == "cds_quote":
             quote["entity"] = "CORP"
-    return calibrate(json.dumps(envelope)).market
+    return calibrate(envelope).market
 
 
 def test_composite_entry_points_price_cs01_like_price_instrument() -> None:

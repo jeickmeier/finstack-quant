@@ -15,7 +15,7 @@
 //!   (`Inequality`, `WeightingScheme`, `MissingMetricPolicy`,
 //!   `OptimizationStatus`, `TradeDirection`, `TradeType`) are exposed.
 //! - [`finstack_quant_portfolio::optimization::CandidatePosition`] is built from a
-//!   typed instrument (or its JSON) and [`finstack_quant_portfolio::optimization::TradeUniverse`]
+//!   typed instrument (or its envelope dict) and [`finstack_quant_portfolio::optimization::TradeUniverse`]
 //!   from its classmethods.
 //! - Optimization results round-trip through ``to_json`` / ``from_json``.
 

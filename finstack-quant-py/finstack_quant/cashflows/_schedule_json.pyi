@@ -82,7 +82,7 @@ class ScheduleBuildOpts:
     def __repr__(self) -> str: ...
 
 def build_cashflow_schedule(
-    spec: dict[str, Any] | str,
+    spec: dict[str, Any],
     market: MarketContext | None = None,
     as_of: datetime.date | str | None = None,
 ) -> CashFlowSchedule:
@@ -92,8 +92,8 @@ def build_cashflow_schedule(
 
     Parameters
     ----------
-    spec : dict or str
-        ``CashflowScheduleBuildSpec`` as a JSON string or an equivalent dict
+    spec : dict
+        ``CashflowScheduleBuildSpec`` as a dict
         (``notional``, ``issue_date``, ``maturity``, ``coupon_program``,
         ``payment_program``, ``fees``, ``principal_events``,
         ``principal_exchange``). Each principal event requires economic ``date``

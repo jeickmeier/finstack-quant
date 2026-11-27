@@ -22,7 +22,6 @@ from __future__ import annotations
 from calendar import monthrange
 import datetime
 from datetime import date as dt_date, timedelta
-import json
 import math
 
 import pandas as pd
@@ -584,10 +583,10 @@ def _hierarchy_period_decomposition() -> PeriodDecomposition:
         "bucket_weighting": "equal",
     }
     inputs = _hierarchy_calibration_inputs()
-    model = CreditCalibrator(json.dumps(config)).calibrate(json.dumps(inputs))
-    spreads_json = json.dumps(inputs["as_of_spreads"])
-    start = decompose_levels(model, spreads_json, 0.0100, "2024-02-29")
-    end = decompose_levels(model, spreads_json, 0.01015, "2024-03-31")
+    model = CreditCalibrator(config).calibrate(inputs)
+    spreads = inputs["as_of_spreads"]
+    start = decompose_levels(model, spreads, 0.0100, "2024-02-29")
+    end = decompose_levels(model, spreads, 0.01015, "2024-03-31")
     return decompose_period(start, end)
 
 
@@ -632,9 +631,9 @@ def _flat_period_decomposition(issuers: tuple[str, str] = ("ZEBRA", "ALPHA")) ->
         "as_of_spreads": ordered(as_of),
         "idiosyncratic_overrides": {},
     }
-    model = CreditCalibrator(json.dumps(config)).calibrate(json.dumps(inputs))
-    start = decompose_levels(model, json.dumps(ordered(start_spreads)), 0.0100, "2024-03-01")
-    end = decompose_levels(model, json.dumps(ordered(end_spreads)), 0.01015, "2024-03-02")
+    model = CreditCalibrator(config).calibrate(inputs)
+    start = decompose_levels(model, ordered(start_spreads), 0.0100, "2024-03-01")
+    end = decompose_levels(model, ordered(end_spreads), 0.01015, "2024-03-02")
     return decompose_period(start, end)
 
 

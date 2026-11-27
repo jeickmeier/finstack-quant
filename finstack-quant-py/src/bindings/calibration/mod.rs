@@ -3,7 +3,8 @@
 //! Wraps `finstack_quant_calibration::api::engine::calibrate` behind a typed
 //! envelope-in / rich-result-out API. Envelopes can be authored as typed
 //! objects (`CalibrationEnvelope`, `CalibrationPlan`, `CalibrationStep`,
-//! quote classes), as dicts, or as canonical JSON strings.
+//! quote classes) or as dicts; JSON text is loaded with
+//! `CalibrationEnvelope.from_json`.
 
 mod config;
 mod envelope;

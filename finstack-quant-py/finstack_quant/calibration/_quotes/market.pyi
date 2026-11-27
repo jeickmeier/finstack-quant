@@ -405,14 +405,13 @@ class CdsTrancheQuote:
 
     """
 
-    def __init__(self, params: dict[str, Any] | str) -> None:
+    def __init__(self, params: dict[str, Any]) -> None:
         """Build a CDS index tranche quote.
 
         Parameters
         ----------
-        params : dict[str, Any] | str
-            Wire fields of the Rust ``CdsTrancheQuote`` as a dict, or the same object as JSON
-            text. Every key is required:
+        params : dict[str, Any]
+            Wire fields of the Rust ``CdsTrancheQuote`` as a dict. Every key is required:
 
             - ``id`` (str): Unique quote identifier.
             - ``index`` (str): Credit index name, for example ``"CDX.NA.IG"``.

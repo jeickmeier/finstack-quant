@@ -9,7 +9,7 @@ use super::quotes::extract_market_datum;
 use super::step_params;
 use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::macros::wire_methods;
-use crate::bindings::module_utils::{py_to_json_value, spec_from_py};
+use crate::bindings::module_utils::{py_to_json_value, py_to_serde};
 use crate::bindings::pickle_support::reduce_via_json;
 use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, serde_json_to_py};
@@ -63,7 +63,7 @@ fn extract_prior_market(
 
 /// One calibration step: the object to build, its quote set, and kind-specific parameters.
 ///
-/// Every constructor takes the step ``id``, a ``params`` dict (or JSON text)
+/// Every constructor takes the step ``id``, a ``params`` dict
 /// holding the kind's wire fields named exactly as in the Rust ``StepParams``
 /// schema (see ``schema.get("calibration.schema.json")``), and an optional
 /// ``quote_set``. Quote payloads live in ``CalibrationEnvelope.market_data``.
@@ -103,7 +103,7 @@ impl PyCalibrationStep {
         quote_set: Option<String>,
     ) -> PyResult<Self> {
         let fields: Map<String, Value> =
-            spec_from_py(params.py(), params, &format!("{kind} step params"))?;
+            py_to_serde(params.py(), params, &format!("{kind} step params"))?;
         let step = CalibrationStep::from_wire_fields(kind, id, quote_set.as_deref(), fields)
             .map_err(core_to_py)?;
         Ok(Self::from_inner(step))

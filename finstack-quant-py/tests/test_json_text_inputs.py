@@ -1,17 +1,22 @@
-"""Loader route against JSON-text route, for parameters that accept JSON text.
+"""JSON text is refused by every parameter that has another form.
 
-Many parameters accept a typed object or the same object as JSON text. The
-text form is being removed: a holder of JSON text then calls a named loader
-first (``T.from_json``, ``Portfolio.from_spec``, or ``json.loads`` where the
-parameter takes a ``dict``). While both routes exist, every case in ``CASES``
-shows that the loader route gives exactly what the text route gives, on valid
-text and on malformed text.
+A ``str`` argument is a value: a label, a code, a date, an id. It is not read
+as a JSON document. A holder of JSON text calls a named loader first
+(``T.from_json``, ``Portfolio.from_spec``, or ``json.loads`` where the
+parameter takes a ``dict``). Every case in ``CASES`` names one parameter that
+once read JSON text and pins two things: the function raises ``rejects_text``
+for the text, valid or malformed, and the loader route still works.
 
-Where the two routes do differ, the case pins what each does in ``differs`` and
-names the owner's ruling on it.
+Three cases keep their text form by the owner's ruling. They compare the two
+routes and pin each known difference in ``differs``: ``portfolio_cashflows``
+and ``portfolio_cashflows_by_date_ladder`` (``net_in_currency_by_date``,
+ruling A) and ``scenario_spec_validator`` (``validate_scenario_spec``,
+ruling J).
 
-When the text form of a parameter is removed, set ``rejects_text`` on its case
-to the exception the function then raises for a ``str``.
+The ``market_datum_*_class_loader`` cases pin a loader that does not apply. A
+datum class ``from_json`` does not read the ``kind``-tagged document that
+``market_data`` takes, so both routes raise there and ``json.loads`` is the
+loader (ruling E).
 """
 
 from __future__ import annotations
@@ -473,7 +478,7 @@ def _datum_text(make: Callable[[], Any]) -> str:
 
 def _prior_curve_text() -> str:
     """A calibrated discount curve as a ``prior_market`` object: tagged with ``kind``."""
-    curve = json.loads(calibrate(_calibration_envelope()).market_json)["curves"][0]
+    curve = json.loads(calibrate(json.loads(_calibration_envelope())).market_json)["curves"][0]
     del curve["type"]
     return json.dumps({"kind": "discount_curve", **curve})
 
@@ -714,12 +719,12 @@ def _json_without_eval_time(result: Any) -> Any:
 
 @dataclass(frozen=True)
 class Case:
-    """One parameter that reads JSON text today, and the loader that replaces the text."""
+    """One parameter that once read JSON text, and the loader a holder of text calls first."""
 
     id: str
     # The function under test, as a function of the one parameter under test.
     call: Callable[[Any], Any]
-    # What a holder of JSON text calls first once the text form is gone.
+    # What a holder of JSON text calls first.
     loader: Callable[[str], Any]
     # Valid JSON text for the parameter.
     text: Callable[[], str]
@@ -730,11 +735,13 @@ class Case:
     # Labels in `malformed` that are a valid (empty) value for this parameter on
     # both routes; every other label must raise on both.
     accepted: frozenset[str] = frozenset()
-    # `None` while the text route exists. Once it is removed: the exception the
-    # function raises for any `str`.
+    # The exception the function raises for JSON text, valid or malformed. Where
+    # the parameter is an enum, a label string is still a value. `None` where
+    # the outcome of the text route is pinned in `differs`: the three cases
+    # that keep their text form, and the datum class loaders.
     rejects_text: type[Exception] | None = None
-    # Where the two routes are known to differ: a label of `malformed`, or
-    # `"valid"` for the valid text, to what each route does, as
+    # Where the two routes are compared: a label of `malformed`, or `"valid"`
+    # for the valid text, to what each route does, as
     # `(via the loader, via the text)`. Each is `"accepted"` or the name of the
     # exception type raised. The owner ruled on every entry on 2026-11-26.
     differs: Mapping[str, tuple[str, str]] = field(default_factory=dict)
@@ -744,12 +751,11 @@ class Case:
 
 # The owner's rulings of 2026-11-26 on the differences the sweep found.
 RULING_A = "A: `net_in_currency_by_date` keeps its text form; a by-date ladder has no loader and no dict form."
-RULING_B = (
-    "B: accepted. A serde-backed loader reads `[]` as an all-default value where the text arm required an object."
-)
 RULING_C = "C: accepted. After `json.loads`, JSON that is not of the expected Python type raises `TypeError`."
 RULING_D = "D: to be fixed. A mapping is iterated as an empty list today; the slice that owns the site rejects it."
-RULING_E = "E: `market_data` text is the `kind`-tagged datum, which the class loader does not read; `json.loads` is its loader."
+RULING_E = (
+    "E: `market_data` takes the `kind`-tagged datum, which the class loader does not read; `json.loads` is its loader."
+)
 RULING_G = "G: accepted. For text that is not JSON, `json.loads` raises `JSONDecodeError` where the text arm raised `PortfolioError`."
 RULING_I = "I: accepted. Text deferred building the portfolio; `Portfolio.from_spec` rejects a spec that does not build at once."
 RULING_J = (
@@ -864,6 +870,7 @@ CASES = [
         CalibrationEnvelope.from_json,
         _calibration_envelope,
         malformed={**MALFORMED, "undefined-quote-set": _calibration_envelope("missing")},
+        rejects_text=TypeError,
     ),
     Case(
         "calibration_envelope_validate_calibration",
@@ -871,6 +878,7 @@ CASES = [
         CalibrationEnvelope.from_json,
         _calibration_envelope,
         malformed={**MALFORMED, "undefined-quote-set": _calibration_envelope("missing")},
+        rejects_text=TypeError,
     ),
     Case(
         "calibration_envelope_dry_run",
@@ -880,6 +888,7 @@ CASES = [
         malformed={**MALFORMED, "undefined-quote-set": _calibration_envelope("missing")},
         # `dry_run` reports an undefined quote set in its result; it does not raise.
         accepted=frozenset({"undefined-quote-set"}),
+        rejects_text=TypeError,
     ),
     Case(
         "metric_pricing_overrides_builder",
@@ -890,6 +899,7 @@ CASES = [
         ).to_json(),
         # Every field is optional, and serde reads a struct from an array too.
         accepted=frozenset({"empty-object", "empty-array"}),
+        rejects_text=ValueError,
     ),
     Case(
         "metric_pricing_overrides_validate",
@@ -900,8 +910,7 @@ CASES = [
         ).to_json(),
         stable=_itself,
         accepted=frozenset({"empty-object"}),
-        differs={"empty-array": ("accepted", "ValueError")},
-        ruling=RULING_B,
+        rejects_text=ValueError,
     ),
     Case(
         "heston_params",
@@ -909,18 +918,21 @@ CASES = [
         HestonParams.from_json,
         lambda: json.dumps(HESTON_PARAMS),
         stable=_itself,
+        rejects_text=ValueError,
     ),
     Case(
         "market_history",
         lambda history: calculate_var([_bond()], _market(), history, AS_OF),
         MarketHistory.from_json,
         _market_history_text,
+        rejects_text=ValueError,
     ),
     Case(
         "company_metrics",
         _relative_value,
         CompanyMetrics.from_json,
         lambda: _company("SUBJ", leverage=2.5, oas_bp=300.0, enterprise_value=1000.0, ebitda=100.0).to_json(),
+        rejects_text=ValueError,
     ),
     Case(
         "typed_instrument",
@@ -937,12 +949,14 @@ CASES = [
         lambda: json.dumps({"market_quotes": {"quoted_clean_price_pct": 99.5}}),
         # Every field is optional, and serde reads a struct from an array too.
         accepted=frozenset({"empty-object", "empty-array"}),
+        rejects_text=ValueError,
     ),
     Case(
         "dict_builder_enum",
         lambda spec: _built_bond("cashflow_spec", spec),
         json.loads,
         _cashflow_spec_text,
+        rejects_text=ValueError,
     ),
     Case(
         "dict_instrument_envelope",
@@ -981,6 +995,7 @@ CASES = [
         json.loads,
         lambda: json.dumps(OPTION_MARKET),
         stable=_itself,
+        rejects_text=ValueError,
     ),
     # --- Statements: typed classes with `from_json`. Most stubs annotate these `Any`. ---
     Case(
@@ -1032,6 +1047,7 @@ CASES = [
         lambda suite: run_checks(_analysis_model(), suite),
         CheckSuiteSpec.from_json,
         lambda: json.dumps(CHECK_SUITE),
+        rejects_text=ValueError,
     ),
     Case(
         "check_report",
@@ -1039,6 +1055,7 @@ CASES = [
         CheckReport.from_json,
         lambda: run_checks(_analysis_model(), CHECK_SUITE).to_json(),
         stable=_itself,
+        rejects_text=ValueError,
     ),
     Case(
         "three_statement_mapping",
@@ -1052,6 +1069,7 @@ CASES = [
             liabilities_nodes=["liabilities"],
             equity_nodes=["equity"],
         ).to_json(),
+        rejects_text=ValueError,
     ),
     Case(
         "credit_mapping",
@@ -1060,24 +1078,28 @@ CASES = [
         lambda: CreditMapping(
             debt_node="total_debt", ebitda_node="ebitda", interest_expense_node="interest_expense"
         ).to_json(),
+        rejects_text=ValueError,
     ),
     Case(
         "peer_set",
         lambda peer_set: score_relative_value(peer_set, [SCORING_DIMENSION]),
         PeerSet.from_json,
         lambda: json.dumps(_peer_set()),
+        rejects_text=ValueError,
     ),
     Case(
         "scoring_dimension",
         lambda dimension: score_relative_value(_peer_set(), [dimension]),
         ScoringDimension.from_json,
         lambda: json.dumps(SCORING_DIMENSION),
+        rejects_text=ValueError,
     ),
     Case(
         "terminal_value_spec",
         lambda terminal_value: dcf_sensitivity(_dcf_model(), 0.10, terminal_value, "ufcf", 0.0),
         TerminalValueSpec.from_json,
         lambda: TerminalValueSpec.gordon_growth(0.02).to_json(),
+        rejects_text=ValueError,
     ),
     # --- Calibration. ---
     Case(
@@ -1087,14 +1109,20 @@ CASES = [
         lambda: json.dumps({"solver": {"max_iterations": 64}, "use_parallel": True}),
         # No override is a valid patch.
         accepted=frozenset({"empty-object"}),
-        differs={"empty-array": ("accepted", "ValueError")},
-        ruling=RULING_B,
+        rejects_text=ValueError,
     ),
     # `market_data` reads a datum as the envelope writes it, `{"kind": ..., ...}`,
-    # from a `dict` or from text. No datum class reads that document: its own
-    # `to_json()` carries no `kind`, and its `from_json` rejects one.
+    # from a `dict`. No datum class reads that document: its own `to_json()`
+    # carries no `kind`, and its `from_json` rejects one. So the class loader
+    # raises on the text, and so does `market_data`.
     *[
-        Case(f"dict_market_datum_{name}", _envelope_with_datum, json.loads, lambda make=make: _datum_text(make))
+        Case(
+            f"dict_market_datum_{name}",
+            _envelope_with_datum,
+            json.loads,
+            lambda make=make: _datum_text(make),
+            rejects_text=ValueError,
+        )
         for name, (_, make) in MARKET_DATUMS.items()
     ],
     *[
@@ -1104,7 +1132,7 @@ CASES = [
             datum.from_json,
             lambda make=make: _datum_text(make),
             malformed={},
-            differs={"valid": ("ValueError", "accepted")},
+            differs={"valid": ("ValueError", "ValueError")},
             ruling=RULING_E,
         )
         for name, (datum, make) in MARKET_DATUMS.items()
@@ -1114,6 +1142,7 @@ CASES = [
         lambda prior: CalibrationEnvelope(_calibration_plan(), prior_market=[prior]),
         json.loads,
         _prior_curve_text,
+        rejects_text=ValueError,
     ),
     # --- Features, models, portfolio, valuations: typed classes with `from_json`. ---
     Case(
@@ -1121,12 +1150,14 @@ CASES = [
         transform_panel,
         PanelTransformSpec.from_json,
         lambda: json.dumps(PANEL_TRANSFORM),
+        rejects_text=TypeError,
     ),
     Case(
         "factor_covariance_matrix",
         lambda covariance: decompose_factors(_sensitivities(), covariance),
         FactorCovarianceMatrix.from_json,
         lambda: json.dumps(FACTOR_COVARIANCE),
+        rejects_text=ValueError,
     ),
     Case(
         "duration_cell_table",
@@ -1140,6 +1171,7 @@ CASES = [
         _factor_stress,
         FactorModelConfig.from_json,
         lambda: json.dumps(FACTOR_MODEL),
+        rejects_text=TypeError,
     ),
     # The text arm of `PortfolioOptimizationSpec.new` keeps the parsed spec; it does
     # not build the portfolio, which `Portfolio.from_spec` does.
@@ -1160,6 +1192,7 @@ CASES = [
         lambda: ConversionSpec(
             ratio=20.0, policy="voluntary", anti_dilution="full_ratchet", dividend_adjustment="none"
         ).to_json(),
+        rejects_text=ValueError,
     ),
     Case(
         "call_put_schedule",
@@ -1168,6 +1201,7 @@ CASES = [
         lambda: CallPutSchedule(
             calls=[{"start": "2026-03-15", "end": "2027-03-15", "price_pct_of_par": 101.0}]
         ).to_json(),
+        rejects_text=ValueError,
     ),
     # `validate_scenario_spec` reports on a spec that parses but is invalid; the
     # loader raises on the same text, so such a spec cannot be held as an object.
@@ -1187,12 +1221,14 @@ CASES = [
         lambda dimensions: score_relative_value(_peer_set(), dimensions),
         json.loads,
         lambda: json.dumps([SCORING_DIMENSION]),
+        rejects_text=ValueError,
     ),
     Case(
         "dict_dcf_inputs",
         lambda inputs: evaluate_dcf(_dcf_model(), inputs),
         json.loads,
         lambda: json.dumps(DCF_INPUTS),
+        rejects_text=ValueError,
     ),
     Case(
         "dict_dcf_options",
@@ -1201,12 +1237,14 @@ CASES = [
         lambda: json.dumps({"mid_year_convention": True}),
         # Every option has a default, and serde reads a struct from an array too.
         accepted=frozenset({"empty-object", "empty-array"}),
+        rejects_text=ValueError,
     ),
     Case(
         "dict_otc_margin_spec",
         _swap_with_margin,
         json.loads,
         lambda: json.dumps(OtcMarginSpec.bilateral_simm(CsaSpec.usd_regulatory()).to_dict()),
+        rejects_text=ValueError,
     ),
     Case(
         "dict_option_contract_params",
@@ -1214,24 +1252,28 @@ CASES = [
         json.loads,
         lambda: json.dumps(HESTON_CONTRACT),
         stable=_itself,
+        rejects_text=ValueError,
     ),
     Case(
         "dict_risk_measure",
         lambda measure: decompose_factors(_sensitivities(), FACTOR_COVARIANCE, measure),
         json.loads,
         lambda: json.dumps({"var": {"confidence": 0.99}}),
+        rejects_text=ValueError,
     ),
     Case(
         "dict_position_risk_request",
         position_risk_report,
         json.loads,
         lambda: json.dumps(POSITION_RISK_REQUEST),
+        rejects_text=ValueError,
     ),
     Case(
         "dict_attribution_inputs",
         lambda inputs: attribute_pnl(_bond(), inputs),
         json.loads,
         _attribution_inputs_text,
+        rejects_text=ValueError,
     ),
     Case(
         "dict_weight_allocation_spec",
@@ -1265,6 +1307,7 @@ CASES = [
         lambda: json.dumps({"instrument_pricing_overrides": {"market_quotes": {"quoted_clean_price_pct": 99.5}}}),
         # Every extra is optional, and serde reads a struct from an array too.
         accepted=frozenset({"empty-object", "empty-array"}),
+        rejects_text=ValueError,
     ),
     # Lists of rows read by `typed_list_from_py`.
     Case(
@@ -1274,8 +1317,7 @@ CASES = [
         lambda: json.dumps([asset.to_dict() for asset in StructuredCredit.example().pool.assets]),
         # No rows is a valid list.
         accepted=frozenset({"empty-array"}),
-        differs={"empty-object": ("accepted", "ValueError")},
-        ruling=RULING_D,
+        rejects_text=ValueError,
     ),
     Case(
         "dict_list_hedge_swaps",
@@ -1284,22 +1326,22 @@ CASES = [
         lambda: json.dumps([HedgeSwap(InterestRateSwap.example(), notional={"tranche_par": TRANCHE_ID}).to_dict()]),
         # No rows is a valid list.
         accepted=frozenset({"empty-array"}),
-        differs={"empty-object": ("accepted", "ValueError")},
-        ruling=RULING_D,
+        rejects_text=ValueError,
     ),
     Case(
         "dict_list_index_constituents",
         _index_with_constituents,
         json.loads,
         _constituents_text,
+        rejects_text=ValueError,
     ),
-    # Tagged enums read by `tagged_enum_from_py`: a bare label, a `dict`, or text
-    # that starts with `{`.
+    # Tagged enums read by `tagged_enum_from_py`: a bare label or a `dict`.
     Case(
         "dict_tagged_enum_call_exercise",
         lambda policy: _asset_pool().with_instruments(bonds=[Bond.example()], call_exercise=policy),
         json.loads,
         lambda: json.dumps({"policy": "refinancing_incentive", "threshold_bp": 50.0}),
+        rejects_text=ValueError,
     ),
     Case(
         "dict_tagged_enum_reserve_destination",
@@ -1311,6 +1353,7 @@ CASES = [
         ),
         json.loads,
         lambda: json.dumps({"kind": "tranche", "tranche_id": "EQ"}),
+        rejects_text=ValueError,
     ),
     Case(
         "dict_covenant_metrics",
@@ -1318,8 +1361,7 @@ CASES = [
         json.loads,
         lambda: json.dumps({"debt_to_ebitda": 4.0}),
         stable=_itself,
-        differs={"empty-array": ("TypeError", "ValueError"), "number": ("TypeError", "ValueError")},
-        ruling=RULING_C,
+        rejects_text=TypeError,
     ),
 ]
 
@@ -1397,17 +1439,17 @@ def test_every_known_difference_names_its_ruling() -> None:
         assert set(case.differs) <= {"valid", *case.malformed}, case.id
 
 
-# Builder setters that parse a string as JSON text into an enum today. Once the
-# text form is gone a string there is a label, so a string that is also valid
-# JSON must not stay accepted with a different meaning. Each row: the class, the
-# setter, one variant name of the enum, and the inputs accepted today (every
-# other input raises `ValueError`). Only `AmortizationSpec` has a variant without
-# data (`none`); for the other enums no bare string is a value.
+# Builder setters whose target is an enum. A string there is a label. It is not
+# read as JSON text, so a string that is also valid JSON (`1`, `true`, `null`,
+# a quoted variant name) is an unknown label. Each row: the class, the setter,
+# one variant name of the enum, and the inputs accepted (every other input
+# raises `ValueError`). Only `AmortizationSpec` has a variant without data
+# (`none`); for the other enums no bare string is a value.
 ENUM_SETTERS: list[tuple[type, str, str, frozenset[str]]] = [
     (Bond, "cashflow_spec", "fixed", frozenset()),
     (ConvertibleBond, "cashflow_spec", "fixed", frozenset()),
     (TermLoan, "rate", "fixed", frozenset()),
-    (TermLoan, "amortization", "none", frozenset({"none", '"none"'})),
+    (TermLoan, "amortization", "none", frozenset({"none"})),
     (TermLoan, "upfront_fee", "amount", frozenset()),
     (CdsOption, "strike", "spread", frozenset()),
     (RevolvingCredit, "rate", "fixed", frozenset()),
@@ -1423,7 +1465,7 @@ ENUM_SETTERS: list[tuple[type, str, str, frozenset[str]]] = [
         for text in ("1", "true", "null", variant, f'"{variant}"')
     ],
 )
-def test_json_looking_strings_today(instrument: Any, setter: str, text: str, accepted: bool) -> None:
+def test_a_string_is_a_value_not_json_text(instrument: Any, setter: str, text: str, accepted: bool) -> None:
     outcome = _outcome(lambda: getattr(instrument.builder(), setter)(text))
     if accepted:
         assert outcome[0] == "accepted"

@@ -64,7 +64,7 @@ from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
 
 DateLike = datetime.date | datetime.datetime | pd.Timestamp | str
-Observations = list[dict[str, Any]] | str
+Observations = list[dict[str, Any]]
 
 __all__ = [
     "CompositeExposureReport",
@@ -720,7 +720,7 @@ class CompositeSpec:
         weighting_method: WeightingMethod,
         rebalance_rule: RebalanceRule,
         *,
-        fx01_pair: dict[str, str] | str | None = None,
+        fx01_pair: dict[str, str] | None = None,
     ) -> None:
         """
         Construct and validate a self-contained composite specification.
@@ -740,9 +740,9 @@ class CompositeSpec:
             Policy used only during initialization or explicit rebalance.
         rebalance_rule : RebalanceRule
             Manual or scheduled rule controlling state transitions.
-        fx01_pair : dict[str, str] or str or None
-            Ordered shock pair, as ``{"base": "EUR", "quote": "USD"}``
-            or equivalent JSON text. Without a pair, FX01 is unavailable.
+        fx01_pair : dict[str, str] or None
+            Ordered shock pair, as ``{"base": "EUR", "quote": "USD"}``.
+            Without a pair, FX01 is unavailable.
 
         Raises
         ------
@@ -927,9 +927,9 @@ class CompositeSpec:
             Complete current market object.
         as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
             Effective date as a date-like value or ISO-8601 string.
-        history : list[dict[str, Any]] | str | None
+        history : list[dict[str, Any]] | None
             Strict chronological ``CompositeMarketObservation`` array as a
-            list of dicts or a JSON string; ``None`` means no history.
+            list of dicts; ``None`` means no history.
 
         Returns
         -------
@@ -1220,9 +1220,9 @@ class CompositeInstrument:
             Complete rebalance-date market.
         as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
             Effective date for the new state.
-        history : list[dict[str, Any]] | str | None
-            Strict chronological observation array (list of dicts or JSON
-            string) available through ``as_of``; ``None`` means no history.
+        history : list[dict[str, Any]] | None
+            Strict chronological observation array (list of dicts) available
+            through ``as_of``; ``None`` means no history.
 
         Returns
         -------
@@ -1894,10 +1894,10 @@ class CompositeHistoryResult:
     >>> _state = json.loads(MarketContext().to_json())
     >>> _history = history_from_spec(
     ...     _spec,
-    ...     json.dumps([
+    ...     [
     ...         {"date": "2025-01-01", "state": _state},
     ...         {"date": "2025-01-02", "state": _state},
-    ...     ]),
+    ...     ],
     ... )
     >>> (len(_history), json.loads(_history.row_json(0))["return_index"])
     (2, 100.0)
@@ -2041,10 +2041,10 @@ class CompositeHistoryResult:
         >>> _state = json.loads(MarketContext().to_json())
         >>> _history = history_from_spec(
         ...     _spec,
-        ...     json.dumps([
+        ...     [
         ...         {"date": "2025-01-01", "state": _state},
         ...         {"date": "2025-01-02", "state": _state},
-        ...     ]),
+        ...     ],
         ... )
         >>> list(_history.to_pandas()["return_index"])
         [100.0, 100.0]
@@ -2190,10 +2190,10 @@ def history_from_spec(
     ----------
     spec : CompositeSpec
         Unresolved definition initialized using only available warmup and first-date information.
-    observations : list[dict[str, Any]] | str
+    observations : list[dict[str, Any]]
         Non-empty strictly increasing complete market-observation array
-        (list of dicts or JSON string).
-    warmup : list[dict[str, Any]] | str | None
+        (list of dicts).
+    warmup : list[dict[str, Any]] | None
         Optional strictly earlier complete observations used for weighting only.
     metrics : list[str] | None
         Optional canonical additive metric keys included on every output row.
@@ -2245,7 +2245,7 @@ def history_from_spec(
     >>> json.loads(
     ...     history_from_spec(
     ...         _spec,
-    ...         json.dumps([{"date": "2025-01-01", "state": _state}, {"date": "2025-01-02", "state": _state}]),
+    ...         [{"date": "2025-01-01", "state": _state}, {"date": "2025-01-02", "state": _state}],
     ...     ).to_json()
     ... )[0]["return_index"]
     100.0
@@ -2265,9 +2265,9 @@ def history(
     ----------
     instrument : CompositeInstrument
         Immutable resolved state held from the first supplied observation.
-    observations : list[dict[str, Any]] | str
+    observations : list[dict[str, Any]]
         Non-empty strictly increasing complete market-observation array
-        (list of dicts or JSON string).
+        (list of dicts).
     metrics : list[str] | None
         Optional canonical additive metric keys included on every output row.
 
@@ -2319,7 +2319,7 @@ def history(
     >>> len(
     ...     history(
     ...         _instrument,
-    ...         json.dumps([{"date": "2025-01-01", "state": _state}, {"date": "2025-01-02", "state": _state}]),
+    ...         [{"date": "2025-01-01", "state": _state}, {"date": "2025-01-02", "state": _state}],
     ...     )
     ... )
     2

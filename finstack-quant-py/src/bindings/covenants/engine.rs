@@ -18,12 +18,9 @@ use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-/// Extract a ``dict[str, float]``, ``pandas.Series`` (mapping metric ids), or
-/// JSON-object string of metric values.
+/// Extract a ``dict[str, float]`` or ``pandas.Series`` (mapping metric ids)
+/// of metric values.
 pub(crate) fn extract_metrics(obj: &Bound<'_, PyAny>) -> PyResult<HashMapMetricSource> {
-    if let Ok(text) = obj.extract::<std::borrow::Cow<'_, str>>() {
-        return HashMapMetricSource::from_json(&text).map_err(core_to_py);
-    }
     if crate::bindings::dataframe_utils::is_pandas_series(obj)? {
         let dict = obj.call_method0("to_dict")?;
         return extract_metric_dict(&dict).map(HashMapMetricSource::from_pairs);
@@ -35,7 +32,7 @@ pub(crate) fn extract_metrics(obj: &Bound<'_, PyAny>) -> PyResult<HashMapMetricS
 pub(crate) fn extract_metric_dict(obj: &Bound<'_, PyAny>) -> PyResult<Vec<(String, f64)>> {
     let dict = obj.cast::<PyDict>().map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err(format!(
-            "metrics must be a dict[str, float] or a JSON object string, got {}",
+            "metrics must be a dict[str, float], got {}",
             obj.get_type()
                 .name()
                 .map_or_else(|_| "?".to_string(), |n| n.to_string())
@@ -270,7 +267,7 @@ impl PyCovenantEngine {
 
     /// Evaluate every applicable covenant on ``as_of``.
     ///
-    /// ``metrics`` is a ``dict[str, float]`` (or JSON object string) keyed by
+    /// ``metrics`` is a ``dict[str, float]`` keyed by
     /// metric id; ``as_of`` a ``datetime.date``, ``pandas.Timestamp`` or ISO
     /// string. Returns a dict keyed by covenant label in spec order.
     ///

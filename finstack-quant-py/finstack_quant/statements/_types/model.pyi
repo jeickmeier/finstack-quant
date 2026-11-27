@@ -785,7 +785,7 @@ class FinancialModelSpec:
         """
         ...
 
-    def apply_edits(self, edits: list[dict[str, Any]] | str) -> FinancialModelSpec:
+    def apply_edits(self, edits: list[dict[str, Any]]) -> FinancialModelSpec:
         """
         Apply named edits atomically and return the edited model.
 
@@ -795,7 +795,7 @@ class FinancialModelSpec:
         Parameters
         ----------
         edits:
-            Edit objects (or their JSON array text), each tagged by ``"edit"``: ``add_node`` and ``replace_node`` (``node``); ``remove_node``, ``remove_forecast`` and ``remove_where`` (``node_id``); ``set_observation`` (``node_id``, ``period``, ``value``, optional ``availability_date``); ``remove_observation`` (``node_id``, ``period``); ``set_formula`` (``node_id``, ``formula``); ``set_forecast`` (``node_id``, ``forecast``; the node becomes mixed); ``set_where`` (``node_id``, ``predicate``).
+            Edit objects, each tagged by ``"edit"``: ``add_node`` and ``replace_node`` (``node``); ``remove_node``, ``remove_forecast`` and ``remove_where`` (``node_id``); ``set_observation`` (``node_id``, ``period``, ``value``, optional ``availability_date``); ``remove_observation`` (``node_id``, ``period``); ``set_formula`` (``node_id``, ``formula``); ``set_forecast`` (``node_id``, ``forecast``; the node becomes mixed); ``set_where`` (``node_id``, ``predicate``).
 
         Returns
         -------

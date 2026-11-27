@@ -318,7 +318,7 @@ print("Input issuers:", list(calibration_inputs["issuer_tags"]["tags"].keys()))
 
 {/* notebook-block notebook="05_portfolio/credit_factor_hierarchy.ipynb" cell="credit-factor-calibration" role="build" */}
 ```python exec id=credit-factor-calibration role=build
-# Config and inputs are accepted as plain dicts (or JSON strings).
+# Config and inputs are plain dicts.
 calibrator = CreditCalibrator(calibration_config)
 model = calibrator.calibrate(calibration_inputs)
 

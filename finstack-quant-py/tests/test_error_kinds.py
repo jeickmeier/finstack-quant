@@ -55,7 +55,7 @@ def _credit_model() -> object:
         "as_of_spreads": {"A": 0.0101},
         "idiosyncratic_overrides": {},
     }
-    return CreditCalibrator(json.dumps(config)).calibrate(json.dumps(inputs))
+    return CreditCalibrator(config).calibrate(inputs)
 
 
 def _performance() -> analytics.Performance:
@@ -126,7 +126,7 @@ class TestPortfolio:
 class TestModels:
     def test_an_issuer_outside_the_factor_model_is_not_found(self) -> None:
         with pytest.raises(KeyError, match="ZZZ"):
-            decompose_levels(_credit_model(), '{"ZZZ": 0.0125}', 0.012, "2025-06-30")
+            decompose_levels(_credit_model(), {"ZZZ": 0.0125}, 0.012, "2025-06-30")
 
     def test_nearest_correlation_that_does_not_converge_is_a_computation_failure(self) -> None:
         matrix = [1.0, 0.95, -0.95, 0.95, 1.0, 0.95, -0.95, 0.95, 1.0]

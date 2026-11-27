@@ -60,11 +60,10 @@ pub(super) fn validate_covenant_engine_json(py: Python<'_>, engine_json: &str) -
 ///
 /// * `engine_json` - Serialized covenant engine (`CovenantEngine.to_json()`
 ///   or a hand-written document; only `specs` is required)
-/// * `metrics` - `dict[str, float]` or JSON-object string mapping metric id to
+/// * `metrics` - `dict[str, float]` mapping metric id to
 ///   value; ratios in turns, amounts in the engine's reporting currency. A
 ///   dict reaches Rust as numbers (`evaluate_engine_with_source`), so a
-///   non-finite value fails only when a covenant reads it; a string is parsed
-///   by Rust `HashMapMetricSource::from_json`
+///   non-finite value fails only when a covenant reads it
 /// * `as_of` - Evaluation date, either a date-like object (`datetime.date`,
 ///   `pandas.Timestamp`) or an ISO 8601 string
 ///
@@ -86,18 +85,13 @@ pub(super) fn evaluate_engine<'py>(
     as_of: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyDict>> {
     let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
-    let reports = match metrics.extract::<String>() {
-        Ok(metrics_json) => py.detach(|| {
-            finstack_quant_covenants::evaluate_engine(engine_json, &metrics_json, &as_of)
-        }),
-        Err(_) => {
-            let source = finstack_quant_covenants::HashMapMetricSource::from_pairs(
-                engine::extract_metric_dict(metrics)?,
-            );
-            py.detach(|| {
-                finstack_quant_covenants::evaluate_engine_with_source(engine_json, &source, &as_of)
-            })
-        }
+    let reports = {
+        let source = finstack_quant_covenants::HashMapMetricSource::from_pairs(
+            engine::extract_metric_dict(metrics)?,
+        );
+        py.detach(|| {
+            finstack_quant_covenants::evaluate_engine_with_source(engine_json, &source, &as_of)
+        })
     }
     .map_err(crate::errors::core_to_py)?;
     engine::reports_to_pydict(py, reports)

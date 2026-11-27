@@ -121,9 +121,9 @@ def _calibration_config() -> dict:
 
 def _calibrate() -> CreditFactorModel:
     config = _calibration_config()
-    cal = CreditCalibrator(json.dumps(config))
+    cal = CreditCalibrator(config)
     inputs = _fixture_inputs()
-    return cal.calibrate(json.dumps(inputs))
+    return cal.calibrate(inputs)
 
 
 # Minimal golden JSON — just enough for from_json / to_json tests.
@@ -250,7 +250,7 @@ def test_calibrated_model_round_trips_json() -> None:
 
 def test_calibrator_bad_config_raises() -> None:
     with pytest.raises(ValueError, match=r"missing field|unknown field|invalid"):
-        CreditCalibrator('{"completely": "wrong"}')
+        CreditCalibrator({"completely": "wrong"})
 
 
 @pytest.mark.parametrize("vol_model", ["garch", "egarch"])
@@ -259,15 +259,15 @@ def test_calibrator_removed_vol_models_rejected_at_parse(vol_model: str) -> None
     config = _calibration_config()
     config["vol_model"] = vol_model
     with pytest.raises(ValueError, match="unknown variant"):
-        CreditCalibrator(json.dumps(config))
+        CreditCalibrator(config)
 
 
 def test_calibrator_ewma_vol_model_calibrates() -> None:
     """EWMA calibrates and persists the estimator in vol_state JSON."""
     config = _calibration_config()
     config["vol_model"] = {"ewma": {"lambda": 0.94}}
-    cal = CreditCalibrator(json.dumps(config))
-    model = cal.calibrate(json.dumps(_fixture_inputs()))
+    cal = CreditCalibrator(config)
+    model = cal.calibrate(_fixture_inputs())
     assert model.n_factors >= 1
     artifact = json.loads(model.to_json())
     factor_models = artifact["vol_state"]["factors"]
@@ -279,11 +279,11 @@ def test_calibrator_ewma_vol_model_calibrates() -> None:
 
 
 def test_calibrator_ledoit_wolf_strategy_calibrates() -> None:
-    """Ledoit-Wolf covariance strategy is accepted end-to-end via JSON."""
+    """Ledoit-Wolf covariance strategy is accepted end-to-end via the config dict."""
     config = _calibration_config()
     config["covariance_strategy"] = "ledoit_wolf"
-    cal = CreditCalibrator(json.dumps(config))
-    model = cal.calibrate(json.dumps(_fixture_inputs()))
+    cal = CreditCalibrator(config)
+    model = cal.calibrate(_fixture_inputs())
     assert model.n_factors >= 1
 
 
@@ -291,16 +291,16 @@ def test_calibrator_ewma_bad_lambda_rejected() -> None:
     """Lambda outside (0, 1) fails calibration validation."""
     config = _calibration_config()
     config["vol_model"] = {"ewma": {"lambda": 1.0}}
-    cal = CreditCalibrator(json.dumps(config))
+    cal = CreditCalibrator(config)
     with pytest.raises(ValueError, match="ewma lambda"):
-        cal.calibrate(json.dumps(_fixture_inputs()))
+        cal.calibrate(_fixture_inputs())
 
 
 def test_calibrator_bad_inputs_raises() -> None:
     config = _calibration_config()
-    cal = CreditCalibrator(json.dumps(config))
+    cal = CreditCalibrator(config)
     with pytest.raises(ValueError, match=r"missing field|unknown field|invalid"):
-        cal.calibrate('{"not_inputs": true}')
+        cal.calibrate({"not_inputs": True})
 
 
 # T3 — decompose_levels
@@ -317,8 +317,7 @@ def _simple_decompose_model_and_spreads() -> tuple[CreditFactorModel, dict[str, 
 
 def test_decompose_levels_runs_without_error() -> None:
     model, observed = _simple_decompose_model_and_spreads()
-    spreads_json = json.dumps(observed)
-    snap = decompose_levels(model, spreads_json, 0.0100, "2024-03-31")
+    snap = decompose_levels(model, observed, 0.0100, "2024-03-31")
     assert isinstance(snap, LevelsAtDate)
     assert snap.date == "2024-03-31"
     assert snap.generic == pytest.approx(100.0)
@@ -326,13 +325,13 @@ def test_decompose_levels_runs_without_error() -> None:
 
 def test_decompose_levels_n_levels_matches_model() -> None:
     model, observed = _simple_decompose_model_and_spreads()
-    snap = decompose_levels(model, json.dumps(observed), 0.0100, "2024-03-31")
+    snap = decompose_levels(model, observed, 0.0100, "2024-03-31")
     assert snap.n_levels == model.n_levels
 
 
 def test_decompose_levels_level_values_are_floats() -> None:
     model, observed = _simple_decompose_model_and_spreads()
-    snap = decompose_levels(model, json.dumps(observed), 0.0100, "2024-03-31")
+    snap = decompose_levels(model, observed, 0.0100, "2024-03-31")
     for k in range(snap.n_levels):
         vals = snap.level_values(k)
         assert isinstance(vals, dict)
@@ -342,14 +341,14 @@ def test_decompose_levels_level_values_are_floats() -> None:
 
 def test_decompose_levels_adder_covers_all_issuers() -> None:
     model, observed = _simple_decompose_model_and_spreads()
-    snap = decompose_levels(model, json.dumps(observed), 0.0100, "2024-03-31")
+    snap = decompose_levels(model, observed, 0.0100, "2024-03-31")
     adder = snap.adder()
     assert set(adder.keys()) == set(observed.keys())
 
 
 def test_decompose_levels_level_index_out_of_range_raises() -> None:
     model, observed = _simple_decompose_model_and_spreads()
-    snap = decompose_levels(model, json.dumps(observed), 0.0100, "2024-03-31")
+    snap = decompose_levels(model, observed, 0.0100, "2024-03-31")
     with pytest.raises(ValueError, match=r"out of range"):
         snap.level_values(999)
 
@@ -369,10 +368,10 @@ def test_decompose_levels_runtime_tags_resolves_unknown_issuer() -> None:
     runtime_tags = {"RUNTIME-ISSUER": {"rating": "IG", "region": "EU"}}
     snap = decompose_levels(
         model,
-        json.dumps(extra),
+        extra,
         0.0100,
         "2024-03-31",
-        json.dumps(runtime_tags),
+        runtime_tags,
     )
     adder = snap.adder()
     assert "RUNTIME-ISSUER" in adder
@@ -383,9 +382,8 @@ def test_decompose_levels_runtime_tags_resolves_unknown_issuer() -> None:
 
 def test_decompose_period_runs_without_error() -> None:
     model, observed = _simple_decompose_model_and_spreads()
-    spreads_json = json.dumps(observed)
-    snap_t0 = decompose_levels(model, spreads_json, 0.0100, "2024-02-29")
-    snap_t1 = decompose_levels(model, spreads_json, 0.01015, "2024-03-31")
+    snap_t0 = decompose_levels(model, observed, 0.0100, "2024-02-29")
+    snap_t1 = decompose_levels(model, observed, 0.01015, "2024-03-31")
     period = decompose_period(snap_t0, snap_t1)
     assert isinstance(period, PeriodDecomposition)
     assert period.from_date == "2024-02-29"
@@ -395,9 +393,8 @@ def test_decompose_period_runs_without_error() -> None:
 
 def test_decompose_period_level_deltas() -> None:
     model, observed = _simple_decompose_model_and_spreads()
-    spreads_json = json.dumps(observed)
-    snap_t0 = decompose_levels(model, spreads_json, 0.0100, "2024-02-29")
-    snap_t1 = decompose_levels(model, spreads_json, 0.0100, "2024-03-31")
+    snap_t0 = decompose_levels(model, observed, 0.0100, "2024-02-29")
+    snap_t1 = decompose_levels(model, observed, 0.0100, "2024-03-31")
     period = decompose_period(snap_t0, snap_t1)
     # Same spreads + same generic → all deltas should be zero.
     for k in range(period.n_levels):
@@ -408,9 +405,8 @@ def test_decompose_period_level_deltas() -> None:
 
 def test_decompose_period_date_order_error() -> None:
     model, observed = _simple_decompose_model_and_spreads()
-    spreads_json = json.dumps(observed)
-    snap_t0 = decompose_levels(model, spreads_json, 0.0100, "2024-01-31")
-    snap_t1 = decompose_levels(model, spreads_json, 0.0100, "2024-03-31")
+    snap_t0 = decompose_levels(model, observed, 0.0100, "2024-01-31")
+    snap_t1 = decompose_levels(model, observed, 0.0100, "2024-03-31")
     # Reverse order: from > to should raise.
     with pytest.raises(ValueError, match=r"from.*to|date"):
         decompose_period(snap_t1, snap_t0)
@@ -445,7 +441,7 @@ def test_factor_covariance_forecast_n_steps_scales_variance() -> None:
     model = _calibrate()
     fcf = FactorCovarianceForecast(model)
     cov_one = fcf.covariance_at("one_step")
-    cov_four = fcf.covariance_at('{"n_steps": 4}')
+    cov_four = fcf.covariance_at(VolHorizon.n_steps(4))
     for a, b in zip(cov_one.data, cov_four.data, strict=True):
         assert abs(4.0 * a - b) < 1e-10, f"expected 4·{a} ≈ {b}"
 
@@ -453,7 +449,7 @@ def test_factor_covariance_forecast_n_steps_scales_variance() -> None:
 def test_factor_covariance_forecast_n_steps_zero_is_zero() -> None:
     model = _calibrate()
     fcf = FactorCovarianceForecast(model)
-    cov = fcf.covariance_at('{"n_steps": 0}')
+    cov = fcf.covariance_at(VolHorizon.n_steps(0))
     for v in cov.data:
         assert abs(v) < 1e-12
 
@@ -476,8 +472,22 @@ def test_factor_covariance_forecast_idiosyncratic_vol_known_issuers() -> None:
 def test_factor_covariance_forecast_invalid_horizon_raises() -> None:
     model = _calibrate()
     fcf = FactorCovarianceForecast(model)
-    with pytest.raises(ValueError, match=r"horizon|invalid"):
+    with pytest.raises(ValueError, match=r"invalid horizon 'not_a_horizon'|invalid horizon \"not_a_horizon\""):
         fcf.covariance_at("not_a_horizon")
+
+
+def test_factor_covariance_forecast_horizon_string_is_a_label_not_json_text() -> None:
+    """A JSON descriptor is loaded with ``VolHorizon.parse``; the parameter takes a label."""
+    model = _calibrate()
+    fcf = FactorCovarianceForecast(model)
+    text = '{"n_steps": 4}'
+    with pytest.raises(ValueError, match=r"VolHorizon\.parse"):
+        fcf.covariance_at(text)
+    with pytest.raises(ValueError, match=r"VolHorizon\.parse"):
+        fcf.idiosyncratic_vol(model.issuer_ids()[0], text)
+    with pytest.raises(ValueError, match=r"VolHorizon\.parse"):
+        fcf.factor_model_at(text)
+    assert fcf.covariance_at(VolHorizon.parse(text)).data == fcf.covariance_at(VolHorizon.n_steps(4)).data
 
 
 def test_factor_covariance_forecast_factor_model_at_runs() -> None:
@@ -515,13 +525,13 @@ def test_from_dataframe_matches_json_path_and_invents_no_generic_ids() -> None:
 
     cfg = _calibration_config()
     inp = _fixture_inputs()
-    via_json = CreditCalibrator(config=json.dumps(cfg)).calibrate(inputs=json.dumps(inp))
+    via_wire = CreditCalibrator(config=cfg).calibrate(inputs=inp)
     spreads = pd.DataFrame(inp["history_panel"]["spreads"], index=pd.to_datetime(inp["history_panel"]["dates"]).date)
     generic = pd.Series(inp["generic_factor"]["values"], index=spreads.index)
     via_frames = CreditCalibrator.from_dataframe(
         spreads, inp["issuer_tags"]["tags"], generic, inp["generic_factor"]["spec"], config=cfg
     )
-    assert json.loads(via_frames.to_json()) == json.loads(via_json.to_json())
+    assert json.loads(via_frames.to_json()) == json.loads(via_wire.to_json())
     with pytest.raises(TypeError):
         CreditCalibrator.from_dataframe(spreads, inp["issuer_tags"]["tags"], generic, config=cfg)  # type: ignore[call-arg]
     with pytest.raises(TypeError):

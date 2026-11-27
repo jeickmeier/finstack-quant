@@ -11,7 +11,7 @@
 use crate::bindings::core::market_data::curves::PyVolSurface;
 use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::macros::{py_getters, tabular_methods, wire_methods};
-use crate::bindings::module_utils::spec_from_py;
+use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::table_builders::TableBuilder;
 use finstack_quant_core::wire::serde_label;
@@ -207,7 +207,7 @@ fn check_surface(
     surface: PyRef<'_, PyVolSurface>,
     config: &Bound<'_, PyAny>,
 ) -> PyResult<PyArbitrageReport> {
-    let config: ArbitrageCheckConfig = spec_from_py(py, config, "ArbitrageCheckConfig")?;
+    let config: ArbitrageCheckConfig = py_to_serde(py, config, "ArbitrageCheckConfig")?;
     model_arbitrage::check_surface(&surface.inner, &config)
         .map(|inner| PyArbitrageReport { inner })
         .map_err(core_to_py)

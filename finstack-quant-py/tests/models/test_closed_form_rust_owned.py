@@ -79,7 +79,7 @@ def test_heston_price_dispatches_put_through_rust() -> None:
     assert HestonParams.from_json(dynamics.to_json()) == dynamics
     call_contract = OptionContractParams(**market, option_type="call")
     call = heston_price(call_contract, dynamics)
-    put = heston_price({**market, "option_type": "put"}, dynamics.to_json())
+    put = heston_price({**market, "option_type": "put"}, HestonParams.from_json(dynamics.to_json()))
     parity = call - put - (100.0 * math.exp(-0.02) - 100.0 * math.exp(-0.05))
     assert abs(parity) < 1e-8
     with pytest.raises(ValueError, match="gl_order"):

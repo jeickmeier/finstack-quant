@@ -34,7 +34,7 @@ SC_ENTRY_POINTS = (
 # Both stochastic dimensions off collapses the OAS to a single deterministic
 # scenario (see `OasConfig::num_paths`), which keeps this fast. Every field is
 # required when a config is supplied; values track `OasConfig::default`.
-_DETERMINISTIC_OAS_CONFIG_JSON = json.dumps({
+_DETERMINISTIC_OAS_CONFIG = {
     "num_paths": 1,
     "stochastic_rates": False,
     "stochastic_credit": False,
@@ -44,7 +44,7 @@ _DETERMINISTIC_OAS_CONFIG_JSON = json.dumps({
     "credit_loading": 0.3,
     "seed": 42,
     "tolerance": 1e-7,
-})
+}
 
 
 def _approx(value: float) -> object:
@@ -161,7 +161,7 @@ def test_tranche_oas_returns_typed_wrapper() -> None:
         market,
         "2024-01-01",
         model_price_pct,
-        _DETERMINISTIC_OAS_CONFIG_JSON,
+        _DETERMINISTIC_OAS_CONFIG,
     )
 
     assert isinstance(result, instruments.OasResult)
@@ -183,9 +183,9 @@ def test_tranche_oas_returns_typed_wrapper() -> None:
 
 def test_tranche_scenario_table_returns_typed_wrapper() -> None:
     """The scenario-table entry point returns ``ScenarioTable``, not JSON."""
-    grid_json = json.dumps({"cprs": [0.10], "cdrs": [0.02], "severities": [0.40]})
+    grid = {"cprs": [0.10], "cdrs": [0.02], "severities": [0.40]}
 
-    table = instruments.tranche_scenario_table(_valid_deal_json(), "CLONOTES-A", _market(), "2024-01-01", grid_json)
+    table = instruments.tranche_scenario_table(_valid_deal_json(), "CLONOTES-A", _market(), "2024-01-01", grid)
 
     assert isinstance(table, instruments.ScenarioTable)
     assert not isinstance(table, str)

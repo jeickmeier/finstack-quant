@@ -387,7 +387,7 @@ class StatementResult:
         """
         ...
 
-    def to_pricing_flows(self, selection: dict[str, Any] | str) -> list[tuple[date, Money]]:
+    def to_pricing_flows(self, selection: dict[str, Any]) -> list[tuple[date, Money]]:
         """
         Read one monetary node as signed economic cash flows for pricing.
 
@@ -399,8 +399,8 @@ class StatementResult:
 
         Parameters
         ----------
-        selection : dict[str, Any] | str
-            A ``PricingFlowSelection`` mapping or its JSON: ``node_id``, the
+        selection : dict[str, Any]
+            A ``PricingFlowSelection`` mapping: ``node_id``, the
             expected ``currency`` code, ``sign`` (``"inflow_positive"`` for a
             signed cash flow or ``"outflow_magnitude"`` for a non-negative
             outflow such as CapEx), the required ``periods`` and

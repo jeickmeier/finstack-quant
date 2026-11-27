@@ -139,7 +139,7 @@ def price_instrument(
     as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
     model: str = "default",
     metrics: list[str] | None = None,
-    extras: PriceExtras | dict[str, Any] | str | None = None,
+    extras: PriceExtras | dict[str, Any] | None = None,
 ) -> ValuationResult:
     """
     Price one instrument and compute explicit risk metric requests.
@@ -183,8 +183,8 @@ def price_instrument(
         Roll specialness is in basis points against the forward curve
         ``repo_curve_id``, or the discount curve when absent; implied
         financing is an ACT/360 decimal rate.
-    extras : PriceExtras or dict[str, Any] or str, optional
-        The rarer pricing inputs, as a dict or JSON text in the shape of the
+    extras : PriceExtras or dict[str, Any], optional
+        The rarer pricing inputs, as a dict in the shape of the
         Rust ``PriceExtras``; every key is optional and an unknown key raises
         ``ValueError``.
         ``metric_pricing_overrides`` (a ``MetricPricingOverrides`` or dict):

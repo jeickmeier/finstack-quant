@@ -77,7 +77,7 @@ impl PyFxForward {
     #[staticmethod]
     #[pyo3(text_signature = "(params)")]
     fn from_trade_date(params: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let params = crate::bindings::module_utils::spec_from_py::<
+        let params = crate::bindings::module_utils::py_to_serde::<
             finstack_quant_valuations::instruments::fx::fx_forward::FxForwardTradeDateParams,
         >(params.py(), params, "FxForwardTradeDateParams")?;
         finstack_quant_valuations::instruments::fx::fx_forward::FxForward::from_trade_date(params)
@@ -202,7 +202,7 @@ impl PyFxForwardBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fx::FxSpotBasis =
-            crate::bindings::module_utils::spec_from_py(value.py(), value, "FxSpotBasis")?;
+            crate::bindings::module_utils::py_to_serde(value.py(), value, "FxSpotBasis")?;
         builder_set!(
             slf,
             spot_basis,
@@ -419,7 +419,7 @@ impl PyFxOption {
     #[staticmethod]
     #[pyo3(text_signature = "(params)")]
     fn european(params: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let params = crate::bindings::module_utils::spec_from_py::<
+        let params = crate::bindings::module_utils::py_to_serde::<
             finstack_quant_valuations::instruments::fx::fx_option::FxOptionParams,
         >(params.py(), params, "FxOptionParams")?;
         finstack_quant_valuations::instruments::fx::fx_option::FxOption::european(params)
@@ -546,7 +546,7 @@ impl PyFxOptionBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fx::fx_option::FxOptionDelivery =
-            crate::bindings::module_utils::spec_from_py(value.py(), value, "FxOptionDelivery")?;
+            crate::bindings::module_utils::py_to_serde(value.py(), value, "FxOptionDelivery")?;
         builder_set!(slf, delivery, format!("{spec:?}"), |b: FxOptionBuilder| b
             .delivery(spec))
     }
@@ -558,7 +558,7 @@ impl PyFxOptionBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fx::FxSpotBasis =
-            crate::bindings::module_utils::spec_from_py(value.py(), value, "FxSpotBasis")?;
+            crate::bindings::module_utils::py_to_serde(value.py(), value, "FxSpotBasis")?;
         builder_set!(
             slf,
             spot_basis,
@@ -633,7 +633,7 @@ impl PyFxOptionBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let convention: FxDeltaConvention =
-            crate::bindings::module_utils::spec_from_py(value.py(), value, "FxDeltaConvention")?;
+            crate::bindings::module_utils::py_to_serde(value.py(), value, "FxDeltaConvention")?;
         convention.validate().map_err(core_to_py)?;
         let shown = format!(
             "{{'kind': '{}', 'premium_currency': '{}', 'venue': '{}'}}",

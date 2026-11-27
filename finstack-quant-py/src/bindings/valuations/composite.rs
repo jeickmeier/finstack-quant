@@ -12,7 +12,7 @@ use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::extract::extract_instrument;
 use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::json_bridge::{deserialize_json_with_context, serialize_json_with_context};
-use crate::bindings::module_utils::opt_spec_from_py;
+use crate::bindings::module_utils::opt_py_to_serde;
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::bindings::valuations::convert::{
@@ -61,14 +61,14 @@ const COMPOSITE_HISTORY_COLUMNS: &[(&str, &str)] = &[
     ("rebalance_trade_count", "int64"),
 ];
 
-/// Accept a ``CompositeMarketObservation`` array as a Python list of dicts,
-/// a JSON string, or ``None`` (no observations).
+/// Accept a ``CompositeMarketObservation`` array as a Python list of dicts
+/// or ``None`` (no observations).
 fn observations_from_py(
     py: Python<'_>,
     obj: Option<&Bound<'_, PyAny>>,
     what: &str,
 ) -> PyResult<Vec<CompositeMarketObservation>> {
-    Ok(opt_spec_from_py(py, obj, what)?.unwrap_or_default())
+    Ok(opt_py_to_serde(py, obj, what)?.unwrap_or_default())
 }
 
 /// Render the fields of a serde object Python-style (``key='str'``, ``True``,
@@ -355,9 +355,7 @@ impl PyCompositeSpec {
             rebalance_rule.inner.clone(),
         );
         inner.fx01_pair = fx01_pair
-            .map(|value| {
-                crate::bindings::module_utils::spec_from_py(value.py(), value, "FX01 pair")
-            })
+            .map(|value| crate::bindings::module_utils::py_to_serde(value.py(), value, "FX01 pair"))
             .transpose()?;
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })

@@ -112,7 +112,7 @@ def test_swaption_builder_setters_accept_keyword_value() -> None:
         .vol_surface_id(value="USD-SWPT-VOL")
         .underlying_fixed_leg(value=fixed)
         .underlying_float_leg(value=float_leg)
-        .sabr_params(value=json.dumps({"alpha": 0.025, "beta": 0.5, "nu": 0.4, "rho": -0.3, "shift": None}))
+        .sabr_params(value={"alpha": 0.025, "beta": 0.5, "nu": 0.4, "rho": -0.3, "shift": None})
         .build()
     )
     assert swpt.id == "SWPT-KW"
@@ -237,14 +237,14 @@ def test_cds_tranche_builder_setters_accept_keyword_value() -> None:
 
 
 def test_convertible_bond_builder_setters_accept_keyword_value() -> None:
-    conversion = json.dumps({
+    conversion = {
         "ratio": 20.0,
         "price": None,
         "policy": "voluntary",
         "anti_dilution": "full_ratchet",
         "dividend_adjustment": "none",
         "dilution_events": [],
-    })
+    }
     bond = (
         ConvertibleBond
         .builder()

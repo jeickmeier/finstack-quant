@@ -28,6 +28,7 @@ use finstack_quant_factor::credit::calibration::{
 use finstack_quant_factor::credit::hierarchy::{
     CreditFactorModel, GenericFactorSpec, IssuerTags, dimension_key,
 };
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple, PyType};
 use std::collections::BTreeMap;
@@ -78,8 +79,9 @@ const ISSUER_ROW_COLUMNS: &[(&str, &str)] = &[
     ("spread_duration", "float64"),
 ];
 
-/// Deserialize `obj` into `T`, accepting a JSON string, a mapping / list, or
-/// any object exposing ``to_dict()`` (``pandas.Series`` / ``DataFrame``).
+/// Deserialize `obj` into `T`, accepting a mapping / list or any object
+/// exposing ``to_dict()`` (``pandas.Series`` / ``DataFrame``). A string is a
+/// value (an enum label), not JSON text.
 fn py_to_serde_any<'py, T: serde::de::DeserializeOwned>(
     py: Python<'py>,
     obj: &Bound<'py, PyAny>,
@@ -243,7 +245,7 @@ pub(crate) struct PyCreditCalibrator {
     inner: finstack_quant_factor::credit::calibration::CreditCalibrator,
 }
 
-/// Parse an optional calibration config from a dict / JSON string.
+/// Convert an optional calibration config from its dict.
 fn extract_calibration_config(
     py: Python<'_>,
     config: Option<&Bound<'_, PyAny>>,
@@ -769,8 +771,16 @@ fn decompose_period(
 typed_or_label!(
     pub(crate) fn extract_vol_horizon -> VolHorizon,
     PyVolHorizon,
-    "VolHorizon or descriptor string (\"one_step\", \"unconditional\", '{\"n_steps\": N}', '{\"years\": Y}')",
-    |label| VolHorizon::parse(label).map_err(core_to_py)
+    "VolHorizon or the label \"one_step\" or \"unconditional\"",
+    |label| match label.trim() {
+        "one_step" => Ok(VolHorizon::OneStep),
+        "unconditional" => Ok(VolHorizon::Unconditional),
+        other => Err(PyValueError::new_err(format!(
+            "invalid horizon {other:?}: a string is the label \"one_step\" or \"unconditional\"; \
+             build any other horizon with VolHorizon.n_steps or VolHorizon.years, or load a \
+             descriptor with VolHorizon.parse"
+        ))),
+    }
 );
 
 #[doc = pydoc!("finstack_quant.models.factor.credit", "VolHorizon")]

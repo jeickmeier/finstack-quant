@@ -271,7 +271,7 @@ from finstack_quant.valuations.instruments._var import VarResult, calculate_var
 
 def validate_instrument_json(
     json: dict[str, Any] | str,
-    metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
+    metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | None = None,
 ) -> str:
     """
     Validate a canonical instrument envelope and return canonical JSON.
@@ -282,12 +282,12 @@ def validate_instrument_json(
         A ``finstack_quant.instrument/1`` envelope, as a dict (the form
         :func:`instrument_envelope_from_spec` returns) or JSON text. Bare
         instrument payloads are rejected.
-    metric_pricing_overrides : MetricPricingOverrides or dict or str, optional
+    metric_pricing_overrides : MetricPricingOverrides or dict, optional
         Metric-time overrides merged into
         ``instrument.spec.metric_pricing_overrides`` before instrument
         validation; ``None`` (the default) retains the envelope configuration.
-        Dict and JSON patches replace only supplied fields, including individual
-        ``bump_config`` fields; explicit ``None``/``null`` clears optional fields.
+        A dict patch replaces only supplied fields, including individual
+        ``bump_config`` fields; an explicit ``None`` clears an optional field.
 
     Returns
     -------
@@ -352,7 +352,7 @@ def validate_typed_instrument_json(type_tag: str, json: dict[str, Any] | str) ->
     """
     ...
 
-def instrument_envelope_from_spec(type_tag: str, spec: dict[str, Any] | str) -> dict[str, Any]:
+def instrument_envelope_from_spec(type_tag: str, spec: dict[str, Any]) -> dict[str, Any]:
     """
     Wrap a bare instrument spec in the canonical envelope after validating it.
 
@@ -371,8 +371,8 @@ def instrument_envelope_from_spec(type_tag: str, spec: dict[str, Any] | str) -> 
         Canonical instrument discriminator, one of
         ``finstack_quant.valuations.schema.instrument_types()`` (e.g.
         ``"forward_rate_agreement"``, ``"fx_spot"``).
-    spec : dict[str, Any] | str
-        The bare ``spec`` object for that type, as a dict or JSON text. Tagged
+    spec : dict[str, Any]
+        The bare ``spec`` object for that type, as a dict. Tagged
         ``{"type", "spec"}`` payloads and envelopes are rejected.
 
     Returns

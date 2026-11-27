@@ -127,8 +127,10 @@ class TestFxOptionTyped:
         example = FxOption.example()
         builder = FxOption.builder().delta_convention(example.delta_convention)
         assert "'venue': 'generic_interbank'" in repr(builder)
-        json_builder = FxOption.builder().delta_convention(json.dumps(example.delta_convention))
+        json_builder = FxOption.builder().delta_convention(json.loads(json.dumps(example.delta_convention)))
         assert "'kind': 'forward'" in repr(json_builder)
+        with pytest.raises(ValueError, match="invalid FxDeltaConvention: invalid type: string"):
+            FxOption.builder().delta_convention(json.dumps(example.delta_convention))
 
     @pytest.mark.parametrize(
         "value",

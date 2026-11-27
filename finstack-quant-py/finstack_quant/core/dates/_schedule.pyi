@@ -205,14 +205,14 @@ class Schedule:
         ...
 
     @staticmethod
-    def from_spec(spec: Union[dict, str]) -> Schedule:
+    def from_spec(spec: dict) -> Schedule:
         """
         Build a schedule from a serialized ``ScheduleSpec``.
 
         Parameters
         ----------
-        spec : dict | str
-            Mapping or JSON string with the canonical fields ``start``,
+        spec : dict
+            Mapping with the canonical fields ``start``,
             ``end`` (ISO dates), ``frequency``, ``stub``, ``grid``,
             ``business_day_convention``, ``calendar_id``,
             and the optional ``payment_lag_days`` and

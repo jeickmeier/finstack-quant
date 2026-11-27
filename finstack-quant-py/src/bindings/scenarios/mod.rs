@@ -2,8 +2,8 @@
 //!
 //! Scenarios are spec-based (serde), so this module exposes typed specification
 //! construction, validation, template registry discovery, and scenario engine
-//! application. Every entry point accepts the typed wrapper or its canonical
-//! JSON string; errors map through `crate::errors::scenarios_to_py`.
+//! application. Every entry point takes the typed wrapper (JSON text is loaded
+//! with its `from_json`); errors map through `crate::errors::scenarios_to_py`.
 
 pub(crate) mod engine;
 mod extract;

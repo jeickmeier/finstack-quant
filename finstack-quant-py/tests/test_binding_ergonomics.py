@@ -311,7 +311,7 @@ class TestDateAcceptanceIsUniform:
                 "waivers": [],
             })
         )
-        metrics = json.dumps({"debt_to_ebitda": 4.0})
+        metrics = {"debt_to_ebitda": 4.0}
 
         def as_json(reports: dict[str, object]) -> dict[str, str]:
             return {key: report.to_json() for key, report in reports.items()}
@@ -342,7 +342,7 @@ class TestDateAcceptanceIsUniform:
         """
         from finstack_quant.models.factor.credit import CreditCalibrator, decompose_levels
 
-        config_json = json.dumps({
+        config = {
             "policy": "globally_off",
             "hierarchy": {"levels": []},
             "min_bucket_size_per_level": {"per_level": []},
@@ -352,8 +352,8 @@ class TestDateAcceptanceIsUniform:
             "use_returns_or_levels": "returns",
             "panel_frequency": "monthly",
             "bucket_weighting": "equal",
-        })
-        inputs_json = json.dumps({
+        }
+        inputs = {
             "history_panel": {
                 "dates": ["2024-01-01", "2024-02-01"],
                 "spreads": {"A": [0.010, 0.0101]},
@@ -366,11 +366,11 @@ class TestDateAcceptanceIsUniform:
             "as_of": "2024-02-01",
             "as_of_spreads": {"A": 0.0101},
             "idiosyncratic_overrides": {},
-        })
-        model = CreditCalibrator(config_json).calibrate(inputs_json)
+        }
+        model = CreditCalibrator(config).calibrate(inputs)
 
-        from_str = decompose_levels(model, '{"A": 0.0125}', 0.012, "2025-06-30")
-        from_date = decompose_levels(model, '{"A": 0.0125}', 0.012, datetime.date(2025, 6, 30))
+        from_str = decompose_levels(model, {"A": 0.0125}, 0.012, "2025-06-30")
+        from_date = decompose_levels(model, {"A": 0.0125}, 0.012, datetime.date(2025, 6, 30))
         assert from_str.date == from_date.date
         assert from_str.generic == from_date.generic
 
@@ -395,7 +395,7 @@ class TestDateAcceptanceIsUniform:
             })
         )
         with pytest.raises(TypeError, match="expected a date-like object") as excinfo:
-            covenants.evaluate_engine(engine, json.dumps({"debt_to_ebitda": 4.0}), 20260331)
+            covenants.evaluate_engine(engine, {"debt_to_ebitda": 4.0}, 20260331)
         message = str(excinfo.value)
         assert "datetime.date" in message
         assert "ISO-8601" in message

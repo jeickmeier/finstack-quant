@@ -990,7 +990,7 @@ class OptionCalculationResult:
         """
         ...
 
-def option_calculation(request: str | dict[str, Any]) -> OptionCalculationResult:
+def option_calculation(request: dict[str, Any]) -> OptionCalculationResult:
     """
     Price a closed-form option or invert its price, with Greeks at the resulting volatility.
 
@@ -1000,8 +1000,8 @@ def option_calculation(request: str | dict[str, Any]) -> OptionCalculationResult
 
     Parameters
     ----------
-    request : str | dict[str, Any]
-        ``OptionCalculation`` as a dict or JSON text with ``model`` and
+    request : dict[str, Any]
+        ``OptionCalculation`` as a dict with ``model`` and
         ``solve``. ``model`` is tagged by ``kind``: ``"black_scholes"``
         (``spot``, ``strike``, ``rate``, ``div_yield`` as continuously
         compounded decimals, ``expiry`` in years, ``is_call``, optional
@@ -1056,7 +1056,7 @@ def option_calculation(request: str | dict[str, Any]) -> OptionCalculationResult
     ...
 
 def bs_price_many(
-    market: OptionMarketParams | Mapping[str, Any] | str,
+    market: OptionMarketParams | Mapping[str, Any],
     spots: float | Sequence[float] | npt.NDArray[np.float64] | pd.Series | None = None,
     strikes: float | Sequence[float] | npt.NDArray[np.float64] | pd.Series | None = None,
 ) -> npt.NDArray[np.float64]:
@@ -1064,7 +1064,7 @@ def bs_price_many(
 
     Parameters
     ----------
-    market : OptionMarketParams or Mapping[str, Any] or str
+    market : OptionMarketParams or Mapping[str, Any]
         Reference rates, carry, expiry, volatility and call or put direction.
     spots : float or array-like or None
         Positive spot quotes. A scalar or singleton broadcasts. None uses market.spot.
@@ -1101,7 +1101,7 @@ def bs_price_many(
     ...
 
 def bs_greeks_many(
-    market: OptionMarketParams | Mapping[str, Any] | str,
+    market: OptionMarketParams | Mapping[str, Any],
     spots: float | Sequence[float] | npt.NDArray[np.float64] | pd.Series | None = None,
     strikes: float | Sequence[float] | npt.NDArray[np.float64] | pd.Series | None = None,
     theta_days_per_year: float = 365.0,
@@ -1110,7 +1110,7 @@ def bs_greeks_many(
 
     Parameters
     ----------
-    market : OptionMarketParams or Mapping[str, Any] or str
+    market : OptionMarketParams or Mapping[str, Any]
         Reference rates, carry, expiry, volatility and call or put direction.
     spots : float or array-like or None
         Positive spot quotes. A scalar or singleton broadcasts. None uses market.spot.
@@ -1148,13 +1148,13 @@ def bs_greeks_many(
     """
     ...
 
-def bs_price(market: OptionMarketParams | dict[str, Any] | str) -> float:
+def bs_price(market: OptionMarketParams | dict[str, Any]) -> float:
     """Price a vanilla European option with Black-Scholes or Garman-Kohlhagen.
 
     Parameters
     ----------
-    market : OptionMarketParams | dict[str, Any] | str
-        Typed market inputs or their canonical dictionary or JSON. Spot and
+    market : OptionMarketParams | dict[str, Any]
+        Typed market inputs or their canonical dictionary. Spot and
         strike share units; the domestic risk-free rate and dividend yield or
         foreign rate use continuous annual decimal rates. Volatility is an
         annualized decimal and expiry is in years. The payoff direction is
@@ -1227,7 +1227,7 @@ def vanilla_expiry_payoff(spot: float, strike: float, is_call: bool) -> float:
     ...
 
 def bs_greeks(
-    market: OptionMarketParams | dict[str, Any] | str,
+    market: OptionMarketParams | dict[str, Any],
     theta_days_per_year: float = 365.0,
 ) -> BsGreeks:
     """
@@ -1238,8 +1238,8 @@ def bs_greeks(
 
     Parameters
     ----------
-    market : dict or str
-        Typed option market, dictionary, or canonical JSON text.
+    market : dict
+        Typed option market or its dictionary.
         Every key is required: ``spot`` and ``strike`` (float, the same price
         units); ``rate`` (continuously compounded risk-free rate, decimal);
         ``dividend_yield`` (continuous dividend, borrow or foreign yield,
@@ -1870,21 +1870,21 @@ class HestonParams:
         """
 
 def heston_price(
-    contract: OptionContractParams | dict[str, Any] | str,
-    heston: HestonParams | dict[str, Any] | str,
-    settings: dict[str, Any] | str | None = None,
+    contract: OptionContractParams | dict[str, Any],
+    heston: HestonParams | dict[str, Any],
+    settings: dict[str, Any] | None = None,
 ) -> float:
     """Price a European option by Heston Fourier inversion.
 
     Parameters
     ----------
-    contract : OptionContractParams or dict or str
+    contract : OptionContractParams or dict
         Option payoff, with positive spot and strike, finite annual continuously
         compounded rates, and nonnegative expiry in years. At expiry, the price
         equals the intrinsic payoff.
-    heston : HestonParams or dict or str
+    heston : HestonParams or dict
         Validated variance parameters or their canonical structured form.
-    settings : dict or str, optional
+    settings : dict, optional
         Fourier quadrature with positive upper frequency u_max, positive
         composite panel count panels, and Gauss-Legendre order gl_order in
         {2, 4, 8, 16}. Omission selects a grid from maturity and variance.
@@ -1916,7 +1916,7 @@ def heston_price(
 # Closed-form exotics
 
 def barrier_option_price(
-    market: OptionMarketParams | dict[str, Any] | str,
+    market: OptionMarketParams | dict[str, Any],
     barrier: float,
     direction: str,
     knock: str,
@@ -1928,8 +1928,8 @@ def barrier_option_price(
 
     Parameters
     ----------
-    market : dict or str
-        Typed option market, dictionary, or canonical JSON text.
+    market : dict
+        Typed option market or its dictionary.
         Every key is required: ``spot`` and ``strike`` (float, the same price
         units); ``rate`` (continuously compounded risk-free rate, decimal);
         ``dividend_yield`` (continuous dividend, borrow or foreign yield,
@@ -1979,7 +1979,7 @@ def barrier_option_price(
     ...
 
 def asian_option_price(
-    market: OptionMarketParams | dict[str, Any] | str,
+    market: OptionMarketParams | dict[str, Any],
     num_fixings: int,
     averaging: str | None = None,
 ) -> float:
@@ -1988,8 +1988,8 @@ def asian_option_price(
 
     Parameters
     ----------
-    market : dict or str
-        Typed option market, dictionary, or canonical JSON text.
+    market : dict
+        Typed option market or its dictionary.
         Every key is required: ``spot`` and ``strike`` (float, the same price
         units); ``rate`` (continuously compounded risk-free rate, decimal);
         ``dividend_yield`` (continuous dividend, borrow or foreign yield,
@@ -2037,7 +2037,7 @@ def asian_option_price(
     ...
 
 def lookback_option_price(
-    market: OptionMarketParams | dict[str, Any] | str,
+    market: OptionMarketParams | dict[str, Any],
     extremum: float,
     strike_type: str = "fixed",
 ) -> float:
@@ -2049,8 +2049,8 @@ def lookback_option_price(
 
     Parameters
     ----------
-    market : dict or str
-        Typed option market, dictionary, or canonical JSON text.
+    market : dict
+        Typed option market or its dictionary.
         Every key is required: ``spot`` and ``strike`` (float, the same price
         units); ``rate`` (continuously compounded risk-free rate, decimal);
         ``dividend_yield`` (continuous dividend, borrow or foreign yield,
@@ -2096,7 +2096,7 @@ def lookback_option_price(
     ...
 
 def quanto_option_price(
-    market: OptionMarketParams | dict[str, Any] | str,
+    market: OptionMarketParams | dict[str, Any],
     rate_foreign: float,
     vol_fx: float,
     correlation: float,
@@ -2106,9 +2106,9 @@ def quanto_option_price(
 
     Parameters
     ----------
-    market : dict or str
+    market : dict
         Serde form of the Rust ``OptionMarketParams`` for the foreign asset,
-        as a dict or JSON text. Every key is required: ``spot`` and
+        as a dict. Every key is required: ``spot`` and
         ``strike`` (float, foreign currency); ``rate`` (the **domestic**
         continuously compounded risk-free rate, decimal); ``dividend_yield``
         (the asset's continuous dividend yield, decimal); ``volatility`` (the

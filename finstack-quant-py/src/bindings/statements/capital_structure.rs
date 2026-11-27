@@ -326,7 +326,7 @@ impl PyWaterfallSpec {
             inner.payment_classes = classes.iter().map(|c| c.borrow().inner.clone()).collect();
         }
         let prepayment = |spec: Option<&Bound<'_, PyAny>>, label: &str| {
-            spec.map(|spec| crate::bindings::module_utils::spec_from_py(spec.py(), spec, label))
+            spec.map(|spec| crate::bindings::module_utils::py_to_serde(spec.py(), spec, label))
                 .transpose()
         };
         inner.mandatory_prepayment = prepayment(mandatory_prepayment, "mandatory prepayment spec")?;

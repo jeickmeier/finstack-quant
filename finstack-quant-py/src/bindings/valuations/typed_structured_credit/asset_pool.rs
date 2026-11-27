@@ -16,7 +16,7 @@ use super::super::convert::enum_from_str;
 use super::{PyPoolAsset, PyRepLine};
 
 /// Parse an internally tagged policy/destination enum from a bare variant
-/// name (``"first_call"``), a ``dict`` in the serde shape, or a JSON ``str``.
+/// name (``"first_call"``) or a ``dict`` in the serde shape.
 fn tagged_enum_from_py<T: serde::de::DeserializeOwned + Send>(
     py: Python<'_>,
     value: &Bound<'_, PyAny>,
@@ -24,12 +24,7 @@ fn tagged_enum_from_py<T: serde::de::DeserializeOwned + Send>(
     label: &str,
 ) -> PyResult<T> {
     if let Ok(text) = value.extract::<String>() {
-        let trimmed = text.trim();
-        let json = if trimmed.starts_with('{') {
-            trimmed.to_string()
-        } else {
-            serde_json::json!({ tag: trimmed }).to_string()
-        };
+        let json = serde_json::json!({ tag: text.trim() }).to_string();
         return serde_json::from_str(&json)
             .map_err(|err| serde_json_to_py(err, &format!("invalid {label}")));
     }
@@ -161,11 +156,8 @@ impl PyAssetPool {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.with_reinvestment_period")]
     #[pyo3(text_signature = "($self, value)")]
     fn with_reinvestment_period(&self, py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let period: ReinvestmentPeriod = match value.extract::<String>() {
-            Ok(text) => serde_json::from_str(&text)
-                .map_err(|err| serde_json_to_py(err, "invalid reinvestment_period"))?,
-            _ => crate::bindings::module_utils::py_to_serde(py, value, "reinvestment_period")?,
-        };
+        let period: ReinvestmentPeriod =
+            crate::bindings::module_utils::py_to_serde(py, value, "reinvestment_period")?;
         let mut inner = self.inner.clone();
         inner.reinvestment_period = Some(period);
         Ok(Self { inner })

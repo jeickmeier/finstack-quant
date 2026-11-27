@@ -332,14 +332,14 @@ class CdsQuote:
         """
 
     @staticmethod
-    def upfront(params: dict[str, Any] | str) -> CdsQuote:
+    def upfront(params: dict[str, Any]) -> CdsQuote:
         """Build a standard-coupon CDS quote with an upfront payment.
 
         Parameters
         ----------
-        params : dict[str, Any] | str
-            Wire fields of the Rust ``CdsQuote::CdsUpfront`` variant as a dict, or the
-            same object as JSON text (the ``"type"`` tag is set to ``"cds_upfront"``).
+        params : dict[str, Any]
+            Wire fields of the Rust ``CdsQuote::CdsUpfront`` variant as a dict
+            (the ``"type"`` tag is set to ``"cds_upfront"``).
             Every key is required:
 
             - ``id`` (str): Unique quote identifier, the residual label.

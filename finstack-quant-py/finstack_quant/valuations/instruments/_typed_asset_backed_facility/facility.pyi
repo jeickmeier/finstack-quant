@@ -806,7 +806,7 @@ class AssetBackedFacilityBuilder:
     ``commitment``, ``drawn``, ``rate``, ``closing_date``,
     ``revolving_end``, ``maturity``, ``frequency`` and ``discount_curve_id``.
     ``day_count`` defaults to Act/360 and ``commitment_fee_bp`` to zero. Nested
-    specs accept a ``dict`` or JSON ``str`` in the Rust serde shape.
+    specs accept a ``dict`` in the Rust serde shape.
 
     Examples
     --------
@@ -879,13 +879,13 @@ class AssetBackedFacilityBuilder:
             If the builder was already consumed.
         """
         ...
-    def borrowing_base_rules(self, value: dict[str, Any] | str) -> AssetBackedFacilityBuilder:
+    def borrowing_base_rules(self, value: dict[str, Any]) -> AssetBackedFacilityBuilder:
         """
         Set the advance rates, eligibility and concentration limits.
 
         Parameters
         ----------
-        value : dict[str, Any] | str
+        value : dict[str, Any]
             ``BorrowingBaseRules`` serde object: ``advance_rates`` (each with
             an ``asset_class`` wire name or ``"*"``, a decimal ``rate`` and an
             optional ``eligibility``) and ``concentration_limits`` (each with
@@ -948,15 +948,14 @@ class AssetBackedFacilityBuilder:
             If ``value`` is not a ``finstack_quant.core.money.Money``.
         """
         ...
-    def rate(self, value: float | Rate | Bps | dict[str, Any] | str) -> AssetBackedFacilityBuilder:
+    def rate(self, value: float | Rate | Bps | dict[str, Any]) -> AssetBackedFacilityBuilder:
         """
         Set the facility coupon.
 
         Parameters
         ----------
-        value : float | Rate | Bps | dict[str, Any] | str
-            A bare decimal, ``Rate`` or ``Bps`` builds a fixed all-in rate (``0.06`` = 6%); a
-            ``dict`` or JSON ``str`` in the ``RateSpec`` serde shape
+        value : float | Rate | Bps | dict[str, Any]
+            A bare decimal, ``Rate`` or ``Bps`` builds a fixed all-in rate (``0.06`` = 6%); a ``dict`` in the ``RateSpec`` serde shape
             (``{"fixed": {"rate": 0.06}}`` or ``{"floating": {...}}`` with a
             ``FloatingRateSpec``) is used verbatim.
 
@@ -1140,13 +1139,13 @@ class AssetBackedFacilityBuilder:
             If the builder was already consumed.
         """
         ...
-    def amortization_events(self, value: list[dict[str, Any]] | str) -> AssetBackedFacilityBuilder:
+    def amortization_events(self, value: list[dict[str, Any]]) -> AssetBackedFacilityBuilder:
         """
         Set the events that end revolving early.
 
         Parameters
         ----------
-        value : list[dict[str, Any]] | str
+        value : list[dict[str, Any]]
             ``AmortizationEvent`` objects: ``{"kind": "date", "date": ...}``,
             ``{"kind": "cumulative_loss", "max_cumulative_loss": ...}`` or
             ``{"kind": "excess_spread", "min_excess_spread_3m": ...}``.
@@ -1163,13 +1162,13 @@ class AssetBackedFacilityBuilder:
             already consumed.
         """
         ...
-    def term_out(self, value: int | TermOutSpec | dict[str, Any] | str) -> AssetBackedFacilityBuilder:
+    def term_out(self, value: int | TermOutSpec | dict[str, Any]) -> AssetBackedFacilityBuilder:
         """
         Set the term-out window after revolving.
 
         Parameters
         ----------
-        value : int | TermOutSpec | dict[str, Any] | str
+        value : int | TermOutSpec | dict[str, Any]
             Months after the revolving end at which the remaining collateral
             is liquidated to repay the facility, or a ``TermOutSpec`` object / dict.
 
@@ -1185,14 +1184,14 @@ class AssetBackedFacilityBuilder:
         """
         ...
 
-    def fees(self, value: dict[str, Any] | str) -> AssetBackedFacilityBuilder:
+    def fees(self, value: dict[str, Any]) -> AssetBackedFacilityBuilder:
         """
         Set the transaction fees paid through the waterfall ahead of the
         facility's interest.
 
         Parameters
         ----------
-        value : dict[str, Any] | str
+        value : dict[str, Any]
             ``DealFees`` serde object (``trustee_fee`` Money per annum,
             ``senior_mgmt_fee_bp``, ``subordinated_mgmt_fee_bp``,
             ``servicing_fee_bp``, optional ``master_servicer_fee_bp`` /
@@ -1212,13 +1211,13 @@ class AssetBackedFacilityBuilder:
         """
         ...
 
-    def draws(self, value: list[dict[str, Any]] | str) -> AssetBackedFacilityBuilder:
+    def draws(self, value: list[dict[str, Any]]) -> AssetBackedFacilityBuilder:
         """
         Set the scheduled draws after closing.
 
         Parameters
         ----------
-        value : list[dict[str, Any]] | str
+        value : list[dict[str, Any]]
             ``DrawEvent`` serde objects ``{"date": "2025-01-01", "amount":
             {"amount": "10000000", "currency": "USD"}}``, ascending by date;
             each is applied on the first payment date at or after its date.
@@ -1298,13 +1297,13 @@ class AssetBackedFacilityBuilder:
             If the builder was already consumed.
         """
         ...
-    def credit_model(self, value: dict[str, Any] | str) -> AssetBackedFacilityBuilder:
+    def credit_model(self, value: dict[str, Any]) -> AssetBackedFacilityBuilder:
         """
         Replace the whole collateral behavior model.
 
         Parameters
         ----------
-        value : dict[str, Any] | str
+        value : dict[str, Any]
             ``CreditModelConfig`` serde object; the per-field setters
             (:meth:`prepayment_spec` ...) then modify it.
 
@@ -1320,13 +1319,13 @@ class AssetBackedFacilityBuilder:
             consumed.
         """
         ...
-    def prepayment_spec(self, value: PrepaymentModelSpec | dict[str, Any] | str) -> AssetBackedFacilityBuilder:
+    def prepayment_spec(self, value: PrepaymentModelSpec | dict[str, Any]) -> AssetBackedFacilityBuilder:
         """
         Set the deterministic prepayment model of the collateral.
 
         Parameters
         ----------
-        value : PrepaymentModelSpec | dict[str, Any] | str
+        value : PrepaymentModelSpec | dict[str, Any]
             Typed spec or its serde form.
 
         Returns
@@ -1341,13 +1340,13 @@ class AssetBackedFacilityBuilder:
             consumed.
         """
         ...
-    def default_spec(self, value: DefaultModelSpec | dict[str, Any] | str) -> AssetBackedFacilityBuilder:
+    def default_spec(self, value: DefaultModelSpec | dict[str, Any]) -> AssetBackedFacilityBuilder:
         """
         Set the deterministic default model of the collateral.
 
         Parameters
         ----------
-        value : DefaultModelSpec | dict[str, Any] | str
+        value : DefaultModelSpec | dict[str, Any]
             Typed spec or its serde form.
 
         Returns
@@ -1362,13 +1361,13 @@ class AssetBackedFacilityBuilder:
             consumed.
         """
         ...
-    def recovery_spec(self, value: RecoveryModelSpec | dict[str, Any] | str) -> AssetBackedFacilityBuilder:
+    def recovery_spec(self, value: RecoveryModelSpec | dict[str, Any]) -> AssetBackedFacilityBuilder:
         """
         Set the recovery model of the collateral.
 
         Parameters
         ----------
-        value : RecoveryModelSpec | dict[str, Any] | str
+        value : RecoveryModelSpec | dict[str, Any]
             Typed spec or its serde form.
 
         Returns
@@ -1383,15 +1382,14 @@ class AssetBackedFacilityBuilder:
             consumed.
         """
         ...
-    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> AssetBackedFacilityBuilder:
+    def instrument_pricing_overrides(self, value: dict[str, object]) -> AssetBackedFacilityBuilder:
         """
         Set the instrument-owned pricing inputs.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
-            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+        value : dict[str, object]
+            Rust ``InstrumentPricingOverrides`` in serde form (a ``dict``): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
             ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
 
         Returns
@@ -1406,17 +1404,14 @@ class AssetBackedFacilityBuilder:
             not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def metric_pricing_overrides(
-        self, value: MetricPricingOverrides | dict[str, object] | str
-    ) -> AssetBackedFacilityBuilder:
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object]) -> AssetBackedFacilityBuilder:
         """
         Set the metric-time pricing configuration stored on the instrument.
 
         Parameters
         ----------
-        value : MetricPricingOverrides | dict[str, object] | str
-            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
-            JSON string.
+        value : MetricPricingOverrides | dict[str, object]
+            Rust ``MetricPricingOverrides`` as the typed class or a ``dict``.
 
         Returns
         -------
@@ -1430,15 +1425,14 @@ class AssetBackedFacilityBuilder:
             not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> AssetBackedFacilityBuilder:
+    def scenario_pricing_overrides(self, value: dict[str, object]) -> AssetBackedFacilityBuilder:
         """
         Set the scenario-only pricing adjustments.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
-            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+        value : dict[str, object]
+            Rust ``ScenarioPricingOverrides`` in serde form (a ``dict``), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
 
         Returns
         -------

@@ -154,8 +154,8 @@ class MertonMcCalibrationSpec:
 
     Parameters
     ----------
-    target : dict[str, float] | str
-        Market quote to match, as a ``BondQuoteInput`` dict or JSON string
+    target : dict[str, float]
+        Market quote to match, as a ``BondQuoteInput`` dict
         with one key: ``clean_price_pct`` (percent of par),
         ``dirty_price_currency``, ``ytm``, ``ytw``, ``z_spread``,
         ``discount_margin``, ``oas``, ``asw_market`` ... Spreads and
@@ -193,7 +193,7 @@ class MertonMcCalibrationSpec:
 
     def __init__(
         self,
-        target: dict[str, float] | str,
+        target: dict[str, float],
         parameter: Literal["debt_barrier", "asset_vol"],
         low_paths: int | None = None,
         max_iterations: int | None = None,
@@ -206,8 +206,8 @@ class MertonMcCalibrationSpec:
 
         Parameters
         ----------
-        target : dict[str, float] | str
-            Market quote to match, as a ``BondQuoteInput`` dict or JSON string
+        target : dict[str, float]
+            Market quote to match, as a ``BondQuoteInput`` dict
             with one key: ``clean_price_pct`` (percent of par),
             ``dirty_price_currency``, ``ytm``, ``ytw``, ``z_spread``,
             ``discount_margin``, ``oas``, ``asw_market`` ... Spreads and

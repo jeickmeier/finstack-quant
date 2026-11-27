@@ -77,7 +77,7 @@ def _credit_market() -> MarketContext:
                 quote["entity"] = entity
                 if spread_bp is not None:
                     quote["spread_bp"] = spread_bp
-        return calibrate(json.dumps(envelope)).market
+        return calibrate(envelope).market
 
     market = calibrated_market("CORP-HAZARD", "CORP")
     index_market = calibrated_market("CDX.NA.IG.HAZARD", "CDX.NA.IG", 60.0)
@@ -279,7 +279,7 @@ class TestCdsIndex:
         result = price_instrument(index, _credit_market(), "2024-06-20", "hazard_rate")
         assert math.isfinite(result.price)
 
-    def test_constituents_accept_typed_dict_and_json(self) -> None:
+    def test_constituents_accept_typed_and_dict_not_json_text(self) -> None:
         row = CdsIndexConstituent("ACME-CORP", 0.4, "CORP-HAZARD", 0.5)
         as_dict = json.loads(row.to_json())
         premium, protection = _cds_legs()
@@ -306,8 +306,10 @@ class TestCdsIndex:
 
         typed = build([row, row])
         via_dict = build([as_dict, as_dict])
-        via_json = build(json.dumps([as_dict, as_dict]))
+        via_json = build(json.loads(json.dumps([as_dict, as_dict])))
         assert typed.to_json() == via_dict.to_json() == via_json.to_json()
+        with pytest.raises(ValueError, match="expected a sequence of CdsIndexConstituent objects or dicts, got str"):
+            build(json.dumps([as_dict, as_dict]))
         assert len(typed.constituents) == 2
         assert typed.constituents[0].reference_entity == "ACME-CORP"
         assert typed.constituents[0].defaulted is False
@@ -400,7 +402,7 @@ class TestConvertibleBond:
         spec = ConversionSpec(ratio=20.0, **terms)  # type: ignore[arg-type]
         assert ConversionSpec.from_json(spec.to_json()).to_json() == spec.to_json()
 
-    def test_conversion_accepts_typed_dict_and_json(self) -> None:
+    def test_conversion_accepts_typed_and_dict_not_json_text(self) -> None:
         spec = ConversionSpec(ratio=20.0, policy="voluntary", anti_dilution="full_ratchet", dividend_adjustment="none")
         as_dict = json.loads(spec.to_json())
 
@@ -420,7 +422,9 @@ class TestConvertibleBond:
                 .build()
             )
 
-        assert build(spec).to_json() == build(as_dict).to_json() == build(json.dumps(as_dict)).to_json()
+        assert build(spec).to_json() == build(as_dict).to_json() == build(json.loads(json.dumps(as_dict))).to_json()
+        with pytest.raises(ValueError, match="invalid conversion: invalid type: string"):
+            build(json.dumps(as_dict))
         assert build(spec).conversion.anti_dilution == "full_ratchet"
 
     @pytest.mark.parametrize("field", ["ratio", "price"])
@@ -465,7 +469,7 @@ class TestConvertibleBond:
         with pytest.raises(TypeError, match="policy"):
             ConversionSpec(ratio=20.0, policy=[], **terms)  # type: ignore[arg-type]
 
-    def test_structured_inputs_require_strict_json_text(self) -> None:
+    def test_structured_inputs_refuse_json_text(self) -> None:
         events = [
             {
                 "date": "2026-01-15",
@@ -476,8 +480,10 @@ class TestConvertibleBond:
         ]
         terms = {"ratio": 20.0, "policy": "voluntary", "anti_dilution": "none", "dividend_adjustment": "none"}
         typed = ConversionSpec(dilution_events=events, **terms)
-        from_json = ConversionSpec(dilution_events=json.dumps(events), **terms)
+        from_json = ConversionSpec(dilution_events=json.loads(json.dumps(events)), **terms)
         assert typed.to_json() == from_json.to_json()
+        with pytest.raises(ValueError, match="invalid dilution_events: invalid type: string"):
+            ConversionSpec(dilution_events=json.dumps(events), **terms)
         for malformed in ["[", "voluntary", json.dumps("voluntary")]:
             with pytest.raises(ValueError, match="conversion"):
                 ConvertibleBond.builder().conversion(malformed)
@@ -489,7 +495,7 @@ class TestConvertibleBond:
     def test_call_put_schedule_pickles_and_round_trips(self) -> None:
         sched = CallPutSchedule(
             calls=[{"start": "2026-01-15", "end": "2029-01-15", "price_pct_of_par": 101.0}],
-            puts='[{"start": "2027-01-15", "end": "2027-01-15", "price_pct_of_par": 100.0}]',
+            puts=[{"start": "2027-01-15", "end": "2027-01-15", "price_pct_of_par": 100.0}],
         )
         assert len(sched.calls) == 1
         assert sched.puts[0]["price_pct_of_par"] == 100.0

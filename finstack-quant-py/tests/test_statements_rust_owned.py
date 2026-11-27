@@ -233,8 +233,10 @@ def test_evaluate_lbo_takes_the_rust_lbo_config_and_runs_its_check_suite() -> No
         {**LBO_CONFIG, "check_mappings": LboCheckMappings.from_json(json.dumps(LBO_CHECK_MAPPINGS))},
     )
     assert json.loads(typed.to_json())["checks"] == json.loads(checked.to_json())["checks"]
-    # JSON text is accepted too.
-    assert evaluate_lbo(lbo_model(), json.dumps(LBO_CONFIG)).moic == pytest.approx(plain.moic)
+    # JSON text is refused; its `json.loads` form is the dict.
+    assert evaluate_lbo(lbo_model(), json.loads(json.dumps(LBO_CONFIG))).moic == pytest.approx(plain.moic)
+    with pytest.raises(ValueError, match="invalid config: invalid type: string"):
+        evaluate_lbo(lbo_model(), json.dumps(LBO_CONFIG))
 
     with pytest.raises(ValueError, match="transaction_fee"):
         evaluate_lbo(lbo_model(), {**LBO_CONFIG, "transaction_fee": 1.0})
@@ -415,7 +417,7 @@ def test_mappings_reject_unknown_keys() -> None:
         "fcf_nodes": "revenue",
     }
     with pytest.raises(ValueError, match="fcf_nodes"):
-        run_credit_underwriting_checks(goal_seek_model(), json.dumps(mapping))
+        run_credit_underwriting_checks(goal_seek_model(), mapping)
 
 
 def test_check_specs_have_no_python_only_defaults_or_grammar() -> None:

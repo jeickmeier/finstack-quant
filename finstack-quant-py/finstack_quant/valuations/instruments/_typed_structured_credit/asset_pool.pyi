@@ -108,15 +108,15 @@ class AssetPool:
         """
         ...
 
-    def with_assets(self, value: list[PoolAsset | dict[str, Any]] | str) -> AssetPool:
+    def with_assets(self, value: list[PoolAsset | dict[str, Any]]) -> AssetPool:
         """
         Attach loan-level assets, returning a new pool.
 
         Parameters
         ----------
-        value : list[PoolAsset | dict[str, Any]] | str
-            Typed :class:`PoolAsset` rows, their serde dicts, or a JSON array
-            string (mixing typed rows and dicts is allowed).
+        value : list[PoolAsset | dict[str, Any]]
+            Typed :class:`PoolAsset` rows or their serde dicts (mixing typed
+            rows and dicts is allowed).
 
         Returns
         -------
@@ -250,7 +250,7 @@ class AssetPool:
         """
         ...
 
-    def with_reinvestment_period(self, value: dict[str, Any] | str) -> AssetPool:
+    def with_reinvestment_period(self, value: dict[str, Any]) -> AssetPool:
         """
         Configure the deal-level reinvestment period, returning a new pool.
 
@@ -261,9 +261,9 @@ class AssetPool:
 
         Parameters
         ----------
-        value : dict[str, Any] | str
-            ``ReinvestmentPeriod`` in its serde shape, or that JSON as a
-            string: ISO ``end`` (inclusive), ``is_active``, ``criteria``
+        value : dict[str, Any]
+            ``ReinvestmentPeriod`` in its serde shape: ISO ``end``
+            (inclusive), ``is_active``, ``criteria``
             (``max_price_pct`` percent of par, ``min_yield`` annual decimal current
             yield below which a surviving asset is skipped), optional
             ``amortizing_tranches`` (note ids paid down inside the window) and

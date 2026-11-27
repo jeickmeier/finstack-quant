@@ -120,7 +120,9 @@ def attribute_scenario_pnl(
     market : MarketContext
         Unshocked inputs.
     method : str or dict or None
-        Native factor method, defaulting to parallel attribution.
+        Native factor method, defaulting to parallel attribution: a label
+        (``"parallel"`` or ``"metrics_based"``) or a method dict. A string is
+        a label; it is not read as JSON text.
 
     Returns
     -------
@@ -606,7 +608,7 @@ def apply_scenario_and_revalue(
     scenario: ScenarioSpec,
     market: MarketContext,
     *,
-    options: dict[str, object] | str | None = None,
+    options: dict[str, object] | None = None,
 ) -> ScenarioRevalueView:
     """
     Apply a scenario and revalue the portfolio.
@@ -620,8 +622,8 @@ def apply_scenario_and_revalue(
         shocks. Load JSON text with ``ScenarioSpec.from_json``.
     market : MarketContext
         Base market context to shock before revaluation.
-    options : dict[str, object] | str | None
-        Portfolio valuation options as a mapping or JSON object. Omit for
+    options : dict[str, object] | None
+        Portfolio valuation options as a mapping. Omit for
         standard metrics and strict risk. Use ``{"metrics": {"mode": "only", "metrics": []}}`` for PV
         only, or ``{"strict_risk": False}`` to permit PV-only fallback on error.
 

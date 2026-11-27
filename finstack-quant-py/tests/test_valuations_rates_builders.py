@@ -772,7 +772,9 @@ def test_typed_builders_set_the_three_pricing_override_bags(name: str) -> None:
     builder = cls.builder()
     assert builder.instrument_pricing_overrides({"model_config": {"tree_steps": 50}}) is builder
     assert builder.metric_pricing_overrides(MetricPricingOverrides(theta_period="1W")) is builder
-    assert builder.metric_pricing_overrides('{"theta_period": {"count": 1, "unit": "weeks"}}') is builder
+    assert builder.metric_pricing_overrides({"theta_period": {"count": 1, "unit": "weeks"}}) is builder
+    with pytest.raises(ValueError, match="invalid type: string"):
+        cls.builder().metric_pricing_overrides('{"theta_period": {"count": 1, "unit": "weeks"}}')
     assert builder.scenario_pricing_overrides({"scenario_price_shock_decimal": -0.02}) is builder
     with pytest.raises(ValueError, match="unknown field"):
         cls.builder().instrument_pricing_overrides({"model_cfg": {}})

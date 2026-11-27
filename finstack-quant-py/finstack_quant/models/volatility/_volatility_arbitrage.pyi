@@ -422,7 +422,7 @@ def check_local_vol_density_grid(
     """
     ...
 
-def check_surface(surface: VolSurface, config: dict[str, Any] | str) -> ArbitrageReport:
+def check_surface(surface: VolSurface, config: dict[str, Any]) -> ArbitrageReport:
     """
     Run the configured butterfly, calendar-spread and local-vol density checks on a surface.
 
@@ -437,8 +437,8 @@ def check_surface(surface: VolSurface, config: dict[str, Any] | str) -> Arbitrag
         Expiry by strike surface of unshifted Black lognormal volatilities
         (``secondary_axis="strike"``, ``quote_type="black_lognormal"``), expiries
         in years and strikes in the underlying's price units.
-    config : dict or str
-        Serde form of the Rust ``ArbitrageCheckConfig``, as a dict or JSON text.
+    config : dict
+        Serde form of the Rust ``ArbitrageCheckConfig``, as a dict.
         Every field is optional and an omitted one takes its default:
         ``check_butterfly``, ``check_calendar_spread`` and
         ``check_local_vol_density`` (bool, default ``True``) select the checks;

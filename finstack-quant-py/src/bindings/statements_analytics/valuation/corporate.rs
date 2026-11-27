@@ -35,9 +35,9 @@ const CREDIT_COLUMNS: [(&str, &str); 6] = [
 ///
 /// Parameters
 /// ----------
-/// three_statement : ThreeStatementMapping | dict | str
+/// three_statement : ThreeStatementMapping | dict
 ///     Balance-sheet / income / cash-flow node mapping.
-/// credit : CreditMapping | dict | str
+/// credit : CreditMapping | dict
 ///     Leverage and coverage node mapping.
 ///
 /// Examples
@@ -365,7 +365,7 @@ pub(super) fn evaluate_dcf<'py>(
     let model = model.inner.clone();
     let inputs = match inputs.extract::<PyRef<'_, PyDcfInputs>>() {
         Ok(inputs) => inputs.inner.clone(),
-        Err(_) => crate::bindings::module_utils::spec_from_py(py, inputs, "DcfInputs")?,
+        Err(_) => crate::bindings::module_utils::py_to_serde(py, inputs, "DcfInputs")?,
     };
     let options = extract_dcf_options(py, options)?;
     let market = market.map(|market| market.inner.clone());
@@ -400,7 +400,7 @@ pub(super) fn evaluate_dcf<'py>(
 ///     a ``"currency"`` key.
 /// wacc : float
 ///     Baseline WACC in decimal form.
-/// terminal_value : TerminalValueSpec | dict | str
+/// terminal_value : TerminalValueSpec | dict
 ///     Terminal value method; selects whether the growth rate or the exit
 ///     multiple is shocked.
 /// ufcf_node : str
@@ -410,7 +410,7 @@ pub(super) fn evaluate_dcf<'py>(
 ///     at the end of the forecast.
 /// net_debt_override : float | None
 ///     Flat net-debt amount used instead of the model-derived bridge.
-/// options : dict | str | None
+/// options : dict | None
 ///     The Rust ``DcfOptions`` serde form (the same document WASM
 ///     ``dcfSensitivity`` takes); every key is optional and a missing one
 ///     takes its Rust default: ``wacc_sensitivity_bump`` (``0.01`` = +/-100bp
@@ -500,7 +500,7 @@ pub(super) fn dcf_sensitivity<'py>(
 /// model : FinancialModelSpec
 ///     A ``FinancialModelSpec``; metadata must include
 ///     a ``"currency"`` key.
-/// config : dict | str
+/// config : dict
 ///     The Rust ``LboConfig`` serde form (the same document WASM
 ///     ``evaluateLbo`` takes): ``entry_multiple`` (turns, ``8.5`` = 8.5x),
 ///     ``entry_metric_node``, ``transaction_fees`` (model currency),
@@ -551,7 +551,7 @@ pub(super) fn evaluate_lbo<'py>(
     config: &Bound<'py, PyAny>,
 ) -> PyResult<PyLboResult> {
     let model = model.inner.clone();
-    let config: LboConfig = crate::bindings::module_utils::spec_from_py(py, config, "config")?;
+    let config: LboConfig = crate::bindings::module_utils::py_to_serde(py, config, "config")?;
 
     let inner = py
         .detach(move || {
@@ -662,7 +662,7 @@ pub(super) fn run_corporate_analysis<'py>(
 ) -> PyResult<PyCorporateAnalysis> {
     let model = model.inner.clone();
     let options: CorporateAnalysisOptions =
-        crate::bindings::module_utils::opt_spec_from_py(py, options, "CorporateAnalysisOptions")?
+        crate::bindings::module_utils::opt_py_to_serde(py, options, "CorporateAnalysisOptions")?
             .unwrap_or_default();
     let market = market.map(|market| market.inner.clone());
 

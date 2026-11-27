@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::json_bridge::serde_to_py;
-use crate::bindings::module_utils::spec_from_py;
+use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::valuations::merton_mc::{PyMertonMcConfig, PyMertonMcResult};
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -63,7 +63,7 @@ fn floating_bond_params(
             "spread_bp",
             decimal_bps_from_any,
         ),
-        Err(_) => spec_from_py(params.py(), params, "FloatingBondParams"),
+        Err(_) => py_to_serde(params.py(), params, "FloatingBondParams"),
     }
 }
 
@@ -452,7 +452,7 @@ impl PyBondBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec =
-            spec_from_py(py, value, "cashflow_spec")?;
+            py_to_serde(py, value, "cashflow_spec")?;
         builder_set!(slf, cashflow_spec, "{...}".to_string(), |b: BondBuilder| b
             .cashflow_spec(spec))
     }
@@ -523,7 +523,7 @@ impl PyBondBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::bond::CallPutSchedule =
-            spec_from_py(py, value, "call_put")?;
+            py_to_serde(py, value, "call_put")?;
         builder_set!(slf, call_put, "{...}".to_string(), |b: BondBuilder| b
             .call_put(spec))
     }
@@ -536,7 +536,7 @@ impl PyBondBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::bond::ReturnFloorSpec =
-            spec_from_py(py, value, "return_floor")?;
+            py_to_serde(py, value, "return_floor")?;
         builder_set!(slf, return_floor, "{...}".to_string(), |b: BondBuilder| b
             .return_floor(spec))
     }
@@ -549,7 +549,7 @@ impl PyBondBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let schedule: finstack_quant_cashflows::builder::CashFlowSchedule =
-            spec_from_py(py, value, "custom_cashflows")?;
+            py_to_serde(py, value, "custom_cashflows")?;
         builder_set!(
             slf,
             custom_cashflows,
@@ -597,7 +597,7 @@ impl PyBondBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let convention: finstack_quant_valuations::instruments::fixed_income::bond::BondSettlementConvention =
-            spec_from_py(py, value, "settlement_convention")?;
+            py_to_serde(py, value, "settlement_convention")?;
         builder_set!(
             slf,
             settlement_convention,

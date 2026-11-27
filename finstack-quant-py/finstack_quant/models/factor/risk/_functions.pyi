@@ -154,7 +154,7 @@ class RiskMeasure:
 
 def decompose_factors(
     sensitivities: SensitivityMatrix,
-    covariance: FactorCovarianceMatrix | str | Mapping[str, Any],
+    covariance: FactorCovarianceMatrix | Mapping[str, Any],
     risk_measure: RiskMeasure | str | Mapping[str, Any] | None = None,
 ) -> RiskDecomposition:
     """
@@ -172,7 +172,7 @@ def decompose_factors(
         :func:`finstack_quant.portfolio.compute_factor_sensitivities` or
         :meth:`finstack_quant.portfolio.SensitivityMatrix.from_json`.
         Sensitivities are in the matrix's base currency per factor bump unit.
-    covariance : FactorCovarianceMatrix or str or Mapping[str, Any]
+    covariance : FactorCovarianceMatrix or Mapping[str, Any]
         Typed factor covariance or its wire form
         (``{"factor_ids": [...], "n": n, "data": [row-major n x n]}``) of
         factor-return variances and covariances. Must use the same factor IDs

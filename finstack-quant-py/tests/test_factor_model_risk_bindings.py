@@ -13,6 +13,7 @@ import pickle
 import pytest
 
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
+from finstack_quant.models.factor import FactorModelConfig
 from finstack_quant.models.factor.risk import decompose_factors
 from finstack_quant.portfolio import (
     FactorModel,
@@ -114,9 +115,9 @@ def test_decompose_factors_zero_factors_returns_zero_risk() -> None:
     assert zero_factor_matrix.n_factors == 0, "Precondition: matrix must have n_factors == 0 for this regression test"
 
     # Dummy covariance for a zero-factor model.
-    cov_json = json.dumps({"factor_ids": [], "n": 0, "data": []})
+    covariance = {"factor_ids": [], "n": 0, "data": []}
 
-    decomposition = decompose_factors(zero_factor_matrix, cov_json)
+    decomposition = decompose_factors(zero_factor_matrix, covariance)
 
     assert decomposition.total_risk == 0.0
     assert decomposition.residual_risk == 0.0
@@ -143,14 +144,16 @@ def test_free_sensitivities_match_factor_model_and_reject_credit_hierarchy_facto
         "market_mapping": {"curve_parallel": {"curve_ids": ["USD-OIS"], "units": "rate_bp"}},
     }
     model = FactorModel.from_config(
-        json.dumps({
-            "factors": [rates],
-            "covariance": {"factor_ids": ["usd_rates"], "n": 1, "data": [0.0001]},
-            "matching": {
-                "mapping_table": [{"dependency_filter": {}, "attribute_filter": {}, "factor_id": "usd_rates"}]
-            },
-            "risk_measure": "variance",
-        })
+        FactorModelConfig.from_json(
+            json.dumps({
+                "factors": [rates],
+                "covariance": {"factor_ids": ["usd_rates"], "n": 1, "data": [0.0001]},
+                "matching": {
+                    "mapping_table": [{"dependency_filter": {}, "attribute_filter": {}, "factor_id": "usd_rates"}]
+                },
+                "risk_measure": "variance",
+            })
+        )
     )
     free = compute_factor_sensitivities(portfolio, [rates], market, "2025-01-15")
     from_model = model.compute_sensitivities(portfolio, market, "2025-01-15")
@@ -186,7 +189,7 @@ def test_canonical_nested_sensitivity_json_roundtrips_and_reconciles_risk() -> N
     assert matrix.position_deltas(0) == [2.0]
     assert matrix.factor_deltas(0) == [2.0, 3.0]
     assert json.loads(pickle.loads(pickle.dumps(matrix)).to_json()) == payload  # noqa: S301
-    decomposition = decompose_factors(matrix, '{"factor_ids":["F"],"n":1,"data":[0.04]}')
+    decomposition = decompose_factors(matrix, {"factor_ids": ["F"], "n": 1, "data": [0.04]})
     assert decomposition.total_risk == pytest.approx(1.0)
     contributions = decomposition.position_factor_contributions
     assert sum(row.risk_contribution for row in contributions) == pytest.approx(1.0)

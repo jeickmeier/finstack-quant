@@ -265,7 +265,7 @@ impl PyCdsIndex {
         preset: PyRef<'_, PyCdsIndexParams>,
         params: &Bound<'_, PyAny>,
     ) -> PyResult<Self> {
-        let params = crate::bindings::module_utils::spec_from_py::<
+        let params = crate::bindings::module_utils::py_to_serde::<
             finstack_quant_valuations::instruments::credit_derivatives::cds::CdsTradeParams,
         >(params.py(), params, "CdsTradeParams")?;
         finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex::from_preset(

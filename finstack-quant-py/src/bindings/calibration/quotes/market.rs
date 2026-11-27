@@ -9,7 +9,7 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_basis_points;
 use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::macros::wire_methods;
-use crate::bindings::module_utils::{py_to_json_value, spec_from_py};
+use crate::bindings::module_utils::{py_to_json_value, py_to_serde};
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::core_to_py;
@@ -311,7 +311,7 @@ impl PyCdsTrancheQuote {
     #[new]
     #[pyo3(text_signature = "(params)")]
     fn new(params: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let inner: CdsTrancheQuote = spec_from_py(params.py(), params, "CdsTrancheQuote params")?;
+        let inner: CdsTrancheQuote = py_to_serde(params.py(), params, "CdsTrancheQuote params")?;
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
     }

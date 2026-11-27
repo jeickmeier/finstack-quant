@@ -297,9 +297,9 @@ pub(crate) fn take_builder<B>(inner: &mut Option<B>) -> PyResult<B> {
         .ok_or_else(|| value_error("builder already consumed by build()"))
 }
 
-/// Coerce `Sequence[P | dict] | JSON str` to a list of Rust rows.
+/// Coerce `Sequence[P | dict]` to a list of Rust rows.
 ///
-/// A `str` is parsed as a JSON array; any other iterable is walked item by
+/// The iterable is walked item by
 /// item, a typed `P` handing over its Rust row through `inner` and any other
 /// item going through the serde round trip of
 /// [`py_to_serde`](crate::bindings::module_utils::py_to_serde). Typed rows and
@@ -314,8 +314,8 @@ pub(crate) fn take_builder<B>(inner: &mut Option<B>) -> PyResult<B> {
 ///
 /// # Errors
 ///
-/// `ValueError` when `value` is neither a string nor iterable, or the JSON
-/// text or an item does not match the row shape.
+/// `ValueError` when `value` is a string, a mapping (it would iterate its
+/// keys) or not iterable, or an item does not match the row shape.
 pub(crate) fn typed_list_from_py<P, T>(
     py: Python<'_>,
     value: &Bound<'_, PyAny>,
@@ -326,11 +326,7 @@ where
     P: pyo3::PyClass,
     T: serde::de::DeserializeOwned + Send,
 {
-    if let Ok(json) = value.extract::<&str>() {
-        return serde_json::from_str(json)
-            .map_err(|err| crate::errors::serde_json_to_py(err, &format!("invalid {label} JSON")));
-    }
-    let items = value.try_iter().map_err(|_| {
+    let not_a_sequence = || {
         let class = P::type_object(py)
             .name()
             .map_or_else(|_| "typed".to_string(), |name| name.to_string());
@@ -339,9 +335,15 @@ where
             .name()
             .map_or_else(|_| "object".to_string(), |name| name.to_string());
         value_error(format!(
-            "{label}: expected a sequence of {class} objects or dicts, or a JSON array string, got {got}"
+            "{label}: expected a sequence of {class} objects or dicts, got {got}"
         ))
-    })?;
+    };
+    if value.is_instance_of::<pyo3::types::PyString>()
+        || value.is_instance_of::<pyo3::types::PyDict>()
+    {
+        return Err(not_a_sequence());
+    }
+    let items = value.try_iter().map_err(|_| not_a_sequence())?;
     items
         .map(|item| {
             let item = item?;

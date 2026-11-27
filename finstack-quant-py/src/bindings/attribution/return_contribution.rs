@@ -132,50 +132,46 @@ pub(crate) fn extract_return_contribution_spec(
         serde_json::from_value(payload)
             .map_err(|e| serde_json_to_py(e, "invalid return contribution spec"))
     };
-    let value = match spec.extract::<String>() {
-        Ok(json) => serde_json::from_str::<serde_json::Value>(&json)
-            .map_err(|e| serde_json_to_py(e, "invalid return contribution JSON"))?,
-        _ => match spec.cast::<PyDict>() {
-            Ok(dict) => {
-                let dict = dict.copy()?;
-                if let Some(value) = dict.get_item("as_of")?
-                    && !value.is_instance_of::<pyo3::types::PyString>()
-                {
-                    dict.set_item("as_of", extract_date_iso(&value)?)?;
-                }
-                py_to_json_value(py, dict.as_any(), "spec")?
+    let value = match spec.cast::<PyDict>() {
+        Ok(dict) => {
+            let dict = dict.copy()?;
+            if let Some(value) = dict.get_item("as_of")?
+                && !value.is_instance_of::<pyo3::types::PyString>()
+            {
+                dict.set_item("as_of", extract_date_iso(&value)?)?;
             }
-            _ => {
-                if crate::bindings::dataframe_utils::is_dataframe_like(spec)? {
-                    let as_of = as_of.ok_or_else(|| {
-                        value_error("as_of is required when spec is a DataFrame or Arrow table")
-                    })?;
-                    return Ok(ReturnContributionSpec {
-                        as_of: extract_date_iso(as_of)?,
-                        positions: positions_from_dataframe(py, spec)?,
-                        weighting: weighting
-                            .map(|label| {
-                                serde_json::from_value(serde_json::Value::String(label.to_owned()))
-                            })
-                            .transpose()
-                            .map_err(|e| serde_json_to_py(e, "invalid return contribution spec"))?
-                            .unwrap_or_default(),
-                        factors: factors
-                            .map(extract_factors)
-                            .transpose()?
-                            .unwrap_or_default(),
-                    });
-                } else {
-                    return Err(PyTypeError::new_err(
-                        "spec must be a dict, a JSON str, or a pandas DataFrame, Polars DataFrame, or Arrow table of positions",
-                    ));
-                }
+            py_to_json_value(py, dict.as_any(), "spec")?
+        }
+        _ => {
+            if crate::bindings::dataframe_utils::is_dataframe_like(spec)? {
+                let as_of = as_of.ok_or_else(|| {
+                    value_error("as_of is required when spec is a DataFrame or Arrow table")
+                })?;
+                return Ok(ReturnContributionSpec {
+                    as_of: extract_date_iso(as_of)?,
+                    positions: positions_from_dataframe(py, spec)?,
+                    weighting: weighting
+                        .map(|label| {
+                            serde_json::from_value(serde_json::Value::String(label.to_owned()))
+                        })
+                        .transpose()
+                        .map_err(|e| serde_json_to_py(e, "invalid return contribution spec"))?
+                        .unwrap_or_default(),
+                    factors: factors
+                        .map(extract_factors)
+                        .transpose()?
+                        .unwrap_or_default(),
+                });
+            } else {
+                return Err(PyTypeError::new_err(
+                    "spec must be a dict, or a pandas DataFrame, Polars DataFrame, or Arrow table of positions",
+                ));
             }
-        },
+        }
     };
     let serde_json::Value::Object(mut fields) = value else {
         return Err(value_error(
-            "invalid return contribution spec: expected a JSON object",
+            "invalid return contribution spec: expected a dict",
         ));
     };
     let factors_json = match factors {

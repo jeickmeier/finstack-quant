@@ -280,7 +280,7 @@ def test_attribute_pnl_typed_inputs_many_and_bridge() -> None:
     assert attr.mark_to_market_pnl == pytest.approx(bridge.amount, rel=1e-9)
 
 
-def test_attribute_return_contribution_json_entrypoint() -> None:
+def test_attribute_return_contribution_dict_entrypoint() -> None:
     from finstack_quant.core.table import LabeledSeries
 
     spec = {
@@ -308,7 +308,9 @@ def test_attribute_return_contribution_json_entrypoint() -> None:
     }
 
     validate_return_contribution_json(json.dumps(spec))
-    result = attribute_return_contribution(json.dumps(spec))
+    result = attribute_return_contribution(json.loads(json.dumps(spec)))
+    with pytest.raises(TypeError, match="spec must be a dict"):
+        attribute_return_contribution(json.dumps(spec))
     assert attribute_return_contribution(spec).portfolio_return == pytest.approx(result.portfolio_return)
     assert list(result.to_pandas().columns) == ["id", "weight", "return", "contribution", "active_contribution"]
     assert result.to_polars().columns == ["id", "weight", "return", "contribution", "active_contribution"]
@@ -348,7 +350,7 @@ def test_attribute_return_contribution_json_entrypoint() -> None:
 )
 def test_return_contribution_rejects_derived_overflow(positions: list[dict], factors: list[dict]) -> None:
     spec = {"as_of": "2026-09-29", "positions": positions, "factors": factors}
-    for supplied in (spec, json.dumps(spec)):
+    for supplied in (spec, json.loads(json.dumps(spec))):
         with pytest.raises(ValueError, match="finite"):
             attribute_return_contribution(supplied)
     with pytest.raises(ValueError, match="finite"):
@@ -491,19 +493,21 @@ def test_return_contribution_keywords_apply_to_every_spec_form() -> None:
     assert gross == pytest.approx(0.00875)
 
     net_dict = attribute_return_contribution(spec, weighting="net_market_value", factors=factors)
-    net_str = attribute_return_contribution(
-        json.dumps({"positions": positions}),
+    net_json = attribute_return_contribution(
+        json.loads(json.dumps({"positions": positions})),
         as_of="2026-01-02",
         weighting="net_market_value",
         factors=factors,
     )
+    with pytest.raises(TypeError, match="spec must be a dict"):
+        attribute_return_contribution(json.dumps({"positions": positions}), as_of="2026-01-02")
     net_frame = attribute_return_contribution(
         pd.DataFrame(positions), as_of="2026-01-02", weighting="net_market_value", factors=factors
     )
-    for result in (net_dict, net_str, net_frame):
+    for result in (net_dict, net_json, net_frame):
         assert result.portfolio_return == pytest.approx(0.035)
         assert result.factor_contribution[0]["contribution"] == pytest.approx(0.01)
-    assert net_dict.to_json() == net_str.to_json() == net_frame.to_json()
+    assert net_dict.to_json() == net_json.to_json() == net_frame.to_json()
 
     with pytest.raises(ValueError, match="as_of is given both"):
         attribute_return_contribution(spec, as_of="2030-01-01")

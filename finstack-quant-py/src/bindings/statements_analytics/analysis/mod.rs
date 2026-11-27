@@ -4,10 +4,9 @@
 //! introspection (dependency tracing, formula explanation). DCF/LBO live in
 //! `valuation.rs`, check suites in `checks.rs`, reports in `reports.rs`.
 //!
-//! All functions that accept a financial model or statement result support
-//! both JSON strings and typed Python objects (`FinancialModelSpec`,
-//! `StatementResult`) for zero-overhead calls when the caller already has
-//! a parsed object. Errors from the `finstack-quant-statements` crate map to
+//! All functions that accept a financial model or statement result take the
+//! typed Python object (`FinancialModelSpec`, `StatementResult`); JSON text
+//! is loaded with the class's `from_json`. Errors from the `finstack-quant-statements` crate map to
 //! `KeyError` for missing nodes, `RuntimeError` for capital-structure
 //! failures and `ValueError` otherwise.
 

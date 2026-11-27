@@ -53,9 +53,8 @@ const METRIC_SCORE_COLUMNS: [(&str, &str); 5] = [
 ///     DSL formula computing the metric value.
 /// weight : float
 ///     Weight in the overall score (default 1.0).
-/// thresholds : dict[str, tuple[float, float]] | str
-///     Rating label to ``(min, max)`` band, or the same mapping as a JSON
-///     string (default ``{}``).
+/// thresholds : dict[str, tuple[float, float]] | None
+///     Rating label to ``(min, max)`` band (default ``{}``).
 /// description : str | None
 ///     Optional human-readable description.
 ///
@@ -87,7 +86,7 @@ impl PyScorecardMetric {
         description: Option<&str>,
     ) -> PyResult<Self> {
         let thresholds: indexmap::IndexMap<String, (f64, f64)> = match thresholds {
-            Some(value) => crate::bindings::module_utils::spec_from_py(py, value, "thresholds")?,
+            Some(value) => crate::bindings::module_utils::py_to_serde(py, value, "thresholds")?,
             None => indexmap::IndexMap::new(),
         };
         Ok(Self {

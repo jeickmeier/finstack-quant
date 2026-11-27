@@ -414,7 +414,7 @@ def compute_quotes(
     bond: Bond,
     market: MarketContext,
     as_of: datetime.date | str,
-    quote_input: dict[str, float] | str,
+    quote_input: dict[str, float],
 ) -> BondQuoteSet:
     """
     Solve every price, yield and spread quote of a bond from any one of them.
@@ -435,8 +435,8 @@ def compute_quotes(
     as_of : datetime.date | str
         Valuation date, either a date-like object or an ISO 8601 string. The quote
         date and accrued interest follow the bond's settlement convention.
-    quote_input : dict[str, float] | str
-        One ``BondQuoteInput``, a dict or JSON string with exactly one key:
+    quote_input : dict[str, float]
+        One ``BondQuoteInput``, a dict with exactly one key:
         ``clean_price_pct`` (percent of par), ``dirty_price_currency`` (currency, the
         whole notional), ``ytm``, ``ytw``, ``z_spread``, ``discount_margin``, ``oas``,
         ``asw_market``, ``i_spread`` or ``japanese_simple_yield`` (decimals, ``0.01`` =

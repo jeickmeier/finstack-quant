@@ -998,11 +998,11 @@ def score_relative_value(peer_set: Any, dimensions: Any) -> RelativeValueResult:
 
     Parameters
     ----------
-    peer_set : PeerSet | dict | str
-        Typed peer set, or the canonical serde ``PeerSet`` payload as a dict or
-        JSON string (``{"subject": ..., "peers": [...], "period_basis": "ltm"}``).
-    dimensions : list[ScoringDimension | dict] | str
-        Typed dimensions, canonical ``ScoringDimension`` dicts, or a JSON list.
+    peer_set : PeerSet | dict
+        Typed peer set, or the canonical serde ``PeerSet`` payload as a dict
+        (``{"subject": ..., "peers": [...], "period_basis": "ltm"}``).
+    dimensions : list[ScoringDimension | dict]
+        Typed dimensions or canonical ``ScoringDimension`` dicts.
 
     Returns
     -------

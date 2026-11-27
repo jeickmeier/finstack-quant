@@ -240,9 +240,10 @@ wire_methods!(
 ///
 /// Parameters
 /// ----------
-/// spec : PanelTransformSpec, dict or str
-///     Typed spec, an equivalent ``dict`` (``values``, ``operations``,
-///     optional ``entity`` / ``order`` / ``time_key``), or its JSON.
+/// spec : PanelTransformSpec or dict
+///     Typed spec or an equivalent ``dict`` (``values``, ``operations``,
+///     optional ``entity`` / ``order`` / ``time_key``). Load JSON text with
+///     ``PanelTransformSpec.from_json``.
 ///
 /// Returns
 /// -------
@@ -270,33 +271,26 @@ pub(super) fn transform_panel(
     let spec: PanelTransformSpec = match spec.extract::<PyRef<'_, PyPanelTransformSpec>>() {
         Ok(typed) => typed.inner.clone(),
         _ => {
-            match spec.extract::<String>() {
-                Ok(json) => serde_json::from_str(&json).map_err(|error| {
-                    crate::errors::serde_json_to_py(error, "invalid panel transform spec")
-                })?,
-                _ => {
-                    // Host conversion only: numeric/NaN values, date-like keys and other
-                    // fields become JSON; Rust serde owns the field set, the
-                    // required fields and the unknown-field rejection.
-                    let mapping = spec.cast::<PyDict>()?;
-                    let mut fields = serde_json::Map::new();
-                    for (key, value) in mapping.iter() {
-                        let key: String = key.extract()?;
-                        let json = match key.as_str() {
-                            _ if value.is_none() => Value::Null,
-                            // Non-finite numbers (NaN marks missing) become JSON null.
-                            "values" => Value::from(extract_opt_f64_vec(&value, "values")?),
-                            "entity" | "order" | "time_key" => {
-                                Value::from(extract_keys(&value, &key)?)
-                            }
-                            _ => py_to_json_value(py, &value, "panel transform spec field")?,
-                        };
-                        fields.insert(key, json);
-                    }
-                    serde_json::from_value(Value::Object(fields)).map_err(|error| {
-                        crate::errors::serde_json_to_py(error, "invalid panel transform spec")
-                    })?
+            {
+                // Host conversion only: numeric/NaN values, date-like keys and other
+                // fields become JSON; Rust serde owns the field set, the
+                // required fields and the unknown-field rejection.
+                let mapping = spec.cast::<PyDict>()?;
+                let mut fields = serde_json::Map::new();
+                for (key, value) in mapping.iter() {
+                    let key: String = key.extract()?;
+                    let json = match key.as_str() {
+                        _ if value.is_none() => Value::Null,
+                        // Non-finite numbers (NaN marks missing) become JSON null.
+                        "values" => Value::from(extract_opt_f64_vec(&value, "values")?),
+                        "entity" | "order" | "time_key" => Value::from(extract_keys(&value, &key)?),
+                        _ => py_to_json_value(py, &value, "panel transform spec field")?,
+                    };
+                    fields.insert(key, json);
                 }
+                serde_json::from_value(Value::Object(fields)).map_err(|error| {
+                    crate::errors::serde_json_to_py(error, "invalid panel transform spec")
+                })?
             }
         }
     };

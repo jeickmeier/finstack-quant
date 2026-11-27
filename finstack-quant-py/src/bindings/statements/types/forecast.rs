@@ -230,8 +230,8 @@ impl PyForecastSpec {
     /// ----------
     /// method : ForecastMethod
     ///     Projection rule applied to forecast periods.
-    /// params : dict | str | None
-    ///     Method-specific parameters as a ``dict`` or a JSON object string
+    /// params : dict | None
+    ///     Method-specific parameters as a ``dict``
     ///     (``rate``, ``curve``, ``mean``, ``std_dev``, ``seed``,
     ///     ``overrides``, ``season_length``, ``target``, ``shape``,
     ///     ``half_life``, ``long_run_mean``, ``reversion_speed``,
@@ -580,7 +580,7 @@ fn parse_params(
             })
             .collect()),
         other => Err(crate::errors::value_error(format!(
-            "forecast params must be a dict or JSON object, got {other}"
+            "forecast params must be a dict, got {other}"
         ))),
     }
 }

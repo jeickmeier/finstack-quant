@@ -85,7 +85,7 @@ def test_bs_greeks_is_typed_with_pandas_exits() -> None:
     assert "rho_r=" in repr(g)
 
 
-def test_bs_greeks_market_accepts_json_text_and_rejects_unknown_keys() -> None:
+def test_bs_greeks_market_refuses_json_text_and_rejects_unknown_keys() -> None:
     market = {
         "spot": 100.0,
         "strike": 100.0,
@@ -95,9 +95,11 @@ def test_bs_greeks_market_accepts_json_text_and_rejects_unknown_keys() -> None:
         "time_to_expiry": 1.0,
         "option_type": "call",
     }
-    g = bs_greeks(json.dumps(market))
+    g = bs_greeks(json.loads(json.dumps(market)))
     assert abs(g.delta - 0.6368) < 1e-3
     assert g == bs_greeks(market)
+    with pytest.raises(ValueError, match="invalid OptionMarketParams: invalid type: string"):
+        bs_greeks(json.dumps(market))
     with pytest.raises(ValueError, match="OptionMarketParams"):
         bs_greeks({**market, "is_call": True})
 

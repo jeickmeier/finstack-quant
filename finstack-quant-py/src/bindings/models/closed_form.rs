@@ -21,7 +21,7 @@
 
 use crate::bindings::core::table::{PyArrowTable, PyLabeledSeries};
 use crate::bindings::macros::{py_getters, tabular_methods, wire_methods};
-use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
+use crate::bindings::module_utils::{opt_py_to_serde, py_to_serde};
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::repr_support::repr_from_serde;
 use crate::bindings::table_builders::TableBuilder;
@@ -41,14 +41,14 @@ use finstack_quant_models::volatility::heston::HestonParams;
 use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1};
 use pyo3::prelude::*;
 
-/// Extract a typed market, or parse it from a dictionary or canonical JSON.
+/// Extract a typed market, or convert it from its canonical dictionary.
 ///
 /// Shared by the closed-form and Monte Carlo option bindings.
 pub(crate) fn option_market(market: &Bound<'_, PyAny>) -> PyResult<OptionMarketParams> {
     if let Ok(typed) = market.cast::<PyOptionMarketParams>() {
         return Ok(typed.borrow().inner.clone());
     }
-    spec_from_py(market.py(), market, "OptionMarketParams")
+    py_to_serde(market.py(), market, "OptionMarketParams")
 }
 
 #[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams")]
@@ -130,7 +130,7 @@ pub(crate) fn option_contract(contract: &Bound<'_, PyAny>) -> PyResult<OptionCon
     if let Ok(typed) = contract.cast::<PyOptionContractParams>() {
         return Ok(typed.get().inner);
     }
-    spec_from_py(contract.py(), contract, "OptionContractParams")
+    py_to_serde(contract.py(), contract, "OptionContractParams")
 }
 
 #[doc = pydoc!("finstack_quant.models._closed_form", "OptionContractParams")]
@@ -419,7 +419,7 @@ wire_methods!(
 #[pyo3(text_signature = "(request)")]
 fn option_calculation_wrapper(request: &Bound<'_, PyAny>) -> PyResult<PyOptionCalculationResult> {
     let request: OptionCalculation =
-        crate::bindings::module_utils::spec_from_py(request.py(), request, "OptionCalculation")?;
+        crate::bindings::module_utils::py_to_serde(request.py(), request, "OptionCalculation")?;
     Ok(PyOptionCalculationResult {
         inner: option_calculation(&request).map_err(core_to_py)?,
     })
@@ -749,7 +749,7 @@ pub(crate) fn heston_params(params: &Bound<'_, PyAny>) -> PyResult<HestonParams>
     if let Ok(params) = params.cast::<PyHestonParams>() {
         return Ok(params.borrow().inner);
     }
-    spec_from_py(params.py(), params, "HestonParams")
+    py_to_serde(params.py(), params, "HestonParams")
 }
 
 #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams")]
@@ -821,7 +821,7 @@ fn heston_price_wrapper(
     let contract = option_contract(contract)?;
     let heston = heston_params(heston)?;
     let settings: Option<HestonFourierSettings> =
-        opt_spec_from_py(py, settings, "HestonFourierSettings")?;
+        opt_py_to_serde(py, settings, "HestonFourierSettings")?;
     py.detach(move || heston_price(&contract, &heston, settings.as_ref()))
         .map_err(core_to_py)
 }

@@ -756,8 +756,9 @@ class OperationSpec:
         Raises
         ------
         ValueError
-            If ``curve_kind`` is not an accepted label or ``target`` is not
-            valid ``HierarchyTarget`` JSON.
+            If ``curve_kind`` is not an accepted label.
+        TypeError
+            If ``target`` is not a ``HierarchyTarget``.
 
         Examples
         --------
@@ -787,8 +788,8 @@ class OperationSpec:
 
         Raises
         ------
-        ValueError
-            If ``target`` is not valid JSON for a ``HierarchyTarget``.
+        TypeError
+            If ``target`` is not a ``HierarchyTarget``.
 
         Examples
         --------
@@ -818,8 +819,8 @@ class OperationSpec:
 
         Raises
         ------
-        ValueError
-            If ``target`` is not valid JSON for a ``HierarchyTarget``.
+        TypeError
+            If ``target`` is not a ``HierarchyTarget``.
 
         Examples
         --------
@@ -849,8 +850,8 @@ class OperationSpec:
 
         Raises
         ------
-        ValueError
-            If ``target`` is not valid JSON for a ``HierarchyTarget``.
+        TypeError
+            If ``target`` is not a ``HierarchyTarget``.
 
         Examples
         --------
@@ -880,8 +881,8 @@ class OperationSpec:
 
         Raises
         ------
-        ValueError
-            If ``target`` is not valid JSON for a ``HierarchyTarget``.
+        TypeError
+            If ``target`` is not a ``HierarchyTarget``.
 
         Examples
         --------

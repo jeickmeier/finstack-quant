@@ -13,6 +13,7 @@ import time
 import pytest
 
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
+from finstack_quant.models.factor import FactorModelConfig
 from finstack_quant.models.factor.risk import decompose_factors
 from finstack_quant.models.liquidity import (
     amihud_illiquidity,
@@ -265,10 +266,10 @@ def test_replay_detached_parse_preserves_value_error_mapping() -> None:
 def test_factor_stress_releases_gil_and_returns_position_results() -> None:
     portfolio = Portfolio.from_spec(_portfolio_spec_json(2_000))
     market = _market()
-    config_json = _factor_model_config_json()
+    config = FactorModelConfig.from_json(_factor_model_config_json())
 
     result = _assert_releases_gil(
-        lambda: FactorModel.from_config(config_json).factor_stress(
+        lambda: FactorModel.from_config(config).factor_stress(
             portfolio, market, AS_OF.isoformat(), [("usd_rates", 1.0)]
         )
     )
@@ -285,15 +286,17 @@ def test_factor_stress_releases_gil_and_returns_position_results() -> None:
 def test_factor_stress_rejects_invalid_config_after_detached_parse() -> None:
     portfolio = Portfolio.from_spec(_portfolio_spec_json(1))
 
+    with pytest.raises(TypeError, match="FactorModelConfig"):
+        FactorModel.from_config('{"factors":')
     with pytest.raises(ValueError, match="EOF"):
-        FactorModel.from_config('{"factors":').factor_stress(
+        FactorModel.from_config(FactorModelConfig.from_json('{"factors":')).factor_stress(
             portfolio, _market(), AS_OF.isoformat(), [("usd_rates", 1.0)]
         )
 
 
 def test_position_what_if_uses_combined_baseline_analysis() -> None:
     portfolio = Portfolio.from_spec(_portfolio_spec_json(2))
-    result = FactorModel.from_config(_factor_model_config_json()).position_what_if(
+    result = FactorModel.from_config(FactorModelConfig.from_json(_factor_model_config_json())).position_what_if(
         portfolio, _market(), AS_OF.isoformat(), [{"kind": "remove", "position_id": "POS-1"}]
     )
 
@@ -304,7 +307,7 @@ def test_position_what_if_uses_combined_baseline_analysis() -> None:
 def test_position_what_if_rejects_unsupported_add() -> None:
     portfolio = Portfolio.from_spec(_portfolio_spec_json(2))
     with pytest.raises(ValueError, match=r"unknown variant.*add"):
-        FactorModel.from_config(_factor_model_config_json()).position_what_if(
+        FactorModel.from_config(FactorModelConfig.from_json(_factor_model_config_json())).position_what_if(
             portfolio, _market(), AS_OF.isoformat(), [{"kind": "add", "position": {}}]
         )
 
@@ -351,7 +354,7 @@ def test_sensitivity_result_conversion_and_decomposition_release_gil() -> None:
     factor_config = json.loads(_factor_model_config_json())
     portfolio = Portfolio.from_spec(_portfolio_spec_json(2_000))
     factors = factor_config["factors"]
-    covariance_json = json.dumps(factor_config["covariance"])
+    covariance = factor_config["covariance"]
     market = _market()
     matrix = _assert_releases_gil(
         lambda: compute_factor_sensitivities(
@@ -361,7 +364,7 @@ def test_sensitivity_result_conversion_and_decomposition_release_gil() -> None:
             AS_OF.isoformat(),
         )
     )
-    decomposition = _assert_releases_gil(lambda: decompose_factors(matrix, covariance_json))
+    decomposition = _assert_releases_gil(lambda: decompose_factors(matrix, covariance))
 
     assert matrix.n_positions == 2_000
     assert matrix.n_factors == 1

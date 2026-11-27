@@ -33,9 +33,9 @@ class LboCheckMappings:
 
     Parameters
     ----------
-    three_statement : ThreeStatementMapping | dict | str
+    three_statement : ThreeStatementMapping | dict
         Balance-sheet / income / cash-flow node mapping.
-    credit : CreditMapping | dict | str
+    credit : CreditMapping | dict
         Leverage and coverage node mapping.
 
     Examples
@@ -596,8 +596,8 @@ class CorporateAnalysis:
 
 def evaluate_dcf(
     model: FinancialModelSpec,
-    inputs: Mapping[str, Any] | str,
-    options: Mapping[str, Any] | str | None = None,
+    inputs: Mapping[str, Any],
+    options: Mapping[str, Any] | None = None,
     market: MarketContext | None = None,
     as_of: Any | None = None,
 ) -> CorporateValuationResult:
@@ -608,9 +608,9 @@ def evaluate_dcf(
     model : FinancialModelSpec
         A ``FinancialModelSpec``; metadata must contain
         a ``"currency"`` key.
-    inputs : dict | str
+    inputs : dict
         The Rust ``DcfInputs`` serde form (the document WASM ``evaluateDcf``
-        takes as ``inputs``), as a dict or JSON text. Unknown keys raise
+        takes as ``inputs``), as a dict. Unknown keys raise
         ``ValueError``:
 
         * ``wacc`` (float, required): weighted average cost of capital in
@@ -628,7 +628,7 @@ def evaluate_dcf(
           must be monetary in model currency and available at a period ending
           on or before the inclusive valuation date; future balances are
           rejected.
-    options : dict | str | None
+    options : dict | None
         The Rust ``DcfOptions`` serde form. Every key is optional and a
         missing one takes its Rust default: ``mid_year_convention``
         (``False``), ``max_stable_growth_rate`` (``0.05``),
@@ -694,7 +694,7 @@ def dcf_sensitivity(
     terminal_value: Any,
     ufcf_node: str = "ufcf",
     net_debt_override: float | None = None,
-    options: Mapping[str, Any] | str | None = None,
+    options: Mapping[str, Any] | None = None,
 ) -> DcfSensitivityResult:
     """Rank the headline DCF assumptions by enterprise-value impact.
 
@@ -709,7 +709,7 @@ def dcf_sensitivity(
         a ``"currency"`` key.
     wacc : float
         Baseline WACC in decimal form.
-    terminal_value : TerminalValueSpec | dict | str
+    terminal_value : TerminalValueSpec | dict
         Terminal value method; selects whether the growth rate or the exit
         multiple is shocked.
     ufcf_node : str
@@ -722,7 +722,7 @@ def dcf_sensitivity(
         cash must be monetary in model currency and available at a period
         ending on or before the inclusive valuation date; future balances are
         rejected.
-    options : dict | str | None
+    options : dict | None
         The Rust ``DcfOptions`` serde form (the document WASM
         ``dcfSensitivity`` takes as ``optionsJson``). Every key is optional
         and a missing one takes its Rust default: ``wacc_sensitivity_bump``
@@ -771,7 +771,7 @@ def dcf_sensitivity(
     ['parameter_id', 'downside', 'upside', 'swing']
     """
 
-def evaluate_lbo(model: FinancialModelSpec, config: Mapping[str, Any] | str) -> LboResult:
+def evaluate_lbo(model: FinancialModelSpec, config: Mapping[str, Any]) -> LboResult:
     """Evaluate a leveraged-buyout transaction against a statement model.
 
     Entry enterprise value is priced at the explicitly selected entry period, the sponsor
@@ -785,7 +785,7 @@ def evaluate_lbo(model: FinancialModelSpec, config: Mapping[str, Any] | str) -> 
     model : FinancialModelSpec
         A ``FinancialModelSpec``; metadata must include
         a ``"currency"`` key.
-    config : dict | str
+    config : dict
         The Rust ``LboConfig`` serde form (the document WASM ``evaluateLbo``
         takes as ``configJson``): ``entry_multiple`` (turns, ``8.5`` = 8.5x),
         ``entry_metric_node`` (monetary node read at the selected entry period),
@@ -1022,7 +1022,7 @@ def wacc(inputs: WaccInputs) -> float:
 
 def run_corporate_analysis(
     model: FinancialModelSpec,
-    options: Mapping[str, Any] | str | None = None,
+    options: Mapping[str, Any] | None = None,
     market: MarketContext | None = None,
 ) -> CorporateAnalysis:
     """Run the full corporate analysis pipeline.
@@ -1035,9 +1035,9 @@ def run_corporate_analysis(
     ----------
     model : FinancialModelSpec
         A ``FinancialModelSpec``.
-    options : dict | str | None
-        The Rust ``CorporateAnalysisOptions`` serde form, as a dict or JSON
-        text. Every key is optional; ``None`` or an omitted key takes the
+    options : dict | None
+        The Rust ``CorporateAnalysisOptions`` serde form, as a dict. Every
+        key is optional; ``None`` or an omitted key takes the
         default below, and an unknown key raises ``ValueError``:
 
         * ``wacc`` (float): enables DCF valuation at this decimal discount

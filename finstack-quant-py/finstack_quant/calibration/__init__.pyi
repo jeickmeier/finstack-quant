@@ -5,7 +5,7 @@ exposes typed authoring classes over the same serde types, so an envelope can be
 built in code (``RateQuote`` / ``CdsQuote`` / ``VolQuote`` / ``InflationQuote`` /
 ``XccyQuote`` / ``CdsTrancheQuote`` and the market datums -> ``CalibrationStep``
 -> ``CalibrationPlan`` -> ``CalibrationEnvelope``) or handed to the entry points
-as a ``dict`` or JSON string. The ``validate_*`` functions run the vol-surface
+as a ``dict``. The ``validate_*`` functions run the vol-surface
 no-arbitrage checks on a standalone ``VolSurface``.
 
 Examples:

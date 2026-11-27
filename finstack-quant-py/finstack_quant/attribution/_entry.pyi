@@ -70,7 +70,7 @@ class AttributionInputs:
 
 # Entry Points
 
-def attribute_pnl(instrument: object, inputs: AttributionInputs | Mapping[str, Any] | str) -> PnlAttribution:
+def attribute_pnl(instrument: object, inputs: AttributionInputs | Mapping[str, Any]) -> PnlAttribution:
     """
     Run P&L attribution for a single instrument.
 
@@ -86,10 +86,10 @@ def attribute_pnl(instrument: object, inputs: AttributionInputs | Mapping[str, A
         Typed instrument wrapper from ``finstack_quant.valuations`` or a
         canonical v1 instrument envelope dict
         (``{"schema": "finstack_quant.instrument/1", "instrument": {...}}``).
-    inputs : AttributionInputs or Mapping[str, Any] or str
+    inputs : AttributionInputs or Mapping[str, Any]
         The Rust ``AttributionInputs`` serde form (the document WASM
         ``attributePnlMany`` takes as ``inputs``; WASM ``attributePnl`` takes
-        the same keys plus ``instrument``), as a dict or JSON text. Unknown
+        the same keys plus ``instrument``), as a dict. Unknown
         keys raise ``ValueError``:
 
         * ``market_t0`` (MarketContext | dict, required): market snapshot at
@@ -173,7 +173,7 @@ def attribute_pnl(instrument: object, inputs: AttributionInputs | Mapping[str, A
     """
     ...
 
-def attribute_pnl_many(inputs: AttributionInputs | Mapping[str, Any] | str, instruments: list[object]) -> ArrowTable:
+def attribute_pnl_many(inputs: AttributionInputs | Mapping[str, Any], instruments: list[object]) -> ArrowTable:
     """
     Run one attribution set-up against many instruments and tabulate.
 
@@ -184,8 +184,8 @@ def attribute_pnl_many(inputs: AttributionInputs | Mapping[str, Any] | str, inst
 
     Parameters
     ----------
-    inputs : AttributionInputs or Mapping[str, Any] or str
-        The Rust ``AttributionInputs`` serde form, dict or JSON text, with the
+    inputs : AttributionInputs or Mapping[str, Any]
+        The Rust ``AttributionInputs`` serde form, a dict, with the
         keys documented on :func:`attribute_pnl` (``market_t0``,
         ``market_t1``, ``as_of_t0``, ``as_of_t1``, ``method`` and the optional
         ``config``, ``full_cross_attribution``, ``model_params_t0``,
@@ -333,7 +333,7 @@ def attribute_pnl_envelope(spec_json: str) -> AttributionResultEnvelope:
     ...
 
 def attribute_return_contribution(
-    spec: dict[str, Any] | str | pd.DataFrame | pl.DataFrame | Any,
+    spec: dict[str, Any] | pd.DataFrame | pl.DataFrame | Any,
     as_of: datetime.date | str | None = None,
     weighting: str | None = None,
     factors: list[dict[str, Any]] | pd.DataFrame | pl.DataFrame | Any | None = None,
@@ -343,8 +343,8 @@ def attribute_return_contribution(
 
     Parameters
     ----------
-    spec : dict[str, Any] or str or pandas.DataFrame or polars.DataFrame or Any
-        A ``dict`` or JSON ``str`` carries ``as_of``, ``positions``, optional
+    spec : dict[str, Any] or pandas.DataFrame or polars.DataFrame or Any
+        A ``dict`` carries ``as_of``, ``positions``, optional
         ``factors`` and ``weighting`` exactly as the wire schema (``as_of``
         may be a ``datetime.date`` in the dict form). A DataFrame (pandas or
         Polars) or Arrow table is one position per row with columns ``id`` (or
@@ -365,7 +365,7 @@ def attribute_return_contribution(
         or DataFrame/Arrow table), set as the spec's ``factors`` field for
         every form.
 
-    A keyword that duplicates a field the dict or JSON spec already carries
+    A keyword that duplicates a field the dict spec already carries
     raises ``ValueError``; pass each field once.
 
     Returns

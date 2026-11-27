@@ -28,7 +28,7 @@ class ReplayConfig:
         mode: Literal["pv_only", "pv_and_pnl", "full_attribution"],
         *,
         attribution_method: str = "parallel",
-        valuation_options: dict[str, Any] | str | None = None,
+        valuation_options: dict[str, Any] | None = None,
         on_error: Literal["strict", "best_effort"] = "strict",
     ) -> None:
         """Build replay settings for one timeline.
@@ -40,8 +40,8 @@ class ReplayConfig:
             for mark changes with the configured attribution method.
         attribution_method : str
             Canonical attribution method label. Used in full_attribution only.
-        valuation_options : dict or str or None
-            Valuation option mapping or canonical JSON for each replay date.
+        valuation_options : dict or None
+            Valuation option mapping for each replay date.
             Omit to use the standard valuation profile.
         on_error : str
             strict fails on a snapshot error. best_effort records skipped dates.

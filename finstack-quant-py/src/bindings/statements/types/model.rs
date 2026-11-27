@@ -489,7 +489,7 @@ impl PyFinancialModelSpec {
     #[pyo3(text_signature = "($self, edits)")]
     fn apply_edits(&self, py: Python<'_>, edits: &Bound<'_, PyAny>) -> PyResult<Self> {
         let edits: Vec<finstack_quant_statements::types::ModelEdit> =
-            crate::bindings::module_utils::spec_from_py(py, edits, "model edits")?;
+            crate::bindings::module_utils::py_to_serde(py, edits, "model edits")?;
         let mut inner = self.inner.clone();
         inner.apply_edits(&edits).map_err(statements_to_py)?;
         Ok(Self { inner })

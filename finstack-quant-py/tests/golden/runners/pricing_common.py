@@ -29,7 +29,7 @@ def _resolve_market(market: dict) -> MarketContext:
         envelope = market["envelope"]
         plan_id = envelope.get("plan", {}).get("id", "?")
         try:
-            result = calibrate(json.dumps(envelope))
+            result = calibrate(envelope)
         except CalibrationEnvelopeError as exc:
             raise CalibrationEnvelopeError(
                 f"calibrate market envelope for plan '{plan_id}' failed ({exc.kind}, step={exc.step_id}): {exc}"

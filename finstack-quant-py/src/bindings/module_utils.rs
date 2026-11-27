@@ -265,18 +265,16 @@ fn typed_wrapper_json_hook<'py>(py: Python<'py>) -> PyResult<Bound<'py, PyAny>> 
 
 /// Convert a Python object (e.g. dict or string) to a `serde_json::Value`.
 ///
-/// A Python `str` is first parsed as JSON; when that fails it is treated as
-/// a **bare string value** (`serde_json::Value::String`). This is what
-/// externally-tagged serde enums expect for unit variants — e.g. a bare
-/// `"parallel"` for a unit-variant method, which would otherwise raise
-/// `ValueError: invalid method JSON` (quant review M11).
+/// A Python `str` is a **string value** (`serde_json::Value::String`), never
+/// JSON text. That is what externally-tagged serde enums expect for unit
+/// variants, e.g. a bare `"parallel"` for a unit-variant method.
 pub(crate) fn py_to_json_value<'py>(
     py: Python<'py>,
     obj: &Bound<'py, PyAny>,
     label: &str,
 ) -> PyResult<Value> {
-    if let Ok(json) = obj.extract::<String>() {
-        return Ok(serde_json::from_str(&json).unwrap_or(Value::String(json)));
+    if let Ok(text) = obj.extract::<String>() {
+        return Ok(Value::String(text));
     }
 
     let json_mod = py.import("json")?;
@@ -292,8 +290,8 @@ pub(crate) fn py_to_json_value<'py>(
 
 /// Serialize a Python object to a compact JSON string.
 ///
-/// Accepts dicts/lists (via ``json.dumps``) or pre-serialized JSON strings
-/// (validated, not double-encoded).
+/// Accepts dicts and lists (via ``json.dumps``). A ``str`` is encoded as a
+/// JSON string value, not read as JSON text.
 pub(crate) fn py_to_json_string<'py>(
     py: Python<'py>,
     obj: &Bound<'py, PyAny>,
@@ -336,23 +334,6 @@ pub(crate) fn py_to_serde<'py, T: serde::de::DeserializeOwned + Send>(
         .map_err(|e| crate::errors::serde_json_to_py(e, &format!("invalid {label}")))
 }
 
-/// Coerce `dict | list | JSON str` Python input into a serde-backed Rust value.
-///
-/// A `str` is parsed as JSON text (`ValueError` "invalid {label} JSON: …" on
-/// malformed or mismatched JSON); any other object goes through [`py_to_serde`].
-/// The one spec coercer for binding inputs that have no typed Python twin.
-pub(crate) fn spec_from_py<T: serde::de::DeserializeOwned + Send>(
-    py: Python<'_>,
-    obj: &Bound<'_, PyAny>,
-    label: &str,
-) -> PyResult<T> {
-    if let Ok(json) = obj.extract::<&str>() {
-        return serde_json::from_str(json)
-            .map_err(|err| crate::errors::serde_json_to_py(err, &format!("invalid {label} JSON")));
-    }
-    py_to_serde(py, obj, label)
-}
-
 /// Read the keyword-only fields of a data-class constructor into its serde
 /// struct.
 ///
@@ -372,15 +353,15 @@ pub(crate) fn fields_from_py<T: serde::de::DeserializeOwned + Send>(
     }
 }
 
-/// [`spec_from_py`] for an optional argument: an omitted argument or `None`
+/// [`py_to_serde`] for an optional argument: an omitted argument or `None`
 /// yields `None`.
-pub(crate) fn opt_spec_from_py<T: serde::de::DeserializeOwned + Send>(
+pub(crate) fn opt_py_to_serde<T: serde::de::DeserializeOwned + Send>(
     py: Python<'_>,
     obj: Option<&Bound<'_, PyAny>>,
     label: &str,
 ) -> PyResult<Option<T>> {
     match obj {
-        Some(value) if !value.is_none() => spec_from_py(py, value, label).map(Some),
+        Some(value) if !value.is_none() => py_to_serde(py, value, label).map(Some),
         _ => Ok(None),
     }
 }

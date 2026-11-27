@@ -846,7 +846,7 @@ class CapitalStructureSummary:
 def capital_structure_summary(
     results: StatementResult,
     model: FinancialModelSpec,
-    config: dict[str, Any] | str,
+    config: dict[str, Any],
 ) -> CapitalStructureSummary:
     """
     Summarize the debt stack by seniority at one period.
@@ -877,8 +877,8 @@ def capital_structure_summary(
         Model, whose capital structure gives the instruments, their
         declaration order and the payment classes, and whose periods bound the LTM
         window.
-    config : dict or str
-        ``CapitalStructureSummaryConfig`` document, a dict or JSON text: ``period`` (the
+    config : dict
+        ``CapitalStructureSummaryConfig`` document, a dict: ``period`` (the
         reporting period, such as ``"2025Q4"``), ``ebitda_node`` (required; the node
         holding EBITDA for each single period, never inferred from a conventional name)
         and ``cash_node`` (optional; the node holding the period-end cash balance,

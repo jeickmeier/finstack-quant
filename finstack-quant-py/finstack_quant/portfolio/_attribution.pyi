@@ -699,7 +699,7 @@ def attribute_portfolio_pnl(
     as_of_t0: datetime.date | str,
     as_of_t1: datetime.date | str,
     method: str | dict[str, Any],
-    config: dict[str, Any] | str | None = None,
+    config: dict[str, Any] | None = None,
 ) -> PortfolioAttribution:
     """
     Attribute portfolio P&L with Rust-owned aggregation and FX translation.
@@ -717,9 +717,11 @@ def attribute_portfolio_pnl(
     as_of_t1 : datetime.date | str
         ISO-8601 closing valuation date associated with ``market_t1``.
     method : str or dict[str, Any]
-        Attribution-method name or method configuration understood by Rust.
-    config : dict[str, Any] or str or None
-        Optional attribution configuration mapping or canonical JSON payload.
+        Attribution-method label (``"parallel"`` or ``"metrics_based"``) or a
+        method configuration dict understood by Rust. A string is a label; it
+        is not read as JSON text.
+    config : dict[str, Any] or None
+        Optional attribution configuration mapping.
 
     Returns
     -------
@@ -731,8 +733,8 @@ def attribute_portfolio_pnl(
     TypeError
         If a portfolio, market, method, or configuration input has an unsupported type.
     ValueError
-        If supplied JSON, either ISO date, or the attribution method or
-        configuration is invalid.
+        If either ISO date, or the attribution method or configuration is
+        invalid.
     PortfolioError
         If valuation, FX conversion, or attribution fails.
 

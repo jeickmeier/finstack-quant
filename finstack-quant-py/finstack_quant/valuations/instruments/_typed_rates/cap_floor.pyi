@@ -1055,14 +1055,14 @@ class CapFloorBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def overnight_coupon(self, value: dict[str, object] | str) -> CapFloorBuilder:
+    def overnight_coupon(self, value: dict[str, object]) -> CapFloorBuilder:
         """
         Set the overnight (RFR) coupon convention for compounded caplets.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``OvernightCouponConvention`` in serde form (``dict`` or JSON string), e.g. ``{"compounding": {"compounded_in_arrears": {"lookback_days": 0}}, "payment_lag_days": 2}``.
+        value : dict[str, object]
+            Rust ``OvernightCouponConvention`` in serde form (a ``dict``), e.g. ``{"compounding": {"compounded_in_arrears": {"lookback_days": 0}}, "payment_lag_days": 2}``.
 
         Returns
         -------
@@ -1075,15 +1075,14 @@ class CapFloorBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as a ``OvernightCouponConvention``.
         """
         ...
-    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> CapFloorBuilder:
+    def instrument_pricing_overrides(self, value: dict[str, object]) -> CapFloorBuilder:
         """
         Set the instrument-owned pricing inputs.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
-            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+        value : dict[str, object]
+            Rust ``InstrumentPricingOverrides`` in serde form (a ``dict``): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
             ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
 
         Returns
@@ -1098,15 +1097,14 @@ class CapFloorBuilder:
             not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object] | str) -> CapFloorBuilder:
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object]) -> CapFloorBuilder:
         """
         Set the metric-time pricing configuration stored on the instrument.
 
         Parameters
         ----------
-        value : MetricPricingOverrides | dict[str, object] | str
-            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
-            JSON string.
+        value : MetricPricingOverrides | dict[str, object]
+            Rust ``MetricPricingOverrides`` as the typed class or a ``dict``.
 
         Returns
         -------
@@ -1120,15 +1118,14 @@ class CapFloorBuilder:
             not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> CapFloorBuilder:
+    def scenario_pricing_overrides(self, value: dict[str, object]) -> CapFloorBuilder:
         """
         Set the scenario-only pricing adjustments.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
-            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+        value : dict[str, object]
+            Rust ``ScenarioPricingOverrides`` in serde form (a ``dict``), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
 
         Returns
         -------

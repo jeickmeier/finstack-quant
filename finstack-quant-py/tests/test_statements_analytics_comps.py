@@ -86,7 +86,7 @@ class TestCompsBindings:
         assert result.dimensions[0].label == "Spread vs Leverage"
         assert result.composite_score > 0.0
 
-    def test_score_relative_value_accepts_json_strings(self) -> None:
+    def test_score_relative_value_refuses_json_strings(self) -> None:
         import json
 
         peer_set = {
@@ -103,8 +103,12 @@ class TestCompsBindings:
             }
         ]
         typed = score_relative_value(peer_set, dimensions)
-        via_json = score_relative_value(json.dumps(peer_set), json.dumps(dimensions))
+        via_json = score_relative_value(json.loads(json.dumps(peer_set)), json.loads(json.dumps(dimensions)))
         assert via_json.to_json() == typed.to_json()
+        with pytest.raises(ValueError, match="invalid peer_set: invalid type: string"):
+            score_relative_value(json.dumps(peer_set), dimensions)
+        with pytest.raises(ValueError, match="invalid dimensions: invalid type: string"):
+            score_relative_value(peer_set, json.dumps(dimensions))
 
     def test_peer_stats_uses_rust_field_names(self) -> None:
         from finstack_quant.statements_analytics import peer_stats

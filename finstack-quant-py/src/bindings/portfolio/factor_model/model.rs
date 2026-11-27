@@ -11,7 +11,7 @@ use finstack_quant_portfolio::factor_model::FactorModel;
 
 use crate::bindings::models::factor::config::PyFactorModelConfig;
 use crate::bindings::portfolio::sensitivity::PySensitivityMatrix;
-use crate::errors::{portfolio_to_py, serde_json_to_py};
+use crate::errors::portfolio_to_py;
 
 use super::assignment::PyFactorAssignmentReport;
 use super::whatif::{PyStressPnl, PyStressResult, PyWhatIfResult, parse_position_changes};
@@ -98,11 +98,11 @@ impl PyFactorModel {
     ///
     /// Parameters
     /// ----------
-    /// config : FactorModelConfig | str
-    ///     Typed ``finstack_quant.models.factor.FactorModelConfig`` or
-    ///     its canonical JSON: factor definitions, covariance matrix (axes in
-    ///     factor order), matching rules, pricing mode, bump sizes and risk
-    ///     measure.
+    /// config : FactorModelConfig
+    ///     Typed ``finstack_quant.models.factor.FactorModelConfig``: factor
+    ///     definitions, covariance matrix (axes in factor order), matching
+    ///     rules, pricing mode, bump sizes and risk measure. Load JSON text
+    ///     with ``FactorModelConfig.from_json``.
     ///
     /// Returns
     /// -------
@@ -112,20 +112,12 @@ impl PyFactorModel {
     /// Raises
     /// ------
     /// ValueError
-    ///     If the JSON is malformed or does not match the ``FactorModelConfig``
-    ///     schema, matching rules reference undeclared factors, the covariance
+    ///     If matching rules reference undeclared factors, the covariance
     ///     axes do not align with the factors, or the risk measure is invalid.
     #[staticmethod]
     #[pyo3(text_signature = "(config)")]
-    fn from_config(py: Python<'_>, config: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let config: FactorModelConfig = match config.cast::<PyFactorModelConfig>() {
-            Ok(typed) => typed.borrow().inner.clone(),
-            _ => {
-                let json: String = config.extract()?;
-                py.detach(move || serde_json::from_str(&json))
-                    .map_err(|e| serde_json_to_py(e, "invalid FactorModelConfig JSON"))?
-            }
-        };
+    fn from_config(py: Python<'_>, config: PyRef<'_, PyFactorModelConfig>) -> PyResult<Self> {
+        let config: FactorModelConfig = config.inner.clone();
         let inner = py
             .detach(move || FactorModel::from_config(config))
             .map_err(portfolio_to_py)?;
@@ -263,7 +255,7 @@ impl PyFactorModel {
     ///     Market used to value positions and compute sensitivities.
     /// as_of : datetime.date | str
     ///     Valuation date of the analysis.
-    /// changes : list[dict] | str
+    /// changes : list[dict]
     ///     ``PositionChange`` objects applied in order:
     ///     ``{"kind": "remove", "position_id": ...}`` or
     ///     ``{"kind": "resize", "position_id": ..., "new_quantity": ...}``.

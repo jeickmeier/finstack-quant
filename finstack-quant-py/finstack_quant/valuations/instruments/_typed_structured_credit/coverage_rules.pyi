@@ -23,31 +23,31 @@ class CoverageRules:
 
     def __init__(
         self,
-        rating_haircuts: dict[str, float] | str | None = None,
+        rating_haircuts: dict[str, float] | None = None,
         defaulted_valuation: dict[str, Any] | str | None = None,
-        ccc_bucket: dict[str, Any] | str | None = None,
-        discount_obligation: dict[str, Any] | str | None = None,
-        borrowing_base: dict[str, Any] | str | None = None,
+        ccc_bucket: dict[str, Any] | None = None,
+        discount_obligation: dict[str, Any] | None = None,
+        borrowing_base: dict[str, Any] | None = None,
     ) -> None:
         """
         Construct rules from their serde parts (every part optional).
 
         Parameters
         ----------
-        rating_haircuts : dict[str, float] | str, optional
+        rating_haircuts : dict[str, float], optional
             Haircut per rating as a decimal fraction (``{"CCC": 0.7, "NR":
             0.5}``); performing collateral is carried at ``par × (1 − haircut)``.
             Empty when omitted.
         defaulted_valuation : dict[str, Any] | str, optional
             ``DefaultedValuation`` serde value: ``"recovery"`` (modeled recovery,
             the default) or ``{"market_value": {"pct": 60.0}}``.
-        ccc_bucket : dict[str, Any] | str, optional
+        ccc_bucket : dict[str, Any], optional
             ``CccBucketRule`` (``threshold_pct`` in percent points, ``carry_at_market_value`` boolean); ``None``
             disables the bucket.
-        discount_obligation : dict[str, Any] | str, optional
+        discount_obligation : dict[str, Any], optional
             ``DiscountObligationRule`` (``price_threshold_pct``); ``None``
             disables it.
-        borrowing_base : dict[str, Any] | str, optional
+        borrowing_base : dict[str, Any], optional
             Borrowing base rules with decimal advance rates, asset eligibility
             and concentration limits. None disables the borrowing base test.
 

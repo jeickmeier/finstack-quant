@@ -258,7 +258,7 @@ class CdsIndex:
         """
         ...
     @staticmethod
-    def from_preset(preset: CdsIndexParams, params: dict[str, Any] | str) -> CdsIndex:
+    def from_preset(preset: CdsIndexParams, params: dict[str, Any]) -> CdsIndex:
         """
         Build an index trade from a standardized preset (mirrors Rust
         ``CdsIndex::from_preset``): the premium leg takes the preset's fixed
@@ -270,8 +270,8 @@ class CdsIndex:
         ----------
         preset : CdsIndexParams
             Index identity, coupon and convention (e.g. :meth:`CdsIndexParams.cdx_na_ig`).
-        params : dict[str, Any] | str
-            ``CdsTradeParams`` trade terms as a dict or JSON text. Every key is
+        params : dict[str, Any]
+            ``CdsTradeParams`` trade terms as a dict. Every key is
             required:
 
             - ``id`` (str): unique instrument identifier for the trade.
@@ -964,14 +964,14 @@ class CdsIndexBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not a recognized pricing mode.
         """
         ...
-    def constituents(self, value: list[CdsIndexConstituent | dict[str, object]] | str) -> CdsIndexBuilder:
+    def constituents(self, value: list[CdsIndexConstituent | dict[str, object]]) -> CdsIndexBuilder:
         """
         Set the index constituents.
 
         Parameters
         ----------
-        value : list[CdsIndexConstituent | dict[str, object]] | str
-            Constituent rows as typed :class:`CdsIndexConstituent` objects, dicts with ``credit`` (``reference_entity``, ``recovery_rate``, ``credit_curve_id``), ``weight`` and optional ``defaulted``, or a JSON array of the same shape.
+        value : list[CdsIndexConstituent | dict[str, object]]
+            Constituent rows as typed :class:`CdsIndexConstituent` objects or dicts with ``credit`` (``reference_entity``, ``recovery_rate``, ``credit_curve_id``), ``weight`` and optional ``defaulted``.
 
         Returns
         -------
@@ -981,7 +981,7 @@ class CdsIndexBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()``, ``value`` is neither a sequence nor a string, or a dict/JSON entry does not match the constituent shape.
+            If the builder was already consumed by ``build()``, ``value`` is not a sequence of rows (a string or a dict is refused), or an entry does not match the constituent shape.
         """
         ...
     def num_constituents(self, value: int) -> CdsIndexBuilder:
@@ -1064,14 +1064,14 @@ class CdsIndexBuilder:
             If ``value`` is not a ``(date, Money)`` pair.
         """
         ...
-    def margin_spec(self, value: OtcMarginSpec | dict[str, object] | str) -> CdsIndexBuilder:
+    def margin_spec(self, value: OtcMarginSpec | dict[str, object]) -> CdsIndexBuilder:
         """
         Set the OTC margin (CSA / initial-margin) specification.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``OtcMarginSpec`` in serde form (``dict`` or JSON string).
+        value : dict[str, object]
+            Rust ``OtcMarginSpec`` in serde form (a ``dict``).
 
         Returns
         -------
@@ -1084,15 +1084,14 @@ class CdsIndexBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as an ``OtcMarginSpec``.
         """
         ...
-    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> CdsIndexBuilder:
+    def instrument_pricing_overrides(self, value: dict[str, object]) -> CdsIndexBuilder:
         """
         Set the instrument-owned pricing inputs.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
-            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+        value : dict[str, object]
+            Rust ``InstrumentPricingOverrides`` in serde form (a ``dict``): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
             ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
 
         Returns
@@ -1107,15 +1106,14 @@ class CdsIndexBuilder:
             not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object] | str) -> CdsIndexBuilder:
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object]) -> CdsIndexBuilder:
         """
         Set the metric-time pricing configuration stored on the instrument.
 
         Parameters
         ----------
-        value : MetricPricingOverrides | dict[str, object] | str
-            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
-            JSON string.
+        value : MetricPricingOverrides | dict[str, object]
+            Rust ``MetricPricingOverrides`` as the typed class or a ``dict``.
 
         Returns
         -------
@@ -1129,15 +1127,14 @@ class CdsIndexBuilder:
             not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> CdsIndexBuilder:
+    def scenario_pricing_overrides(self, value: dict[str, object]) -> CdsIndexBuilder:
         """
         Set the scenario-only pricing adjustments.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
-            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+        value : dict[str, object]
+            Rust ``ScenarioPricingOverrides`` in serde form (a ``dict``), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
 
         Returns
         -------

@@ -166,26 +166,26 @@ class TestConvertibleBondTyped:
             ConvertibleBond.builder().conversion("{nope")
 
     def test_conversion_pascal_case_enum_raises(self) -> None:
-        conversion = json.dumps({
+        conversion = {
             "ratio": 20.0,
             "price": None,
             "policy": "Voluntary",  # schema-rejection-test
             "anti_dilution": "FullRatchet",  # schema-rejection-test
             "dividend_adjustment": "none",
             "dilution_events": [],
-        })
+        }
         with pytest.raises(ValueError, match="invalid conversion"):
             ConvertibleBond.builder().conversion(conversion)
 
     def test_credit_curve_and_recovery_and_settlement_days(self) -> None:
-        conversion = json.dumps({
+        conversion = {
             "ratio": None,
             "price": 50.0,
             "policy": "voluntary",
             "anti_dilution": "none",
             "dividend_adjustment": "adjust_ratio",
             "dilution_events": [],
-        })
+        }
         bond = (
             ConvertibleBond
             .builder()

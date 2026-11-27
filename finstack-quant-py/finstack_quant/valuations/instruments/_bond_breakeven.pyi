@@ -437,7 +437,7 @@ def bond_breakeven_ladder(
     market: MarketContext,
     as_of: date | str,
     horizons: Sequence[Tenor | str],
-    config: BondBreakevenConfig | str,
+    config: BondBreakevenConfig,
 ) -> BondBreakevenLadder:
     """Measure carry and signed basis-point breakeven for each horizon.
 
@@ -451,10 +451,10 @@ def bond_breakeven_ladder(
         Valuation date or ISO date string anchoring the horizons.
     horizons : Sequence[Tenor or str]
         Nonempty ordered positive calendar tenors, such as "1M" and "1Y".
-    config : BondBreakevenConfig or str
+    config : BondBreakevenConfig
         Select yield, Z-spread for a vanilla bond, or linear OAS for an
-        option-bearing bond, either as a mapping or its JSON string. Spread
-        targets require instrument spread CS01.
+        option-bearing bond, as a mapping. Spread targets require instrument
+        spread CS01.
 
     Returns
     -------

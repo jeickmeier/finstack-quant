@@ -2,7 +2,7 @@
 
 use super::results::{PyMoneyEstimate, PyPathSummary};
 use crate::bindings::core::currency::extract_currency;
-use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
+use crate::bindings::module_utils::{opt_py_to_serde, py_to_serde};
 use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
 use finstack_quant_core::currency::Currency;
@@ -13,7 +13,7 @@ use pyo3::prelude::*;
 #[pyfunction]
 #[pyo3(text_signature = "(spec)")]
 fn simulate_paths(py: Python<'_>, spec: &Bound<'_, PyAny>) -> PyResult<PyPathSummary> {
-    let spec: PathSimulationSpec = spec_from_py(py, spec, "PathSimulationSpec")?;
+    let spec: PathSimulationSpec = py_to_serde(py, spec, "PathSimulationSpec")?;
     py.detach(move || {
         finstack_quant_models::monte_carlo::simulate::simulate_paths(&spec).map_err(core_to_py)
     })
@@ -52,7 +52,7 @@ fn price_heston(
 
     let contract = option_contract(contract)?;
     let heston = heston_params(heston)?;
-    let settings = opt_spec_from_py(py, settings, "HestonMcSettings")?;
+    let settings = opt_py_to_serde(py, settings, "HestonMcSettings")?;
     py.detach(|| canonical::price_heston(&contract, &heston, settings))
         .map(PyMoneyEstimate::from_inner)
         .map_err(core_to_py)

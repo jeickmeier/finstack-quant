@@ -5,6 +5,8 @@ from __future__ import annotations
 import datetime
 import json
 
+import pytest
+
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
 from finstack_quant.valuations.instruments import (
@@ -51,7 +53,9 @@ def test_h28_bond_breakeven_ladder_wire_and_config() -> None:
     )
     cfg = {"target": "z_spread", "mode": "linear"}
     ladder_dict = bond_breakeven_ladder(bond, market, bond.issue_date, ["3M", "1Y"], cfg)
-    ladder_json = bond_breakeven_ladder(bond, market, bond.issue_date, ["3M", "1Y"], json.dumps(cfg))
+    ladder_json = bond_breakeven_ladder(bond, market, bond.issue_date, ["3M", "1Y"], json.loads(json.dumps(cfg)))
+    with pytest.raises(ValueError, match="invalid breakeven config: invalid type: string"):
+        bond_breakeven_ladder(bond, market, bond.issue_date, ["3M", "1Y"], json.dumps(cfg))
 
     assert ladder_dict.config == cfg
     assert ladder_json.config == cfg

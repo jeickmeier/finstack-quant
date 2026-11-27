@@ -7,7 +7,7 @@ use pyo3::types::{PyDict, PyString};
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::json_bridge::serde_to_py;
-use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
+use crate::bindings::module_utils::{opt_py_to_serde, py_to_serde};
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations::instruments::Instrument;
@@ -59,7 +59,7 @@ impl PyConversionSpec {
             Ok(label) => super::convert::enum_from_str(label.to_str()?, "conversion policy")?,
             _ => {
                 if policy.is_instance_of::<PyDict>() {
-                    spec_from_py(py, policy, "conversion policy")?
+                    py_to_serde(py, policy, "conversion policy")?
                 } else {
                     return Err(pyo3::exceptions::PyTypeError::new_err(
                         "policy: expected a bare conversion-policy label or a tagged dict",
@@ -72,7 +72,7 @@ impl PyConversionSpec {
         let dividend_adjustment: DividendAdjustment =
             super::convert::enum_from_str(dividend_adjustment, "dividend_adjustment")?;
         let dilution_events: Vec<DilutionEvent> =
-            opt_spec_from_py(py, dilution_events, "dilution_events")?.unwrap_or_default();
+            opt_py_to_serde(py, dilution_events, "dilution_events")?.unwrap_or_default();
         Ok(Self {
             inner: ConversionSpec {
                 ratio,
@@ -138,13 +138,13 @@ pub struct PyCallPutSchedule {
     pub(crate) inner: CallPutSchedule,
 }
 
-/// Coerce `list[dict] | str | None` to call/put windows.
+/// Coerce `list[dict] | None` to call/put windows.
 fn windows_from_py(
     py: Python<'_>,
     value: Option<&Bound<'_, PyAny>>,
     what: &str,
 ) -> PyResult<Vec<CallPut>> {
-    Ok(opt_spec_from_py(py, value, what)?.unwrap_or_default())
+    Ok(opt_py_to_serde(py, value, what)?.unwrap_or_default())
 }
 
 #[pymethods]
@@ -486,7 +486,7 @@ impl PyConvertibleBondBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let conversion = match value.cast::<PyConversionSpec>() {
             Ok(spec) => spec.borrow().inner.clone(),
-            _ => spec_from_py(py, value, "conversion")?,
+            _ => py_to_serde(py, value, "conversion")?,
         };
         let shown = PyConversionSpec {
             inner: conversion.clone(),
@@ -544,7 +544,7 @@ impl PyConvertibleBondBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let call_put = match value.cast::<PyCallPutSchedule>() {
             Ok(schedule) => schedule.borrow().inner.clone(),
-            _ => spec_from_py(py, value, "call_put")?,
+            _ => py_to_serde(py, value, "call_put")?,
         };
         let shown = format!(
             "CallPutSchedule(calls=<{}>, puts=<{}>)",
@@ -562,7 +562,7 @@ impl PyConvertibleBondBuilder {
         py: Python<'py>,
         value: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let trigger: PriceTrigger = spec_from_py(py, value, "soft_call_trigger")?;
+        let trigger: PriceTrigger = py_to_serde(py, value, "soft_call_trigger")?;
         let shown = format!(
             "{{'threshold_pct': {}, 'observation_days': {}, 'required_days_above': {}}}",
             float_repr(trigger.threshold_pct),
@@ -612,7 +612,7 @@ impl PyConvertibleBondBuilder {
         py: Python<'py>,
         value: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let claim = spec_from_py(py, value, "resolved_settlement")?;
+        let claim = py_to_serde(py, value, "resolved_settlement")?;
         builder_set!(
             slf,
             resolved_settlement,
@@ -629,7 +629,7 @@ impl PyConvertibleBondBuilder {
         value: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec =
-            spec_from_py(py, value, "cashflow_spec")?;
+            py_to_serde(py, value, "cashflow_spec")?;
         builder_set!(
             slf,
             cashflow_spec,

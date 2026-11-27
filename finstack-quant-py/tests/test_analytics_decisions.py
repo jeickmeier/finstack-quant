@@ -128,7 +128,9 @@ def test_restored_summary_retains_nan_sentinels_and_validates_provenance() -> No
         },
     }
     assert validate_summary(table) is None
-    assert validate_summary(json.dumps(table)) is None
+    assert validate_summary(json.loads(json.dumps(table))) is None
+    with pytest.raises(ValueError, match="invalid analytics summary: invalid type: string"):
+        validate_summary(json.dumps(table))
     table["metadata"]["benchmark"] = "MISSING"
     with pytest.raises(AnalyticsError):
         validate_summary(table)
@@ -149,7 +151,7 @@ def test_performance_summary_produces_validatable_table_envelope_with_nonfinite_
     report = perf.summary(0.0, 0.0, 0.0, 0.95)
 
     assert validate_summary(report) is None
-    assert validate_summary(json.dumps(report, allow_nan=False)) is None
+    assert validate_summary(json.loads(json.dumps(report, allow_nan=False))) is None
     assert report["row_count"] == 2
     assert report["metadata"]["kind"] == "analytics_summary"
 

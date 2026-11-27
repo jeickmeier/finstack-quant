@@ -496,8 +496,8 @@ class CreditCalibrator:
     """
     Deterministic calibrator that produces a :class:`CreditFactorModel`.
 
-    The configuration is a ``CreditCalibrationConfig`` given as a dict or a
-    JSON string; every field has a default, so a partial dict such as
+    The configuration is a ``CreditCalibrationConfig`` given as a dict;
+    every field has a default, so a partial dict such as
     ``{"hierarchy": {"levels": ["rating"]}}`` is accepted, and ``None`` selects
     the all-defaults configuration.
 
@@ -517,14 +517,14 @@ class CreditCalibrator:
     1
     """
 
-    def __init__(self, config: Mapping[str, Any] | str | None = None) -> None:
+    def __init__(self, config: Mapping[str, Any] | None = None) -> None:
         """
         Construct a calibrator from a ``CreditCalibrationConfig``.
 
         Parameters
         ----------
-        config : Mapping[str, Any] | str | None
-            ``CreditCalibrationConfig`` as a dict or JSON string. Omitted
+        config : Mapping[str, Any] | None
+            ``CreditCalibrationConfig`` as a dict. Omitted
             fields take their defaults (``policy="globally_off"``, empty
             hierarchy, ``vol_model="sample"``,
             ``covariance_strategy="full_sample_repaired"``,
@@ -539,14 +539,14 @@ class CreditCalibrator:
         """
         ...
 
-    def calibrate(self, inputs: Mapping[str, Any] | str) -> CreditFactorModel:
+    def calibrate(self, inputs: Mapping[str, Any]) -> CreditFactorModel:
         """
         Run calibration and return a validated factor model.
 
         Parameters
         ----------
-        inputs : Mapping[str, Any] | str
-            ``CreditCalibrationInputs`` as a dict or JSON string:
+        inputs : Mapping[str, Any]
+            ``CreditCalibrationInputs`` as a dict:
             ``history_panel`` (``dates`` + per-issuer decimal spread lists),
             ``issuer_tags``, ``generic_factor``, ``as_of``, ``as_of_spreads``
             and optional ``idiosyncratic_overrides`` / ``spread_durations``.
@@ -586,9 +586,9 @@ class CreditCalibrator:
         spreads: pd.DataFrame | pl.DataFrame | Any,
         tags: Mapping[str, Mapping[str, str]] | pd.DataFrame | pl.DataFrame | Any,
         generic: pd.Series | pl.Series | Sequence[float] | npt.NDArray[np.float64] | Any,
-        generic_spec: Mapping[str, str] | str,
+        generic_spec: Mapping[str, str],
         spread_durations: Mapping[str, float] | pd.Series | pl.Series | pd.DataFrame | pl.DataFrame | Any | None = None,
-        config: Mapping[str, Any] | str | None = None,
+        config: Mapping[str, Any] | None = None,
         *,
         date_col: str | None = None,
     ) -> CreditFactorModel:
@@ -618,17 +618,16 @@ class CreditCalibrator:
             decimal units (accepts sequences, NumPy arrays, ``pandas.Series``,
             ``polars.Series``, or single-column tables). A Series' ``name`` is
             not used.
-        generic_spec : Mapping[str, str] | str
-            ``GenericFactorSpec`` dict or JSON string
+        generic_spec : Mapping[str, str]
+            ``GenericFactorSpec`` dict
             ``{"name": ..., "series_id": ...}`` identifying the generic series;
             persisted verbatim into the model artifact.
         spread_durations : Mapping[str, float] | pd.Series | pl.Series | pd.DataFrame | pl.DataFrame | Any | None
             ``{issuer: years}`` mapping, ``pandas.Series`` indexed by issuer,
             or two-column Polars/pandas/Arrow table of ``(issuer, duration)``;
             required when ``bucket_weighting="dts"``.
-        config : Mapping[str, Any] | str | None
-            ``CreditCalibrationConfig`` dict / JSON string / ``None`` (see
-            :meth:`__init__`).
+        config : Mapping[str, Any] | None
+            ``CreditCalibrationConfig`` dict or ``None`` (see :meth:`__init__`).
         date_col : str | None, optional
             Column name holding observation dates in ``spreads`` (and optional
             date column in ``generic``). Auto-detects a unique Polars/Arrow
@@ -1288,9 +1287,10 @@ class FactorCovarianceForecast:
     """
     Factor covariance and idiosyncratic vol forecasts from a credit factor model.
 
-    Every method takes a ``horizon`` that is either a :class:`VolHorizon` or a
-    descriptor string: ``"one_step"``, ``"unconditional"``,
-    ``'{"n_steps": N}'`` or ``'{"years": Y}'``.
+    Every method takes a ``horizon`` that is either a :class:`VolHorizon` or
+    one of the labels ``"one_step"`` and ``"unconditional"``. Build a step or
+    year horizon with :meth:`VolHorizon.n_steps` or :meth:`VolHorizon.years`;
+    a string is not read as JSON text.
 
     Examples
     --------
@@ -1332,8 +1332,9 @@ class FactorCovarianceForecast:
         Parameters
         ----------
         horizon : str | VolHorizon
-            :class:`VolHorizon` or descriptor string (``"one_step"``,
-            ``"unconditional"``, ``'{"n_steps": N}'``, ``'{"years": Y}'``).
+            :class:`VolHorizon`, or the label ``"one_step"`` or
+            ``"unconditional"``. Any other string raises; load a JSON
+            descriptor with :meth:`VolHorizon.parse`.
 
         Returns
         -------
@@ -1357,7 +1358,7 @@ class FactorCovarianceForecast:
         issuer_id : str
             Issuer identifier present in the model artifact.
         horizon : str | VolHorizon
-            :class:`VolHorizon` or descriptor string (see :meth:`covariance_at`).
+            :class:`VolHorizon` or horizon label (see :meth:`covariance_at`).
 
         Returns
         -------
@@ -1383,12 +1384,12 @@ class FactorCovarianceForecast:
         Parameters
         ----------
         horizon : str | VolHorizon
-            :class:`VolHorizon` or descriptor string (see :meth:`covariance_at`).
+            :class:`VolHorizon` or horizon label (see :meth:`covariance_at`).
         risk_measure : str | Mapping[str, Any] | None
             ``"variance"`` (default), ``"volatility"``, or a dict such as
             ``{"var": {"confidence": 0.99}}`` /
-            ``{"expected_shortfall": {"confidence": 0.975}}``; a JSON string of
-            any of these is also accepted.
+            ``{"expected_shortfall": {"confidence": 0.975}}``. A string is one of
+            the two labels; it is not read as JSON text.
 
         Returns
         -------
@@ -1423,10 +1424,10 @@ class FactorCovarianceForecast:
 
 def decompose_levels(
     model: CreditFactorModel,
-    observed_spreads: Mapping[str, float] | pd.Series | pd.DataFrame | pl.DataFrame | str | Any,
+    observed_spreads: Mapping[str, float] | pd.Series | pd.DataFrame | pl.DataFrame | Any,
     observed_generic: float,
     as_of: datetime.date | str,
-    runtime_tags: Mapping[str, Mapping[str, str]] | pd.DataFrame | pl.DataFrame | str | Any | None = None,
+    runtime_tags: Mapping[str, Mapping[str, str]] | pd.DataFrame | pl.DataFrame | Any | None = None,
 ) -> LevelsAtDate:
     """
     Decompose observed issuer spreads into hierarchy levels and adders.
@@ -1435,19 +1436,18 @@ def decompose_levels(
     ----------
     model : CreditFactorModel
         Calibrated hierarchy artifact.
-    observed_spreads : Mapping[str, float] | pd.Series | pd.DataFrame | pl.DataFrame | str | Any
+    observed_spreads : Mapping[str, float] | pd.Series | pd.DataFrame | pl.DataFrame | Any
         Issuer ID to observed **decimal** spread (``0.01`` = 100 bp) — a dict,
-        a ``pandas.Series`` indexed by issuer, a two-column DataFrame / Arrow
-        table, or a JSON string of the same object.
+        a ``pandas.Series`` indexed by issuer, or a two-column DataFrame /
+        Arrow table.
     observed_generic : float
         Generic (PC) factor value at ``as_of``, decimal.
     as_of : datetime.date | str
         Observation date, either a date-like object or an ISO 8601 string.
-    runtime_tags : Mapping[str, Mapping[str, str]] | pd.DataFrame | pl.DataFrame | str | Any | None
+    runtime_tags : Mapping[str, Mapping[str, str]] | pd.DataFrame | pl.DataFrame | Any | None
         ``{issuer_id: {dimension_key: tag}}`` for issuers not present in the
         model — a dict, a ``pandas.DataFrame`` indexed by issuer, a Polars or
-        Arrow table keyed by ``"issuer"``/``"issuer_id"`` or first column, or a
-        JSON string.
+        Arrow table keyed by ``"issuer"``/``"issuer_id"`` or first column.
 
     Returns
     -------

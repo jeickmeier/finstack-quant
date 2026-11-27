@@ -4,7 +4,7 @@
 //! convenience entry points in `finstack_quant_models::monte_carlo::greeks::gbm_european`.
 
 use super::results::PyEstimate;
-use crate::bindings::module_utils::spec_from_py;
+use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
 use finstack_quant_models::monte_carlo::greeks::gbm_european::{self, GbmEuropeanFdSpec};
@@ -14,7 +14,7 @@ use pyo3::prelude::*;
 #[pyfunction]
 #[pyo3(signature = (spec))]
 fn finite_diff_delta(py: Python<'_>, spec: &Bound<'_, PyAny>) -> PyResult<PyEstimate> {
-    let spec: GbmEuropeanFdSpec = spec_from_py(py, spec, "GbmEuropeanFdSpec")?;
+    let spec: GbmEuropeanFdSpec = py_to_serde(py, spec, "GbmEuropeanFdSpec")?;
     py.detach(|| gbm_european::finite_diff_delta(spec))
         .map(PyEstimate::from_inner)
         .map_err(core_to_py)
@@ -24,7 +24,7 @@ fn finite_diff_delta(py: Python<'_>, spec: &Bound<'_, PyAny>) -> PyResult<PyEsti
 #[pyfunction]
 #[pyo3(signature = (spec))]
 fn finite_diff_gamma(py: Python<'_>, spec: &Bound<'_, PyAny>) -> PyResult<PyEstimate> {
-    let spec: GbmEuropeanFdSpec = spec_from_py(py, spec, "GbmEuropeanFdSpec")?;
+    let spec: GbmEuropeanFdSpec = py_to_serde(py, spec, "GbmEuropeanFdSpec")?;
     py.detach(|| gbm_european::finite_diff_gamma(spec))
         .map(PyEstimate::from_inner)
         .map_err(core_to_py)

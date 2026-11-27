@@ -139,7 +139,7 @@ pub(super) fn dcf_sensitivity_on_results<'py>(
     let model = model.inner.clone();
     let results = results.inner.clone();
     let request = request.inner.clone();
-    let shocks = crate::bindings::module_utils::spec_from_py(py, shocks, "DCF shocks")?;
+    let shocks = crate::bindings::module_utils::py_to_serde(py, shocks, "DCF shocks")?;
     let report = py
         .detach(move || {
             finstack_quant_statements_analytics::analysis::dcf_sensitivity_on_results(

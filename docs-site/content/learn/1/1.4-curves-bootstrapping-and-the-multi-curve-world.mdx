@@ -88,7 +88,7 @@ calibrations = {}
 for interpolation in ('linear', 'log_linear'):
     envelope = calibration_envelope('foundations')
     envelope['plan']['steps'][0]['interpolation'] = interpolation
-    result = calibrate(json.dumps(envelope))
+    result = calibrate(envelope)
     calibrations[interpolation] = result
 linear = calibrations['linear'].market.get_discount('USD-OIS')
 loglinear = calibrations['log_linear'].market.get_discount('USD-OIS')
@@ -97,7 +97,7 @@ reduced = calibration_envelope('foundations')
 removed = 'USD-OIS-SWAP-5Y'
 reduced['market_data'] = [quote for quote in reduced['market_data'] if quote['id'] != removed]
 reduced['plan']['quote_sets']['usd_rate_quotes'].remove(removed)
-reduced_result = calibrate(json.dumps(reduced))
+reduced_result = calibrate(reduced)
 print('forward comparisons:', forwards)
 ```
 {/* /notebook-block */}
@@ -148,7 +148,7 @@ for quote in forward_input['market_data']:
             months=12*(original.year-anchor.year)+original.month-anchor.month
             quote[boundary]['date']=(AS_OF if months==0 else Tenor.parse(f'{months}M').add_to_date(AS_OF, business_day_convention="unadjusted")).isoformat()
 for step in forward_input['plan']['steps']:step['base_date']=AS_OF.isoformat()
-forward_fit=calibrate(json.dumps(forward_input))
+forward_fit=calibrate(forward_input)
 forward_curve=forward_fit.market.get_forward('USD-SOFR-3M')
 discount_curve=forward_fit.market.get_discount('USD-OIS')
 # Hull convention, explicitly assumed adjustment of one basis point.
@@ -172,7 +172,7 @@ for month,forward in zip((6,9,12),fra_rates):
            'price':100-100*(forward+convexity_adjustment),'convexity_adjustment':convexity_adjustment}
     futures_input['market_data'].append(quote)
     futures_input['plan']['quote_sets']['sofr_3m_quotes'].append(quote['id'])
-futures_fit=calibrate(json.dumps(futures_input))
+futures_fit=calibrate(futures_input)
 print({'deposit_swap_discount_plus_futures_projection_residual':futures_fit.report.max_residual,
        'futures_quotes':[q for q in futures_input['market_data'] if q['type']=='futures']})
 ```
@@ -198,7 +198,7 @@ AS_OF = date(2025, 1, 15)
 fig,ax=plt.subplots(figsize=(8,3.6))
 for mode in ('linear','log_linear'):
     envelope=calibration_envelope('foundations');envelope['plan']['steps'][0]['interpolation']=mode
-    fit=calibrate(json.dumps(envelope))
+    fit=calibrate(envelope)
     curve=fit.market.get_discount('USD-OIS')
     grid=[0.3+i*0.05 for i in range(190)]
     ax.plot(grid,[100*curve.forward(t,t+0.02) for t in grid],label=mode)
@@ -234,7 +234,7 @@ complete=calibration_envelope('foundations');reduced=calibration_envelope('found
 removed='USD-OIS-SWAP-5Y'
 reduced['market_data']=[q for q in reduced['market_data'] if q['id']!=removed]
 reduced['plan']['quote_sets']['usd_rate_quotes'].remove(removed)
-first,second=[calibrate(json.dumps(x)) for x in (complete,reduced)]
+first,second=[calibrate(x) for x in (complete,reduced)]
 curves=[x.market.get_discount('USD-OIS') for x in (first,second)]
 rows=[{'year':t,'DF_change':curves[1].df(t)-curves[0].df(t),'forward_change_bp':10000*(curves[1].forward(t,t+0.1)-curves[0].forward(t,t+0.1))} for t in (1,2,3,5,7,9)]
 print(rows)

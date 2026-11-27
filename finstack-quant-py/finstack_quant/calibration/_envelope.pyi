@@ -22,7 +22,7 @@ class CalibrationStep:
     """One calibration step: a target kind, parameters, and a named quote set.
 
     Each constructor corresponds to a Rust ``StepParams`` variant and takes the
-    step ``id``, a ``params`` dict (or JSON text) holding that variant's wire
+    step ``id``, a ``params`` dict holding that variant's wire
     fields, and an optional ``quote_set``. Quote payloads belong to
     ``CalibrationEnvelope.market_data`` and their IDs to ``plan.quote_sets``.
 
@@ -58,7 +58,7 @@ class CalibrationStep:
         ...
 
     @staticmethod
-    def discount(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
+    def discount(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
         """Build a discount-curve bootstrap step.
 
         Parameters
@@ -66,8 +66,8 @@ class CalibrationStep:
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set`` and
             ``curve_id``.
-        params : dict[str, Any] | str
-            Wire fields of the ``discount`` step as a dict, or the same object as JSON text, keyed as in the
+        params : dict[str, Any]
+            Wire fields of the ``discount`` step as a dict, keyed as in the
             Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
 
             - ``currency`` (str | Currency, required): Upper-case ISO 4217 code (or a ``Currency``) of the
@@ -116,7 +116,7 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def forward(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
+    def forward(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
         """Build a projection (forward) curve calibration step.
 
         Parameters
@@ -124,8 +124,8 @@ class CalibrationStep:
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set`` and
             ``curve_id``.
-        params : dict[str, Any] | str
-            Wire fields of the ``forward`` step as a dict, or the same object as JSON text, keyed as in the
+        params : dict[str, Any]
+            Wire fields of the ``forward`` step as a dict, keyed as in the
             Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
 
             - ``currency`` (str | Currency, required): Upper-case ISO 4217 code (or a ``Currency``) of the
@@ -180,7 +180,7 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def hazard(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
+    def hazard(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
         """Build a credit hazard-curve bootstrap step.
 
         Parameters
@@ -188,8 +188,8 @@ class CalibrationStep:
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set`` and
             ``curve_id``.
-        params : dict[str, Any] | str
-            Wire fields of the ``hazard`` step as a dict, or the same object as JSON text, keyed as in the
+        params : dict[str, Any]
+            Wire fields of the ``hazard`` step as a dict, keyed as in the
             Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
 
             - ``entity`` (str, required): Reference entity identifier.
@@ -247,7 +247,7 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def inflation(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
+    def inflation(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
         """Build an inflation-curve bootstrap step.
 
         Parameters
@@ -255,8 +255,8 @@ class CalibrationStep:
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set`` and
             ``curve_id``.
-        params : dict[str, Any] | str
-            Wire fields of the ``inflation`` step as a dict, or the same object as JSON text, keyed as in the
+        params : dict[str, Any]
+            Wire fields of the ``inflation`` step as a dict, keyed as in the
             Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
 
             - ``currency`` (str | Currency, required): Upper-case ISO 4217 code (or a ``Currency``) of the
@@ -323,7 +323,7 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def vol_surface(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
+    def vol_surface(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
         """Build an equity/FX SABR volatility-surface fit step from option vol quotes.
 
         Parameters
@@ -331,8 +331,8 @@ class CalibrationStep:
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set`` and
             ``vol_surface_id``.
-        params : dict[str, Any] | str
-            Wire fields of the ``vol_surface`` step as a dict, or the same object as JSON text, keyed as in
+        params : dict[str, Any]
+            Wire fields of the ``vol_surface`` step as a dict, keyed as in
             the Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
 
             - ``base_date`` (str, required): Surface base date as an ISO-8601 date string (``"YYYY-MM-DD"``).
@@ -382,7 +382,7 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def swaption_vol(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
+    def swaption_vol(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
         """Build a swaption volatility-cube (SABR) fit step.
 
         Parameters
@@ -390,8 +390,8 @@ class CalibrationStep:
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set`` and
             ``vol_surface_id``.
-        params : dict[str, Any] | str
-            Wire fields of the ``swaption_vol`` step as a dict, or the same object as JSON text, keyed as in
+        params : dict[str, Any]
+            Wire fields of the ``swaption_vol`` step as a dict, keyed as in
             the Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
 
             - ``base_date`` (str, required): Surface base date as an ISO-8601 date string (``"YYYY-MM-DD"``).
@@ -452,15 +452,15 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def base_correlation(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
+    def base_correlation(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
         """Build an index-tranche base-correlation bootstrap step.
 
         Parameters
         ----------
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set``.
-        params : dict[str, Any] | str
-            Wire fields of the ``base_correlation`` step as a dict, or the same object as JSON text, keyed as
+        params : dict[str, Any]
+            Wire fields of the ``base_correlation`` step as a dict, keyed as
             in the Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted.
             Keys:
 
@@ -524,15 +524,15 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def student_t(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
+    def student_t(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
         """Build a Student-t copula degrees-of-freedom fit step for one tranche.
 
         Parameters
         ----------
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set``.
-        params : dict[str, Any] | str
-            Wire fields of the ``student_t`` step as a dict, or the same object as JSON text, keyed as in the
+        params : dict[str, Any]
+            Wire fields of the ``student_t`` step as a dict, keyed as in the
             Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
 
             - ``tranche_instrument_id`` (str, required): Tranche instrument repriced during the fit; the
@@ -576,15 +576,15 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def hull_white(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
+    def hull_white(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
         """Build a Hull-White one-factor swaption calibration step.
 
         Parameters
         ----------
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set``.
-        params : dict[str, Any] | str
-            Wire fields of the ``hull_white`` step as a dict, or the same object as JSON text, keyed as in the
+        params : dict[str, Any]
+            Wire fields of the ``hull_white`` step as a dict, keyed as in the
             Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
 
             - ``curve_id`` (str, required): Discount curve the model is fitted against (must already exist).
@@ -630,15 +630,15 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def cap_floor_hull_white(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
+    def cap_floor_hull_white(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
         """Build a Hull-White one-factor cap/floor calibration step.
 
         Parameters
         ----------
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set``.
-        params : dict[str, Any] | str
-            Wire fields of the ``cap_floor_hull_white`` step as a dict, or the same object as JSON text, keyed
+        params : dict[str, Any]
+            Wire fields of the ``cap_floor_hull_white`` step as a dict, keyed
             as in the Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted.
             Keys:
 
@@ -697,7 +697,7 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def svi_surface(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
+    def svi_surface(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
         """Build an SVI volatility-surface fit step from option vol quotes.
 
         Parameters
@@ -705,8 +705,8 @@ class CalibrationStep:
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set`` and
             ``vol_surface_id``.
-        params : dict[str, Any] | str
-            Wire fields of the ``svi_surface`` step as a dict, or the same object as JSON text, keyed as in
+        params : dict[str, Any]
+            Wire fields of the ``svi_surface`` step as a dict, keyed as in
             the Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
 
             - ``base_date`` (str, required): Surface base date as an ISO-8601 date string (``"YYYY-MM-DD"``).
@@ -754,7 +754,7 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def xccy_basis(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
+    def xccy_basis(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
         """Build a cross-currency basis (foreign discount curve) bootstrap step.
 
         Parameters
@@ -762,8 +762,8 @@ class CalibrationStep:
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set`` and
             ``curve_id``.
-        params : dict[str, Any] | str
-            Wire fields of the ``xccy_basis`` step as a dict, or the same object as JSON text, keyed as in the
+        params : dict[str, Any]
+            Wire fields of the ``xccy_basis`` step as a dict, keyed as in the
             Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
 
             - ``currency`` (str | Currency, required): Upper-case ISO 4217 code (or a ``Currency``) of the
@@ -816,7 +816,7 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def parametric(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
+    def parametric(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
         """Build a parametric (Nelson-Siegel / Svensson) single-curve fit step.
 
         Parameters
@@ -824,8 +824,8 @@ class CalibrationStep:
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set`` and
             ``curve_id``.
-        params : dict[str, Any] | str
-            Wire fields of the ``parametric`` step as a dict, or the same object as JSON text, keyed as in the
+        params : dict[str, Any]
+            Wire fields of the ``parametric`` step as a dict, keyed as in the
             Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
 
             - ``base_date`` (str, required): Curve base date as an ISO-8601 date string (``"YYYY-MM-DD"``).

@@ -526,12 +526,12 @@ class EquityTotalReturnSwapBuilder:
         """
         ...
 
-    def underlying(self, value: dict[str, object] | str) -> EquityTotalReturnSwapBuilder:
+    def underlying(self, value: dict[str, object]) -> EquityTotalReturnSwapBuilder:
         """Set the contract's underlying.
 
         Parameters
         ----------
-        value : dict[str, object] | str
+        value : dict[str, object]
             Underlying equity parameters (spot ID, dividend yield, contract size).
 
         Returns
@@ -546,12 +546,12 @@ class EquityTotalReturnSwapBuilder:
         """
         ...
 
-    def financing_leg(self, value: dict[str, object] | str) -> EquityTotalReturnSwapBuilder:
+    def financing_leg(self, value: dict[str, object]) -> EquityTotalReturnSwapBuilder:
         """Set the contract's financing leg.
 
         Parameters
         ----------
-        value : dict[str, object] | str
+        value : dict[str, object]
             Financing leg specification (curves, spread, day count).
 
         Returns
@@ -566,12 +566,12 @@ class EquityTotalReturnSwapBuilder:
         """
         ...
 
-    def schedule(self, value: dict[str, object] | str) -> EquityTotalReturnSwapBuilder:
+    def schedule(self, value: dict[str, object]) -> EquityTotalReturnSwapBuilder:
         """Set the contract's schedule.
 
         Parameters
         ----------
-        value : dict[str, object] | str
+        value : dict[str, object]
             Schedule specification (payment dates and frequency).
 
         Returns
@@ -646,12 +646,12 @@ class EquityTotalReturnSwapBuilder:
         """
         ...
 
-    def margin_spec(self, value: dict[str, object] | str | None) -> EquityTotalReturnSwapBuilder:
+    def margin_spec(self, value: dict[str, object] | None) -> EquityTotalReturnSwapBuilder:
         """Set the contract's margin spec.
 
         Parameters
         ----------
-        value : dict[str, object] | str | None
+        value : dict[str, object] | None
             Optional OTC margin specification for VM/IM. Equity TRS use SIMM equity bucket for margin calculation.
 
         Returns
@@ -748,15 +748,14 @@ class EquityTotalReturnSwapBuilder:
         """
         ...
 
-    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> EquityTotalReturnSwapBuilder:
+    def instrument_pricing_overrides(self, value: dict[str, object]) -> EquityTotalReturnSwapBuilder:
         """
         Set the instrument-owned pricing inputs.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
-            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+        value : dict[str, object]
+            Rust ``InstrumentPricingOverrides`` in serde form (a ``dict``): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
             ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
 
         Returns
@@ -773,16 +772,15 @@ class EquityTotalReturnSwapBuilder:
         ...
 
     def metric_pricing_overrides(
-        self, value: MetricPricingOverrides | dict[str, object] | str
+        self, value: MetricPricingOverrides | dict[str, object]
     ) -> EquityTotalReturnSwapBuilder:
         """
         Set the metric-time pricing configuration stored on the instrument.
 
         Parameters
         ----------
-        value : MetricPricingOverrides | dict[str, object] | str
-            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
-            JSON string.
+        value : MetricPricingOverrides | dict[str, object]
+            Rust ``MetricPricingOverrides`` as the typed class or a ``dict``.
 
         Returns
         -------
@@ -797,15 +795,14 @@ class EquityTotalReturnSwapBuilder:
         """
         ...
 
-    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> EquityTotalReturnSwapBuilder:
+    def scenario_pricing_overrides(self, value: dict[str, object]) -> EquityTotalReturnSwapBuilder:
         """
         Set the scenario-only pricing adjustments.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
-            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+        value : dict[str, object]
+            Rust ``ScenarioPricingOverrides`` in serde form (a ``dict``), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
 
         Returns
         -------

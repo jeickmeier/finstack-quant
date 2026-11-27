@@ -13,9 +13,9 @@ from finstack_quant.valuations.instruments._pricing import MarketHistory
 def calculate_var(
     instruments: list[Any],
     market: MarketContext,
-    history: MarketHistory | dict[str, Any] | str,
+    history: MarketHistory | dict[str, Any],
     as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
-    config: dict[str, Any] | str | None = None,
+    config: dict[str, Any] | None = None,
     model: str = "default",
 ) -> VarResult:
     """
@@ -36,12 +36,12 @@ def calculate_var(
         empty list returns zero VaR and ES.
     market : MarketContext
         Unshocked base market every scenario perturbs.
-    history : MarketHistory | dict[str, Any] | str
+    history : MarketHistory | dict[str, Any]
         Historical risk-factor shifts; a non-empty portfolio needs at least
         one scenario.
     as_of : datetime.date | datetime.datetime | pd.Timestamp | str
         Valuation date for the base and every scenario revaluation.
-    config : dict[str, Any] | str | None, default None
+    config : dict[str, Any] | None, default None
         Rust ``VarConfig``: ``confidence_level`` (decimal in ``(0, 1)``),
         ``method`` (``"full_revaluation"`` or ``"taylor_approximation"``) and
         ``reporting_currency`` (required for mixed-currency portfolios).

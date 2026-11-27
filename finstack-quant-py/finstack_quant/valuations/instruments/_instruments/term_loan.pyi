@@ -697,7 +697,7 @@ class TermLoanBuilder:
     instrument. Required fields: ``id``, ``currency``, ``notional_limit``,
     ``maturity``, ``rate``, ``frequency``, ``day_count``,
     ``discount_curve_id``, ``amortization``. Nested specs accept a ``dict``
-    or JSON ``str`` in the Rust serde shape.
+    in the Rust serde shape.
 
     Examples
     --------
@@ -827,16 +827,16 @@ class TermLoanBuilder:
             If the builder was already consumed by ``build()`` or the date cannot be interpreted.
         """
         ...
-    def rate(self, value: float | Rate | dict[str, object] | str) -> TermLoanBuilder:
+    def rate(self, value: float | Rate | dict[str, object]) -> TermLoanBuilder:
         """
         Set the interest rate specification.
 
         Parameters
         ----------
-        value : float | Rate | dict[str, object] | str
+        value : float | Rate | dict[str, object]
             A bare decimal (``0.06`` = 6%) or ``Rate`` sets a fixed rate (mirrors
             Rust ``RateSpec::fixed_rate``). A
-            ``dict`` / JSON ``str`` is the Rust ``RateSpec`` in serde form, e.g.
+            ``dict`` is the Rust ``RateSpec`` in serde form, e.g.
             ``{"floating": {"forward_curve_id": "USD-SOFR-3M", "spread_bp": 400, ...}}``.
 
         Returns
@@ -1048,7 +1048,7 @@ class TermLoanBuilder:
         Parameters
         ----------
         value : dict[str, object] | str
-            Rust ``AmortizationSpec`` in serde form (``dict`` or JSON string), e.g. ``"none"``, ``{"percent_of_remaining_per_period": {"pct": 0.025}}`` (declining balance), ``{"percent_of_original_per_period": {"pct": 0.01}}``, ``{"linear_between": {"start": "2025-01-01", "end": "2029-01-01"}}`` or ``{"custom_principal": {"items": [...]}}``; ``linear_to`` and ``step_remaining`` are rejected at ``build()``.
+            Rust ``AmortizationSpec`` in serde form (a ``dict``), e.g. ``"none"``, ``{"percent_of_remaining_per_period": {"pct": 0.025}}`` (declining balance), ``{"percent_of_original_per_period": {"pct": 0.01}}``, ``{"linear_between": {"start": "2025-01-01", "end": "2029-01-01"}}`` or ``{"custom_principal": {"items": [...]}}``; ``linear_to`` and ``step_remaining`` are rejected at ``build()``.
 
         Returns
         -------
@@ -1081,14 +1081,14 @@ class TermLoanBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not a recognized name.
         """
         ...
-    def upfront_fee(self, value: dict[str, object] | str) -> TermLoanBuilder:
+    def upfront_fee(self, value: dict[str, object]) -> TermLoanBuilder:
         """
         Set the upfront (arrangement or OID) fee paid on the issue date.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            The ``UpfrontFee`` serde form, as a ``dict`` or JSON string:
+        value : dict[str, object]
+            The ``UpfrontFee`` serde form, as a ``dict``:
             ``{"amount": Money}`` for an absolute fee (a ``Money`` or its
             ``{"amount": "20000", "currency": "USD"}`` dict) or
             ``{"fraction_of_commitment": 0.02}`` for a decimal fraction of the
@@ -1106,14 +1106,14 @@ class TermLoanBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not match the ``UpfrontFee`` shape.
         """
         ...
-    def ddtl(self, value: dict[str, object] | str) -> TermLoanBuilder:
+    def ddtl(self, value: dict[str, object]) -> TermLoanBuilder:
         """
         Set the delayed-draw (DDTL) specification.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``DdtlSpec`` in serde form (``dict`` or JSON string), e.g. ``TermLoan.example_floating_with_ddtl().ddtl``.
+        value : dict[str, object]
+            Rust ``DdtlSpec`` in serde form (a ``dict``), e.g. ``TermLoan.example_floating_with_ddtl().ddtl``.
 
         Returns
         -------
@@ -1126,14 +1126,14 @@ class TermLoanBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as a ``DdtlSpec``.
         """
         ...
-    def covenants(self, value: dict[str, object] | str) -> TermLoanBuilder:
+    def covenants(self, value: dict[str, object]) -> TermLoanBuilder:
         """
         Set the covenant event schedule.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``TermLoanCovenantEvents`` in serde form (``dict`` or JSON string), e.g. ``{"events": [...]}``.
+        value : dict[str, object]
+            Rust ``TermLoanCovenantEvents`` in serde form (a ``dict``), e.g. ``{"events": [...]}``.
 
         Returns
         -------
@@ -1146,14 +1146,14 @@ class TermLoanBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as a ``TermLoanCovenantEvents``.
         """
         ...
-    def oid_eir(self, value: dict[str, object] | str) -> TermLoanBuilder:
+    def oid_eir(self, value: dict[str, object]) -> TermLoanBuilder:
         """
         Set the OID / effective-interest-rate specification.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``OidEirSpec`` in serde form (``dict`` or JSON string), e.g. ``{"include_fees": false}``.
+        value : dict[str, object]
+            Rust ``OidEirSpec`` in serde form (a ``dict``), e.g. ``{"include_fees": false}``.
 
         Returns
         -------
@@ -1166,14 +1166,14 @@ class TermLoanBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as a ``OidEirSpec``.
         """
         ...
-    def call_schedule(self, value: dict[str, object] | str) -> TermLoanBuilder:
+    def call_schedule(self, value: dict[str, object]) -> TermLoanBuilder:
         """
         Set the prepayment (call) schedule.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``LoanCallSchedule`` in serde form (``dict`` or JSON string), e.g. ``TermLoan.example_callable().call_schedule``.
+        value : dict[str, object]
+            Rust ``LoanCallSchedule`` in serde form (a ``dict``), e.g. ``TermLoan.example_callable().call_schedule``.
 
         Returns
         -------
@@ -1206,15 +1206,14 @@ class TermLoanBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> TermLoanBuilder:
+    def instrument_pricing_overrides(self, value: dict[str, object]) -> TermLoanBuilder:
         """
         Set the instrument-owned pricing inputs.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
-            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+        value : dict[str, object]
+            Rust ``InstrumentPricingOverrides`` in serde form (a ``dict``): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
             ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
 
         Returns
@@ -1229,15 +1228,14 @@ class TermLoanBuilder:
             not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object] | str) -> TermLoanBuilder:
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object]) -> TermLoanBuilder:
         """
         Set the metric-time pricing configuration stored on the instrument.
 
         Parameters
         ----------
-        value : MetricPricingOverrides | dict[str, object] | str
-            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
-            JSON string.
+        value : MetricPricingOverrides | dict[str, object]
+            Rust ``MetricPricingOverrides`` as the typed class or a ``dict``.
 
         Returns
         -------
@@ -1251,15 +1249,14 @@ class TermLoanBuilder:
             not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> TermLoanBuilder:
+    def scenario_pricing_overrides(self, value: dict[str, object]) -> TermLoanBuilder:
         """
         Set the scenario-only pricing adjustments.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
-            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+        value : dict[str, object]
+            Rust ``ScenarioPricingOverrides`` in serde form (a ``dict``), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
 
         Returns
         -------

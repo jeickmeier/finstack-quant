@@ -1,8 +1,8 @@
 //! Covenant evaluation and breach forecasting over evaluated statement results.
 //!
 //! Wraps `finstack_quant_statements_analytics::analysis::{evaluate_covenants,
-//! forecast_breaches}`: the statement results come in as a typed object or
-//! JSON, the engine and forecast configuration as the
+//! forecast_breaches}`: the statement results come in as a typed object,
+//! the engine and forecast configuration as the
 //! `finstack_quant.covenants` classes.
 
 use crate::bindings::core::table::PyArrowTable;

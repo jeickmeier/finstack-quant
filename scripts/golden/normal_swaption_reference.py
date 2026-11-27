@@ -29,7 +29,7 @@ fixture_path = (
     / "finstack-quant/valuations/tests/golden/data/pricing/regression_goldens/swaption/usd_swaption_normal_vol_self_test.json"
 )
 f = json.loads(fixture_path.read_text())
-market = calibrate(json.dumps(f["market"]["envelope"])).market
+market = calibrate(f["market"]["envelope"]).market
 option = Swaption.from_json(json.dumps(f["instrument"]))
 as_of = date.fromisoformat(f["metadata"]["valuation_date"])
 spec = f["instrument"]["instrument"]["spec"]
@@ -102,7 +102,7 @@ def bumped(bp):
     for datum in env["market_data"]:
         if datum.get("kind") == "rate_quote":
             datum["rate"] += delta
-    return calibrate(json.dumps(env)).market
+    return calibrate(env).market
 
 
 dv01 = (value(bumped(1))[0] - value(bumped(-1))[0]) / 2

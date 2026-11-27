@@ -210,7 +210,7 @@ def test_metric_pricing_overrides_merge_identically() -> None:
     )
     assert kind == "ok"
     kind, _ = _assert_same(
-        lambda: price_instrument(bond, _market(), AS_OF, extras='{"metric_pricing_overrides": {"bogus": 1}}'),
+        lambda: price_instrument(bond, _market(), AS_OF, extras={"metric_pricing_overrides": {"bogus": 1}}),
         lambda: price_instrument(_envelope(bond), _market(), AS_OF, extras={"metric_pricing_overrides": {"bogus": 1}}),
     )
     assert kind == "ValueError"

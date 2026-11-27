@@ -96,7 +96,7 @@ class TestRunChecks:
                 }
             ],
         }
-        report = run_checks(_model(), json.dumps(spec))
+        report = run_checks(_model(), spec)
         assert isinstance(report, statements.CheckReport)
         assert report.total_checks == 1
         assert "revenue_positive" in report.to_json()
@@ -125,13 +125,13 @@ class TestRunChecks:
         results = statements.Evaluator().evaluate(negative)
 
         # Supplied results are used as they are, for the model they came from.
-        report = run_checks(negative, json.dumps(spec), results)
+        report = run_checks(negative, spec, results)
         assert report.has_errors()
         assert report.outcome == "fail"
 
         # Results of another model are not a verified run of this one.
         with pytest.raises(ValueError, match="not a verified run"):
-            run_checks(_model(), json.dumps(spec), results)
+            run_checks(_model(), spec, results)
 
 
 class TestCorporateAnalysis:

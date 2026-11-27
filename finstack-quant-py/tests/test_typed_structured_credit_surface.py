@@ -122,10 +122,13 @@ def _clo() -> StructuredCredit:
     )
 
 
-def test_pool_assets_and_hedge_swaps_accept_a_json_array_string() -> None:
+def test_pool_assets_and_hedge_swaps_take_rows_not_a_json_array_string() -> None:
     loans = _loans()
-    pool = AssetPool("P", "clo", USD).with_assets(json.dumps([loan.to_dict() for loan in loans]))
+    rows_text = json.dumps([loan.to_dict() for loan in loans])
+    pool = AssetPool("P", "clo", USD).with_assets(json.loads(rows_text))
     assert [asset.to_dict() for asset in pool.assets] == [loan.to_dict() for loan in loans]
+    with pytest.raises(ValueError, match="assets: expected a sequence of PoolAsset objects or dicts, got str"):
+        AssetPool("P", "clo", USD).with_assets(rows_text)
 
     hedge = HedgeSwap(InterestRateSwap.example(), notional={"tranche_par": "A"})
     deal = (
@@ -140,10 +143,12 @@ def test_pool_assets_and_hedge_swaps_accept_a_json_array_string() -> None:
         .maturity(MATURITY)
         .frequency(Tenor.quarterly())
         .discount_curve_id("USD-OIS")
-        .hedge_swaps(json.dumps([hedge.to_dict()]))
+        .hedge_swaps(json.loads(json.dumps([hedge.to_dict()])))
         .build()
     )
     assert [h.to_dict() for h in deal.hedge_swaps] == [hedge.to_dict()]
+    with pytest.raises(ValueError, match="hedge_swaps: expected a sequence of HedgeSwap objects or dicts, got str"):
+        StructuredCredit.builder().hedge_swaps(json.dumps([hedge.to_dict()]))
 
     with pytest.raises(ValueError, match="assets"):
         AssetPool("P", "clo", USD).with_assets("[{")
@@ -1012,7 +1017,7 @@ def test_pool_report_is_one_native_call_over_the_pool_analytics() -> None:
         }
         for id_, balance, obligor, industry, rating, defaulted in rows
     ]
-    pool = AssetPool("P", "clo", USD).with_assets(json.dumps(assets))
+    pool = AssetPool("P", "clo", USD).with_assets(assets)
 
     report = pool_report(pool, CLOSE)
 

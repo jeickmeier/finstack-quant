@@ -390,7 +390,7 @@ tabular_methods!(PyPortfolioAttribution);
 /// ``portfolio`` and both markets are typed objects. ``method`` uses the same serde shape as
 /// instrument attribution (for example ``"parallel"`` or
 /// ``{"waterfall": ["carry", "rates_curves"]}``). ``config`` is an optional
-/// canonical ``FinstackConfig`` dictionary or JSON string. ``as_of_t0`` and
+/// canonical ``FinstackConfig`` dictionary. ``as_of_t0`` and
 /// ``as_of_t1`` are the two snapshot dates, each either a date-like object
 /// (``datetime.date``, ``pandas.Timestamp``) or an ISO 8601 string.
 #[pyfunction]

@@ -110,7 +110,7 @@ fn compute_quotes(
     let market = market.inner.clone();
     let as_of = py_to_date(as_of)?;
     let quote_input: BondQuoteInput =
-        crate::bindings::module_utils::spec_from_py(py, quote_input, "BondQuoteInput")?;
+        crate::bindings::module_utils::py_to_serde(py, quote_input, "BondQuoteInput")?;
     let bond = bond.inner.clone();
     let inner = py
         .detach(move || {

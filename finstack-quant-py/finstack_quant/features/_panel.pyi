@@ -348,7 +348,7 @@ class PanelTransformResult:
     def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str: ...
 
-def transform_panel(spec: PanelTransformSpec | dict[str, Any] | str) -> PanelTransformResult:
+def transform_panel(spec: PanelTransformSpec | dict[str, Any]) -> PanelTransformResult:
     """
     Apply a named panel transform pipeline (typed twin of :func:`transform_panel_json`).
 
@@ -357,9 +357,9 @@ def transform_panel(spec: PanelTransformSpec | dict[str, Any] | str) -> PanelTra
 
     Parameters
     ----------
-    spec : PanelTransformSpec, dict or str
+    spec : PanelTransformSpec, dict
         Typed spec, an equivalent dict (``values``, ``operations``, optional
-        ``entity`` / ``order`` / ``time_key``), or its JSON.
+        ``entity`` / ``order`` / ``time_key``).
 
     Returns
     -------

@@ -311,7 +311,7 @@ impl PyStatementResult {
         selection: &Bound<'py, PyAny>,
     ) -> PyResult<Vec<(Bound<'py, PyAny>, PyMoney)>> {
         let selection: finstack_quant_statements::evaluator::PricingFlowSelection =
-            crate::bindings::module_utils::spec_from_py(py, selection, "pricing flow selection")?;
+            crate::bindings::module_utils::py_to_serde(py, selection, "pricing flow selection")?;
         finstack_quant_statements::evaluator::node_to_pricing_flows(&self.inner, &selection)
             .map_err(statements_to_py)?
             .into_iter()

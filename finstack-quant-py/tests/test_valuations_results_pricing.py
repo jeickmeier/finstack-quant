@@ -307,18 +307,15 @@ def test_price_instrument_keyword_and_typed_options() -> None:
             }
         },
     )
-    as_str = price_instrument(
-        _bond(),
-        market,
-        AS_OF,
-        metrics=["theta"],
-        extras=json.dumps({
-            "metric_pricing_overrides": {
-                "theta_period": {"count": 1, "unit": "weeks"},
-                "theta_day_basis": "trading_252",
-            }
-        }),
-    )
+    extras_text = json.dumps({
+        "metric_pricing_overrides": {
+            "theta_period": {"count": 1, "unit": "weeks"},
+            "theta_day_basis": "trading_252",
+        }
+    })
+    as_str = price_instrument(_bond(), market, AS_OF, metrics=["theta"], extras=json.loads(extras_text))
+    with pytest.raises(ValueError, match="invalid PriceExtras: invalid type: string"):
+        price_instrument(_bond(), market, AS_OF, metrics=["theta"], extras=extras_text)
     assert typed["theta"] == as_dict["theta"] == as_str["theta"]
     assert typed["theta"] != by_keyword["theta"]
 
@@ -449,14 +446,15 @@ def test_validate_instrument_json_merges_overrides_before_validation() -> None:
 
     with pytest.raises(ValueError, match="invalid instrument envelope JSON"):
         validate_instrument_json(raw)
-    prepared = validate_instrument_json(raw, metric_pricing_overrides='{"theta_period":{"count":1,"unit":"weeks"}}')
+    prepared = validate_instrument_json(raw, metric_pricing_overrides={"theta_period": {"count": 1, "unit": "weeks"}})
     assert json.loads(prepared)["instrument"]["spec"]["metric_pricing_overrides"]["theta_period"] == {
         "count": 1,
         "unit": "weeks",
     }
     assert validate_instrument_json(prepared) == prepared
-    with pytest.raises(ValueError, match="invalid metric_pricing_overrides JSON"):
-        validate_instrument_json(raw, metric_pricing_overrides="{")
+    for text in ('{"theta_period":{"count":1,"unit":"weeks"}}', "{"):
+        with pytest.raises(ValueError, match="metric pricing overrides must be an object"):
+            validate_instrument_json(raw, metric_pricing_overrides=text)
 
 
 @pytest.mark.parametrize("patch", [{}, {"theta_day_basis": "trading_252"}])
@@ -519,14 +517,21 @@ def test_every_pricing_entry_point_accepts_the_same_metric_pricing_overrides_typ
         PriceExtras(metric_pricing_overrides=as_dict),
         {"metric_pricing_overrides": typed},
         {"metric_pricing_overrides": as_dict},
-        json.dumps({"metric_pricing_overrides": as_dict}),
+        json.loads(json.dumps({"metric_pricing_overrides": as_dict})),
     ):
         assert price_instrument(bond, market, AS_OF, metrics=["theta"], extras=extras)["theta"] == expected
         envelope = json.loads(bond.to_json())
         assert price_instrument(envelope, market, AS_OF, metrics=["theta"], extras=extras)["theta"] == expected
-    for value in (typed, as_dict, json.dumps(as_dict)):
+    for value in (typed, as_dict, json.loads(json.dumps(as_dict))):
         prepared = json.loads(validate_instrument_json(bond.to_json(), metric_pricing_overrides=value))
         assert prepared["instrument"]["spec"]["metric_pricing_overrides"]["theta_period"] == as_dict["theta_period"]
+    # Both entry points refuse the same value as JSON text.
+    with pytest.raises(ValueError, match="invalid PriceExtras: invalid type: string"):
+        price_instrument(
+            bond, market, AS_OF, metrics=["theta"], extras=json.dumps({"metric_pricing_overrides": as_dict})
+        )
+    with pytest.raises(ValueError, match="metric pricing overrides must be an object"):
+        validate_instrument_json(bond.to_json(), metric_pricing_overrides=json.dumps(as_dict))
 
 
 def test_call_time_market_quote_overrides_match_typed_and_wire_pricing() -> None:
@@ -541,7 +546,7 @@ def test_call_time_market_quote_overrides_match_typed_and_wire_pricing() -> None
     typed = price_instrument(bond, market, AS_OF, metrics=metrics, extras=PriceExtras(**extras))
     assert typed["clean_price"] == pytest.approx(float(bond.notional.amount) * 0.9825)
     assert price_instrument(bond, market, AS_OF, metrics=metrics, extras=extras)["ytm"] == typed["ytm"]
-    via_wire = price_instrument(json.loads(wire), market, AS_OF, metrics=metrics, extras=json.dumps(extras))
+    via_wire = price_instrument(json.loads(wire), market, AS_OF, metrics=metrics, extras=extras)
     assert via_wire["ytm"] == typed["ytm"]
     assert bond.to_json() == wire
     original = price_instrument(bond, market, AS_OF, metrics=metrics)
@@ -577,7 +582,7 @@ def test_price_extras_rejects_unknown_keys_and_the_retired_keywords() -> None:
     with pytest.raises(ValueError, match="PriceExtras"):
         price_instrument(bond, market, AS_OF, extras={"explian": True})  # schema-rejection-test: unknown extras key
     with pytest.raises(ValueError, match="PriceExtras"):
-        price_instrument(bond, market, AS_OF, extras='{"history": {}}')  # schema-rejection-test: unknown extras key
+        price_instrument(bond, market, AS_OF, extras={"history": {}})  # schema-rejection-test: unknown extras key
     with pytest.raises(TypeError):
         price_instrument(bond, market, AS_OF, explain=True)  # schema-rejection-test: retired kwarg explain
     with pytest.raises(TypeError):
@@ -730,7 +735,9 @@ def test_instrument_envelope_from_spec_wraps_and_validates_bare_spec() -> None:
     assert envelope["schema"] == "finstack_quant.instrument/1"
     assert envelope["instrument"]["type"] == "fx_spot"
     assert json.loads(validate_instrument_json(envelope)) == envelope
-    assert instrument_envelope_from_spec("fx_spot", json.dumps(spec)) == envelope
+    assert instrument_envelope_from_spec("fx_spot", json.loads(json.dumps(spec))) == envelope
+    with pytest.raises(ValueError, match="bare spec object"):
+        instrument_envelope_from_spec("fx_spot", json.dumps(spec))
 
     with pytest.raises(ValueError, match="bare spec"):
         instrument_envelope_from_spec("fx_spot", {"type": "fx_spot", "spec": spec})

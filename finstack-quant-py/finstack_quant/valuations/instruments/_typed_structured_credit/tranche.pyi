@@ -627,18 +627,18 @@ class TrancheBuilder:
         """
         ...
 
-    def coupon_floating(self, value: dict[str, Any] | str) -> TrancheBuilder:
+    def coupon_floating(self, value: dict[str, Any]) -> TrancheBuilder:
         """
-        Set a floating-rate coupon from a JSON ``RateSpec::Floating`` payload.
+        Set a floating-rate coupon from a ``RateSpec::Floating`` dict.
 
         The floating-rate spec (``FloatingRateSpec``: index, spread, gearing,
-        floors/caps, reset conventions) stays JSON per the nested-spec rule —
+        floors/caps, reset conventions) stays a serde dict per the nested-spec rule —
         the typed cashflows plan owns that shape.
 
         Parameters
         ----------
-        value : dict[str, Any] | str
-            JSON-encoded, externally-tagged ``RateSpec`` value, e.g.
+        value : dict[str, Any]
+            Externally-tagged ``RateSpec`` dict, e.g.
             ``{"floating": {...FloatingRateSpec fields...}}``.
 
         Returns
@@ -649,7 +649,7 @@ class TrancheBuilder:
         Raises
         ------
         ValueError
-            If ``value`` is not valid JSON for the ``RateSpec`` shape.
+            If ``value`` does not match the ``RateSpec`` shape.
         """
         ...
 
@@ -830,13 +830,13 @@ class TrancheBuilder:
         """
         ...
 
-    def oc_trigger(self, value: dict[str, Any] | str) -> TrancheBuilder:
+    def oc_trigger(self, value: dict[str, Any]) -> TrancheBuilder:
         """
         Attach a per-tranche overcollateralization trigger.
 
         Parameters
         ----------
-        value : dict[str, Any] | str
+        value : dict[str, Any]
             ``CoverageTrigger`` serde object: ``trigger_level`` (ratio), optional
             ``cure_level``, ``consequence`` and breach memory fields.
         Returns
@@ -852,13 +852,13 @@ class TrancheBuilder:
         """
         ...
 
-    def ic_trigger(self, value: dict[str, Any] | str) -> TrancheBuilder:
+    def ic_trigger(self, value: dict[str, Any]) -> TrancheBuilder:
         """
         Attach a per-tranche interest-coverage trigger.
 
         Parameters
         ----------
-        value : dict[str, Any] | str
+        value : dict[str, Any]
             ``CoverageTrigger`` serde object (see :meth:`oc_trigger`).
         Returns
         -------

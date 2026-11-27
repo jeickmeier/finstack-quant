@@ -775,7 +775,7 @@ pub(crate) fn extract_otc_margin_spec(
     if let Ok(spec) = value.cast::<PyOtcMarginSpec>() {
         return Ok(spec.borrow().inner.clone());
     }
-    crate::bindings::module_utils::spec_from_py(py, value, "margin_spec")
+    crate::bindings::module_utils::py_to_serde(py, value, "margin_spec")
 }
 
 #[pymethods]

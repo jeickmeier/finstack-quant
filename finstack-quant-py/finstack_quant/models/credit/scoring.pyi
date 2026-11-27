@@ -1722,7 +1722,7 @@ def zmijewski_score(input: ZmijewskiInput) -> ScoringResult:
     """
     ...
 
-def credit_score_report(request: str | dict[str, Any]) -> CreditScoreReport:
+def credit_score_report(request: dict[str, Any]) -> CreditScoreReport:
     """
     Score one model and grade its implied PD on the default PD master scale.
 
@@ -1732,8 +1732,8 @@ def credit_score_report(request: str | dict[str, Any]) -> CreditScoreReport:
 
     Parameters
     ----------
-    request : str | dict[str, Any]
-        ``CreditScoreRequest`` as a dict or JSON text: ``model`` (one of
+    request : dict[str, Any]
+        ``CreditScoreRequest`` as a dict: ``model`` (one of
         ``"altman_z_score"``, ``"altman_z_prime"``, ``"altman_z_double_prime"``,
         ``"altman_em_score"``, ``"ohlson_o_score"``, ``"zmijewski_score"``) and
         ``input`` (that model's input ratios by Rust field name, decimals;

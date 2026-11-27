@@ -65,7 +65,7 @@ impl PyAdjustment {
     #[pyo3(text_signature = "($self, cap)")]
     fn with_cap(&self, cap: &Bound<'_, PyAny>) -> PyResult<Self> {
         let cap: AdjustmentCap =
-            crate::bindings::module_utils::spec_from_py(cap.py(), cap, "adjustment cap")?;
+            crate::bindings::module_utils::py_to_serde(cap.py(), cap, "adjustment cap")?;
         Ok(Self {
             inner: self.inner.clone().with_cap(cap),
         })

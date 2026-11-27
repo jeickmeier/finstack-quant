@@ -4,9 +4,8 @@
 //! `LboCheckMappings`) and typed results (`CorporateValuationResult`,
 //! `DcfSensitivityResult`, `LboResult`, `CorporateAnalysis`) wrap the Rust
 //! types one-to-one. The Rust config types (`DcfOptions`, `LboConfig`) are
-//! taken in their serde form (dict or JSON string), where a typed input may
-//! sit in place of its nested dict; every other structured input also accepts
-//! the canonical JSON string.
+//! taken in their serde form (dict), where a typed input may
+//! sit in place of its nested dict. A string is a value, never JSON text.
 
 mod corporate;
 mod inputs;

@@ -621,7 +621,7 @@ pub(super) fn compute_multiple(
     Ok(core_compute_multiple(&metrics, multiple))
 }
 
-/// Extract scoring dimensions from typed objects, serde dicts, or JSON.
+/// Extract scoring dimensions from a list of typed objects or serde dicts.
 fn extract_dimensions(
     py: Python<'_>,
     dimensions: &Bound<'_, PyAny>,
@@ -632,12 +632,12 @@ fn extract_dimensions(
             .map(
                 |item| match item.extract::<PyRef<'_, PyScoringDimension>>() {
                     Ok(typed) => Ok(typed.inner.clone()),
-                    _ => crate::bindings::module_utils::spec_from_py(py, &item, "dimensions"),
+                    _ => crate::bindings::module_utils::py_to_serde(py, &item, "dimensions"),
                 },
             )
             .collect();
     }
-    crate::bindings::module_utils::spec_from_py(py, dimensions, "dimensions")
+    crate::bindings::module_utils::py_to_serde(py, dimensions, "dimensions")
 }
 
 /// Score a subject against its peers across weighted dimensions.
@@ -649,11 +649,11 @@ fn extract_dimensions(
 ///
 /// Parameters
 /// ----------
-/// peer_set : PeerSet | dict | str
-///     Typed peer set, or the canonical serde ``PeerSet`` payload as a dict or
-///     JSON string (``{"subject": ..., "peers": [...], "period_basis": "ltm"}``).
-/// dimensions : list[ScoringDimension | dict] | str
-///     Typed dimensions, canonical ``ScoringDimension`` dicts, or a JSON list.
+/// peer_set : PeerSet | dict
+///     Typed peer set, or the canonical serde ``PeerSet`` payload as a dict
+///     (``{"subject": ..., "peers": [...], "period_basis": "ltm"}``).
+/// dimensions : list[ScoringDimension | dict]
+///     Typed dimensions or canonical ``ScoringDimension`` dicts.
 ///
 /// Returns
 /// -------
@@ -685,7 +685,7 @@ pub(super) fn score_relative_value(
 ) -> PyResult<PyRelativeValueResult> {
     let peer_set: PeerSet = match peer_set.extract::<PyRef<'_, PyPeerSet>>() {
         Ok(typed) => typed.inner.clone(),
-        _ => crate::bindings::module_utils::spec_from_py(py, peer_set, "peer_set")?,
+        _ => crate::bindings::module_utils::py_to_serde(py, peer_set, "peer_set")?,
     };
     let dims = extract_dimensions(py, dimensions)?;
     let inner = core_score(&peer_set, &dims).map_err(core_to_py)?;

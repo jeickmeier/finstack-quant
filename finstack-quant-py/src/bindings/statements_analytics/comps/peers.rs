@@ -171,8 +171,7 @@ pub(super) fn dict_to_company_metrics(id: &str, d: &Bound<'_, PyDict>) -> PyResu
     Ok(CompanyMetrics::from_flat_metrics(id, values))
 }
 
-/// Extract a `CompanyMetrics` from a typed object, a dict of the serde shape,
-/// or a JSON string.
+/// Extract a `CompanyMetrics` from a typed object or a dict of the serde shape.
 pub(crate) fn extract_company_metrics(
     py: Python<'_>,
     obj: &Bound<'_, PyAny>,
@@ -180,7 +179,7 @@ pub(crate) fn extract_company_metrics(
     if let Ok(metrics) = obj.extract::<PyRef<'_, PyCompanyMetrics>>() {
         return Ok(metrics.inner.clone());
     }
-    crate::bindings::module_utils::spec_from_py(py, obj, "company_metrics")
+    crate::bindings::module_utils::py_to_serde(py, obj, "company_metrics")
 }
 
 /// Screening criteria for building a peer set from a universe.
@@ -309,9 +308,9 @@ wire_methods!(PyPeerFilter, PeerFilter, "PeerFilter");
 ///
 /// Parameters
 /// ----------
-/// subject : CompanyMetrics | dict | str
-///     The company being evaluated (typed, serde dict, or JSON).
-/// peers : list[CompanyMetrics | dict | str]
+/// subject : CompanyMetrics | dict
+///     The company being evaluated (typed or serde dict).
+/// peers : list[CompanyMetrics | dict]
 ///     Peer companies.
 /// period_basis : str
 ///     ``"ltm"``, ``"ntm"`` or a custom label such as ``"FY2025E"``.
@@ -360,9 +359,9 @@ impl PyPeerSet {
     ///
     /// Parameters
     /// ----------
-    /// subject : CompanyMetrics | dict | str
+    /// subject : CompanyMetrics | dict
     ///     The company being evaluated.
-    /// universe : list[CompanyMetrics | dict | str]
+    /// universe : list[CompanyMetrics | dict]
     ///     Candidate companies.
     /// filter : PeerFilter
     ///     Screening criteria.

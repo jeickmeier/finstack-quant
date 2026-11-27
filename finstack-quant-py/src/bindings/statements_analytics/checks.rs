@@ -4,7 +4,8 @@
 //! that drive the built-in three-statement and credit-underwriting suites, the
 //! suite runners (`run_checks`, `run_three_statement_checks`,
 //! `run_credit_underwriting_checks`) and the report renderers. Every entry
-//! point accepts the typed object or its canonical JSON string.
+//! point takes the typed object or its dict; JSON text is loaded with the
+//! class's `from_json`.
 
 use crate::bindings::macros::wire_methods;
 use crate::bindings::statements::checks::{PyCheckReport, PyCheckSuiteSpec};
@@ -457,7 +458,7 @@ impl PyCreditMapping {
 
 wire_methods!(PyCreditMapping, CreditMapping, "CreditMapping");
 
-/// Extract a `ThreeStatementMapping` from the typed object, a dict, or JSON.
+/// Extract a `ThreeStatementMapping` from the typed object or a dict.
 pub(crate) fn extract_three_statement_mapping(
     py: Python<'_>,
     obj: &Bound<'_, PyAny>,
@@ -465,10 +466,10 @@ pub(crate) fn extract_three_statement_mapping(
     if let Ok(typed) = obj.extract::<PyRef<'_, PyThreeStatementMapping>>() {
         return Ok(typed.inner.clone());
     }
-    crate::bindings::module_utils::spec_from_py(py, obj, "ThreeStatementMapping")
+    crate::bindings::module_utils::py_to_serde(py, obj, "ThreeStatementMapping")
 }
 
-/// Extract a `CreditMapping` from the typed object, a dict, or JSON.
+/// Extract a `CreditMapping` from the typed object or a dict.
 pub(crate) fn extract_credit_mapping(
     py: Python<'_>,
     obj: &Bound<'_, PyAny>,
@@ -476,11 +477,11 @@ pub(crate) fn extract_credit_mapping(
     if let Ok(typed) = obj.extract::<PyRef<'_, PyCreditMapping>>() {
         return Ok(typed.inner.clone());
     }
-    crate::bindings::module_utils::spec_from_py(py, obj, "CreditMapping")
+    crate::bindings::module_utils::py_to_serde(py, obj, "CreditMapping")
 }
 
-/// Extract a `CheckSuiteSpec` from the typed `finstack_quant.statements.CheckSuiteSpec`,
-/// a dict, or JSON.
+/// Extract a `CheckSuiteSpec` from the typed `finstack_quant.statements.CheckSuiteSpec`
+/// or a dict.
 pub(crate) fn extract_check_suite_spec(
     py: Python<'_>,
     obj: &Bound<'_, PyAny>,
@@ -488,10 +489,10 @@ pub(crate) fn extract_check_suite_spec(
     if let Ok(typed) = obj.extract::<PyRef<'_, PyCheckSuiteSpec>>() {
         return Ok(typed.inner.clone());
     }
-    crate::bindings::module_utils::spec_from_py(py, obj, "CheckSuiteSpec")
+    crate::bindings::module_utils::py_to_serde(py, obj, "CheckSuiteSpec")
 }
 
-/// Extract a `CheckReport` from the typed wrapper, a dict, or JSON.
+/// Extract a `CheckReport` from the typed wrapper or a dict.
 pub(crate) fn extract_check_report(
     py: Python<'_>,
     obj: &Bound<'_, PyAny>,
@@ -499,7 +500,7 @@ pub(crate) fn extract_check_report(
     if let Ok(typed) = obj.extract::<PyRef<'_, PyCheckReport>>() {
         return Ok(typed.inner.clone());
     }
-    crate::bindings::module_utils::spec_from_py(py, obj, "CheckReport")
+    crate::bindings::module_utils::py_to_serde(py, obj, "CheckReport")
 }
 
 fn run_check_suite(
@@ -529,9 +530,8 @@ fn run_check_suite(
 /// ----------
 /// model : FinancialModelSpec
 ///     A ``FinancialModelSpec``.
-/// spec : CheckSuiteSpec | dict | str
-///     Typed ``finstack_quant.statements.CheckSuiteSpec``, its serde dict, or
-///     JSON string.
+/// spec : CheckSuiteSpec | dict
+///     Typed ``finstack_quant.statements.CheckSuiteSpec`` or its serde dict.
 /// results : StatementResult | None
 ///     Pre-computed evaluation results, or a rollup of them
 ///     (``StatementResult.rollup``), which is checked at its target periods;
@@ -585,8 +585,8 @@ fn run_checks(
 /// ----------
 /// model : FinancialModelSpec
 ///     A ``FinancialModelSpec``.
-/// mapping : ThreeStatementMapping | dict | str
-///     Typed node mapping, its serde dict, or JSON string.
+/// mapping : ThreeStatementMapping | dict
+///     Typed node mapping or its serde dict.
 /// results : StatementResult | None
 ///     Pre-computed evaluation results; skips re-evaluation when provided.
 ///     Supplied accounting-node units must agree with the model's declarations
@@ -651,8 +651,8 @@ fn run_three_statement_checks(
 /// ----------
 /// model : FinancialModelSpec
 ///     A ``FinancialModelSpec``.
-/// mapping : CreditMapping | dict | str
-///     Typed node mapping, its serde dict, or JSON string.
+/// mapping : CreditMapping | dict
+///     Typed node mapping or its serde dict.
 /// results : StatementResult | None
 ///     Pre-computed evaluation results; skips re-evaluation when provided.
 ///
@@ -705,8 +705,8 @@ fn run_credit_underwriting_checks(
 ///
 /// Parameters
 /// ----------
-/// report : CheckReport | dict | str
-///     Typed report, its serde dict, or JSON string.
+/// report : CheckReport | dict
+///     Typed report or its serde dict.
 ///
 /// Returns
 /// -------
@@ -743,8 +743,8 @@ fn render_check_report_text(py: Python<'_>, report: &Bound<'_, PyAny>) -> PyResu
 ///
 /// Parameters
 /// ----------
-/// report : CheckReport | dict | str
-///     Typed report, its serde dict, or JSON string.
+/// report : CheckReport | dict
+///     Typed report or its serde dict.
 ///
 /// Returns
 /// -------

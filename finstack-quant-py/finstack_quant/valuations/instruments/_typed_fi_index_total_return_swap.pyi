@@ -481,12 +481,12 @@ class FiIndexTotalReturnSwapBuilder:
         """
         ...
 
-    def underlying(self, value: dict[str, object] | str) -> FiIndexTotalReturnSwapBuilder:
+    def underlying(self, value: dict[str, object]) -> FiIndexTotalReturnSwapBuilder:
         """Set the contract's underlying.
 
         Parameters
         ----------
-        value : dict[str, object] | str
+        value : dict[str, object]
             Underlying index parameters (index ID, yield, duration, base currency).
 
         Returns
@@ -501,12 +501,12 @@ class FiIndexTotalReturnSwapBuilder:
         """
         ...
 
-    def financing_leg(self, value: dict[str, object] | str) -> FiIndexTotalReturnSwapBuilder:
+    def financing_leg(self, value: dict[str, object]) -> FiIndexTotalReturnSwapBuilder:
         """Set the contract's financing leg.
 
         Parameters
         ----------
-        value : dict[str, object] | str
+        value : dict[str, object]
             Financing leg specification (curves, spread, day count).
 
         Returns
@@ -521,12 +521,12 @@ class FiIndexTotalReturnSwapBuilder:
         """
         ...
 
-    def schedule(self, value: dict[str, object] | str) -> FiIndexTotalReturnSwapBuilder:
+    def schedule(self, value: dict[str, object]) -> FiIndexTotalReturnSwapBuilder:
         """Set the contract's schedule.
 
         Parameters
         ----------
-        value : dict[str, object] | str
+        value : dict[str, object]
             Schedule specification (payment dates and frequency).
 
         Returns
@@ -601,12 +601,12 @@ class FiIndexTotalReturnSwapBuilder:
         """
         ...
 
-    def margin_spec(self, value: dict[str, object] | str | None) -> FiIndexTotalReturnSwapBuilder:
+    def margin_spec(self, value: dict[str, object] | None) -> FiIndexTotalReturnSwapBuilder:
         """Set the contract's margin spec.
 
         Parameters
         ----------
-        value : dict[str, object] | str | None
+        value : dict[str, object] | None
             Optional OTC margin specification for VM/IM. Fixed income index TRS use duration-based margin calculations.
 
         Returns
@@ -643,15 +643,14 @@ class FiIndexTotalReturnSwapBuilder:
         """
         ...
 
-    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> FiIndexTotalReturnSwapBuilder:
+    def instrument_pricing_overrides(self, value: dict[str, object]) -> FiIndexTotalReturnSwapBuilder:
         """
         Set the instrument-owned pricing inputs.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
-            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+        value : dict[str, object]
+            Rust ``InstrumentPricingOverrides`` in serde form (a ``dict``): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
             ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
 
         Returns
@@ -668,16 +667,15 @@ class FiIndexTotalReturnSwapBuilder:
         ...
 
     def metric_pricing_overrides(
-        self, value: MetricPricingOverrides | dict[str, object] | str
+        self, value: MetricPricingOverrides | dict[str, object]
     ) -> FiIndexTotalReturnSwapBuilder:
         """
         Set the metric-time pricing configuration stored on the instrument.
 
         Parameters
         ----------
-        value : MetricPricingOverrides | dict[str, object] | str
-            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
-            JSON string.
+        value : MetricPricingOverrides | dict[str, object]
+            Rust ``MetricPricingOverrides`` as the typed class or a ``dict``.
 
         Returns
         -------
@@ -692,15 +690,14 @@ class FiIndexTotalReturnSwapBuilder:
         """
         ...
 
-    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> FiIndexTotalReturnSwapBuilder:
+    def scenario_pricing_overrides(self, value: dict[str, object]) -> FiIndexTotalReturnSwapBuilder:
         """
         Set the scenario-only pricing adjustments.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
-            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+        value : dict[str, object]
+            Rust ``ScenarioPricingOverrides`` in serde form (a ``dict``), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
 
         Returns
         -------

@@ -30,21 +30,24 @@ class FactorModel:
     --------
     >>> import json, math
     >>> from finstack_quant.core.market_data import DiscountCurve, MarketContext
+    >>> from finstack_quant.models.factor import FactorModelConfig
     >>> from finstack_quant.portfolio import FactorModel, Portfolio
-    >>> config = json.dumps({
-    ...     "factors": [
-    ...         {
-    ...             "id": "usd_rates",
-    ...             "factor_type": "rates",
-    ...             "market_mapping": {"curve_parallel": {"curve_ids": ["USD-OIS"], "units": "rate_bp"}},
-    ...         }
-    ...     ],
-    ...     "covariance": {"factor_ids": ["usd_rates"], "n": 1, "data": [0.0001]},
-    ...     "matching": {
-    ...         "mapping_table": [{"dependency_filter": {}, "attribute_filter": {}, "factor_id": "usd_rates"}]
-    ...     },
-    ...     "risk_measure": "variance",
-    ... })
+    >>> config = FactorModelConfig.from_json(
+    ...     json.dumps({
+    ...         "factors": [
+    ...             {
+    ...                 "id": "usd_rates",
+    ...                 "factor_type": "rates",
+    ...                 "market_mapping": {"curve_parallel": {"curve_ids": ["USD-OIS"], "units": "rate_bp"}},
+    ...             }
+    ...         ],
+    ...         "covariance": {"factor_ids": ["usd_rates"], "n": 1, "data": [0.0001]},
+    ...         "matching": {
+    ...             "mapping_table": [{"dependency_filter": {}, "attribute_filter": {}, "factor_id": "usd_rates"}]
+    ...         },
+    ...         "risk_measure": "variance",
+    ...     })
+    ... )
     >>> deposit = {
     ...     "type": "deposit",
     ...     "spec": {
@@ -96,16 +99,17 @@ class FactorModel:
     """
 
     @staticmethod
-    def from_config(config: FactorModelConfig | str) -> FactorModel:
+    def from_config(config: FactorModelConfig) -> FactorModel:
         """
         Build a factor model from a declarative configuration.
 
         Parameters
         ----------
-        config : FactorModelConfig | str
-            Typed ``FactorModelConfig`` or its canonical JSON: factor
-            definitions, covariance matrix (axes in factor order), matching
-            rules, pricing mode, bump sizes and risk measure.
+        config : FactorModelConfig
+            Typed ``FactorModelConfig``: factor definitions, covariance matrix
+            (axes in factor order), matching rules, pricing mode, bump sizes
+            and risk measure. Load JSON text with
+            ``FactorModelConfig.from_json``.
 
         Returns
         -------
@@ -114,14 +118,17 @@ class FactorModel:
 
         Raises
         ------
+        TypeError
+            If ``config`` is not a ``FactorModelConfig``; JSON text and dicts
+            are refused.
         ValueError
-            If the JSON is malformed or does not match the ``FactorModelConfig``
-            schema, a matching rule names an undeclared factor, the covariance
-            axes do not align with the factors, or the risk measure is invalid.
+            If a matching rule names an undeclared factor, the covariance axes
+            do not align with the factors, or the risk measure is invalid.
 
         Examples
         --------
         >>> import json
+        >>> from finstack_quant.models.factor import FactorModelConfig
         >>> from finstack_quant.portfolio import FactorModel
         >>> config = {
         ...     "factors": [
@@ -138,7 +145,7 @@ class FactorModel:
         ...     "risk_measure": "variance",
         ... }
         >>> try:
-        ...     FactorModel.from_config(json.dumps(config))
+        ...     FactorModel.from_config(FactorModelConfig.from_json(json.dumps(config)))
         ... except ValueError as exc:
         ...     print("missing" in str(exc))
         True
@@ -243,7 +250,7 @@ class FactorModel:
         portfolio: Portfolio,
         market: MarketContext,
         as_of: datetime.date | str,
-        changes: list[dict[str, Any]] | str,
+        changes: list[dict[str, Any]],
     ) -> WhatIfResult:
         """
         Run a position remove/resize what-if against the model's baseline.
@@ -256,7 +263,7 @@ class FactorModel:
             Market used to value positions and compute sensitivities.
         as_of : datetime.date | str
             Valuation date of the analysis.
-        changes : list[dict[str, Any]] | str
+        changes : list[dict[str, Any]]
             ``PositionChange`` objects applied in order:
             ``{"kind": "remove", "position_id": ...}`` or
             ``{"kind": "resize", "position_id": ..., "new_quantity": ...}``.

@@ -217,7 +217,7 @@ premium=PremiumLegSpec(start='2025-03-20', end='2030-03-20', frequency=Tenor.qua
 protection=ProtectionLegSpec('ACME-HZD',.4,3)
 cds=(CreditDefaultSwap.builder().include_valuation_date_cashflows(False).id('TYPED-ACME-CDS').notional(Money(1_000_000,'USD')).side('pay')
  .convention('isda_na').premium_leg(premium).protection_leg(protection).build())
-inputs=calibration_envelope('base');fit=calibrate(json.dumps(inputs))
+inputs=calibration_envelope('base');fit=calibrate(inputs)
 value=price_instrument(cds,fit.market,AS_OF,model='hazard_rate',metrics=['par_spread'])
 print({'next_CDS_roll':next_cds_date(AS_OF),'next_futures_IMM':next_imm(AS_OF),'quote_strip':[q for q in inputs['market_data'] if q['kind']=='cds_quote']})
 print({'calibration_success':fit.success,'max_residual_tolerance_ratio':fit.report.max_residual_ratio,'CDS_price_USD':value.price,'par_spread_bp':value.get_metric('par_spread')})
@@ -250,7 +250,7 @@ for recovery in (0.4,0.25):
     envelope=calibration_envelope('base');envelope['plan']['steps'][-1]['recovery_rate']=recovery
     for quote in envelope['market_data']:
         if quote['kind']=='cds_quote':quote['recovery_rate']=recovery
-    fit=calibrate(json.dumps(envelope))
+    fit=calibrate(envelope)
     restored=MarketContext.from_json(fit.market.to_json())
     pds[recovery]=1-restored.get_hazard('ACME-HZD').sp(5)
 print({'fixed_hazard_5y_PD':1-fixed.sp(5),'fixed_quote_5y_PD':pds})

@@ -569,10 +569,10 @@ pub(super) fn extract_terminal_value(
     if let Ok(typed) = obj.extract::<PyRef<'_, PyTerminalValueSpec>>() {
         return Ok(typed.inner.clone());
     }
-    crate::bindings::module_utils::spec_from_py(py, obj, "terminal_value")
+    crate::bindings::module_utils::py_to_serde(py, obj, "terminal_value")
 }
 
-/// Rust `DcfOptions` from its serde form (a dict or JSON string, missing
+/// Rust `DcfOptions` from its serde form (a dict, missing
 /// fields taking their Rust defaults); `None` is `DcfOptions::default()`.
 pub(super) fn extract_dcf_options(
     py: Python<'_>,
@@ -583,7 +583,7 @@ pub(super) fn extract_dcf_options(
     {
         return Ok(options.inner.clone());
     }
-    obj.map(|obj| crate::bindings::module_utils::spec_from_py(py, obj, "options"))
+    obj.map(|obj| crate::bindings::module_utils::py_to_serde(py, obj, "options"))
         .transpose()
         .map(Option::unwrap_or_default)
 }

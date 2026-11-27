@@ -755,8 +755,8 @@ def render_check_report_html(report: Any) -> str:
 
     Parameters
     ----------
-    report : CheckReport | dict | str
-        Typed report, its serde dict, or JSON string.
+    report : CheckReport | dict
+        Typed report or its serde dict.
 
     Returns
     -------
@@ -771,7 +771,7 @@ def render_check_report_html(report: Any) -> str:
     Examples
     --------
     >>> from finstack_quant.statements_analytics import render_check_report_html
-    >>> render_check_report_html("{}")
+    >>> render_check_report_html({})
     Traceback (most recent call last):
     ValueError: ...
     """
@@ -781,8 +781,8 @@ def render_check_report_text(report: Any) -> str:
 
     Parameters
     ----------
-    report : CheckReport | dict | str
-        Typed report, its serde dict, or JSON string.
+    report : CheckReport | dict
+        Typed report or its serde dict.
 
     Returns
     -------
@@ -797,7 +797,7 @@ def render_check_report_text(report: Any) -> str:
     Examples
     --------
     >>> from finstack_quant.statements_analytics import render_check_report_text
-    >>> render_check_report_text("{}")
+    >>> render_check_report_text({})
     Traceback (most recent call last):
     ValueError: ...
     """
@@ -812,9 +812,8 @@ def run_checks(model: FinancialModelSpec, spec: Any, results: StatementResult | 
     ----------
     model : FinancialModelSpec
         A ``FinancialModelSpec``.
-    spec : CheckSuiteSpec | dict | str
-        Typed ``finstack_quant.statements.CheckSuiteSpec``, its serde dict, or
-        JSON string.
+    spec : CheckSuiteSpec | dict
+        Typed ``finstack_quant.statements.CheckSuiteSpec`` or its serde dict.
     results : StatementResult | None
         Pre-computed evaluation results, or a rollup of them
         (``StatementResult.rollup``), which is checked at its target periods;
@@ -872,8 +871,8 @@ def run_credit_underwriting_checks(
     ----------
     model : FinancialModelSpec
         A ``FinancialModelSpec``.
-    mapping : CreditMapping | dict | str
-        Typed node mapping, its serde dict, or JSON string.
+    mapping : CreditMapping | dict
+        Typed node mapping or its serde dict.
     results : StatementResult | None
         Pre-computed evaluation results; skips re-evaluation when provided.
 
@@ -908,8 +907,8 @@ def run_three_statement_checks(
     ----------
     model : FinancialModelSpec
         A ``FinancialModelSpec``.
-    mapping : ThreeStatementMapping | dict | str
-        Typed node mapping, its serde dict, or JSON string.
+    mapping : ThreeStatementMapping | dict
+        Typed node mapping or its serde dict.
     results : StatementResult | None
         Pre-computed evaluation results; skips re-evaluation when provided.
         Supplied accounting-node units must agree with the model's declarations

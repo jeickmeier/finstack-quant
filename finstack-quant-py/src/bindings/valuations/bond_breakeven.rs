@@ -135,7 +135,7 @@ fn bond_breakeven_ladder(
         .iter()
         .map(extract_tenor)
         .collect::<PyResult<Vec<_>>>()?;
-    let config = crate::bindings::module_utils::spec_from_py(py, config, "breakeven config")?;
+    let config = crate::bindings::module_utils::py_to_serde(py, config, "breakeven config")?;
     let bond = &bond.inner;
     let market_ref: &finstack_quant_core::market_data::context::MarketContext = market;
     py.detach(|| {

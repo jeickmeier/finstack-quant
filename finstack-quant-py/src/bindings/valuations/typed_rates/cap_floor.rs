@@ -8,7 +8,7 @@ use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::module_utils::spec_from_py;
+use crate::bindings::module_utils::py_to_serde;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 
@@ -451,7 +451,7 @@ impl PyCapFloorBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let convention: finstack_quant_valuations::instruments::rates::cap_floor::OvernightCouponConvention =
-            spec_from_py(py, value, "overnight_coupon")?;
+            py_to_serde(py, value, "overnight_coupon")?;
         builder_set!(
             slf,
             overnight_coupon,

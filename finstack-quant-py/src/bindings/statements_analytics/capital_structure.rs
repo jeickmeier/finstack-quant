@@ -1,5 +1,5 @@
 //! Debt stack by seniority (`capital_structure_summary`) over an evaluated
-//! capital structure. The request is the Rust serde form, a dict or JSON text,
+//! capital structure. The request is the Rust serde form, a dict,
 //! the same document WASM takes.
 
 use crate::bindings::core::money::PyMoney;
@@ -242,7 +242,7 @@ fn capital_structure_summary<'py>(
     let results = &results.inner;
     let model = &model.inner;
     let config: CapitalStructureSummaryConfig =
-        crate::bindings::module_utils::spec_from_py(py, config, "config")?;
+        crate::bindings::module_utils::py_to_serde(py, config, "config")?;
     let inner =
         analysis::capital_structure_summary(results, model, &config).map_err(statements_to_py)?;
     Ok(PyCapitalStructureSummary { inner })

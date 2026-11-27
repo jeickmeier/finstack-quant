@@ -157,7 +157,7 @@ def _engine_evaluate() -> Any:
     engine = CovenantEngine.from_template(covenants.CovenantTemplate.cov_lite(7.0, 4.5))
     return {
         "pass": wire(engine.evaluate({"total_leverage": 5.0, "senior_leverage": 3.0}, "2026-03-31")),
-        "breach": wire(engine.evaluate(json.dumps({"total_leverage": 7.5, "senior_leverage": 3.0}), "2026-03-31")),
+        "breach": wire(engine.evaluate({"total_leverage": 7.5, "senior_leverage": 3.0}, "2026-03-31")),
         "specs": wire(engine.specs),
         "waivers": wire(engine.waivers),
         "breach_history": wire(engine.breach_history),

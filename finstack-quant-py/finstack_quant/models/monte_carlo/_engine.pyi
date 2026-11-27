@@ -7,7 +7,7 @@ from typing import Any
 from .._closed_form import HestonParams, OptionContractParams
 from finstack_quant.models.monte_carlo._results import MoneyEstimate, PathSummary
 
-def simulate_paths(spec: dict[str, Any] | str) -> PathSummary:
+def simulate_paths(spec: dict[str, Any]) -> PathSummary:
     """
     Simulate paths of any built-in process on a shared time grid.
 
@@ -18,8 +18,8 @@ def simulate_paths(spec: dict[str, Any] | str) -> PathSummary:
 
     Parameters
     ----------
-    spec : dict or str
-        ``PathSimulationSpec`` as a dict or its JSON text, with keys:
+    spec : dict
+        ``PathSimulationSpec`` as a dict, with keys:
 
         - ``process`` : dict tagged by ``"type"`` plus that process's
           parameters. Rates, yields and volatilities are annualized decimals
@@ -205,21 +205,21 @@ def heston_satisfies_feller(kappa: float, theta: float, vol_of_vol: float) -> bo
     ...
 
 def price_heston(
-    contract: OptionContractParams | dict[str, Any] | str,
-    heston: HestonParams | dict[str, Any] | str,
-    settings: dict[str, Any] | str | None = None,
+    contract: OptionContractParams | dict[str, Any],
+    heston: HestonParams | dict[str, Any],
+    settings: dict[str, Any] | None = None,
 ) -> MoneyEstimate:
     """Price a European Heston option using quadratic-exponential Monte Carlo.
 
     Parameters
     ----------
-    contract : OptionContractParams or dict or str
+    contract : OptionContractParams or dict
         Spot and strike in quote currency, positive expiry in years, annual
         continuous rates and a call or put payoff.
-    heston : HestonParams or dict or str
+    heston : HestonParams or dict
         Validated opening variance and stochastic variance dynamics or their
         canonical structured form.
-    settings : dict or str, optional
+    settings : dict, optional
         Optional independent estimator count num_paths, Philox seed, uniform
         step count num_steps, and ISO result currency. Omitted keys use the
         registry defaults.

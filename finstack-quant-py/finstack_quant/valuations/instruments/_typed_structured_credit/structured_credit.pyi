@@ -45,7 +45,7 @@ class StructuredCredit:
         builder fields have no default), which the corresponding setters
         (``market_conditions``, ``waterfall_rules``, ``fees``,
         ``credit_model``, ``hedge_swaps`` ...) can override with typed
-        objects, dicts or JSON strings. Prefer :meth:`new_standard` for registry-calibrated deal-type
+        objects or dicts. Prefer :meth:`new_standard` for registry-calibrated deal-type
         defaults; use this builder for full manual control.
 
         Returns
@@ -1534,13 +1534,13 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def market_conditions(self, value: dict[str, Any] | str) -> StructuredCreditBuilder:
+    def market_conditions(self, value: dict[str, Any]) -> StructuredCreditBuilder:
         """
-        Set market conditions from a JSON object.
+        Set market conditions from a dict.
 
         Parameters
         ----------
-        value : dict[str, Any] | str
+        value : dict[str, Any]
             ``MarketConditions`` object with finite annual decimal ``refi_rate``
             for Richard-Roll refinancing incentives. Negative rates are accepted.
             This replaces the registry default; unknown macro-factor fields fail.
@@ -1557,14 +1557,14 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def waterfall_rules(self, value: dict[str, Any] | str) -> StructuredCreditBuilder:
+    def waterfall_rules(self, value: dict[str, Any]) -> StructuredCreditBuilder:
         """
-        Set declarative waterfall rules from a JSON object.
+        Set declarative waterfall rules from a dict.
 
         Parameters
         ----------
-        value : dict[str, Any] | str
-            JSON-encoded ``WaterfallRules`` object (available-funds caps,
+        value : dict[str, Any]
+            ``WaterfallRules`` dict (available-funds caps,
             step-down, shifting interest, controlled accumulation), layered
             onto the base waterfall.
 
@@ -1580,14 +1580,14 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def fees(self, value: dict[str, Any] | str) -> StructuredCreditBuilder:
+    def fees(self, value: dict[str, Any]) -> StructuredCreditBuilder:
         """
-        Set senior transaction fees from a JSON object.
+        Set senior transaction fees from a dict.
 
         Parameters
         ----------
-        value : dict[str, Any] | str
-            JSON-encoded ``DealFees`` object (trustee, senior management,
+        value : dict[str, Any]
+            ``DealFees`` dict (trustee, senior management,
             servicing, and optional master/special servicer fees), paid
             ahead of every note. Optional ``workout_fee_pct`` (percent of the
             P&I collected on specially serviced loans) and
@@ -1606,14 +1606,14 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def credit_model(self, value: dict[str, Any] | str) -> StructuredCreditBuilder:
+    def credit_model(self, value: dict[str, Any]) -> StructuredCreditBuilder:
         """
         Replace the whole credit model (prepayment, default, recovery,
         stochastic and correlation specs, delinquency and card models).
 
         Parameters
         ----------
-        value : dict[str, Any] | str
+        value : dict[str, Any]
             ``CreditModelConfig`` serde object. Later per-field setters
             (:meth:`prepayment_spec` ...) modify this model.
         Returns
@@ -1629,13 +1629,13 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def prepayment_spec(self, value: PrepaymentModelSpec | dict[str, Any] | str) -> StructuredCreditBuilder:
+    def prepayment_spec(self, value: PrepaymentModelSpec | dict[str, Any]) -> StructuredCreditBuilder:
         """
         Set the deterministic prepayment model.
 
         Parameters
         ----------
-        value : PrepaymentModelSpec | dict[str, Any] | str
+        value : PrepaymentModelSpec | dict[str, Any]
             Typed spec (``PrepaymentModelSpec.constant_cpr`` / ``psa`` / ``abs`` /
             ``vector`` / ``cmbs_with_lockout``) or its serde form.
         Returns
@@ -1651,13 +1651,13 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def default_spec(self, value: DefaultModelSpec | dict[str, Any] | str) -> StructuredCreditBuilder:
+    def default_spec(self, value: DefaultModelSpec | dict[str, Any]) -> StructuredCreditBuilder:
         """
         Set the deterministic default model.
 
         Parameters
         ----------
-        value : DefaultModelSpec | dict[str, Any] | str
+        value : DefaultModelSpec | dict[str, Any]
             Typed spec (``DefaultModelSpec.constant_cdr`` / ``sda`` / ``vector`` /
             ``cumulative_loss`` / ``timing``) or its serde form.
         Returns
@@ -1673,13 +1673,13 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def recovery_spec(self, value: RecoveryModelSpec | dict[str, Any] | str) -> StructuredCreditBuilder:
+    def recovery_spec(self, value: RecoveryModelSpec | dict[str, Any]) -> StructuredCreditBuilder:
         """
         Set the recovery model.
 
         Parameters
         ----------
-        value : RecoveryModelSpec | dict[str, Any] | str
+        value : RecoveryModelSpec | dict[str, Any]
             Typed spec (rate, lag, optional severity vector) or its serde form.
         Returns
         -------
@@ -1694,14 +1694,14 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def stochastic_prepay_spec(self, value: dict[str, Any] | str) -> StructuredCreditBuilder:
+    def stochastic_prepay_spec(self, value: dict[str, Any]) -> StructuredCreditBuilder:
         """
         Set the stochastic prepayment specification used by
         :meth:`StructuredCredit.price_stochastic`.
 
         Parameters
         ----------
-        value : dict[str, Any] | str
+        value : dict[str, Any]
             ``StochasticPrepaySpec`` serde object (Richard-Roll or factor
             parameters).
         Returns
@@ -1717,14 +1717,14 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def stochastic_default_spec(self, value: dict[str, Any] | str) -> StructuredCreditBuilder:
+    def stochastic_default_spec(self, value: dict[str, Any]) -> StructuredCreditBuilder:
         """
         Set the stochastic default specification used by
         :meth:`StructuredCredit.price_stochastic`.
 
         Parameters
         ----------
-        value : dict[str, Any] | str
+        value : dict[str, Any]
             ``StochasticDefaultSpec`` serde object.
         Returns
         -------
@@ -1739,14 +1739,14 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def stochastic_recovery_spec(self, value: dict[str, Any] | str) -> StructuredCreditBuilder:
+    def stochastic_recovery_spec(self, value: dict[str, Any]) -> StructuredCreditBuilder:
         """
         Set the stochastic recovery specification used by
         :meth:`StructuredCredit.price_stochastic`.
 
         Parameters
         ----------
-        value : dict[str, Any] | str
+        value : dict[str, Any]
             ``RecoverySpec`` serde object: ``{"type": "constant", "rate": 0.4}``
             or ``{"type": "market_correlated", "mean_recovery": 0.4,
             "recovery_volatility": 0.25, "factor_correlation": 0.4}`` (recovery
@@ -1766,14 +1766,14 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def correlation_structure(self, value: dict[str, Any] | str) -> StructuredCreditBuilder:
+    def correlation_structure(self, value: dict[str, Any]) -> StructuredCreditBuilder:
         """
         Set the default correlation structure used by
         :meth:`StructuredCredit.price_stochastic`.
 
         Parameters
         ----------
-        value : dict[str, Any] | str
+        value : dict[str, Any]
             ``CorrelationStructure`` serde object (factor loadings).
         Returns
         -------
@@ -1788,14 +1788,14 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def delinquency(self, value: dict[str, Any] | str) -> StructuredCreditBuilder:
+    def delinquency(self, value: dict[str, Any]) -> StructuredCreditBuilder:
         """
         Set the delinquency roll-rate, advancing and modification model
         (ABS/RMBS asset and rep-line pools).
 
         Parameters
         ----------
-        value : dict[str, Any] | str
+        value : dict[str, Any]
             ``DelinquencyModel`` serde object: ``roll_rates`` (per bucket, the
             last rolls to charge-off), ``cure_rates``, ``advancing``
             (``{"policy": "none"}`` or ``{"policy": "principal_and_interest",
@@ -1814,13 +1814,13 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def card(self, value: dict[str, Any] | str) -> StructuredCreditBuilder:
+    def card(self, value: dict[str, Any]) -> StructuredCreditBuilder:
         """
         Set the card master-trust portfolio model.
 
         Parameters
         ----------
-        value : dict[str, Any] | str
+        value : dict[str, Any]
             ``CardPortfolioSpec`` serde object: ``monthly_payment_rate``,
             ``portfolio_yield`` and ``charge_off_rate`` (annual decimals),
             plus the optional ``seller_interest`` (``Money`` serde object in
@@ -1840,13 +1840,13 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def coverage_triggers(self, value: list[dict[str, Any]] | str) -> StructuredCreditBuilder:
+    def coverage_triggers(self, value: list[dict[str, Any]]) -> StructuredCreditBuilder:
         """
         Set the deal-level OC / IC coverage tests.
 
         Parameters
         ----------
-        value : list[dict[str, Any]] | str
+        value : list[dict[str, Any]]
             ``CoverageTestSpec`` objects (``id``, ``tranche_id``, ``kind``
             (``"oc"`` / ``"ic"``), ``trigger_level`` ratio, ``action``, optional
             ``placement`` (``{"kind": "after_tranche", "tranche_id": ...}`` or
@@ -1864,13 +1864,13 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def coverage_rules(self, value: CoverageRules | dict[str, Any] | str) -> StructuredCreditBuilder:
+    def coverage_rules(self, value: CoverageRules | dict[str, Any]) -> StructuredCreditBuilder:
         """
         Set the collateral valuation rules for the coverage tests.
 
         Parameters
         ----------
-        value : CoverageRules | dict[str, Any] | str
+        value : CoverageRules | dict[str, Any]
             Typed :class:`CoverageRules` or its serde form.
         Returns
         -------
@@ -1885,13 +1885,13 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def call_assumption(self, value: CallAssumption | dict[str, Any] | str) -> StructuredCreditBuilder:
+    def call_assumption(self, value: CallAssumption | dict[str, Any]) -> StructuredCreditBuilder:
         """
         Set the assumed optional redemption for price-to-call analytics.
 
         Parameters
         ----------
-        value : CallAssumption | dict[str, Any] | str
+        value : CallAssumption | dict[str, Any]
             Typed :class:`CallAssumption` or its serde form (``date``,
             ``price_pct``, ``scope``).
         Returns
@@ -1907,13 +1907,13 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def waterfall(self, value: Waterfall | dict[str, Any] | str) -> StructuredCreditBuilder:
+    def waterfall(self, value: Waterfall | dict[str, Any]) -> StructuredCreditBuilder:
         """
         Set a custom priority of payments in place of the deal-type template.
 
         Parameters
         ----------
-        value : Waterfall | dict[str, Any] | str
+        value : Waterfall | dict[str, Any]
             Typed :class:`Waterfall` or its serde form (``tiers``,
             ``currency``, optional ``coverage_rules``).
         Returns
@@ -1929,15 +1929,14 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def hedge_swaps(self, value: list[HedgeSwap | dict[str, Any]] | str) -> StructuredCreditBuilder:
+    def hedge_swaps(self, value: list[HedgeSwap | dict[str, Any]]) -> StructuredCreditBuilder:
         """
         Set the interest-rate hedges settled through the waterfall.
 
         Parameters
         ----------
-        value : list[HedgeSwap | dict[str, Any]] | str
-            Typed :class:`HedgeSwap` objects, their serde dicts, or a JSON
-            array string.
+        value : list[HedgeSwap | dict[str, Any]]
+            Typed :class:`HedgeSwap` objects or their serde dicts.
         Returns
         -------
         StructuredCreditBuilder
@@ -2044,13 +2043,13 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def tranche_draws(self, value: list[dict[str, Any]] | str) -> StructuredCreditBuilder:
+    def tranche_draws(self, value: list[dict[str, Any]]) -> StructuredCreditBuilder:
         """
         Set the scheduled lender draws on notes after closing.
 
         Parameters
         ----------
-        value : list[dict[str, Any]] | str
+        value : list[dict[str, Any]]
             ``TrancheDraw`` serde objects ``{"tranche_id": "A", "date":
             "2025-01-01", "amount": {"amount": "5000000", "currency": "USD"}}``,
             ascending by date; each is applied on the first payment date at or
@@ -2070,14 +2069,14 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def tranche_readvance(self, value: dict[str, Any] | str) -> StructuredCreditBuilder:
+    def tranche_readvance(self, value: dict[str, Any]) -> StructuredCreditBuilder:
         """
         Set the per-period re-advance of one note up to its commitment and the
         borrowing base while the deal revolves.
 
         Parameters
         ----------
-        value : dict[str, Any] | str
+        value : dict[str, Any]
             ``TrancheReadvance`` serde object ``{"tranche_id": "A",
             "commitment": {"amount": "70000000", "currency": "USD"}}``; requires
             ``coverage_rules.borrowing_base``.
@@ -2119,13 +2118,13 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def deal_metadata(self, value: dict[str, Any] | str) -> StructuredCreditBuilder:
+    def deal_metadata(self, value: dict[str, Any]) -> StructuredCreditBuilder:
         """
         Set deal metadata (counterparties, identifiers).
 
         Parameters
         ----------
-        value : dict[str, Any] | str
+        value : dict[str, Any]
             ``Metadata`` serde object.
         Returns
         -------
@@ -2140,15 +2139,14 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> StructuredCreditBuilder:
+    def instrument_pricing_overrides(self, value: dict[str, object]) -> StructuredCreditBuilder:
         """
         Set the instrument-owned pricing inputs.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
-            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+        value : dict[str, object]
+            Rust ``InstrumentPricingOverrides`` in serde form (a ``dict``): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
             ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
 
         Returns
@@ -2163,17 +2161,14 @@ class StructuredCreditBuilder:
             not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def metric_pricing_overrides(
-        self, value: MetricPricingOverrides | dict[str, object] | str
-    ) -> StructuredCreditBuilder:
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object]) -> StructuredCreditBuilder:
         """
         Set the metric-time pricing configuration stored on the instrument.
 
         Parameters
         ----------
-        value : MetricPricingOverrides | dict[str, object] | str
-            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
-            JSON string.
+        value : MetricPricingOverrides | dict[str, object]
+            Rust ``MetricPricingOverrides`` as the typed class or a ``dict``.
 
         Returns
         -------
@@ -2187,15 +2182,14 @@ class StructuredCreditBuilder:
             not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> StructuredCreditBuilder:
+    def scenario_pricing_overrides(self, value: dict[str, object]) -> StructuredCreditBuilder:
         """
         Set the scenario-only pricing adjustments.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
-            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+        value : dict[str, object]
+            Rust ``ScenarioPricingOverrides`` in serde form (a ``dict``), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
 
         Returns
         -------

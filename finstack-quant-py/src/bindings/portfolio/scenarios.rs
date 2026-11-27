@@ -56,7 +56,7 @@ fn apply_scenario_and_revalue(
     let portfolio = &portfolio.inner;
     let scenario = scenario.inner.clone();
     let market = &market.inner;
-    let options = crate::bindings::module_utils::opt_spec_from_py::<
+    let options = crate::bindings::module_utils::opt_py_to_serde::<
         finstack_quant_portfolio::valuation::PortfolioValuationOptions,
     >(py, options, "PortfolioValuationOptions")?;
     let config = finstack_quant_core::config::FinstackConfig::default();

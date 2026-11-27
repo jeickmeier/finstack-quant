@@ -712,7 +712,7 @@ class MertonReport:
         """
         ...
 
-def merton_report(request: str | dict[str, Any]) -> MertonReport:
+def merton_report(request: dict[str, Any]) -> MertonReport:
     """
     Compute a Merton report in one call.
 
@@ -722,8 +722,8 @@ def merton_report(request: str | dict[str, Any]) -> MertonReport:
 
     Parameters
     ----------
-    request : str | dict[str, Any]
-        ``MertonReportRequest`` as a dict or JSON text: ``source`` (``{"kind":
+    request : dict[str, Any]
+        ``MertonReportRequest`` as a dict: ``source`` (``{"kind":
         "model", "model": ...}`` with canonical `MertonModel` JSON, or
         ``{"kind": "equity", "equity_value", "equity_vol", "short_term_debt",
         "long_term_debt", "risk_free_rate", "payout_rate", "maturity"}`` in the

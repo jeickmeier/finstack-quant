@@ -43,8 +43,9 @@ class TestSwaptionTyped:
     def test_every_vol_model_literal_value_accepted(self, value: str) -> None:
         assert _payer_swaption(vol_model=value).id == "SWPT-1"
 
-    def test_sabr_params_json_string_accepted(self) -> None:
+    def test_sabr_params_dict_accepted_and_json_string_refused(self) -> None:
         fixed, float_leg = _legs()
+        sabr = {"alpha": 0.025, "beta": 0.5, "nu": 0.4, "rho": -0.3, "shift": None}
         swpt = (
             Swaption
             .builder()
@@ -58,11 +59,13 @@ class TestSwaptionTyped:
             .vol_surface_id("USD-SWPT-VOL")
             .underlying_fixed_leg(fixed)
             .underlying_float_leg(float_leg)
-            .sabr_params(json.dumps({"alpha": 0.025, "beta": 0.5, "nu": 0.4, "rho": -0.3, "shift": None}))
+            .sabr_params(json.loads(json.dumps(sabr)))
             .build()
         )
         payload = json.loads(swpt.to_json())
         assert payload["instrument"]["spec"]["sabr_params"]["alpha"] == 0.025
+        with pytest.raises(ValueError, match="invalid sabr_params: invalid type: string"):
+            Swaption.builder().sabr_params(json.dumps(sabr))
 
     def test_retired_exercise_style_is_rejected(self) -> None:
         payload = json.loads(Swaption.example().to_json())

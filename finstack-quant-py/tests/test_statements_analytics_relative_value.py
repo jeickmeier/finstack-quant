@@ -190,11 +190,15 @@ def test_misspelt_company_metric_raises_value_error() -> None:
         relative_value_report(SUBJECT, [misspelt], CONFIG)
 
 
-def test_accepts_serde_documents_and_json_text() -> None:
+def test_accepts_serde_documents_not_json_text() -> None:
     subject = json.loads(SUBJECT.to_json())
     universe = [json.loads(company.to_json()) for company in UNIVERSE]
-    from_documents = relative_value_report(subject, universe, json.dumps(CONFIG))
+    from_documents = relative_value_report(subject, universe, json.loads(json.dumps(CONFIG)))
     assert from_documents.to_json() == relative_value_report(SUBJECT, UNIVERSE, CONFIG).to_json()
+    with pytest.raises(ValueError, match="invalid config: invalid type: string"):
+        relative_value_report(subject, universe, json.dumps(CONFIG))
+    with pytest.raises(ValueError, match="invalid company_metrics: invalid type: string"):
+        relative_value_report(SUBJECT.to_json(), universe, CONFIG)
 
 
 def test_extractors_keep_their_kind_as_wasm_does() -> None:
@@ -209,12 +213,13 @@ def test_extractors_keep_their_kind_as_wasm_does() -> None:
     assert [(d.y, d.x) for d in report.dimensions] == [(w["y"], w["x"]) for w in wire]
 
 
-def test_universe_accepts_one_json_array_text() -> None:
+def test_universe_refuses_one_json_array_text() -> None:
     universe = json.dumps([json.loads(company.to_json()) for company in UNIVERSE])
-    from_text = relative_value_report(SUBJECT, universe, CONFIG)
+    from_text = relative_value_report(SUBJECT, json.loads(universe), CONFIG)
     assert from_text.to_json() == relative_value_report(SUBJECT, UNIVERSE, CONFIG).to_json()
-    with pytest.raises(ValueError, match="universe"):
-        relative_value_report(SUBJECT, "[{]", CONFIG)
+    for text in (universe, "[{]"):
+        with pytest.raises(TypeError, match="universe must be a list"):
+            relative_value_report(SUBJECT, text, CONFIG)
 
 
 def test_to_dataframe_has_one_row_per_company() -> None:

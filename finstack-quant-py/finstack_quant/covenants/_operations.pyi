@@ -133,7 +133,7 @@ def validate_covenant_engine_json(engine_json: str) -> str:
     ['breach_history', 'specs', 'waivers', 'windows']
     """
 
-def evaluate_engine(engine_json: str, metrics: dict[str, float] | str, as_of: DateLike) -> dict[str, CovenantReport]:
+def evaluate_engine(engine_json: str, metrics: dict[str, float], as_of: DateLike) -> dict[str, CovenantReport]:
     """
     Evaluate a covenant engine JSON document against a metric mapping.
 
@@ -145,12 +145,12 @@ def evaluate_engine(engine_json: str, metrics: dict[str, float] | str, as_of: Da
     engine_json : str
         Serialized engine (``CovenantEngine.to_json()`` or a hand-written
         document; only ``specs`` is required).
-    metrics : dict[str, float] | str
-        Metric values keyed by metric id, or a JSON object string. Ratios in
-        turns, amounts in the reporting currency. A dict is handed to Rust as
-        numbers, exactly as :meth:`CovenantEngine.evaluate` does: a NaN or
-        infinite value fails only when a covenant reads that metric. Every
-        value of a JSON string must be a JSON number.
+    metrics : dict[str, float]
+        Metric values keyed by metric id. Ratios in turns, amounts in the
+        reporting currency. The dict is handed to Rust as numbers, exactly as
+        :meth:`CovenantEngine.evaluate` does: a NaN or infinite value fails
+        only when a covenant reads that metric. JSON text is not read; load
+        it with ``json.loads`` first.
     as_of : datetime.date | str
         Evaluation date, a date-like object or an ISO 8601 string.
 

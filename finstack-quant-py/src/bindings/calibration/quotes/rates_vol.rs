@@ -6,7 +6,7 @@ use crate::bindings::date_utils::py_to_date;
 use crate::bindings::extract::{extract_basis_points, extract_rate_decimal};
 use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::macros::wire_methods;
-use crate::bindings::module_utils::{py_to_serde, spec_from_py};
+use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::core_to_py;
@@ -312,7 +312,7 @@ impl PyCdsQuote {
     #[pyo3(text_signature = "(params)")]
     fn upfront(params: &Bound<'_, PyAny>) -> PyResult<Self> {
         let mut fields: Map<String, Value> =
-            spec_from_py(params.py(), params, "CdsQuote.upfront params")?;
+            py_to_serde(params.py(), params, "CdsQuote.upfront params")?;
         fields.insert("type".to_string(), Value::from("cds_upfront"));
         let quote: CdsQuote = from_value(Value::Object(fields), "CdsQuote.upfront params")?;
         quote.validate().map_err(core_to_py)?;

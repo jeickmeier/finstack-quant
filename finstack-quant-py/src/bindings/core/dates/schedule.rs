@@ -101,12 +101,8 @@ typed_or_label!(
     |label| label.parse().map_err(core_to_py)
 );
 
-/// Convert a Python spec (``dict`` or JSON string) into a [`ScheduleSpec`].
+/// Convert a Python spec ``dict`` into a [`ScheduleSpec`].
 fn extract_schedule_spec(obj: &Bound<'_, PyAny>) -> PyResult<ScheduleSpec> {
-    if let Ok(json) = obj.extract::<String>() {
-        return serde_json::from_str(&json)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid ScheduleSpec JSON"));
-    }
     crate::bindings::module_utils::py_to_serde(obj.py(), obj, "ScheduleSpec")
 }
 
@@ -162,7 +158,7 @@ impl PySchedule {
         })
     }
 
-    /// Build a schedule from a serialized spec (``dict`` or JSON string)
+    /// Build a schedule from a serialized spec (a ``dict``)
     /// with the canonical ``ScheduleSpec`` fields (``start``, ``end``,
     /// ``frequency``, ``stub``, ``grid``,
     /// ``business_day_convention``, ``calendar_id``, and the optional

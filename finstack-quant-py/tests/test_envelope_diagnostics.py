@@ -61,14 +61,14 @@ def test_parametric_step_rejects_removed_separate_discount_option() -> None:
 
 
 def test_dry_run_returns_json_report() -> None:
-    report = dry_run(json.dumps(_empty_envelope()))
+    report = dry_run(_empty_envelope())
     assert report.errors == []
     assert report.is_valid
     assert "dependency_graph" in json.loads(report.to_json())
 
 
 def test_calibration_result_pickles_through_top_level_module() -> None:
-    result = calibrate(json.dumps(_empty_envelope()))
+    result = calibrate(_empty_envelope())
     restored = pickle.loads(pickle.dumps(result))  # noqa: S301 - trusted in-process round trip
     assert restored.success is True
     assert type(restored).__module__ == "finstack_quant.calibration"
@@ -87,7 +87,7 @@ def test_dry_run_surfaces_undefined_quote_set_with_suggestion() -> None:
             "base_date": "2026-05-08",
         }
     ]
-    report = json.loads(dry_run(json.dumps(envelope)).to_json())
+    report = json.loads(dry_run(envelope).to_json())
     undef = next(
         (e for e in report["errors"] if e["kind"] == "undefined_quote_set"),
         None,
@@ -114,7 +114,7 @@ def test_calibration_entry_points_enforce_semantic_validation(
     ]
 
     with pytest.raises(CalibrationEnvelopeError) as excinfo:
-        operation(json.dumps(envelope))
+        operation(envelope)
 
     assert excinfo.value.kind == "undefined_quote_set"
     details = json.loads(excinfo.value.details)
@@ -140,8 +140,11 @@ def test_calibration_envelope_error_inherits_runtime_error() -> None:
 def test_all_calibration_entry_points_expose_execution_error_details(
     operation: Callable[[str], object],
 ) -> None:
-    with pytest.raises(CalibrationEnvelopeError) as excinfo:
+    # JSON text is refused; a document that fails the strict load reaches each entry point as a dict.
+    with pytest.raises(TypeError, match="load JSON text with CalibrationEnvelope"):
         operation("{ malformed")
+    with pytest.raises(CalibrationEnvelopeError) as excinfo:
+        operation({})
 
     exc = excinfo.value
     assert exc.kind == "strict_load"
@@ -173,15 +176,17 @@ def test_runtime_error_handler_catches_calibration_envelope_error() -> None:
     keep functioning.
     """
     with pytest.raises(RuntimeError) as excinfo:
-        dry_run("garbage")
+        dry_run({})
     assert isinstance(excinfo.value, CalibrationEnvelopeError)
 
 
 @pytest.mark.parametrize("entry", [calibrate, dry_run, validate_calibration])
 def test_malformed_json_reports_the_rust_parse_diagnostic(entry: Callable[[str], object]) -> None:
-    # A str goes straight to the Rust strict loader (same diagnostic as WASM).
-    with pytest.raises(CalibrationEnvelopeError) as info:
+    # JSON text goes through `CalibrationEnvelope.from_json`, the Rust strict loader (same diagnostic as WASM).
+    with pytest.raises(TypeError, match="load JSON text with CalibrationEnvelope"):
         entry("not json")
+    with pytest.raises(CalibrationEnvelopeError) as info:
+        entry(CalibrationEnvelope.from_json("not json"))
     assert info.value.kind == "strict_load"
     assert info.value.diagnostics[0]["code"] == "contract/parse-error"
     assert info.value.diagnostics[0]["pointer"] is None
@@ -195,7 +200,7 @@ def test_unusable_solver_settings_are_rejected_everywhere(solver: dict) -> None:
     envelope["plan"]["settings"] = {"solver": solver}
     for entry in (calibrate, dry_run, validate_calibration):
         with pytest.raises(CalibrationEnvelopeError, match=r"solver (tolerance|max_iterations)"):
-            entry(json.dumps(envelope))
+            entry(envelope)
     with pytest.raises(ValueError, match=r"solver (tolerance|max_iterations)"):
         SolverConfig.from_json(json.dumps(solver))
     with pytest.raises(ValueError, match=r"solver (tolerance|max_iterations)"):
@@ -205,7 +210,7 @@ def test_unusable_solver_settings_are_rejected_everywhere(solver: dict) -> None:
 
 
 def test_dry_run_report_serializes() -> None:
-    report = dry_run(json.dumps(_empty_envelope()))
+    report = dry_run(_empty_envelope())
     assert json.loads(report.to_json())["errors"] == report.errors
 
 

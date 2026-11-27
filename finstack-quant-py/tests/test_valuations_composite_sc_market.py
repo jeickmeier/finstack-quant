@@ -120,8 +120,10 @@ def test_history_engine_accepts_observation_lists() -> None:
     state = json.loads(MarketContext().to_json())
     observations = [{"date": "2025-01-01", "state": state}, {"date": "2025-01-02", "state": state}]
     via_list = history_from_spec(_fixed_spec(), observations)
-    via_json = history_from_spec(_fixed_spec(), json.dumps(observations))
+    via_json = history_from_spec(_fixed_spec(), json.loads(json.dumps(observations)))
     assert via_list.to_json() == via_json.to_json()
+    with pytest.raises(ValueError, match="invalid composite observations: invalid type: string"):
+        history_from_spec(_fixed_spec(), json.dumps(observations))
     assert via_list.dates == ["2025-01-01", "2025-01-02"]
     assert list(via_list.to_pandas()["return_index"]) == [100.0, 100.0]
     assert via_list.to_arrow().num_rows == 2
@@ -332,9 +334,11 @@ def test_unknown_tranche_raises_key_error_and_grid_accepts_dict() -> None:
     grid = {"cprs": [0.10], "cdrs": [0.02], "severities": [0.40]}
     via_dict = tranche_scenario_table(deal, tranche_id, _market(), "2024-01-01", grid)
     via_json = tranche_scenario_table(
-        instrument=deal, tranche_id=tranche_id, market=_market(), as_of="2024-01-01", grid=json.dumps(grid)
+        instrument=deal, tranche_id=tranche_id, market=_market(), as_of="2024-01-01", grid=json.loads(json.dumps(grid))
     )
     assert via_dict.to_json() == via_json.to_json()
+    with pytest.raises(ValueError, match="invalid type: string"):
+        tranche_scenario_table(deal, tranche_id, _market(), "2024-01-01", json.dumps(grid))
     assert via_dict._repr_html_() == via_dict.to_arrow()._repr_html_()
 
 

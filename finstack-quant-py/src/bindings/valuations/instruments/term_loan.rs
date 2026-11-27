@@ -9,7 +9,7 @@ use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::json_bridge::serde_to_py;
-use crate::bindings::module_utils::spec_from_py;
+use crate::bindings::module_utils::py_to_serde;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 
@@ -284,8 +284,7 @@ impl PyTermLoanBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let (spec, shown) = if value.extract::<&str>().is_ok() || value.cast::<PyDict>().is_ok() {
-            let spec: finstack_quant_cashflows::builder::RateSpec =
-                spec_from_py(py, value, "rate")?;
+            let spec: finstack_quant_cashflows::builder::RateSpec = py_to_serde(py, value, "rate")?;
             (spec, "{...}".to_string())
         } else {
             let rate = rate_from_py(value, "rate")?;
@@ -434,14 +433,12 @@ impl PyTermLoanBuilder {
         py: Python<'py>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        // A bare name (`"bullet"`) is a unit variant; JSON text, dicts and
-        // typed specs go through the shared spec coercer.
+        // A string is the label of a unit variant (`"none"`); dicts and typed
+        // specs go through the shared serde coercer.
         let spec: finstack_quant_cashflows::builder::AmortizationSpec =
             match value.extract::<&str>() {
-                Ok(name) if !name.trim_start().starts_with(['{', '"']) => {
-                    enum_from_str(name, "amortization")?
-                }
-                _ => spec_from_py(py, value, "amortization")?,
+                Ok(name) => enum_from_str(name, "amortization")?,
+                _ => py_to_serde(py, value, "amortization")?,
             };
         builder_set!(
             slf,
@@ -473,7 +470,7 @@ impl PyTermLoanBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         use finstack_quant_valuations::instruments::fixed_income::loan_terms::UpfrontFee;
-        let fee: UpfrontFee = spec_from_py(value.py(), value, "upfront_fee")?;
+        let fee: UpfrontFee = py_to_serde(value.py(), value, "upfront_fee")?;
         builder_set!(
             slf,
             upfront_fee,
@@ -490,7 +487,7 @@ impl PyTermLoanBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::term_loan::DdtlSpec =
-            spec_from_py(py, value, "ddtl")?;
+            py_to_serde(py, value, "ddtl")?;
         builder_set!(slf, ddtl, "{...}".to_string(), |b: TermLoanBuilder| b
             .ddtl(spec))
     }
@@ -503,7 +500,7 @@ impl PyTermLoanBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoanCovenantEvents =
-            spec_from_py(py, value, "covenants")?;
+            py_to_serde(py, value, "covenants")?;
         builder_set!(slf, covenants, "{...}".to_string(), |b: TermLoanBuilder| b
             .covenants(spec))
     }
@@ -516,7 +513,7 @@ impl PyTermLoanBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::loan_terms::OidEirSpec =
-            spec_from_py(py, value, "oid_eir")?;
+            py_to_serde(py, value, "oid_eir")?;
         builder_set!(slf, oid_eir, "{...}".to_string(), |b: TermLoanBuilder| b
             .oid_eir(spec))
     }
@@ -529,7 +526,7 @@ impl PyTermLoanBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::term_loan::LoanCallSchedule =
-            spec_from_py(py, value, "call_schedule")?;
+            py_to_serde(py, value, "call_schedule")?;
         builder_set!(
             slf,
             call_schedule,

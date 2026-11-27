@@ -783,7 +783,7 @@ class RevolvingCreditBuilder:
     ``issue_date``, ``maturity``, ``rate``, ``day_count``,
     ``frequency``, ``fees``, ``draw_repay_spec``,
     ``discount_curve_id`` and ``recovery_rate``. Nested specs accept a
-    ``dict`` or JSON ``str`` in the Rust serde shape.
+    ``dict`` in the Rust serde shape.
 
     Examples
     --------
@@ -922,15 +922,14 @@ class RevolvingCreditBuilder:
             If ``value`` is not a date or the builder was already consumed.
         """
         ...
-    def rate(self, value: float | Rate | Bps | dict[str, Any] | str) -> RevolvingCreditBuilder:
+    def rate(self, value: float | Rate | Bps | dict[str, Any]) -> RevolvingCreditBuilder:
         """
         Set the facility coupon.
 
         Parameters
         ----------
-        value : float | Rate | Bps | dict[str, Any] | str
-            A bare decimal, ``Rate`` or ``Bps`` builds a fixed rate (``0.06`` = 6%); a ``dict`` or
-            JSON ``str`` in the ``RateSpec`` serde shape
+        value : float | Rate | Bps | dict[str, Any]
+            A bare decimal, ``Rate`` or ``Bps`` builds a fixed rate (``0.06`` = 6%); a ``dict`` in the ``RateSpec`` serde shape
             (``{"fixed": {"rate": 0.06}}`` or ``{"floating": {...}}`` with a
             ``FloatingRateSpec``) is used verbatim.
 
@@ -1037,14 +1036,14 @@ class RevolvingCreditBuilder:
             If ``value`` is neither ``Tenor`` nor ``str``.
         """
         ...
-    def fees(self, value: dict[str, Any] | str) -> RevolvingCreditBuilder:
+    def fees(self, value: dict[str, Any]) -> RevolvingCreditBuilder:
         """
         Set the fee structure from its serde shape.
 
         Parameters
         ----------
-        value : dict[str, Any] | str
-            ``RevolvingCreditFees`` as a ``dict`` or JSON ``str``
+        value : dict[str, Any]
+            ``RevolvingCreditFees`` as a ``dict``
             (``upfront_fee`` as ``None``, ``{"amount": Money-dict}`` or
             ``{"fraction_of_commitment": 0.02}``; ``commitment_fee_tiers``,
             ``usage_fee_tiers``, ``facility_fee_bp`` and the dated ``steps`` list of
@@ -1063,15 +1062,15 @@ class RevolvingCreditBuilder:
             already consumed.
         """
         ...
-    def commitment_steps(self, value: list[dict[str, Any]] | str) -> RevolvingCreditBuilder:
+    def commitment_steps(self, value: list[dict[str, Any]]) -> RevolvingCreditBuilder:
         """
         Set the scheduled commitment changes.
 
         Parameters
         ----------
-        value : list[dict[str, Any]] | str
+        value : list[dict[str, Any]]
             Rows of ``{"date": "YYYY-MM-DD", "amount": Money-dict,
-            "reduction_fee_bp": str}`` (a ``list`` of dicts or a JSON ``str``),
+            "reduction_fee_bp": str}`` (a ``list`` of dicts),
             each the commitment in force from its date; ``reduction_fee_bp`` is
             the one-off reduction fee on a step down, a decimal string in basis
             points of the reduced amount (default ``"0"``). Dates must
@@ -1090,15 +1089,14 @@ class RevolvingCreditBuilder:
             already consumed; ordering and feasibility fail at ``build()``.
         """
         ...
-    def scheduled_fees(self, value: list[dict[str, Any]] | str) -> RevolvingCreditBuilder:
+    def scheduled_fees(self, value: list[dict[str, Any]]) -> RevolvingCreditBuilder:
         """
         Set the dated fixed fees (amendment, waiver, extension, consent).
 
         Parameters
         ----------
-        value : list[dict[str, Any]] | str
-            Rows of ``{"date": "YYYY-MM-DD", "amount": Money-dict}`` (a
-            ``list`` of dicts or a JSON ``str``), each paid on its date. Dates
+        value : list[dict[str, Any]]
+            Rows of ``{"date": "YYYY-MM-DD", "amount": Money-dict}`` (a ``list`` of dicts), each paid on its date. Dates
             must lie after the commitment date and on or before maturity.
 
         Returns
@@ -1113,14 +1111,14 @@ class RevolvingCreditBuilder:
             already consumed; date and sign checks fail at ``build()``.
         """
         ...
-    def oid_eir(self, value: dict[str, Any] | str | None) -> RevolvingCreditBuilder:
+    def oid_eir(self, value: dict[str, Any] | None) -> RevolvingCreditBuilder:
         """
         Set the effective-interest-rate reporting switch.
 
         Parameters
         ----------
-        value : dict[str, Any] | str | None
-            ``{"include_fees": bool}`` as a ``dict`` or JSON ``str``; ``None``
+        value : dict[str, Any] | None
+            ``{"include_fees": bool}`` as a ``dict``; ``None``
             (the default) includes fees in the effective yield.
 
         Returns
@@ -1135,14 +1133,14 @@ class RevolvingCreditBuilder:
             already consumed.
         """
         ...
-    def lc(self, value: dict[str, Any] | str | None) -> RevolvingCreditBuilder:
+    def lc(self, value: dict[str, Any] | None) -> RevolvingCreditBuilder:
         """
         Set the letter-of-credit sub-facility.
 
         Parameters
         ----------
-        value : dict[str, Any] | str | None
-            ``LetterOfCreditSpec`` as a ``dict`` or JSON ``str`` with
+        value : dict[str, Any] | None
+            ``LetterOfCreditSpec`` as a ``dict`` with
             ``sublimit`` and ``outstanding`` (Money dicts), ``events`` (rows
             of ``{"date", "amount", "is_issue"}``), ``fee_bp`` (``None``
             accrues the floating margin), ``fronting_fee_bp`` and ``leq`` (the
@@ -1161,16 +1159,16 @@ class RevolvingCreditBuilder:
             already consumed; sublimit and capacity checks fail at ``build()``.
         """
         ...
-    def margin_steps(self, value: list[dict[str, Any]] | str) -> RevolvingCreditBuilder:
+    def margin_steps(self, value: list[dict[str, Any]]) -> RevolvingCreditBuilder:
         """
         Set the dated margin steps.
 
         Parameters
         ----------
-        value : list[dict[str, Any]] | str
+        value : list[dict[str, Any]]
             Rows of ``{"date": "YYYY-MM-DD", "delta_bp": str}`` (a decimal
             string in basis points; a ``list`` of
-            dicts or a JSON ``str``); each delta shifts the floating spread or
+            dicts); each delta shifts the floating spread or
             the fixed rate from its date, cumulatively. Dates must be strictly
             increasing and strictly inside the facility life.
 
@@ -1186,14 +1184,14 @@ class RevolvingCreditBuilder:
             already consumed; ordering fails at ``build()``.
         """
         ...
-    def draw_repay_spec(self, value: dict[str, Any] | str) -> RevolvingCreditBuilder:
+    def draw_repay_spec(self, value: dict[str, Any]) -> RevolvingCreditBuilder:
         """
         Set the draw/repay specification from its serde shape.
 
         Parameters
         ----------
-        value : dict[str, Any] | str
-            ``DrawRepaySpec`` as a ``dict`` or JSON ``str``:
+        value : dict[str, Any]
+            ``DrawRepaySpec`` as a ``dict``:
             ``{"deterministic": [{"date": ..., "amount": Money, "is_draw": bool}, ...]}``
             or ``{"stochastic": {"utilization_process": {...}, "mc_config": ...}}``.
             The estimator count, antithetic flag and seed label come from
@@ -1408,15 +1406,14 @@ class RevolvingCreditBuilder:
             If the builder was already consumed.
         """
         ...
-    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> RevolvingCreditBuilder:
+    def instrument_pricing_overrides(self, value: dict[str, object]) -> RevolvingCreditBuilder:
         """
         Set the instrument-owned pricing inputs.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
-            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+        value : dict[str, object]
+            Rust ``InstrumentPricingOverrides`` in serde form (a ``dict``): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
             ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
 
         Returns
@@ -1431,17 +1428,14 @@ class RevolvingCreditBuilder:
             not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def metric_pricing_overrides(
-        self, value: MetricPricingOverrides | dict[str, object] | str
-    ) -> RevolvingCreditBuilder:
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object]) -> RevolvingCreditBuilder:
         """
         Set the metric-time pricing configuration stored on the instrument.
 
         Parameters
         ----------
-        value : MetricPricingOverrides | dict[str, object] | str
-            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
-            JSON string.
+        value : MetricPricingOverrides | dict[str, object]
+            Rust ``MetricPricingOverrides`` as the typed class or a ``dict``.
 
         Returns
         -------
@@ -1455,15 +1449,14 @@ class RevolvingCreditBuilder:
             not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> RevolvingCreditBuilder:
+    def scenario_pricing_overrides(self, value: dict[str, object]) -> RevolvingCreditBuilder:
         """
         Set the scenario-only pricing adjustments.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
-            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+        value : dict[str, object]
+            Rust ``ScenarioPricingOverrides`` in serde form (a ``dict``), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
 
         Returns
         -------

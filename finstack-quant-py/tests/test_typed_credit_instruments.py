@@ -360,19 +360,17 @@ class TestCdsIndexTyped:
             .pricing(value)
         )
         if value == "constituents":
-            builder = builder.constituents(
-                json.dumps([
-                    {
-                        "credit": {
-                            "reference_entity": "ACME-CORP",
-                            "recovery_rate": 0.4,
-                            "credit_curve_id": "ACME-HZD",
-                        },
-                        "weight": 1.0,
-                        "defaulted": False,
-                    }
-                ])
-            )
+            builder = builder.constituents([
+                {
+                    "credit": {
+                        "reference_entity": "ACME-CORP",
+                        "recovery_rate": 0.4,
+                        "credit_curve_id": "ACME-HZD",
+                    },
+                    "weight": 1.0,
+                    "defaulted": False,
+                }
+            ])
         index = builder.build()
         payload = json.loads(index.to_json())
         assert payload["instrument"]["spec"]["pricing"] == value

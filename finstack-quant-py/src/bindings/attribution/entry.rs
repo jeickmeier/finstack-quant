@@ -11,7 +11,7 @@ use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{extract_date_iso, py_to_date};
 use crate::bindings::extract::extract_instrument;
-use crate::bindings::module_utils::{py_to_serde, spec_from_py};
+use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::core_to_py;
 use finstack_quant_attribution::{AttributionEnvelope, AttributionInputs, AttributionSpec};
@@ -77,7 +77,7 @@ fn attribution_inputs(py: Python<'_>, inputs: &Bound<'_, PyAny>) -> PyResult<Att
         return Ok(typed.borrow().inner.clone());
     }
     let Ok(fields) = inputs.cast::<PyDict>() else {
-        return spec_from_py(py, inputs, "AttributionInputs");
+        return py_to_serde(py, inputs, "AttributionInputs");
     };
     let normalized = fields.copy()?;
     for key in ["as_of_t0", "as_of_t1"] {
@@ -85,7 +85,7 @@ fn attribution_inputs(py: Python<'_>, inputs: &Bound<'_, PyAny>) -> PyResult<Att
             normalized.set_item(key, extract_date_iso(&date)?)?;
         }
     }
-    spec_from_py(py, normalized.as_any(), "AttributionInputs")
+    py_to_serde(py, normalized.as_any(), "AttributionInputs")
 }
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.attribution._entry", "attribute_pnl")]
@@ -257,8 +257,8 @@ pub(crate) fn attribute_pnl_envelope(
 ///
 /// Parameters
 /// ----------
-/// spec : dict | str | pandas.DataFrame
-///     The return-contribution specification. A ``dict`` or JSON ``str``
+/// spec : dict | pandas.DataFrame
+///     The return-contribution specification. A ``dict``
 ///     carries ``as_of``, ``positions``, optional ``factors`` and
 ///     ``weighting`` exactly as the wire schema (``as_of`` may be a
 ///     ``datetime.date`` in the dict form). A ``DataFrame`` is one position
@@ -279,7 +279,7 @@ pub(crate) fn attribute_pnl_envelope(
 ///     Factor rows ``{"factor", "exposure", "factor_return"}``, set as the
 ///     spec's ``factors`` field for every form.
 ///
-/// A keyword that duplicates a field the dict or JSON spec already carries
+/// A keyword that duplicates a field the dict spec already carries
 /// raises ``ValueError``; pass each field once.
 ///
 /// Returns

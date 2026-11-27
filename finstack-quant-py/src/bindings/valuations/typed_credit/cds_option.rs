@@ -19,7 +19,7 @@ use super::super::convert::{
 use super::super::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_trait_methods,
 };
-use crate::bindings::module_utils::spec_from_py;
+use crate::bindings::module_utils::py_to_serde;
 
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionBuilder;
 
@@ -200,7 +200,7 @@ impl PyCdsOptionBuilder {
         py: Python<'py>,
         value: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let strike: CdsOptionStrike = spec_from_py(py, value, "strike")?;
+        let strike: CdsOptionStrike = py_to_serde(py, value, "strike")?;
         let shown = value.repr()?.to_string();
         builder_set!(slf, strike, shown, |b: CdsOptionBuilder| b.strike(strike))
     }

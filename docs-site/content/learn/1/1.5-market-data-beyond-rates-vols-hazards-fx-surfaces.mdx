@@ -110,7 +110,7 @@ The first calculation holds hazard fixed. The second holds calibration quotes fi
 {/* notebook-block notebook="01_foundations/market_data/hazard_curves.ipynb" cell="recovery-proof" role="build" */}
 ```python exec id=recovery-proof role=build
 from datetime import date
-import json, math
+import math
 from finstack_quant.core.market_data import HazardCurve, MarketContext
 from finstack_quant.calibration import calibrate
 from _shared.analyst_book import single_name_calibration_envelope
@@ -125,7 +125,7 @@ for recovery in (0.40, 0.25):
     for quote in envelope['market_data']:
         if quote['kind'] == 'cds_quote':
             quote['recovery_rate'] = recovery
-    result = calibrate(json.dumps(envelope))
+    result = calibrate(envelope)
     calibrated[recovery] = MarketContext.from_json(result.market.to_json())
 print({recovery: 1 - market.get_hazard('ACME-HZD').sp(5.0) for recovery, market in calibrated.items()})
 ```
@@ -188,7 +188,6 @@ The fixed-hazard PD is unchanged. The quote-calibrated PD falls when recovery fa
 {/* notebook-block notebook="01_foundations/market_data/hazard_curves.ipynb" cell="exercise-recovery-experiments" role="exercise" */}
 ```python exec id=exercise-recovery-experiments role=exercise
 from datetime import date
-import json
 from finstack_quant.calibration import calibrate
 from finstack_quant.core.market_data import HazardCurve,MarketContext
 from _shared.analyst_book import single_name_calibration_envelope
@@ -199,7 +198,7 @@ for recovery in (0.4,0.25):
     envelope=single_name_calibration_envelope(AS_OF);envelope['plan']['steps'][-1]['recovery_rate']=recovery
     for quote in envelope['market_data']:
         if quote['kind']=='cds_quote':quote['recovery_rate']=recovery
-    fit=calibrate(json.dumps(envelope))
+    fit=calibrate(envelope)
     restored=MarketContext.from_json(fit.market.to_json())
     pds[recovery]=1-restored.get_hazard('ACME-HZD').sp(5)
 print({'fixed_hazard_5y_PD':1-fixed.sp(5),'fixed_quote_5y_PD':pds})

@@ -110,8 +110,7 @@ fn tranche_oas(
     let config: OasConfig = match config.filter(|value| !value.is_none()) {
         Some(value) => {
             let json = crate::bindings::module_utils::py_to_json_string(py, value, "OasConfig")?;
-            serde_json::from_str(&json)
-                .map_err(|e| serde_json_to_py(e, "invalid OAS config JSON"))?
+            serde_json::from_str(&json).map_err(|e| serde_json_to_py(e, "invalid OAS config"))?
         }
         None => OasConfig::default(),
     };
@@ -191,7 +190,7 @@ fn tranche_scenario_table(
     let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     let grid_json = crate::bindings::module_utils::py_to_json_string(py, grid, "ScenarioGrid")?;
     let grid: ScenarioGrid = serde_json::from_str(&grid_json)
-        .map_err(|e| serde_json_to_py(e, "invalid scenario grid JSON"))?;
+        .map_err(|e| serde_json_to_py(e, "invalid scenario grid"))?;
     let inner = py
         .detach(move || sc::tranche_scenario_table(&deal, &tranche_id, &market, as_of, &grid))
         .map_err(core_to_py)?;

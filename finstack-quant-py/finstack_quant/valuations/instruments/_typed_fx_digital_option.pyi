@@ -148,7 +148,7 @@ class FxDigitalOption:
         market: MarketContext,
         as_of: date | str,
         model: str = "default",
-        extras: PriceExtras | dict[str, Any] | str | None = None,
+        extras: PriceExtras | dict[str, Any] | None = None,
     ) -> dict[str, float]:
         """Compute the first- and second-order price sensitivities supported by the selected model.
 
@@ -160,7 +160,7 @@ class FxDigitalOption:
             Valuation date used to determine the remaining option life and observed state.
         model : str
             Registered engine name. The default uses the instrument's standard model.
-        extras : PriceExtras or dict or str, optional
+        extras : PriceExtras or dict, optional
             Request configuration and overrides accepted by ``price_instrument``.
             Omit to use the stored instrument controls.
 
@@ -807,15 +807,14 @@ class FxDigitalOptionBuilder:
         """
         ...
 
-    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> FxDigitalOptionBuilder:
+    def instrument_pricing_overrides(self, value: dict[str, object]) -> FxDigitalOptionBuilder:
         """
         Set the instrument-owned pricing inputs.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
-            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+        value : dict[str, object]
+            Rust ``InstrumentPricingOverrides`` in serde form (a ``dict``): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
             ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
 
         Returns
@@ -831,17 +830,14 @@ class FxDigitalOptionBuilder:
         """
         ...
 
-    def metric_pricing_overrides(
-        self, value: MetricPricingOverrides | dict[str, object] | str
-    ) -> FxDigitalOptionBuilder:
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object]) -> FxDigitalOptionBuilder:
         """
         Set the metric-time pricing configuration stored on the instrument.
 
         Parameters
         ----------
-        value : MetricPricingOverrides | dict[str, object] | str
-            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
-            JSON string.
+        value : MetricPricingOverrides | dict[str, object]
+            Rust ``MetricPricingOverrides`` as the typed class or a ``dict``.
 
         Returns
         -------
@@ -856,15 +852,14 @@ class FxDigitalOptionBuilder:
         """
         ...
 
-    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> FxDigitalOptionBuilder:
+    def scenario_pricing_overrides(self, value: dict[str, object]) -> FxDigitalOptionBuilder:
         """
         Set the scenario-only pricing adjustments.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
-            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+        value : dict[str, object]
+            Rust ``ScenarioPricingOverrides`` in serde form (a ``dict``), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
 
         Returns
         -------

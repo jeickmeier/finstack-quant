@@ -27,7 +27,7 @@ def test_covenant_template_roundtrip_and_evaluate() -> None:
     canonical_engine = covenants.validate_covenant_engine_json(_engine_json(specs[0]))
     reports = covenants.evaluate_engine(
         canonical_engine,
-        json.dumps({"debt_to_ebitda": 4.0}),
+        {"debt_to_ebitda": 4.0},
         "2026-03-31",
     )
 
@@ -53,7 +53,9 @@ def test_evaluate_engine_accepts_dict_metrics_and_specs_only_document() -> None:
     }
     reports = covenants.evaluate_engine(engine, metrics, "2026-03-31")
     assert list(reports) == ["max_debt_ebitda", "min_interest_coverage", "min_fcc", "max_capex"]
-    assert covenants.evaluate_engine(engine, json.dumps(metrics), "2026-03-31") == reports
+    assert covenants.evaluate_engine(engine, json.loads(json.dumps(metrics)), "2026-03-31") == reports
+    with pytest.raises(TypeError, match="metrics must be a dict"):
+        covenants.evaluate_engine(engine, json.dumps(metrics), "2026-03-31")
     assert json.loads(covenants.validate_covenant_engine_json(engine))["waivers"] == []
 
 
@@ -67,7 +69,7 @@ def test_evaluate_engine_report_dataframe_and_pickle() -> None:
     spec = _specs(covenants.CovenantTemplate.lbo_standard(5.0, 1.5, 1.2, 10_000_000.0))[0]
     report = covenants.evaluate_engine(
         _engine_json(spec),
-        json.dumps({"debt_to_ebitda": 5.5}),
+        {"debt_to_ebitda": 5.5},
         "2026-03-31",
     )["max_debt_ebitda"]
 
@@ -493,25 +495,29 @@ def test_forecast_scope_and_mc_boundaries() -> None:
 
 
 @pytest.mark.parametrize(
-    ("metrics", "message"),
+    ("metrics", "error", "message"),
     [
-        ('{"debt_to_ebitda": true}', "Validation error: Metric 'debt_to_ebitda' must be a finite JSON number"),
-        ("[1,2]", "Validation error: Invalid metric map JSON: invalid type: sequence"),
+        ('{"debt_to_ebitda": true}', ValueError, "Metric 'debt_to_ebitda' must be a number, got bool"),
+        ("[1,2]", TypeError, "metrics must be a dict[str, float], got list"),
     ],
 )
-def test_json_metric_map_errors_come_from_the_rust_parser(metrics: str, message: str) -> None:
-    """A JSON metric map is parsed only by Rust ``HashMapMetricSource::from_json``.
+def test_metric_map_refuses_json_text_and_wrong_shapes(metrics: str, error: type[Exception], message: str) -> None:
+    """A metric map is a ``dict``: JSON text is refused, and a wrong shape loaded with ``json.loads`` raises.
 
-    The messages are the ones WASM ``evaluateEngine`` throws for the same input.
+    The function and the engine method raise the same error for the same input.
     """
     specs = _specs(covenants.CovenantTemplate.lbo_standard(5.0, 1.5, 1.2, 10_000_000.0))
     engine_json = _engine_json(specs[0])
-    with pytest.raises(ValueError, match=r"^Validation error: ") as from_function:
-        covenants.evaluate_engine(engine_json, metrics, "2026-03-31")
-    assert str(from_function.value).startswith(message)
     engine = covenants.CovenantEngine.from_json(engine_json)
-    with pytest.raises(ValueError, match=r"^Validation error: ") as from_method:
+    with pytest.raises(TypeError, match="metrics must be a dict"):
+        covenants.evaluate_engine(engine_json, metrics, "2026-03-31")
+    with pytest.raises(TypeError, match="metrics must be a dict"):
         engine.evaluate(metrics, "2026-03-31")
+    with pytest.raises(error) as from_function:
+        covenants.evaluate_engine(engine_json, json.loads(metrics), "2026-03-31")
+    assert str(from_function.value).startswith(message)
+    with pytest.raises(error) as from_method:
+        engine.evaluate(json.loads(metrics), "2026-03-31")
     assert str(from_method.value) == str(from_function.value)
 
 

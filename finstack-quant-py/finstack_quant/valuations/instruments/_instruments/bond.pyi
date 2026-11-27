@@ -277,7 +277,7 @@ class Bond:
         """
         ...
     @staticmethod
-    def floating(params: dict[str, Any] | str) -> Bond:
+    def floating(params: dict[str, Any]) -> Bond:
         """
         Create a floating-rate bond (FRN) linked to a forward index.
 
@@ -289,8 +289,8 @@ class Bond:
 
         Parameters
         ----------
-        params : dict[str, Any] | str
-            ``FloatingBondParams`` as a dict or JSON text. Every key is
+        params : dict[str, Any]
+            ``FloatingBondParams`` as a dict. Every key is
             required:
 
             - ``id`` (str): unique instrument identifier.
@@ -347,7 +347,7 @@ class Bond:
         ...
     @staticmethod
     def floating_with_convention(
-        params: dict[str, Any] | str,
+        params: dict[str, Any],
         convention: Literal[
             "us_treasury", "us_agency", "german_bund", "uk_gilt", "french_oat", "jgb", "us_corporate", "eur_corporate"
         ],
@@ -360,8 +360,8 @@ class Bond:
 
         Parameters
         ----------
-        params : dict[str, Any] | str
-            ``FloatingBondParams`` as a dict or JSON text. Every key is
+        params : dict[str, Any]
+            ``FloatingBondParams`` as a dict. Every key is
             required:
 
             - ``id`` (str): unique instrument identifier.
@@ -1140,7 +1140,7 @@ class BondBuilder:
 
     Builders are consumed by ``build()``; create a new builder per
     instrument. Required fields: ``id``, ``notional``, ``issue_date``, ``maturity``,
-    ``cashflow_spec``, ``discount_curve_id``. Nested specs accept a ``dict`` or JSON ``str``
+    ``cashflow_spec``, ``discount_curve_id``. Nested specs accept a ``dict``
     in the Rust serde shape; ``Bond.example().to_dict()`` shows the exact
     field names.
 
@@ -1252,14 +1252,14 @@ class BondBuilder:
             If the builder was already consumed by ``build()`` or the date cannot be interpreted.
         """
         ...
-    def cashflow_spec(self, value: dict[str, object] | str) -> BondBuilder:
+    def cashflow_spec(self, value: dict[str, object]) -> BondBuilder:
         """
         Set the coupon/cashflow specification.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``CashflowSpec`` in serde form (``dict`` or JSON string), e.g. ``{"fixed": {"coupon_type": "cash", "rate": "0.05", "schedule": {...}}}`` (copy ``Bond.example().cashflow_spec``).
+        value : dict[str, object]
+            Rust ``CashflowSpec`` in serde form (a ``dict``), e.g. ``{"fixed": {"coupon_type": "cash", "rate": "0.05", "schedule": {...}}}`` (copy ``Bond.example().cashflow_spec``).
 
         Returns
         -------
@@ -1354,14 +1354,14 @@ class BondBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def call_put(self, value: dict[str, object] | str) -> BondBuilder:
+    def call_put(self, value: dict[str, object]) -> BondBuilder:
         """
         Set the call/put schedule.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``CallPutSchedule`` in serde form (``dict`` or JSON string), e.g. ``{"calls": [{"start": "2027-01-15", "end": "2029-01-15", "price_pct_of_par": 100.0}], "puts": []}``.
+        value : dict[str, object]
+            Rust ``CallPutSchedule`` in serde form (a ``dict``), e.g. ``{"calls": [{"start": "2027-01-15", "end": "2029-01-15", "price_pct_of_par": 100.0}], "puts": []}``.
 
         Returns
         -------
@@ -1374,14 +1374,14 @@ class BondBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as a ``CallPutSchedule``.
         """
         ...
-    def return_floor(self, value: dict[str, object] | str) -> BondBuilder:
+    def return_floor(self, value: dict[str, object]) -> BondBuilder:
         """
         Set the return-floor specification (minimum MOIC / XIRR on early redemption).
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``ReturnFloorSpec`` in serde form (``dict`` or JSON string), e.g. ``Bond.example().min_moic(1.25).return_floor``.
+        value : dict[str, object]
+            Rust ``ReturnFloorSpec`` in serde form (a ``dict``), e.g. ``Bond.example().min_moic(1.25).return_floor``.
 
         Returns
         -------
@@ -1394,14 +1394,14 @@ class BondBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as a ``ReturnFloorSpec``.
         """
         ...
-    def custom_cashflows(self, value: dict[str, object] | str) -> BondBuilder:
+    def custom_cashflows(self, value: dict[str, object]) -> BondBuilder:
         """
         Set the explicit cashflow schedule that overrides generated coupons.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``CashFlowSchedule`` in serde form (``dict`` or JSON string), e.g. the ``custom_cashflows`` value of a bond built from cashflows.
+        value : dict[str, object]
+            Rust ``CashFlowSchedule`` in serde form (a ``dict``), e.g. the ``custom_cashflows`` value of a bond built from cashflows.
 
         Returns
         -------
@@ -1434,14 +1434,14 @@ class BondBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not a recognized name.
         """
         ...
-    def settlement_convention(self, value: dict[str, object] | str) -> BondBuilder:
+    def settlement_convention(self, value: dict[str, object]) -> BondBuilder:
         """
         Set the settlement convention (settlement lag and ex-coupon period).
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``BondSettlementConvention`` in serde form (``dict`` or JSON string), e.g. ``{"settlement_days": 2, "ex_coupon_days": 0, "ex_coupon_calendar_id": None}``.
+        value : dict[str, object]
+            Rust ``BondSettlementConvention`` in serde form (a ``dict``), e.g. ``{"settlement_days": 2, "ex_coupon_days": 0, "ex_coupon_calendar_id": None}``.
 
         Returns
         -------
@@ -1454,15 +1454,14 @@ class BondBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as a ``BondSettlementConvention``.
         """
         ...
-    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> BondBuilder:
+    def instrument_pricing_overrides(self, value: dict[str, object]) -> BondBuilder:
         """
         Set the instrument-owned pricing inputs.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
-            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+        value : dict[str, object]
+            Rust ``InstrumentPricingOverrides`` in serde form (a ``dict``): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
             ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
 
         Returns
@@ -1477,15 +1476,14 @@ class BondBuilder:
             not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object] | str) -> BondBuilder:
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object]) -> BondBuilder:
         """
         Set the metric-time pricing configuration stored on the instrument.
 
         Parameters
         ----------
-        value : MetricPricingOverrides | dict[str, object] | str
-            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
-            JSON string.
+        value : MetricPricingOverrides | dict[str, object]
+            Rust ``MetricPricingOverrides`` as the typed class or a ``dict``.
 
         Returns
         -------
@@ -1499,15 +1497,14 @@ class BondBuilder:
             not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> BondBuilder:
+    def scenario_pricing_overrides(self, value: dict[str, object]) -> BondBuilder:
         """
         Set the scenario-only pricing adjustments.
 
         Parameters
         ----------
-        value : dict[str, object] | str
-            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
-            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+        value : dict[str, object]
+            Rust ``ScenarioPricingOverrides`` in serde form (a ``dict``), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
 
         Returns
         -------

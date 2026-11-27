@@ -9,7 +9,7 @@ use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::json_bridge::serde_to_py;
-use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
+use crate::bindings::module_utils::{opt_py_to_serde, py_to_serde};
 use crate::bindings::valuations::convert::{
     attributes_from_py, bdc_from_py, day_count_from_py, enum_to_py_string, money_from_py,
     money_repr, money_to_py,
@@ -344,7 +344,7 @@ impl PyRevolvingCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: RateSpec =
             if value.extract::<&str>().is_ok() || value.cast::<pyo3::types::PyDict>().is_ok() {
-                spec_from_py(py, value, "rate")?
+                py_to_serde(py, value, "rate")?
             } else {
                 let rate = super::super::convert::rate_from_py(value, "rate")?;
                 RateSpec::fixed_rate(rate)
@@ -422,7 +422,7 @@ impl PyRevolvingCreditBuilder {
         py: Python<'py>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let fees: RevolvingCreditFees = spec_from_py(py, value, "fees")?;
+        let fees: RevolvingCreditFees = py_to_serde(py, value, "fees")?;
         builder_set!(
             slf,
             fees,
@@ -440,7 +440,7 @@ impl PyRevolvingCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let steps: Vec<
             finstack_quant_valuations::instruments::fixed_income::loan_terms::CommitmentStep,
-        > = spec_from_py(py, value, "commitment_steps")?;
+        > = py_to_serde(py, value, "commitment_steps")?;
         builder_set!(
             slf,
             commitment_steps,
@@ -458,7 +458,7 @@ impl PyRevolvingCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let fees: Vec<
             finstack_quant_valuations::instruments::fixed_income::loan_terms::ScheduledFee,
-        > = spec_from_py(py, value, "scheduled_fees")?;
+        > = py_to_serde(py, value, "scheduled_fees")?;
         builder_set!(
             slf,
             scheduled_fees,
@@ -477,7 +477,7 @@ impl PyRevolvingCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: Option<
             finstack_quant_valuations::instruments::fixed_income::loan_terms::OidEirSpec,
-        > = opt_spec_from_py(py, value, "oid_eir")?;
+        > = opt_py_to_serde(py, value, "oid_eir")?;
         let repr = if spec.is_some() { "{..}" } else { "None" };
         builder_set!(
             slf,
@@ -497,7 +497,7 @@ impl PyRevolvingCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let lc: Option<
             finstack_quant_valuations::instruments::fixed_income::loan_terms::LetterOfCreditSpec,
-        > = opt_spec_from_py(py, value, "lc")?;
+        > = opt_py_to_serde(py, value, "lc")?;
         let repr = if lc.is_some() { "{..}" } else { "None" };
         builder_set!(slf, lc, repr.to_string(), |b: RevolvingCreditBuilder| b
             .lc_opt(lc))
@@ -512,7 +512,7 @@ impl PyRevolvingCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let steps: Vec<
             finstack_quant_valuations::instruments::fixed_income::loan_terms::MarginStep,
-        > = spec_from_py(py, value, "margin_steps")?;
+        > = py_to_serde(py, value, "margin_steps")?;
         builder_set!(
             slf,
             margin_steps,
@@ -528,7 +528,7 @@ impl PyRevolvingCreditBuilder {
         py: Python<'py>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let spec: DrawRepaySpec = spec_from_py(py, value, "draw_repay_spec")?;
+        let spec: DrawRepaySpec = py_to_serde(py, value, "draw_repay_spec")?;
         let kind = match &spec {
             DrawRepaySpec::Deterministic(_) => "deterministic",
             DrawRepaySpec::Stochastic(_) => "stochastic",

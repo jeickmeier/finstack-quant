@@ -23,9 +23,9 @@ class ScorecardMetric:
     weight : float
         Non-negative contribution weight for the composite rating; defaults to
         ``1.0`` before normalization across usable metrics.
-    thresholds : Mapping[str, tuple[float, float]] or str or None
-        Mapping (or JSON object string) that defines rating thresholds for the
-        calculated metric; ``None`` means no thresholds.
+    thresholds : Mapping[str, tuple[float, float]] or None
+        Mapping that defines rating thresholds for the calculated metric;
+        ``None`` means no thresholds.
     description : str or None
         Optional reader-facing explanation of the metric and its credit meaning.
 
@@ -43,7 +43,7 @@ class ScorecardMetric:
         name: str,
         formula: str,
         weight: float = 1.0,
-        thresholds: Mapping[str, tuple[float, float]] | str | None = None,
+        thresholds: Mapping[str, tuple[float, float]] | None = None,
         description: str | None = None,
     ) -> None:
         """
@@ -57,9 +57,9 @@ class ScorecardMetric:
             Statement formula or node expression evaluated for the metric.
         weight : float, default 1.0
             Non-negative contribution weight before normalization across usable metrics.
-        thresholds : Mapping[str, tuple[float, float]] or str or None, default None
-            Mapping (or JSON object string) of rating label to its lower and upper
-            threshold pair. ``None`` means no thresholds.
+        thresholds : Mapping[str, tuple[float, float]] or None, default None
+            Mapping of rating label to its lower and upper threshold pair.
+            ``None`` means no thresholds.
         description : str or None, default None
             Optional reader-facing explanation of the metric's credit meaning.
 

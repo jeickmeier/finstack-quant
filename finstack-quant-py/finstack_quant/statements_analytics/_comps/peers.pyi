@@ -388,9 +388,9 @@ class PeerSet:
 
     Parameters
     ----------
-    subject : CompanyMetrics | dict | str
-        The company being evaluated (typed, serde dict, or JSON).
-    peers : list[CompanyMetrics | dict | str]
+    subject : CompanyMetrics | dict
+        The company being evaluated (typed or serde dict).
+    peers : list[CompanyMetrics | dict]
         Peer companies.
     period_basis : str
         ``"ltm"``, ``"ntm"`` or a custom label such as ``"FY2025E"``.
@@ -419,9 +419,9 @@ class PeerSet:
 
         Parameters
         ----------
-        subject : CompanyMetrics | dict | str
+        subject : CompanyMetrics | dict
             The company being evaluated.
-        universe : list[CompanyMetrics | dict | str]
+        universe : list[CompanyMetrics | dict]
             Candidate companies.
         filter : PeerFilter
             Screening criteria.
@@ -436,7 +436,7 @@ class PeerSet:
         Examples
         --------
         >>> from finstack_quant.statements_analytics import PeerFilter, PeerSet
-        >>> PeerSet.from_universe("{}", [], PeerFilter(), "ltm")
+        >>> PeerSet.from_universe({}, [], PeerFilter(), "ltm")
         Traceback (most recent call last):
         ValueError: ...
         """

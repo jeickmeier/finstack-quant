@@ -9,7 +9,7 @@ use finstack_quant_core::cashflow::{CashFlow, CashFlowParams};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use pyo3::prelude::*;
-use pyo3::types::PyCapsule;
+use pyo3::types::{PyCapsule, PyString};
 
 use super::specs::date_money_to_py;
 use crate::bindings::cashflows::aggregation::PyPeriodAggregation;
@@ -22,9 +22,9 @@ use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::parse_label;
 use crate::bindings::macros::{py_getters, wire_methods};
-use crate::bindings::module_utils::spec_from_py;
+use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::table_builders::TableBuilder;
-use crate::errors::{core_to_py, display_to_py};
+use crate::errors::{core_to_py, display_to_py, serde_json_to_py};
 
 use super::orchestrator::PyCashFlowBuilder;
 use super::specs::PyNotional;
@@ -159,13 +159,26 @@ fn is_missing(obj: &Bound<'_, PyAny>) -> PyResult<bool> {
     crate::bindings::dataframe_utils::is_missing_cell(obj)
 }
 
+/// Decode one optional structured cell of a cash-flow frame.
+///
+/// The frames this module writes (`to_pandas`, `to_polars`, `to_arrow`) hold
+/// the structured columns as JSON text, because a table cell has no nested
+/// type shared by every frame library. A string cell is therefore that wire
+/// text and is decoded as JSON; a mapping cell goes through [`py_to_serde`].
 fn optional_json_field<T: serde::de::DeserializeOwned + Send>(
     columns: &Option<Vec<Bound<'_, PyAny>>>,
     index: usize,
     label: &str,
 ) -> PyResult<Option<T>> {
     match columns.as_ref().map(|rows| &rows[index]) {
-        Some(value) if !is_missing(value)? => spec_from_py(value.py(), value, label).map(Some),
+        Some(value) if !is_missing(value)? => {
+            if let Ok(text) = value.cast::<PyString>() {
+                return serde_json::from_str(text.to_str()?)
+                    .map(Some)
+                    .map_err(|err| serde_json_to_py(err, &format!("invalid {label} JSON")));
+            }
+            py_to_serde(value.py(), value, label).map(Some)
+        }
         _ => Ok(None),
     }
 }

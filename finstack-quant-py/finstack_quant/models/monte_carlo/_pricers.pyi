@@ -118,7 +118,7 @@ class EuropeanPricer:
 
     def price_gbm(
         self,
-        market: OptionMarketParams | dict[str, Any] | str,
+        market: OptionMarketParams | dict[str, Any],
         num_steps: int | None = None,
         currency: str | None = None,
     ) -> MoneyEstimate:
@@ -127,9 +127,9 @@ class EuropeanPricer:
 
         Parameters
         ----------
-        market : dict or str
-            Serde form of the Rust ``OptionMarketParams``, as a dict or JSON
-            text. Every key is required: ``spot`` (spot level at time 0) and
+        market : dict
+            Serde form of the Rust ``OptionMarketParams``, as a dict. Every
+            key is required: ``spot`` (spot level at time 0) and
             ``strike`` (same units); ``rate`` (continuously compounded
             risk-free rate, decimal); ``dividend_yield`` (continuous dividend
             yield, decimal); ``volatility`` (annualized GBM volatility,
@@ -260,7 +260,7 @@ class PathDependentPricer:
 
     def price_asian(
         self,
-        market: OptionMarketParams | dict[str, Any] | str,
+        market: OptionMarketParams | dict[str, Any],
         num_steps: int | None = None,
         currency: str | None = None,
     ) -> MoneyEstimate:
@@ -269,9 +269,9 @@ class PathDependentPricer:
 
         Parameters
         ----------
-        market : dict or str
-            Serde form of the Rust ``OptionMarketParams``, as a dict or JSON
-            text. Every key is required: ``spot`` (spot level at time 0) and
+        market : dict
+            Serde form of the Rust ``OptionMarketParams``, as a dict. Every
+            key is required: ``spot`` (spot level at time 0) and
             ``strike`` (same units); ``rate`` (continuously compounded
             risk-free rate, decimal); ``dividend_yield`` (continuous dividend
             yield, decimal); ``volatility`` (annualized GBM volatility,
@@ -335,7 +335,7 @@ class PathDependentPricer:
 
     def price_with_lrm_greeks(
         self,
-        market: OptionMarketParams | dict[str, Any] | str,
+        market: OptionMarketParams | dict[str, Any],
         num_steps: int | None = None,
         currency: str | None = None,
     ) -> LrmGreeks:
@@ -350,9 +350,9 @@ class PathDependentPricer:
 
         Parameters
         ----------
-        market : dict or str
-            Serde form of the Rust ``OptionMarketParams``, as a dict or JSON
-            text. Every key is required: ``spot`` (spot level at time 0) and
+        market : dict
+            Serde form of the Rust ``OptionMarketParams``, as a dict. Every
+            key is required: ``spot`` (spot level at time 0) and
             ``strike`` (same units); ``rate`` (continuously compounded
             risk-free rate, decimal); ``dividend_yield`` (continuous dividend
             yield, decimal); ``volatility`` (annualized GBM volatility,
@@ -679,7 +679,7 @@ class LsmcPricer:
 
     def price_american(
         self,
-        market: OptionMarketParams | dict[str, Any] | str,
+        market: OptionMarketParams | dict[str, Any],
         currency: str | None = None,
         num_steps: int | None = None,
         basis: str | None = None,
@@ -694,9 +694,9 @@ class LsmcPricer:
 
         Parameters
         ----------
-        market : dict or str
-            Serde form of the Rust ``OptionMarketParams``, as a dict or JSON
-            text. Every key is required: ``spot`` (spot level at time 0) and
+        market : dict
+            Serde form of the Rust ``OptionMarketParams``, as a dict. Every
+            key is required: ``spot`` (spot level at time 0) and
             ``strike`` (same units); ``rate`` (continuously compounded
             risk-free rate, decimal); ``dividend_yield`` (continuous dividend
             yield, decimal); ``volatility`` (annualized GBM volatility,
@@ -752,7 +752,7 @@ class LsmcPricer:
 
     def price_american_unbiased(
         self,
-        market: OptionMarketParams | dict[str, Any] | str,
+        market: OptionMarketParams | dict[str, Any],
         pricing_seed: int,
         currency: str | None = None,
         num_steps: int | None = None,
@@ -768,9 +768,9 @@ class LsmcPricer:
 
         Parameters
         ----------
-        market : dict or str
-            Serde form of the Rust ``OptionMarketParams``, as a dict or JSON
-            text. Every key is required: ``spot`` (spot level at time 0) and
+        market : dict
+            Serde form of the Rust ``OptionMarketParams``, as a dict. Every
+            key is required: ``spot`` (spot level at time 0) and
             ``strike`` (same units); ``rate`` (continuously compounded
             risk-free rate, decimal); ``dividend_yield`` (continuous dividend
             yield, decimal); ``volatility`` (annualized GBM volatility,

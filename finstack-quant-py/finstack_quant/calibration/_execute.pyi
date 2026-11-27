@@ -59,7 +59,7 @@ class CalibrationEnvelopeError(RuntimeError):
     --------
     >>> from finstack_quant.calibration import CalibrationEnvelopeError, dry_run
     >>> try:
-    ...     dry_run("{}")
+    ...     dry_run({})
     ... except CalibrationEnvelopeError as exc:
     ...     isinstance(exc.diagnostics, list)
     True
@@ -74,15 +74,16 @@ class CalibrationEnvelopeError(RuntimeError):
     diagnostics: list[dict[str, Any]]
 
 def validate_calibration(
-    envelope: CalibrationEnvelope | dict[str, Any] | str,
+    envelope: CalibrationEnvelope | dict[str, Any],
 ) -> CalibrationEnvelope:
     """Validate a calibration envelope and return it in canonical typed form.
 
     Parameters
     ----------
-    envelope : CalibrationEnvelope | dict | str
-        Typed envelope, plan, dict, or JSON string using the schema marker
-        ``finstack_quant.calibration/1``.
+    envelope : CalibrationEnvelope | dict
+        Typed envelope, or an envelope dict using the schema marker
+        ``finstack_quant.calibration/1``. Load JSON text with
+        ``CalibrationEnvelope.from_json``.
 
     Returns
     -------
@@ -105,7 +106,7 @@ def validate_calibration(
     """
 
 def dry_run(
-    envelope: CalibrationEnvelope | dict[str, Any] | str,
+    envelope: CalibrationEnvelope | dict[str, Any],
 ) -> CalibrationValidationReport:
     """Validate an envelope statically without invoking the solver.
 
@@ -114,8 +115,9 @@ def dry_run(
 
     Parameters
     ----------
-    envelope : CalibrationEnvelope | dict | str
-        Typed envelope, plan, dict, or JSON string.
+    envelope : CalibrationEnvelope | dict
+        Typed envelope, or an envelope dict. Load JSON text with
+        ``CalibrationEnvelope.from_json``.
 
     Returns
     -------
@@ -138,15 +140,16 @@ def dry_run(
     """
 
 def calibrate(
-    envelope: CalibrationEnvelope | dict[str, Any] | str,
+    envelope: CalibrationEnvelope | dict[str, Any],
 ) -> CalibrationResultEnvelope:
     """Execute a calibration plan and return the calibrated market and reports.
 
     Parameters
     ----------
-    envelope : CalibrationEnvelope | dict | str
-        Typed envelope, dict,
-        or JSON string using the schema marker ``finstack_quant.calibration/1``.
+    envelope : CalibrationEnvelope | dict
+        Typed envelope, or an envelope dict using the schema marker
+        ``finstack_quant.calibration/1``. Load JSON text with
+        ``CalibrationEnvelope.from_json``.
 
     Returns
     -------

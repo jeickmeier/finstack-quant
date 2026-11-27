@@ -1,6 +1,6 @@
 //! Relative value report (`relative_value_report`): the comps table, peer
 //! statistics, regression scatter and composite score of one subject. The request
-//! is the Rust serde form, a dict or JSON text, the same document WASM takes.
+//! is the Rust serde form, a dict, the same document WASM takes.
 
 use super::comps::{
     PyPeerStats, PyRegressionResult, PyRelativeValueResult, extract_company_metrics,
@@ -380,16 +380,18 @@ fn relative_value_report<'py>(
     config: &Bound<'py, PyAny>,
 ) -> PyResult<PyRelativeValueReport> {
     let subject = extract_company_metrics(py, subject)?;
-    let universe: Vec<CompanyMetrics> = if universe.is_instance_of::<PyString>() {
-        crate::bindings::module_utils::spec_from_py(py, universe, "universe")?
-    } else {
-        universe
-            .try_iter()?
-            .map(|company| extract_company_metrics(py, &company?))
-            .collect::<PyResult<_>>()?
-    };
+    // A string is a value, not a document; a mapping would iterate its keys.
+    if universe.is_instance_of::<PyString>() || universe.is_instance_of::<pyo3::types::PyDict>() {
+        return Err(pyo3::exceptions::PyTypeError::new_err(
+            "universe must be a list of CompanyMetrics objects or dicts",
+        ));
+    }
+    let universe: Vec<CompanyMetrics> = universe
+        .try_iter()?
+        .map(|company| extract_company_metrics(py, &company?))
+        .collect::<PyResult<_>>()?;
     let config: RelativeValueReportConfig =
-        crate::bindings::module_utils::spec_from_py(py, config, "config")?;
+        crate::bindings::module_utils::py_to_serde(py, config, "config")?;
     let inner =
         analysis::relative_value_report(&subject, &universe, &config).map_err(core_to_py)?;
     Ok(PyRelativeValueReport { inner })

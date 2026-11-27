@@ -552,7 +552,7 @@ wire_methods!(
 #[pyo3(text_signature = "(request)")]
 pub(super) fn merton_report(request: &Bound<'_, PyAny>) -> PyResult<PyMertonReport> {
     let request: MertonReportRequest =
-        crate::bindings::module_utils::spec_from_py(request.py(), request, "MertonReportRequest")?;
+        crate::bindings::module_utils::py_to_serde(request.py(), request, "MertonReportRequest")?;
     Ok(PyMertonReport {
         inner: rust_merton_report(&request).map_err(core_to_py)?,
     })

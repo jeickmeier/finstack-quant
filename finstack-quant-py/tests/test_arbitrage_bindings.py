@@ -52,8 +52,9 @@ def test_check_surface_passes_a_flat_surface_with_a_partial_config() -> None:
     assert report.passed is True
     assert report.total_violations == 0
     assert report.vol_surface_id == "SPX-VOL"
-    # JSON text is the same serde shape as the dict.
-    assert check_surface(surface, '{"forward_prices": [100.0]}').passed is True
+    # JSON text of the same serde shape is refused.
+    with pytest.raises(ValueError, match="invalid ArbitrageCheckConfig: invalid type: string"):
+        check_surface(surface, '{"forward_prices": [100.0]}')
 
 
 def test_check_surface_reports_a_butterfly_violation() -> None:

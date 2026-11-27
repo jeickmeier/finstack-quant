@@ -946,7 +946,7 @@ fn multi_factor_greeks(
 #[pyfunction]
 fn validate_summary(py: Python<'_>, table: &Bound<'_, PyAny>) -> PyResult<()> {
     let table: finstack_quant_core::table::TableEnvelope =
-        crate::bindings::module_utils::spec_from_py(py, table, "analytics summary")?;
+        crate::bindings::module_utils::py_to_serde(py, table, "analytics summary")?;
     py.detach(|| finstack_quant_analytics::validate_summary(&table))
         .map_err(analytics_to_py)
 }

@@ -375,7 +375,7 @@ class ForecastSpec:
 
     """
 
-    def __init__(self, method: ForecastMethod, params: Mapping[str, Any] | str | None = None) -> None:
+    def __init__(self, method: ForecastMethod, params: Mapping[str, Any] | None = None) -> None:
         """
         Build a forecast spec from a method plus its method-specific parameters.
 
@@ -385,7 +385,7 @@ class ForecastSpec:
             A :class:`ForecastMethod` describing the projection rule applied
             to forecast periods.
         params:
-            Mapping (or JSON object string) of method-specific parameters (``rate``, ``curve``,
+            Mapping of method-specific parameters (``rate``, ``curve``,
             ``mean``, ``std_dev``, ``seed``, ``overrides``, ``season_length``,
             ``target``, ``shape``, ``half_life``, ``long_run_mean``,
             ``reversion_speed``, ``historical``, ``mode``, ``phi``, ...).
@@ -409,7 +409,7 @@ class ForecastSpec:
         Raises
         ------
         ValueError
-            If ``params`` is not a JSON object / dict, names a parameter the
+            If ``params`` is not a dict, names a parameter the
             method does not accept, omits a required one, sets one to
             ``null``/``None``, carries a value of the wrong type (a string
             ``rate``, a non-list ``curve``), or fails a static requirement of
