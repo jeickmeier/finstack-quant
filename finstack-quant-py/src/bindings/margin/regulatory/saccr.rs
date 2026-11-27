@@ -14,7 +14,7 @@ use crate::bindings::table_builders::{
 use crate::errors::core_to_py;
 use finstack_quant_margin::regulatory::sa_ccr::{
     EadResult, SaCcrAssetClass, SaCcrEngine, SaCcrNettingSetConfig, SaCcrOptionType,
-    SaCcrSupervisoryCategory, SaCcrTrade, saccr_ead as saccr_ead_rs,
+    SaCcrSupervisoryCategory, SaCcrTrade,
 };
 use pyo3::prelude::*;
 use std::collections::BTreeMap;
@@ -457,7 +457,7 @@ impl PySaCcrEngine {
 
 /// SA-CCR Exposure at Default result (BCBS 279).
 ///
-/// Returned by ``saccr_ead`` and ``SaCcrEngine.calculate_ead``.
+/// Returned by ``SaCcrEngine.calculate_ead``.
 /// ``ead == alpha * (rc + pfe)``; ``pfe == multiplier * add_on_aggregate``.
 #[pyclass(
     name = "EadResult",
@@ -573,36 +573,3 @@ impl PyEadResult {
 }
 
 tabular_methods!(PyEadResult);
-
-/// Compute SA-CCR Exposure at Default for a netting set of trades.
-///
-/// Thin wrapper over ``SaCcrEngine.calculate_ead``: builds the engine with
-/// the regulatory alpha of 1.4 (or ``alpha`` when supplied) and prices
-/// ``trades`` under ``config``.
-///
-/// Parameters
-/// ----------
-/// trades : list[SaCcrTrade]
-///     Derivative trades in the netting set (may be empty, giving zero EAD).
-/// config : SaCcrNettingSetConfig
-///     Netting-set collateral, threshold, MTA, NICA, MPoR and valuation date
-///     (``SaCcrNettingSetConfig.unmargined`` / ``margined``).
-/// alpha : float | None
-///     Supervisory alpha override; must be finite and at least 1.0.
-///
-/// Returns an ``EadResult`` per BCBS 279. Raises ``ValueError`` if ``alpha``
-/// is invalid or the configuration or a trade fails validation.
-#[pyfunction]
-#[pyo3(signature = (trades, config, alpha = None))]
-pub fn saccr_ead(
-    py: Python<'_>,
-    trades: Vec<PyRef<'_, PySaCcrTrade>>,
-    config: &PySaCcrNettingSetConfig,
-    alpha: Option<f64>,
-) -> PyResult<PyEadResult> {
-    let trade_vec: Vec<SaCcrTrade> = trades.iter().map(|t| t.inner.clone()).collect();
-    let result = py
-        .detach(|| saccr_ead_rs(&trade_vec, &config.inner, alpha))
-        .map_err(core_to_py)?;
-    Ok(PyEadResult::from_inner(result))
-}

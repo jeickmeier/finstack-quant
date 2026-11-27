@@ -2,6 +2,19 @@
 
 ## Itemized changes
 
+### Margin: the SA-CCR and FRTB free functions are removed
+
+`saccr_ead` and `frtb_sba_charge` (WASM `saccrEad`, `frtbSbaCharge`) are
+removed in Rust, Python and WASM. Each only built an engine and called it.
+The engines are unchanged and give the same numbers. Old → new:
+
+- Rust `saccr_ead(&trades, &config, None)` → `SaCcrEngine::default().calculate_ead(&trades, &config)`; with an alpha, `SaCcrEngine::with_alpha(alpha)?.calculate_ead(..)`
+- Rust `frtb_sba_charge(&sens, None)` → `FrtbSbaEngine::default().calculate(&sens)`; one scenario, `FrtbSbaEngine::with_selection(Some(vec![scenario]), None)?.calculate(&sens)`
+- Python `saccr_ead(trades, config, alpha)` → `SaCcrEngine(alpha).calculate_ead(trades, config)`
+- Python `frtb_sba_charge(sens, "high")` → `FrtbSbaEngine(scenarios=["high"]).calculate(sens)`
+- WASM `margin.saccrEad(trades, config, alpha)` → `new margin.SaCcrEngine(alpha).calculateEad(trades, config)`
+- WASM `margin.frtbSbaCharge(sens, "high")` → `new margin.FrtbSbaEngine(["high"]).calculate(sens)`
+
 ### Python: `Portfolio.from_json(text)` and `Portfolio.from_spec(dict)`
 
 `Portfolio` now has the same two loader pairs as the rest of the package:

@@ -7277,19 +7277,6 @@ export interface MarginNamespace {
    */
   readonly exposureProfileValidate: typeof wasm.exposureProfileValidate;
   /**
-   * FRTB SBA capital charge for one sensitivity portfolio.
-   * @param sensitivities - Portfolio of FRTB sensitivities (delta, vega, curvature, DRC, RRAO).
-   * @param correlationScenario - `"low"`, `"medium"` or `"high"` to evaluate only that scenario; omitted runs all three and reports the binding (maximum) one per BCBS d457.
-   * @returns The `FrtbSbaResult` as a plain object: `total`, the per-risk-class delta, vega and curvature breakdown, `drc`, `rrao`, and the per-scenario charges with the binding one named.
-   *
-   * # Errors
-   *
-   * Throws if `correlation_scenario` is unknown, or a sensitivity has an
-   * unsupported tenor or bucket, an empty required identifier, or a non-finite
-   * value.
-   */
-  readonly frtbSbaCharge: typeof wasm.frtbSbaCharge;
-  /**
    * Funding benefit spread applied to negative exposure.
    *
    * The configured `funding_benefit_bp`, or the funding spread when no
@@ -7537,19 +7524,6 @@ export interface MarginNamespace {
    * floor.
    */
   readonly saCcrNettingSetConfigValidate: typeof wasm.saCcrNettingSetConfigValidate;
-  /**
-   * SA-CCR Exposure at Default for one netting set (BCBS 279).
-   * @param trades - Array (or JSON) of `SaCcrTrade` objects in the netting set; empty gives zero EAD.
-   * @param config - `SaCcrNettingSetConfig` (object or JSON): collateral, threshold, MTA, NICA, MPOR and valuation date.
-   * @param alpha - Supervisory alpha override, finite and at least `1.0`; omitted uses the regulatory `1.4`.
-   * @returns The `EadResult` as a plain object, after the unmargined cap for margined sets.
-   *
-   * # Errors
-   *
-   * Throws if `alpha` is invalid, or `config` or a trade is malformed or
-   * fails validation.
-   */
-  readonly saccrEad: typeof wasm.saccrEad;
   /**
    * Net desk cash outflow of a variation margin result: post minus collect.
    * @param result - `VmResult` (object or JSON).

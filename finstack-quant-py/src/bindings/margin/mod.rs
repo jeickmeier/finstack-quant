@@ -83,9 +83,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "XvaResult",
             "compute_bilateral_xva",
             "compute_mva",
-            "frtb_sba_charge",
             "im_profile_from_simm",
-            "saccr_ead",
             "schema",
         ],
     )?;

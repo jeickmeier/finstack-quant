@@ -1256,7 +1256,7 @@ class EadResult:
     """
     SA-CCR Exposure at Default result (BCBS 279).
 
-    Returned by :func:`saccr_ead` and :meth:`SaCcrEngine.calculate_ead`.
+    Returned by :meth:`SaCcrEngine.calculate_ead`.
     ``pfe == multiplier * add_on_aggregate``; ``ead`` is ``alpha * (rc + pfe)``
     capped at the unmargined EAD for margined sets. RC and PFE remain the
     components before the cap;
@@ -1570,62 +1570,3 @@ class EadResult:
         This accessor does not raise; it returns the stored value.
         """
         ...
-
-def saccr_ead(
-    trades: list[SaCcrTrade],
-    config: SaCcrNettingSetConfig,
-    alpha: float | None = None,
-) -> EadResult:
-    """
-    Compute SA-CCR Exposure at Default per BCBS 279.
-
-    Thin wrapper over ``SaCcrEngine.calculate_ead``: builds the engine with
-    the regulatory alpha of 1.4 (or ``alpha``) and prices ``trades`` under
-    ``config``.
-
-    Parameters
-    ----------
-    trades : list[SaCcrTrade]
-        Derivative trades making up the netting set (an empty list gives
-        zero EAD).
-    config : SaCcrNettingSetConfig
-        Netting-set collateral, threshold, MTA, NICA, MPoR and valuation date
-        from ``SaCcrNettingSetConfig.unmargined`` / ``margined``.
-    alpha : float or None, optional
-        Supervisory alpha override; must be finite and at least 1.0.
-
-    Returns
-    -------
-    EadResult
-        EAD after applying the unmargined cap for margined sets, together with the multiplier, the
-        aggregate and per-asset-class add-ons, and the maturity factor.
-
-    Raises
-    ------
-    ValueError
-        If ``alpha`` is invalid, ``config`` fails validation, or a trade's
-        numeric fields are non-finite or its direction, supervisory delta and
-        option type are inconsistent.
-
-    Examples
-    --------
-    >>> from finstack_quant.margin import NettingSetId, SaCcrNettingSetConfig, SaCcrTrade, saccr_ead
-    >>> trade = SaCcrTrade(
-    ...     trade_id="t1",
-    ...     asset_class="interest_rate",
-    ...     notional=1_000_000,
-    ...     start_date="2025-01-01",
-    ...     end_date="2030-01-01",
-    ...     underlier="USD-SOFR",
-    ...     hedging_set="rates",
-    ...     direction=1.0,
-    ...     supervisory_delta=1.0,
-    ...     mtm=0.0,
-    ...     is_option=False,
-    ... )
-    >>> config = SaCcrNettingSetConfig.unmargined(NettingSetId.bilateral("CPTY", "CSA"), 0.0, "2025-01-01")
-    >>> result = saccr_ead([trade], config)
-    >>> (round(result.rc, 2), round(result.pfe, 2), round(result.ead, 2))
-    (0.0, 22130.59, 30982.83)
-    """
-    ...

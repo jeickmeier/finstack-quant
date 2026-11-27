@@ -29,7 +29,7 @@ The shared public fields and derived collateral are governed by the accepted [AD
 
 ## Selection and controls
 
-The same VM/NICA/threshold/MTA values remain in the recursive cap config; unmargined RC ignores threshold/MTA but still subtracts VM+NICA. A high-threshold empty margined book can consequently have positive reported RC and zero capped EAD. The public `saccr_ead` convenience wrapper applies an optional validated alpha and delegates to this engine.
+The same VM/NICA/threshold/MTA values remain in the recursive cap config; unmargined RC ignores threshold/MTA but still subtracts VM+NICA. A high-threshold empty margined book can consequently have positive reported RC and zero capped EAD.
 
 ## Limitations and failure behavior
 

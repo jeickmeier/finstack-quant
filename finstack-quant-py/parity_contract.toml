@@ -451,9 +451,7 @@ public = [
     "XvaResult",
     "compute_bilateral_xva",
     "compute_mva",
-    "frtb_sba_charge",
     "im_profile_from_simm",
-    "saccr_ead",
 ]
 
 [crates.margin.module_symbols.schema]

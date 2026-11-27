@@ -54,9 +54,7 @@ from finstack_quant.margin import (
     SimmSensitivities,
     VmCalculator,
     compute_mva,
-    frtb_sba_charge,
     im_profile_from_simm,
-    saccr_ead,
 )
 
 GOLDEN = Path(__file__).parent / "data" / "margin_wasm_parity.json"
@@ -440,8 +438,8 @@ def compute() -> dict[str, Any]:
     out["frtb"] = {
         "wire": _wire(frtb),
         "base_currency": frtb.base_currency,
-        "charge": _wire(frtb_sba_charge(frtb)),
-        "charge_high": _wire(frtb_sba_charge(frtb, "high")),
+        "charge": _wire(FrtbSbaEngine().calculate(frtb)),
+        "charge_high": _wire(FrtbSbaEngine(scenarios=["high"]).calculate(frtb)),
         "engine": {"scenarios": engine.scenarios, "risk_classes": engine.risk_classes},
         "engine_default": {
             "scenarios": FrtbSbaEngine().scenarios,
@@ -458,9 +456,9 @@ def compute() -> dict[str, Any]:
         "trades": [_wire(trade) for trade in trades],
         "unmargined": _wire(unmargined),
         "margined": _wire(margined),
-        "ead_unmargined": _wire(saccr_ead(trades, unmargined)),
-        "ead_margined": _wire(saccr_ead(trades, margined)),
-        "ead_alpha": _wire(saccr_ead(trades, unmargined, 1.5)),
+        "ead_unmargined": _wire(SaCcrEngine().calculate_ead(trades, unmargined)),
+        "ead_margined": _wire(SaCcrEngine().calculate_ead(trades, margined)),
+        "ead_alpha": _wire(SaCcrEngine(alpha=1.5).calculate_ead(trades, unmargined)),
         "engine_alpha": [SaCcrEngine().alpha, SaCcrEngine(1.5).alpha],
         "engine_ead": _wire(SaCcrEngine(1.5).calculate_ead(trades, unmargined)),
     }
@@ -518,9 +516,11 @@ def test_validate_twins_reject_what_wasm_rejects() -> None:
     with pytest.raises(ValueError, match="cannot merge SIMM sensitivities in EUR into a USD container"):
         SimmSensitivities("USD").merge(SimmSensitivities("EUR"))
     with pytest.raises(ValueError, match="alpha"):
-        saccr_ead(saccr_trades(), SaCcrNettingSetConfig.unmargined(NettingSetId.cleared("LCH"), 0.0, "2025-01-15"), 0.5)
+        SaCcrEngine(alpha=0.5).calculate_ead(
+            saccr_trades(), SaCcrNettingSetConfig.unmargined(NettingSetId.cleared("LCH"), 0.0, "2025-01-15")
+        )
     with pytest.raises(ValueError, match="unknown variant `extreme`"):
-        frtb_sba_charge(frtb_sensitivities(), "extreme")
+        FrtbSbaEngine(scenarios=["extreme"]).calculate(frtb_sensitivities())
     with pytest.raises(ValueError, match="at least one correlation scenario"):
         FrtbSbaEngine([], None)
     SaCcrNettingSetConfig.unmargined(NettingSetId.cleared("LCH"), 0.0, "2025-01-15").validate()

@@ -5,23 +5,19 @@
 //! JSON value typed by the generated TypeScript.
 
 use crate::utils::input::js_currency;
-use crate::utils::input::{
-    from_js_json, js_bool, js_f64, js_opt_string, js_opt_string_seq, js_string, js_uint,
-};
+use crate::utils::input::{from_js_json, js_bool, js_f64, js_opt_string_seq, js_string, js_uint};
 use crate::utils::wire::parse_label;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_margin::regulatory::frtb::{
     CorrelationScenario, DrcPosition, FrtbRiskClass, FrtbSbaEngine, FrtbSensitivities,
-    frtb_sba_charge as frtb_sba_charge_rs,
 };
 use wasm_bindgen::prelude::*;
 
 /// FRTB sensitivity portfolio for the Sensitivity-Based Approach.
 ///
 /// Build up delta, vega, curvature, DRC and RRAO inputs with the `add*`
-/// methods, then pass the handle to `frtbSbaCharge` or
-/// `FrtbSbaEngine.calculate` to compute the capital charge under one or more
-/// correlation scenarios per BCBS d457.
+/// methods, then pass the handle to `FrtbSbaEngine.calculate` to compute the
+/// capital charge under one or more correlation scenarios per BCBS d457.
 ///
 /// Units: GIRR deltas are base-currency P&L per 1 percentage point of curve
 /// shift (`100 * DV01`); CSR deltas are per 1 percentage point of spread;
@@ -36,7 +32,7 @@ use wasm_bindgen::prelude::*;
 /// await init();
 /// const sens = new margin.FrtbSensitivities("USD");
 /// sens.addGirrDelta("USD", "USD-OIS", "5Y", 100_000);
-/// margin.frtbSbaCharge(sens).total; // capital charge in USD
+/// new margin.FrtbSbaEngine().calculate(sens).total; // capital charge in USD
 /// ```
 #[wasm_bindgen(js_name = FrtbSensitivities)]
 #[derive(Clone)]
@@ -665,31 +661,6 @@ impl JsFrtbSbaEngine {
                 .map_err(to_js_err)?,
         )
     }
-}
-
-/// FRTB SBA capital charge for one sensitivity portfolio.
-/// @param sensitivities - Portfolio of FRTB sensitivities (delta, vega, curvature, DRC, RRAO).
-/// @param correlationScenario - `"low"`, `"medium"` or `"high"` to evaluate only that scenario; omitted runs all three and reports the binding (maximum) one per BCBS d457.
-/// @returns The `FrtbSbaResult` as a plain object: `total`, the per-risk-class delta, vega and curvature breakdown, `drc`, `rrao`, and the per-scenario charges with the binding one named.
-///
-/// # Errors
-///
-/// Throws if `correlation_scenario` is unknown, or a sensitivity has an
-/// unsupported tenor or bucket, an empty required identifier, or a non-finite
-/// value.
-#[wasm_bindgen(js_name = frtbSbaCharge, unchecked_return_type = "FrtbSbaResult")]
-pub fn frtb_sba_charge(
-    sensitivities: &JsFrtbSensitivities,
-    #[wasm_bindgen(
-        js_name = "correlationScenario",
-        unchecked_optional_param_type = "CorrelationScenario | null"
-    )]
-    correlation_scenario: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let scenario = js_opt_string(correlation_scenario.as_ref(), "correlationScenario")?
-        .map(|label| parse_label::<CorrelationScenario>(&label))
-        .transpose()?;
-    to_js_value(&frtb_sba_charge_rs(&sensitivities.inner, scenario).map_err(to_js_err)?)
 }
 
 /// Construct a checked non-securitisation Default Risk Charge position.

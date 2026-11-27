@@ -56,8 +56,6 @@ EadResult = _margin.EadResult
 SaCcrTrade = _margin.SaCcrTrade
 SaCcrNettingSetConfig = _margin.SaCcrNettingSetConfig
 SaCcrEngine = _margin.SaCcrEngine
-frtb_sba_charge = _margin.frtb_sba_charge
-saccr_ead = _margin.saccr_ead
 schema = _margin.schema
 
 __all__: list[str] = [
@@ -105,8 +103,6 @@ __all__: list[str] = [
     "XvaResult",
     "compute_bilateral_xva",
     "compute_mva",
-    "frtb_sba_charge",
     "im_profile_from_simm",
-    "saccr_ead",
     "schema",
 ]

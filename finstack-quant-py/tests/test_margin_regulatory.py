@@ -18,8 +18,6 @@ from finstack_quant.margin import (
     SaCcrEngine,
     SaCcrNettingSetConfig,
     SaCcrTrade,
-    frtb_sba_charge,
-    saccr_ead,
 )
 
 
@@ -138,11 +136,11 @@ def test_sa_ccr_engine_accepts_only_active_configuration() -> None:
         SaCcrEngine(reporting_currency="EUR")
 
 
-def test_saccr_ead_returns_typed_result() -> None:
-    """`saccr_ead` returns the full `EadResult`, not a lossy 3-tuple."""
+def test_sa_ccr_engine_returns_typed_result() -> None:
+    """`calculate_ead` returns the full `EadResult`, not a lossy 3-tuple."""
     trade = SaCcrTrade.from_json(json.dumps(linear_trade_payload()))
 
-    result = saccr_ead([trade], unmargined_config())
+    result = SaCcrEngine().calculate_ead([trade], unmargined_config())
 
     assert isinstance(result, EadResult)
     assert result.ead == pytest.approx(result.alpha * (result.rc + result.pfe))
@@ -156,7 +154,7 @@ def test_saccr_ead_returns_typed_result() -> None:
 
 def test_ead_result_wire_and_frame_surfaces() -> None:
     trade = SaCcrTrade.from_json(json.dumps(linear_trade_payload()))
-    result = saccr_ead([trade], unmargined_config())
+    result = SaCcrEngine().calculate_ead([trade], unmargined_config())
 
     round_tripped = EadResult.from_json(result.to_json())
     assert round_tripped.ead == pytest.approx(result.ead)
@@ -203,8 +201,8 @@ def sample_sensitivities() -> FrtbSensitivities:
     return sens
 
 
-def test_frtb_sba_charge_returns_typed_result() -> None:
-    result = frtb_sba_charge(sample_sensitivities())
+def test_frtb_sba_engine_returns_typed_result() -> None:
+    result = FrtbSbaEngine().calculate(sample_sensitivities())
 
     assert isinstance(result, FrtbSbaResult)
     assert result.total > 0.0
@@ -239,13 +237,13 @@ def test_frtb_sba_result_wire_and_frame_surfaces() -> None:
 
 
 def test_frtb_scenario_selection_still_honoured() -> None:
-    only_low = frtb_sba_charge(sample_sensitivities(), correlation_scenario="low")
+    only_low = FrtbSbaEngine(scenarios=["low"]).calculate(sample_sensitivities())
 
     assert only_low.binding_scenario == "low"
     assert set(only_low.scenario_charges) == {"low"}
 
 
-def test_saccr_ead_is_a_thin_engine_wrapper() -> None:
+def test_margined_config_getters_and_engine_alpha() -> None:
     trade = SaCcrTrade.from_json(json.dumps(linear_trade_payload()))
     config = SaCcrNettingSetConfig.margined(
         NettingSetId.cleared("LCH"),
@@ -262,11 +260,10 @@ def test_saccr_ead_is_a_thin_engine_wrapper() -> None:
     assert (config.threshold, config.mta, config.nica, config.mpor_days) == (100_000.0, 50_000.0, 0.0, 5)
     assert "mpor_days=5" in repr(config)
 
-    via_function = saccr_ead([trade], config, alpha=1.5)
-    via_engine = SaCcrEngine(alpha=1.5).calculate_ead([trade], config)
-    assert via_function.to_json() == via_engine.to_json()
+    result = SaCcrEngine(alpha=1.5).calculate_ead([trade], config)
     assert SaCcrEngine(alpha=1.5).alpha == 1.5
-    assert via_function.meta["numeric_mode"] is not None
+    assert result.alpha == 1.5
+    assert result.meta["numeric_mode"] is not None
 
     with pytest.raises(ValueError, match="MPOR"):
         SaCcrNettingSetConfig.margined(NettingSetId.bilateral("A", "B"), 0.0, 0.0, 0.0, 0.0, 0, "2025-01-15")
@@ -337,12 +334,12 @@ def test_frtb_sensitivities_adders_and_dataframe_round_trip() -> None:
         "maturity_years": 1.0,
         "pnl_adjustment": 0.0,
     })
-    charged = frtb_sba_charge(sens)
+    charged = FrtbSbaEngine().calculate(sens)
     assert charged.drc > 0.0
     with_drc = FrtbSensitivities.from_dataframe(sens.to_arrow(), "USD")
     assert with_drc.to_json() == sens.to_json()
 
-    empty = frtb_sba_charge(FrtbSensitivities("USD"))
+    empty = FrtbSbaEngine().calculate(FrtbSensitivities("USD"))
     assert repr(empty.rrao) == "0.0"
 
 
@@ -354,7 +351,7 @@ def test_frtb_basis_repo_and_option_categories_round_trip() -> None:
     sens.add_commodity_delta("WTI", 2, "1Y", "Houston", -100.0)
     sens.add_equity_repo_delta("ACME", 3, 1_000.0)
     assert FrtbSensitivities.from_dataframe(sens.to_polars(), "USD").to_json() == sens.to_json()
-    assert frtb_sba_charge(sens).total > 0
+    assert FrtbSbaEngine().calculate(sens).total > 0
     option = SaCcrTrade(
         trade_id="OPT",
         asset_class="equity",
@@ -405,7 +402,7 @@ def test_frtb_dataframe_round_trips_drc_positions_and_base_currency() -> None:
 
     restored = FrtbSensitivities.from_dataframe(frame, "EUR")
     assert restored.base_currency == "EUR"
-    assert frtb_sba_charge(restored).total == frtb_sba_charge(sens).total
+    assert FrtbSbaEngine().calculate(restored).total == FrtbSbaEngine().calculate(sens).total
     restored_positions = sorted(json.loads(restored.to_json())["drc_positions"], key=lambda p: p["issuer"])
     original_positions = sorted(json.loads(sens.to_json())["drc_positions"], key=lambda p: p["issuer"])
     assert restored_positions == original_positions
@@ -474,4 +471,4 @@ def test_structured_drc_input_uses_complete_rust_validation() -> None:
             sens.add_drc_position(position | change)
     assert json.loads(sens.to_json())["drc_positions"] == []
     sens.add_drc_position(position)
-    assert frtb_sba_charge(sens).drc == 45_000.0
+    assert FrtbSbaEngine().calculate(sens).drc == 45_000.0

@@ -7,9 +7,7 @@
 use crate::utils::input::{from_js_json, js_f64, js_opt_f64, js_uint};
 use crate::utils::wire::js_date;
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_margin::regulatory::sa_ccr::{
-    SaCcrEngine, SaCcrNettingSetConfig, SaCcrTrade, saccr_ead as saccr_ead_rs,
-};
+use finstack_quant_margin::regulatory::sa_ccr::{SaCcrEngine, SaCcrNettingSetConfig, SaCcrTrade};
 use finstack_quant_margin::types::NettingSetId;
 use wasm_bindgen::prelude::*;
 
@@ -185,26 +183,4 @@ impl JsSaCcrEngine {
                 .map_err(to_js_err)?,
         )
     }
-}
-
-/// SA-CCR Exposure at Default for one netting set (BCBS 279).
-/// @param trades - Array (or JSON) of `SaCcrTrade` objects in the netting set; empty gives zero EAD.
-/// @param config - `SaCcrNettingSetConfig` (object or JSON): collateral, threshold, MTA, NICA, MPOR and valuation date.
-/// @param alpha - Supervisory alpha override, finite and at least `1.0`; omitted uses the regulatory `1.4`.
-/// @returns The `EadResult` as a plain object, after the unmargined cap for margined sets.
-///
-/// # Errors
-///
-/// Throws if `alpha` is invalid, or `config` or a trade is malformed or
-/// fails validation.
-#[wasm_bindgen(js_name = saccrEad, unchecked_return_type = "EadResult")]
-pub fn saccr_ead(
-    #[wasm_bindgen(unchecked_param_type = "readonly SaCcrTrade[] | string")] trades: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "SaCcrNettingSetConfig | string")] config: JsValue,
-    #[wasm_bindgen(unchecked_optional_param_type = "number | null")] alpha: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let trades: Vec<SaCcrTrade> = from_js_json(&trades, "trades")?;
-    let config: SaCcrNettingSetConfig = from_js_json(&config, "config")?;
-    let alpha = js_opt_f64(alpha.as_ref(), "alpha")?;
-    to_js_value(&saccr_ead_rs(&trades, &config, alpha).map_err(to_js_err)?)
 }

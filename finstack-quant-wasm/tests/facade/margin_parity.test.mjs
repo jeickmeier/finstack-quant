@@ -624,7 +624,7 @@ test('VmCalculator and the VmResult twins match Python', () => {
   throwsKind(() => new margin.VmCalculator({ id: 'x' }), 'validation');
 });
 
-test('FrtbSensitivities, FrtbSbaEngine and frtbSbaCharge match Python', () => {
+test('FrtbSensitivities and FrtbSbaEngine match Python', () => {
   const expected = golden.frtb;
   const sens = frtbSensitivities();
   close(wire(sens.toJson()), expected.wire, 'wire');
@@ -632,8 +632,12 @@ test('FrtbSensitivities, FrtbSbaEngine and frtbSbaCharge match Python', () => {
   assert.equal(sens.validate(), undefined);
   close(wire(margin.FrtbSensitivities.fromJson(sens.toJson()).toJson()), expected.wire, 'trip');
 
-  close(wire(margin.frtbSbaCharge(sens)), expected.charge, 'charge');
-  close(wire(margin.frtbSbaCharge(sens, 'high')), expected.charge_high, 'charge_high');
+  close(wire(new margin.FrtbSbaEngine().calculate(sens)), expected.charge, 'charge');
+  close(
+    wire(new margin.FrtbSbaEngine(['high']).calculate(sens)),
+    expected.charge_high,
+    'charge_high'
+  );
 
   const engine = new margin.FrtbSbaEngine(['low', 'high'], ['girr', 'fx']);
   close(
@@ -650,7 +654,7 @@ test('FrtbSensitivities, FrtbSbaEngine and frtbSbaCharge match Python', () => {
   close(wire(engine.calculate(sens)), expected.engine_charge, 'engine_charge');
 
   throwsKind(
-    () => margin.frtbSbaCharge(sens, 'extreme'),
+    () => new margin.FrtbSbaEngine(['extreme']),
     'validation',
     /unknown variant `extreme`/
   );
@@ -671,7 +675,7 @@ test('FrtbSensitivities, FrtbSbaEngine and frtbSbaCharge match Python', () => {
   );
 });
 
-test('SA-CCR configuration twins, SaCcrEngine and saccrEad match Python', () => {
+test('SA-CCR configuration twins and SaCcrEngine match Python', () => {
   const expected = golden.saccr;
   const nettingSet = { kind: 'bilateral', counterparty_id: 'CPTY', csa_id: 'CSA' };
   const unmargined = margin.saCcrNettingSetConfigUnmargined(nettingSet, 0, '2025-01-15');
@@ -693,9 +697,14 @@ test('SA-CCR configuration twins, SaCcrEngine and saccrEad match Python', () => 
   );
 
   const trades = expected.trades;
-  close(wire(margin.saccrEad(trades, unmargined)), expected.ead_unmargined, 'ead_unmargined');
-  close(wire(margin.saccrEad(trades, margined)), expected.ead_margined, 'ead_margined');
-  close(wire(margin.saccrEad(trades, unmargined, 1.5)), expected.ead_alpha, 'ead_alpha');
+  const saCcr = new margin.SaCcrEngine();
+  close(wire(saCcr.calculateEad(trades, unmargined)), expected.ead_unmargined, 'ead_unmargined');
+  close(wire(saCcr.calculateEad(trades, margined)), expected.ead_margined, 'ead_margined');
+  close(
+    wire(new margin.SaCcrEngine(1.5).calculateEad(trades, unmargined)),
+    expected.ead_alpha,
+    'ead_alpha'
+  );
   assert.deepEqual(
     [new margin.SaCcrEngine().alpha, new margin.SaCcrEngine(1.5).alpha],
     expected.engine_alpha
@@ -705,8 +714,7 @@ test('SA-CCR configuration twins, SaCcrEngine and saccrEad match Python', () => 
     expected.engine_ead,
     'engine_ead'
   );
-  throwsKind(() => margin.saccrEad(trades, unmargined, 0.5), 'validation', /alpha/);
-  throwsKind(() => new margin.SaCcrEngine(0.5), 'validation');
+  throwsKind(() => new margin.SaCcrEngine(0.5), 'validation', /alpha/);
 });
 
 test('addRraoPosition requires the exotic flag', () => {
@@ -738,7 +746,7 @@ test('GIRR requires explicit risk currency and DRC delegates complete Rust valid
   }
   assert.deepEqual(JSON.parse(sens.toJson()).drc_positions, []);
   sens.addDrcPosition(position);
-  assert.equal(margin.frtbSbaCharge(sens).drc, 45_000);
+  assert.equal(new margin.FrtbSbaEngine().calculate(sens).drc, 45_000);
 });
 
 test('instrument roundtrip preserves the CSA-owned no-IM election', () => {
@@ -804,6 +812,6 @@ test('typed margin authoring validates agreement terms and the default-risk posi
   });
   const sens = new margin.FrtbSensitivities('USD');
   sens.addDrcPosition(position);
-  assert.ok(margin.frtbSbaCharge(sens).drc > 0);
+  assert.ok(new margin.FrtbSbaEngine().calculate(sens).drc > 0);
   assert.throws(() => margin.drcPosition({ ...position, maturity_years: -1 }), /maturity/);
 });

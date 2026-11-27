@@ -332,8 +332,8 @@ See [`docs/SERDE_STABILITY.md`](../../docs/SERDE_STABILITY.md) and
   `ExposureProfile`, `ExposureDiagnostics`, `XvaResult`,
   `ImProfile`, `ImDecayProfile`, `MvaResult`,
   `compute_bilateral_xva`, `compute_mva`, `im_profile_from_simm`), the four
-  metrics types, `FrtbSensitivities`/`FrtbSbaEngine`/`FrtbSbaResult`/`frtb_sba_charge`,
-  `SaCcrTrade`/`SaCcrNettingSetConfig`/`SaCcrEngine`/`EadResult`/`saccr_ead`, `CONSTANTS`,
+  metrics types, `FrtbSensitivities`/`FrtbSbaEngine`/`FrtbSbaResult`,
+  `SaCcrTrade`/`SaCcrNettingSetConfig`/`SaCcrEngine`/`EadResult`, `CONSTANTS`,
   and a `schema` submodule.
 - **WASM** — the `margin` namespace in
   [`exports/margin.js`](../../finstack-quant-wasm/exports/margin.js) binds the
@@ -345,8 +345,7 @@ See [`docs/SERDE_STABILITY.md`](../../docs/SERDE_STABILITY.md) and
   classes are free functions named `<type><Method>` (`csaSpecUsdRegulatory`,
   `csaSpecWithIm`, `imDecayProfileFactor`, `marginUtilizationShortfall`, …).
   `constants()` returns `MarginConstants::current()`, and `computeMva`,
-  `imProfileFromSimm`, `frtbSbaCharge`, `saccrEad` and `computeBilateralXva`
-  are the module functions. The `schema` submodule is not bound.
+  `imProfileFromSimm` and `computeBilateralXva` are the module functions. The `schema` submodule is not bound.
 
 ## Verification
 

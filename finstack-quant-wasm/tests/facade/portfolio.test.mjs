@@ -1471,7 +1471,7 @@ test('ordinary GIRR uses exact tenors and preserves the signed quote change unde
     assert.ok(Math.abs(year.positions[0].pnl_base_per_pp - 100 * expected) < 2);
     const risk = facade.margin.FrtbSensitivities.fromJson(result.sensitivities);
     try {
-      assert.ok(facade.margin.frtbSbaCharge(risk).total > 0);
+      assert.ok(new facade.margin.FrtbSbaEngine().calculate(risk).total > 0);
     } finally {
       risk.free();
     }

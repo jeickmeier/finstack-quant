@@ -17,6 +17,7 @@ from finstack_quant.core.market_data import DiscountCurve, HazardCurve
 from finstack_quant.margin import (
     CsaSpec,
     ExposureProfile,
+    FrtbSbaEngine,
     FrtbSensitivities,
     FundingConfig,
     ImResult,
@@ -25,7 +26,6 @@ from finstack_quant.margin import (
     SimmSensitivities,
     VmCalculator,
     compute_bilateral_xva,
-    frtb_sba_charge,
 )
 
 
@@ -194,7 +194,7 @@ def test_frtb_scenario_breakdown_covers_every_scenario() -> None:
     sens.add_girr_delta("USD", "USD-OIS", "10Y", -15_000.0)
     sens.add_equity_delta("ACME", 1, 12_000.0)
 
-    result = frtb_sba_charge(sens)
+    result = FrtbSbaEngine().calculate(sens)
     breakdown = result.scenario_breakdown
 
     assert sorted(breakdown) == sorted(result.scenario_charges) == ["high", "low", "medium"]

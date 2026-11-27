@@ -191,30 +191,6 @@ impl FrtbSbaEngine {
     }
 }
 
-/// FRTB SBA capital charge for one sensitivity set.
-///
-/// Runs the full engine (every risk class), under one correlation scenario
-/// when `correlation_scenario` is given and under all three otherwise.
-///
-/// # Arguments
-///
-/// * `sensitivities` - Delta, vega, curvature, DRC and RRAO inputs in one
-///   reporting currency.
-/// * `correlation_scenario` - Single scenario to evaluate, or `None` for the
-///   regulatory maximum over low, medium and high correlations.
-///
-/// # Errors
-///
-/// Returns a validation error if `sensitivities` fail
-/// [`FrtbSensitivities::validate`].
-pub fn frtb_sba_charge(
-    sensitivities: &FrtbSensitivities,
-    correlation_scenario: Option<CorrelationScenario>,
-) -> Result<FrtbSbaResult> {
-    FrtbSbaEngine::with_selection(correlation_scenario.map(|scenario| vec![scenario]), None)?
-        .calculate(sensitivities)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -817,18 +793,21 @@ mod tests {
     }
 
     #[test]
-    fn frtb_sba_charge_matches_the_engine_for_one_and_all_scenarios() {
+    fn one_selected_scenario_charges_what_it_contributes_to_the_full_run() {
         let mut sens = FrtbSensitivities::new(Currency::USD);
         sens.add_girr_delta(Currency::USD, "USD-OIS", "5Y", 1_000_000.0)
             .expect("valid GIRR delta");
         sens.add_equity_delta("AAPL", 1, 250_000.0);
 
-        let all = frtb_sba_charge(&sens, None).expect("all scenarios");
-        let engine = FrtbSbaEngine::default().calculate(&sens).expect("engine");
-        assert_eq!(all.total, engine.total);
+        let all = FrtbSbaEngine::default()
+            .calculate(&sens)
+            .expect("all scenarios");
         assert_eq!(all.scenario_charges.len(), 3);
 
-        let high = frtb_sba_charge(&sens, Some(CorrelationScenario::High)).expect("high");
+        let high = FrtbSbaEngine::with_selection(Some(vec![CorrelationScenario::High]), None)
+            .expect("one scenario")
+            .calculate(&sens)
+            .expect("high");
         assert_eq!(high.scenario_charges.len(), 1);
         assert_eq!(high.binding_scenario, CorrelationScenario::High);
         let expected = all.scenario_charges[&CorrelationScenario::High] + all.drc + all.rrao;

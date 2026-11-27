@@ -12,7 +12,7 @@ use crate::bindings::table_builders::{
 use crate::errors::core_to_py;
 use finstack_quant_margin::regulatory::frtb::{
     CorrelationScenario, DrcPosition, FrtbRiskClass, FrtbSbaEngine, FrtbSbaResult,
-    FrtbSensitivities, frtb_sba_charge as frtb_sba_charge_rs,
+    FrtbSensitivities,
 };
 use pyo3::prelude::*;
 use std::collections::BTreeMap;
@@ -34,8 +34,7 @@ pub(super) fn py_bool(value: bool) -> &'static str {
 /// FRTB sensitivity portfolio for the Sensitivity-Based Approach.
 ///
 /// Build up delta/vega/curvature/DRC/RRAO inputs with the ``add_*`` methods
-/// (or ``from_dataframe``), then pass to ``frtb_sba_charge`` or
-/// ``FrtbSbaEngine.calculate``. Units: GIRR deltas are base-currency P&L per
+/// (or ``from_dataframe``), then pass to ``FrtbSbaEngine.calculate``. Units: GIRR deltas are base-currency P&L per
 /// **1 percentage point** of curve shift (``100 x DV01``); CSR deltas are
 /// base-currency P&L per 1 basis point of spread; equity, commodity and FX
 /// deltas are base-currency P&L per 1 percentage point of the underlying;
@@ -529,7 +528,7 @@ impl PyFrtbSbaEngine {
 
 /// FRTB SBA capital-charge result (BCBS d457).
 ///
-/// Returned by ``frtb_sba_charge`` and ``FrtbSbaEngine.calculate``.
+/// Returned by ``FrtbSbaEngine.calculate``.
 /// Carries the headline charge, the per-risk-class delta/vega/curvature
 /// breakdown, the default risk charge, the residual risk add-on, and the
 /// charge under each correlation scenario together with the binding one.
@@ -696,32 +695,3 @@ impl PyFrtbSbaResult {
 }
 
 tabular_methods!(PyFrtbSbaResult);
-
-/// Compute the FRTB SBA capital charge.
-///
-/// Returns a ``FrtbSbaResult`` exposing ``total``, ``drc``, ``rrao``,
-/// ``binding_scenario``, ``scenario_charges``, and the per-risk-class
-/// ``delta_by_risk_class`` / ``vega_by_risk_class`` /
-/// ``curvature_by_risk_class`` breakdowns, plus ``to_pandas`` / ``to_polars`` /
-/// ``to_arrow`` and ``to_breakdown_table`` / ``to_scenario_table`` exits.
-///
-/// If ``correlation_scenario`` is provided (``"low"``, ``"medium"``, ``"high"``),
-/// only that scenario is evaluated. Otherwise all three are run and the
-/// max is taken per BCBS d457. Raises ``ValueError`` for an unknown scenario
-/// label or sensitivities that fail validation.
-#[pyfunction]
-#[pyo3(signature = (sensitivities, correlation_scenario = None))]
-pub fn frtb_sba_charge(
-    py: Python<'_>,
-    sensitivities: &PyFrtbSensitivities,
-    correlation_scenario: Option<&str>,
-) -> PyResult<PyFrtbSbaResult> {
-    let scenario = correlation_scenario
-        .map(parse_label::<CorrelationScenario>)
-        .transpose()?;
-    let result = py
-        .detach(|| frtb_sba_charge_rs(&sensitivities.inner, scenario))
-        .map_err(core_to_py)?;
-
-    Ok(PyFrtbSbaResult::from_inner(result))
-}

@@ -4,10 +4,10 @@ from finstack_quant.core.money import Money
 from finstack_quant.margin import (
     CsaSpec,
     DrcPosition,
+    FrtbSbaEngine,
     FrtbSensitivities,
     OtcMarginSpec,
     SimmCreditClassification,
-    frtb_sba_charge,
 )
 from finstack_quant.valuations.instruments import InterestRateSwap
 
@@ -65,6 +65,6 @@ def test_native_drc_position_validates_before_aggregation() -> None:
     }
     sens = FrtbSensitivities("USD")
     sens.add_drc_position(DrcPosition(**kwargs))
-    assert frtb_sba_charge(sens).drc > 0.0
+    assert FrtbSbaEngine().calculate(sens).drc > 0.0
     with pytest.raises(ValueError, match="maturity"):
         DrcPosition(**(kwargs | {"maturity_years": -1.0}))

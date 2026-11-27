@@ -2013,7 +2013,6 @@
       "excessCollateralHasExcess",
       "excessCollateralHasShortfall",
       "exposureProfileValidate",
-      "frtbSbaCharge",
       "fundingConfigEffectiveBenefitBp",
       "haircut01",
       "haircut01HaircutBp",
@@ -2038,7 +2037,6 @@
       "saCcrNettingSetConfigMargined",
       "saCcrNettingSetConfigUnmargined",
       "saCcrNettingSetConfigValidate",
-      "saccrEad",
       "schema",
       "vmResultNetMargin",
       "vmResultRequiresCall"
@@ -2266,9 +2264,6 @@
   "margin.exposureProfileValidate": {
     "kind": "function"
   },
-  "margin.frtbSbaCharge": {
-    "kind": "function"
-  },
   "margin.fundingConfigEffectiveBenefitBp": {
     "kind": "function"
   },
@@ -2330,9 +2325,6 @@
     "kind": "function"
   },
   "margin.saCcrNettingSetConfigValidate": {
-    "kind": "function"
-  },
-  "margin.saccrEad": {
     "kind": "function"
   },
   "margin.vmResultNetMargin": {

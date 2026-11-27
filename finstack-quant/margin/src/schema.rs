@@ -279,11 +279,10 @@ mod examples {
 
     /// The EAD of [`sa_ccr_trade`] under [`sa_ccr_netting_set_config`].
     pub(super) fn ead_result() -> Result<Vec<Value>> {
-        example(&crate::regulatory::sa_ccr::saccr_ead(
-            &[sa_ccr_trade_value()?],
-            &sa_ccr_config_value()?,
-            None,
-        )?)
+        example(
+            &crate::regulatory::sa_ccr::SaCcrEngine::default()
+                .calculate_ead(&[sa_ccr_trade_value()?], &sa_ccr_config_value()?)?,
+        )
     }
 
     pub(super) fn excess_collateral() -> Result<Vec<Value>> {
@@ -327,10 +326,10 @@ mod examples {
 
     /// The SBA charge of [`frtb_sensitivities`] across all three scenarios.
     pub(super) fn frtb_sba_result() -> Result<Vec<Value>> {
-        example(&crate::regulatory::frtb::frtb_sba_charge(
-            &frtb_sensitivities_value()?,
-            None,
-        )?)
+        example(
+            &crate::regulatory::frtb::FrtbSbaEngine::default()
+                .calculate(&frtb_sensitivities_value()?)?,
+        )
     }
 
     pub(super) fn funding_config() -> Result<Vec<Value>> {

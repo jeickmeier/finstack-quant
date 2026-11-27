@@ -67,7 +67,7 @@ The engine adds delta, vega and curvature charges across the selected risk class
 3. Across ordinary delta/vega buckets, first calculate `Q=Σ_b K_b²+Σ_{b≠c}gamma_bc S_b S_c`. If `Q>=0`, return `sqrt(Q)` using raw S. Otherwise replace each S with `clamp(S,−K,K)` and recompute, finally flooring the quadratic at zero. This fallback is conditional, not an always-applied cap.
 4. Non-CTP CSR instead returns `sqrt(Σ ordinary K_b²)+Σ undiversified K_b`; the other bucket is added outside the root. Curvature uses its own sign-aware quadratic and zero floor, without the ordinary delta/vega capped-S retry.
 5. Sum positive class charges into each scenario total. Only strict `total>best` replaces the binding scenario, so ties select the first configured scenario. Defaults are `[Low, Medium, High]`: an empty or tied default book reports Low. Store that scenario's component maps and a breakdown for every evaluated scenario. Zero charges are omitted.
-6. `total=max(best_SBA,0)+DRC+RRAO`. DRC/RRAO run regardless of the selected SBA risk-class subset. `frtb_sba_charge(..., Some(scenario))` selects one scenario; `None` selects all.
+6. `total=max(best_SBA,0)+DRC+RRAO`. DRC/RRAO run regardless of the selected SBA risk-class subset. `FrtbSbaEngine::with_selection(Some(vec![scenario]), None)` selects one scenario; `FrtbSbaEngine::default()` selects all.
 
 ## Selection and controls
 

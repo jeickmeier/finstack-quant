@@ -10,7 +10,7 @@ mod pfe;
 mod replacement_cost;
 pub(crate) mod types;
 
-pub use engine::{SaCcrEngine, saccr_ead};
+pub use engine::SaCcrEngine;
 pub use types::{
     EadResult, SaCcrAssetClass, SaCcrNettingSetConfig, SaCcrOptionType, SaCcrSupervisoryCategory,
     SaCcrTrade,

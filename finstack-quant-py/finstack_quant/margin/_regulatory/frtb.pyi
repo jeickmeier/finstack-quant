@@ -77,7 +77,7 @@ class FrtbSensitivities:
     FRTB sensitivity portfolio for the Sensitivity-Based Approach.
 
     Build up delta / vega / curvature / DRC / RRAO inputs with the ``add_*``
-    methods (or ``from_dataframe``), then pass to :func:`frtb_sba_charge` or
+    methods (or ``from_dataframe``), then pass to
     ``FrtbSbaEngine.calculate`` to compute the capital charge under one or
     more correlation scenarios per BCBS d457.
 
@@ -898,7 +898,7 @@ class FrtbSensitivities:
         --------
         >>> sens = FrtbSensitivities("USD")
         >>> sens.add_rrao_position("EXOTIC-1", 5_000_000.0, True)
-        >>> frtb_sba_charge(sens).rrao
+        >>> FrtbSbaEngine().calculate(sens).rrao
         50000.0
         """
         ...
@@ -932,7 +932,7 @@ class FrtbSensitivities:
         deliberately - a column per bucket would give a different schema for
         every portfolio.
 
-        ``risk_class`` uses the same labels as the ``frtb_sba_charge``
+        ``risk_class`` uses the same labels as the ``FrtbSbaResult``
         breakdown (``girr``, ``csr_non_sec``, ``csr_sec_ctp``,
         ``csr_sec_non_ctp``, ``equity``, ``commodity``, ``fx``), plus ``drc``
         and ``rrao`` for the two position lists.
@@ -1155,15 +1155,15 @@ class FrtbSbaResult:
     """
     FRTB SBA capital-charge result (BCBS d457).
 
-    Returned by :func:`frtb_sba_charge` and :meth:`FrtbSbaEngine.calculate`.
+    Returned by :meth:`FrtbSbaEngine.calculate`.
     Amounts are floats in the sensitivity portfolio's base currency.
 
     Examples
     --------
-    >>> from finstack_quant.margin import FrtbSensitivities, frtb_sba_charge
+    >>> from finstack_quant.margin import FrtbSbaEngine, FrtbSensitivities
     >>> sens = FrtbSensitivities("USD")
     >>> sens.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
-    >>> result = frtb_sba_charge(sens)
+    >>> result = FrtbSbaEngine().calculate(sens)
     >>> result.total > 0.0
     True
     >>> result.binding_scenario in {"low", "medium", "high"}
@@ -1369,7 +1369,7 @@ class FrtbSbaResult:
         --------
         >>> sens = FrtbSensitivities("USD")
         >>> sens.add_girr_delta("USD", "USD-OIS", "5Y", 1.0)
-        >>> result = frtb_sba_charge(sens)
+        >>> result = FrtbSbaEngine().calculate(sens)
         >>> sorted(result.scenario_breakdown) == sorted(result.scenario_charges)
         True
         """
@@ -1395,7 +1395,7 @@ class FrtbSbaResult:
         --------
         >>> sens = FrtbSensitivities("USD")
         >>> sens.add_girr_delta("USD", "USD-OIS", "5Y", 1.0)
-        >>> result = frtb_sba_charge(sens)
+        >>> result = FrtbSbaEngine().calculate(sens)
         >>> "numeric_mode" in result.meta
         True
         """
@@ -1508,7 +1508,7 @@ class FrtbSbaResult:
         --------
         >>> sens = FrtbSensitivities("USD")
         >>> sens.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
-        >>> frtb_sba_charge(sens).to_scenario_table().to_dict()["scenario"]
+        >>> FrtbSbaEngine().calculate(sens).to_scenario_table().to_dict()["scenario"]
         ['low', 'medium', 'high']
         """
         ...
@@ -1527,39 +1527,3 @@ class FrtbSbaResult:
         This accessor does not raise; it returns the stored value.
         """
         ...
-
-def frtb_sba_charge(sensitivities: FrtbSensitivities, correlation_scenario: str | None = None) -> FrtbSbaResult:
-    """
-    Compute the FRTB SBA capital charge.
-
-    Parameters
-    ----------
-    sensitivities : FrtbSensitivities
-        Portfolio of FRTB sensitivities (delta, vega, curvature, DRC, RRAO).
-    correlation_scenario : str or None, optional
-        If provided (``"low"``, ``"medium"``, or ``"high"``), only that scenario
-        is evaluated. Otherwise all three are run and the max-binding one is
-        reported per BCBS d457.
-
-    Returns
-    -------
-    FrtbSbaResult
-        Total charge with the per-risk-class delta/vega/curvature breakdown,
-        DRC, RRAO, and the per-scenario charges with the binding one named.
-
-    Raises
-    ------
-    ValueError
-        If ``correlation_scenario`` is unknown, or a sensitivity has an
-        unsupported tenor or bucket, an empty required identifier, or a
-        non-finite numeric value.
-
-    Examples
-    --------
-    >>> sens = FrtbSensitivities("USD")
-    >>> sens.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
-    >>> result = frtb_sba_charge(sens)
-    >>> result.total > 0.0
-    True
-    """
-    ...
