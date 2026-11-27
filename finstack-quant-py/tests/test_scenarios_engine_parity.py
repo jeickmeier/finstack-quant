@@ -408,9 +408,7 @@ def test_floating_horizons_preserve_opening_and_crossed_fixings(method: str, iss
     opening = price_instrument(instrument, market, origin).value
     rolled = apply_scenario(scenario, market, origin, instruments=[instrument])
     assert rolled.instruments is not None
-    closing = price_instrument(
-        Bond.from_json(rolled.instruments[0]), rolled.market, rolled.report.time_roll["new_date"]
-    ).value
+    closing = price_instrument(rolled.instruments[0], rolled.market, rolled.report.time_roll["new_date"]).value
 
     result = compute_horizon_return(instrument, market, origin, scenario, method=method)
     payload = json.loads(result.to_json())
@@ -616,21 +614,23 @@ def test_shocked_instrument_copies_survive_result_round_trips(with_model: bool) 
     for restored in [result, ApplicationResult.from_json(result.to_json()), pickle.loads(pickle.dumps(result))]:  # noqa: S301 - own serialized result
         assert restored.instruments is not None
         assert len(restored.instruments) == 1
-        payload = json.loads(restored.instruments[0])
+        payload = restored.instruments[0]
+        assert isinstance(payload, dict)
         shock = payload["instrument"]["spec"]["scenario_pricing_overrides"]["scenario_price_shock_decimal"]
         assert 100.0 * (1.0 + shock) == pytest.approx(16.0)
         next_result = apply_scenario(
             ScenarioSpec("half", [OperationSpec.instrument_price_pct_by_type(["bond"], -50.0)]),
             _market(),
             AS_OF,
-            instruments=[json.loads(text) for text in restored.instruments],
+            instruments=restored.instruments,
         )
         assert next_result.instruments is not None
-        next_shock = json.loads(next_result.instruments[0])["instrument"]["spec"]["scenario_pricing_overrides"][
+        next_shock = next_result.instruments[0]["instrument"]["spec"]["scenario_pricing_overrides"][
             "scenario_price_shock_decimal"
         ]
         assert 100.0 * (1.0 + next_shock) == pytest.approx(8.0)
-    assert "instruments" in json.loads(result.to_json())
+    # The getter returns what `to_json()` writes for the field.
+    assert json.loads(result.to_json())["instruments"] == result.instruments
 
 
 def test_empty_inventory_is_distinct_from_absent_inventory() -> None:

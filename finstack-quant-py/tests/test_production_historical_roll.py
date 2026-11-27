@@ -128,7 +128,7 @@ def test_frn_time_roll_preserves_raw_index_excluding_coupon_spread() -> None:
         result.market,
         result.report.time_roll["new_date"],
         None,
-        [json.loads(text) for text in result.instruments],
+        result.instruments,
     )
     assert repeated.report.time_roll["failed_instruments"] == []
     assert json.loads(repeated.market.to_json())["series"] == json.loads(result.market.to_json())["series"]

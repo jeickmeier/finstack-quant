@@ -250,8 +250,8 @@ tabular_methods!(PyApplicationReport);
 /// one was supplied), and the application report.
 ///
 /// The input objects are copied. ``instruments`` returns the shocked copies as
-/// canonical envelope JSON strings; load one with ``json.loads`` or the
-/// instrument class's ``from_json`` before passing it to another call.
+/// canonical instrument-envelope dicts, which ``apply_scenario(instruments=)``
+/// and ``price_instrument`` take directly.
 #[pyclass(
     name = "ApplicationResult",
     module = "finstack_quant.scenarios",
@@ -281,18 +281,18 @@ impl PyApplicationResult {
         })
     }
 
-    /// Shocked instrument copies as canonical envelope JSON strings in input
-    /// order, or ``None`` when no inventory was supplied. Raises ``ValueError``
-    /// if an instrument cannot be serialized.
+    /// Shocked instrument copies as canonical envelope dicts in input order,
+    /// or ``None`` when no inventory was supplied. Raises ``ValueError`` if an
+    /// instrument cannot be serialized.
     #[getter]
-    fn instruments(&self) -> PyResult<Option<Vec<String>>> {
+    fn instruments<'py>(&self, py: Python<'py>) -> PyResult<Option<Vec<Bound<'py, PyAny>>>> {
         self.instruments
             .as_ref()
             .map(|inventory| {
                 finstack_quant_scenarios::instrument_envelopes(inventory)
                     .map_err(display_to_py)?
                     .iter()
-                    .map(|envelope| serde_json::to_string(envelope).map_err(display_to_py))
+                    .map(|envelope| serde_to_py(py, envelope))
                     .collect()
             })
             .transpose()

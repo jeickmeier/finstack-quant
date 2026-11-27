@@ -244,7 +244,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   JSON remains explicit through Python `to_json`/`from_json` or JSON-named inputs.
 
 Python `ApplicationResult.instruments` returns shocked copies as canonical
-instrument-envelope JSON strings in input order. WASM accepts the optional
+instrument-envelope dicts in input order. WASM accepts the optional
 `instrumentsJson` array and returns the same envelopes as objects in
 `result.instruments`. Both hosts require an inventory for instrument shocks;
 input objects remain unchanged. JSON and Python pickle round trips retain the

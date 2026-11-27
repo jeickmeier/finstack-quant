@@ -2,6 +2,14 @@
 
 ## Itemized changes
 
+### Python: a scenario result's instruments are envelope dicts
+
+`ApplicationResult.instruments` returns a list of instrument-envelope dicts
+instead of JSON strings. `apply_scenario(instruments=)` and `price_instrument`
+take them directly, so one scenario's output feeds the next call. Old → new:
+`[json.loads(text) for text in result.instruments]` → `result.instruments`.
+`to_json()`, `from_json()` and pickling are unchanged.
+
 ### Python: calibration steps take a dict or the typed params class
 
 Each per-kind `CalibrationStep` method (`discount`, `forward`, `hazard`, and
@@ -69,8 +77,7 @@ takes JSON text, because it also reads a by-date ladder that
 `PortfolioCashflows.from_json` does not.
 The instrument validators (`validate_instrument_json` and its siblings)
 still take the envelope as a dict or as text; the envelope document is their
-subject. `ApplicationResult.instruments` still returns envelope text: load
-each entry with `json.loads` or the class's `from_json` before passing it on.
+subject.
 
 ### Valuations: a builder names every missing required field
 

@@ -491,15 +491,15 @@ class ApplicationResult:
         ...
 
     @property
-    def instruments(self) -> list[str] | None:
+    def instruments(self) -> list[dict[str, Any]] | None:
         """Shocked copies of the supplied instrument inventory.
 
         Returns
         -------
-        list[str] or None
-            Canonical instrument-envelope JSON strings in input order. Each
-            loads with ``json.loads`` for a subsequent scenario call, or with an
-            instrument ``from_json`` constructor.
+        list[dict[str, Any]] or None
+            Canonical instrument-envelope dicts in input order. Each is the
+            form ``apply_scenario(instruments=)`` and ``price_instrument``
+            take, so a result feeds the next call with no conversion.
             ``None`` means no inventory was supplied; an empty list stays empty.
             The original Python objects are never mutated.
 

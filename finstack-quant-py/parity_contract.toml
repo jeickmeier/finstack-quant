@@ -2064,10 +2064,10 @@ warning   = { python = "finstack_quant.scenarios.warning",   status = "missing",
 schema = { python = "finstack_quant.scenarios.schema", status = "exists", note = "Registry-backed index/get/validate over the crate's published JSON Schemas; bound in WASM as the `schema` sub-namespace (plain objects instead of JSON text)." }
 
 # ExecutionContext: the Python entry points (apply_scenario,
-# apply_scenario) accept `instruments: list[Instrument | str] | None`
+# apply_scenario) accept `instruments: list[Instrument | dict] | None`
 # and wire it into ExecutionContext.instruments. ApplicationResult.instruments
-# returns shocked copies in input order as canonical envelope JSON strings,
-# including JSON and pickle round trips. WASM accepts instrumentsJson (an
+# returns shocked copies in input order as canonical envelope dicts, the form
+# the input takes, including after JSON and pickle round trips. WASM accepts instrumentsJson (an
 # optional JSON array of canonical envelopes) and returns those envelopes as
 # objects in instruments. ScenarioEngine::apply itself rejects
 # instrument-scoped operations (mutates_instruments()) without an inventory,
