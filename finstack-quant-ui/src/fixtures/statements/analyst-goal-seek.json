@@ -23,25 +23,25 @@
   "evaluations": 6,
   "original_run": {
     "model_id": "ACME-SOFTWARE-3STMT",
-    "model_content_hash": "sha256:15f96cf56a9f5f5164d2dd0fc942c36861329029c5f2267a7c8889f66b33614f",
+    "model_content_hash": "sha256:26672c308d30598faa33e7e382cec9e16f4fa3f656cfce7ba5cf91366110c0f9",
     "source_snapshot": "analyst-published-2025Q1",
     "observation_cutoff": {
       "through": "2025-04-01"
     },
     "valuation_date": "2025-04-01",
     "market_content_hash": "sha256:3b61d6d907002a1ceb52e85384017f811218f6d652aeef0034a002c03ff53aa7",
-    "run_id": "sha256:3f08445e11f9ee52a9c4b59e1306a7780c6cc831c5ea7195e1f081b063d51936"
+    "run_id": "sha256:1f7fde76ae7247a2ffcafeb04d7464a33fa0c8e6542151fec1eeea5cf9e89325"
   },
   "solved_run": {
     "model_id": "ACME-SOFTWARE-3STMT",
-    "model_content_hash": "sha256:90c4aac5feb3355a545165051a1ab5917a4047ce09198146df263617d05bb10d",
+    "model_content_hash": "sha256:a5954db62642b1ec6c5c891f14381e2e07e5fbd97677e87e7da360ef86ef4fc0",
     "source_snapshot": "analyst-published-2025Q1",
     "observation_cutoff": {
       "through": "2025-04-01"
     },
     "valuation_date": "2025-04-01",
     "market_content_hash": "sha256:3b61d6d907002a1ceb52e85384017f811218f6d652aeef0034a002c03ff53aa7",
-    "run_id": "sha256:33728db29ce4c3579e1a4871fbe13e5a04524e41e3f240d6dfa8a59c5e3d810a"
+    "run_id": "sha256:39777a2533d10c066a5689b9cfe1dd3e370e6acb9c01b25516fd4a5a365a3580"
   },
   "market_hash": "sha256:3b61d6d907002a1ceb52e85384017f811218f6d652aeef0034a002c03ff53aa7",
   "model": null

@@ -89477,11 +89477,11 @@
           }
         },
         "availability_dates": {
-          "2024Q1": "2024-04-01",
-          "2024Q2": "2024-07-01",
-          "2024Q3": "2024-10-01",
-          "2024Q4": "2025-01-01",
-          "2025Q1": "2025-04-01"
+          "2024Q1": "2024-03-31",
+          "2024Q2": "2024-06-30",
+          "2024Q3": "2024-09-30",
+          "2024Q4": "2024-12-31",
+          "2025Q1": "2025-03-31"
         }
       },
       "revenue_growth_qoq": {
@@ -89529,11 +89529,11 @@
         },
         "formula_text": "revenue * 0.3375",
         "availability_dates": {
-          "2024Q1": "2024-04-01",
-          "2024Q2": "2024-07-01",
-          "2024Q3": "2024-10-01",
-          "2024Q4": "2025-01-01",
-          "2025Q1": "2025-04-01"
+          "2024Q1": "2024-03-31",
+          "2024Q2": "2024-06-30",
+          "2024Q3": "2024-09-30",
+          "2024Q4": "2024-12-31",
+          "2025Q1": "2025-03-31"
         }
       },
       "gross_profit": {
@@ -89598,11 +89598,11 @@
           }
         },
         "availability_dates": {
-          "2024Q1": "2024-04-01",
-          "2024Q2": "2024-07-01",
-          "2024Q3": "2024-10-01",
-          "2024Q4": "2025-01-01",
-          "2025Q1": "2025-04-01"
+          "2024Q1": "2024-03-31",
+          "2024Q2": "2024-06-30",
+          "2024Q3": "2024-09-30",
+          "2024Q4": "2024-12-31",
+          "2025Q1": "2025-03-31"
         }
       },
       "ebitda": {
@@ -89667,11 +89667,11 @@
           }
         },
         "availability_dates": {
-          "2024Q1": "2024-04-01",
-          "2024Q2": "2024-07-01",
-          "2024Q3": "2024-10-01",
-          "2024Q4": "2025-01-01",
-          "2025Q1": "2025-04-01"
+          "2024Q1": "2024-03-31",
+          "2024Q2": "2024-06-30",
+          "2024Q3": "2024-09-30",
+          "2024Q4": "2024-12-31",
+          "2025Q1": "2025-03-31"
         }
       },
       "ebit": {
@@ -89779,11 +89779,11 @@
           }
         },
         "availability_dates": {
-          "2024Q1": "2024-04-01",
-          "2024Q2": "2024-07-01",
-          "2024Q3": "2024-10-01",
-          "2024Q4": "2025-01-01",
-          "2025Q1": "2025-04-01"
+          "2024Q1": "2024-03-31",
+          "2024Q2": "2024-06-30",
+          "2024Q3": "2024-09-30",
+          "2024Q4": "2024-12-31",
+          "2025Q1": "2025-03-31"
         }
       },
       "debt_draws": {
@@ -89829,11 +89829,11 @@
           }
         },
         "availability_dates": {
-          "2024Q1": "2024-04-01",
-          "2024Q2": "2024-07-01",
-          "2024Q3": "2024-10-01",
-          "2024Q4": "2025-01-01",
-          "2025Q1": "2025-04-01"
+          "2024Q1": "2024-03-31",
+          "2024Q2": "2024-06-30",
+          "2024Q3": "2024-09-30",
+          "2024Q4": "2024-12-31",
+          "2025Q1": "2025-03-31"
         }
       },
       "debt_repayments": {
@@ -89872,11 +89872,11 @@
           "method": "forward_fill"
         },
         "availability_dates": {
-          "2024Q1": "2024-04-01",
-          "2024Q2": "2024-07-01",
-          "2024Q3": "2024-10-01",
-          "2024Q4": "2025-01-01",
-          "2025Q1": "2025-04-01"
+          "2024Q1": "2024-03-31",
+          "2024Q2": "2024-06-30",
+          "2024Q3": "2024-09-30",
+          "2024Q4": "2024-12-31",
+          "2025Q1": "2025-03-31"
         }
       },
       "total_debt": {
@@ -89939,11 +89939,11 @@
           "method": "forward_fill"
         },
         "availability_dates": {
-          "2024Q1": "2024-04-01",
-          "2024Q2": "2024-07-01",
-          "2024Q3": "2024-10-01",
-          "2024Q4": "2025-01-01",
-          "2025Q1": "2025-04-01"
+          "2024Q1": "2024-03-31",
+          "2024Q2": "2024-06-30",
+          "2024Q3": "2024-09-30",
+          "2024Q4": "2024-12-31",
+          "2025Q1": "2025-03-31"
         }
       },
       "ltm_ebitda": {
@@ -91958,10 +91958,10 @@
     },
     "provenance": {
       "model_id": "ACME-SOFTWARE-3STMT",
-      "model_content_hash": "sha256:15f96cf56a9f5f5164d2dd0fc942c36861329029c5f2267a7c8889f66b33614f",
+      "model_content_hash": "sha256:26672c308d30598faa33e7e382cec9e16f4fa3f656cfce7ba5cf91366110c0f9",
       "source_snapshot": "analyst-published-2025Q1",
       "observation_cutoff": "full_snapshot",
-      "run_id": "sha256:5cf9d93e67f0b3fc7c80ca3a9b1eb02215494255ac564f0a628b58bb39f4c033"
+      "run_id": "sha256:46f5db106df9183b66a68e1825ad6cf24418b353cc758d08aedbb243e09f6a16"
     },
     "cs_cashflows": {
       "by_instrument": {
@@ -97363,10 +97363,10 @@
             },
             "provenance": {
               "model_id": "ACME-SOFTWARE-3STMT",
-              "model_content_hash": "sha256:5c57deb330d51c131ad691f34483541dff91cc4e89ed18b68fe1604b7649861c",
+              "model_content_hash": "sha256:4a82a428ebee5084f4788f5cac8c381489a37bf2a34dfc7134bdd79a2d8de420",
               "source_snapshot": "analyst-published-2025Q1",
               "observation_cutoff": "full_snapshot",
-              "run_id": "sha256:f7065fde2a7f15e75d3904dbbcfcfebcd3e35a7f99fa0171a9009164739a968a"
+              "run_id": "sha256:4c5a00dddb3d06ea9c3a2a26c0864d65c5ab73562cbfc22299a8fbbe7d7a9e3b"
             },
             "cs_cashflows": {
               "by_instrument": {
@@ -102175,10 +102175,10 @@
             },
             "provenance": {
               "model_id": "ACME-SOFTWARE-3STMT",
-              "model_content_hash": "sha256:3e79e7835bf5e5c09bc4a0f96bf96d7e1a1ccf1202bc2b28f6901d2f75e57abd",
+              "model_content_hash": "sha256:58cfbd916b9cb04d4846b62d617ad9011cfa5aa94265e11add85d1237fe1656d",
               "source_snapshot": "analyst-published-2025Q1",
               "observation_cutoff": "full_snapshot",
-              "run_id": "sha256:3e09ec218a8049ad15f64937749ca9f55eca38cb404e4c9a235eb0f1b28d3439"
+              "run_id": "sha256:8cfbcba40fb362daefe0ef6212e941744f32fdfaf961f4f9597b565c21ea43d3"
             },
             "cs_cashflows": {
               "by_instrument": {
@@ -106987,10 +106987,10 @@
             },
             "provenance": {
               "model_id": "ACME-SOFTWARE-3STMT",
-              "model_content_hash": "sha256:c52103d65aed01b5330a2fa05617e369906cb548a363a24a0eb73ba589a52f25",
+              "model_content_hash": "sha256:387e91199a89a485b95dbda24b179e16fe17bba2653fd6326857865ca3eb8e95",
               "source_snapshot": "analyst-published-2025Q1",
               "observation_cutoff": "full_snapshot",
-              "run_id": "sha256:6dec8f492535d3482ee108e8b71a987d6cc99f5c959784e428660f753010dc81"
+              "run_id": "sha256:b155fe7332dd966223fe01362523b39fa15cbafe446c4987ff446d2156a481ba"
             },
             "cs_cashflows": {
               "by_instrument": {
@@ -111799,10 +111799,10 @@
             },
             "provenance": {
               "model_id": "ACME-SOFTWARE-3STMT",
-              "model_content_hash": "sha256:bf2c55496f499b2957d5e384fcc178c7b606daf4871dc099c4617497c5b7230f",
+              "model_content_hash": "sha256:0d0cd771913997c8cc129b8d10f1b5f05ae9c01657f8dea884cb4c4841b7a973",
               "source_snapshot": "analyst-published-2025Q1",
               "observation_cutoff": "full_snapshot",
-              "run_id": "sha256:c7fe46188ad314fa1d0154868ff3b10b8323403482568fcd50563e4154cf537d"
+              "run_id": "sha256:6500cf65d41176c5575538c257768d58faf94c31f95ba2ae3508a2988b84742b"
             },
             "cs_cashflows": {
               "by_instrument": {
@@ -116608,10 +116608,10 @@
         },
         "provenance": {
           "model_id": "ACME-SOFTWARE-3STMT",
-          "model_content_hash": "sha256:15f96cf56a9f5f5164d2dd0fc942c36861329029c5f2267a7c8889f66b33614f",
+          "model_content_hash": "sha256:26672c308d30598faa33e7e382cec9e16f4fa3f656cfce7ba5cf91366110c0f9",
           "source_snapshot": "analyst-published-2025Q1",
           "observation_cutoff": "full_snapshot",
-          "run_id": "sha256:5cf9d93e67f0b3fc7c80ca3a9b1eb02215494255ac564f0a628b58bb39f4c033"
+          "run_id": "sha256:46f5db106df9183b66a68e1825ad6cf24418b353cc758d08aedbb243e09f6a16"
         },
         "cs_cashflows": {
           "by_instrument": {
@@ -119726,25 +119726,25 @@
     "evaluations": 6,
     "original_run": {
       "model_id": "ACME-SOFTWARE-3STMT",
-      "model_content_hash": "sha256:15f96cf56a9f5f5164d2dd0fc942c36861329029c5f2267a7c8889f66b33614f",
+      "model_content_hash": "sha256:26672c308d30598faa33e7e382cec9e16f4fa3f656cfce7ba5cf91366110c0f9",
       "source_snapshot": "analyst-published-2025Q1",
       "observation_cutoff": {
         "through": "2025-04-01"
       },
       "valuation_date": "2025-04-01",
       "market_content_hash": "sha256:3b61d6d907002a1ceb52e85384017f811218f6d652aeef0034a002c03ff53aa7",
-      "run_id": "sha256:3f08445e11f9ee52a9c4b59e1306a7780c6cc831c5ea7195e1f081b063d51936"
+      "run_id": "sha256:1f7fde76ae7247a2ffcafeb04d7464a33fa0c8e6542151fec1eeea5cf9e89325"
     },
     "solved_run": {
       "model_id": "ACME-SOFTWARE-3STMT",
-      "model_content_hash": "sha256:90c4aac5feb3355a545165051a1ab5917a4047ce09198146df263617d05bb10d",
+      "model_content_hash": "sha256:a5954db62642b1ec6c5c891f14381e2e07e5fbd97677e87e7da360ef86ef4fc0",
       "source_snapshot": "analyst-published-2025Q1",
       "observation_cutoff": {
         "through": "2025-04-01"
       },
       "valuation_date": "2025-04-01",
       "market_content_hash": "sha256:3b61d6d907002a1ceb52e85384017f811218f6d652aeef0034a002c03ff53aa7",
-      "run_id": "sha256:33728db29ce4c3579e1a4871fbe13e5a04524e41e3f240d6dfa8a59c5e3d810a"
+      "run_id": "sha256:39777a2533d10c066a5689b9cfe1dd3e370e6acb9c01b25516fd4a5a365a3580"
     },
     "market_hash": "sha256:3b61d6d907002a1ceb52e85384017f811218f6d652aeef0034a002c03ff53aa7",
     "model": null
@@ -127079,11 +127079,11 @@
                 }
               },
               "availability_dates": {
-                "2024Q1": "2024-04-01",
-                "2024Q2": "2024-07-01",
-                "2024Q3": "2024-10-01",
-                "2024Q4": "2025-01-01",
-                "2025Q1": "2025-04-01"
+                "2024Q1": "2024-03-31",
+                "2024Q2": "2024-06-30",
+                "2024Q3": "2024-09-30",
+                "2024Q4": "2024-12-31",
+                "2025Q1": "2025-03-31"
               },
               "forecast": {
                 "method": "curve_pct",
@@ -127136,11 +127136,11 @@
                 }
               },
               "availability_dates": {
-                "2024Q1": "2024-04-01",
-                "2024Q2": "2024-07-01",
-                "2024Q3": "2024-10-01",
-                "2024Q4": "2025-01-01",
-                "2025Q1": "2025-04-01"
+                "2024Q1": "2024-03-31",
+                "2024Q2": "2024-06-30",
+                "2024Q3": "2024-09-30",
+                "2024Q4": "2024-12-31",
+                "2025Q1": "2025-03-31"
               },
               "formula_text": "revenue * 0.3375",
               "tags": ["income_statement"],
@@ -127200,11 +127200,11 @@
                 }
               },
               "availability_dates": {
-                "2024Q1": "2024-04-01",
-                "2024Q2": "2024-07-01",
-                "2024Q3": "2024-10-01",
-                "2024Q4": "2025-01-01",
-                "2025Q1": "2025-04-01"
+                "2024Q1": "2024-03-31",
+                "2024Q2": "2024-06-30",
+                "2024Q3": "2024-09-30",
+                "2024Q4": "2024-12-31",
+                "2025Q1": "2025-03-31"
               },
               "forecast": {
                 "method": "growth_pct",
@@ -127269,11 +127269,11 @@
                 }
               },
               "availability_dates": {
-                "2024Q1": "2024-04-01",
-                "2024Q2": "2024-07-01",
-                "2024Q3": "2024-10-01",
-                "2024Q4": "2025-01-01",
-                "2025Q1": "2025-04-01"
+                "2024Q1": "2024-03-31",
+                "2024Q2": "2024-06-30",
+                "2024Q3": "2024-09-30",
+                "2024Q4": "2024-12-31",
+                "2025Q1": "2025-03-31"
               },
               "forecast": {
                 "method": "growth_pct",
@@ -127387,11 +127387,11 @@
                 }
               },
               "availability_dates": {
-                "2024Q1": "2024-04-01",
-                "2024Q2": "2024-07-01",
-                "2024Q3": "2024-10-01",
-                "2024Q4": "2025-01-01",
-                "2025Q1": "2025-04-01"
+                "2024Q1": "2024-03-31",
+                "2024Q2": "2024-06-30",
+                "2024Q3": "2024-09-30",
+                "2024Q4": "2024-12-31",
+                "2025Q1": "2025-03-31"
               },
               "tags": ["debt"],
               "value_type": {
@@ -127427,11 +127427,11 @@
                 }
               },
               "availability_dates": {
-                "2024Q1": "2024-04-01",
-                "2024Q2": "2024-07-01",
-                "2024Q3": "2024-10-01",
-                "2024Q4": "2025-01-01",
-                "2025Q1": "2025-04-01"
+                "2024Q1": "2024-03-31",
+                "2024Q2": "2024-06-30",
+                "2024Q3": "2024-09-30",
+                "2024Q4": "2024-12-31",
+                "2025Q1": "2025-03-31"
               },
               "forecast": {
                 "method": "override",
@@ -127477,11 +127477,11 @@
                 }
               },
               "availability_dates": {
-                "2024Q1": "2024-04-01",
-                "2024Q2": "2024-07-01",
-                "2024Q3": "2024-10-01",
-                "2024Q4": "2025-01-01",
-                "2025Q1": "2025-04-01"
+                "2024Q1": "2024-03-31",
+                "2024Q2": "2024-06-30",
+                "2024Q3": "2024-09-30",
+                "2024Q4": "2024-12-31",
+                "2025Q1": "2025-03-31"
               },
               "forecast": {
                 "method": "forward_fill"
@@ -127544,11 +127544,11 @@
                 }
               },
               "availability_dates": {
-                "2024Q1": "2024-04-01",
-                "2024Q2": "2024-07-01",
-                "2024Q3": "2024-10-01",
-                "2024Q4": "2025-01-01",
-                "2025Q1": "2025-04-01"
+                "2024Q1": "2024-03-31",
+                "2024Q2": "2024-06-30",
+                "2024Q3": "2024-09-30",
+                "2024Q4": "2024-12-31",
+                "2025Q1": "2025-03-31"
               },
               "forecast": {
                 "method": "forward_fill"
@@ -129386,10 +129386,10 @@
           },
           "provenance": {
             "model_id": "ACME-SOFTWARE-3STMT",
-            "model_content_hash": "sha256:6a6c2dcb3ddfc8be829ea64f72ef27e2a52e3c913542e3a1e573874d21fcc2ba",
+            "model_content_hash": "sha256:2548f23b9cf819052de1ec66b140603d4cd0718858f736807a64129190492d89",
             "source_snapshot": "analyst-published-2025Q1",
             "observation_cutoff": "full_snapshot",
-            "run_id": "sha256:215b07d4bd15e5145e2f9880141f98631595de29009d0092f5f0b1e5e7ba9103"
+            "run_id": "sha256:62982fdb4cc17bbd581c9cc3804f1d515592bce4ffc0ab689fa0f2f592bed237"
           },
           "meta": {
             "num_nodes": 26,

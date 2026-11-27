@@ -1745,10 +1745,10 @@
   },
   "provenance": {
     "model_id": "ACME-SOFTWARE-3STMT",
-    "model_content_hash": "sha256:15f96cf56a9f5f5164d2dd0fc942c36861329029c5f2267a7c8889f66b33614f",
+    "model_content_hash": "sha256:26672c308d30598faa33e7e382cec9e16f4fa3f656cfce7ba5cf91366110c0f9",
     "source_snapshot": "analyst-published-2025Q1",
     "observation_cutoff": "full_snapshot",
-    "run_id": "sha256:5cf9d93e67f0b3fc7c80ca3a9b1eb02215494255ac564f0a628b58bb39f4c033"
+    "run_id": "sha256:46f5db106df9183b66a68e1825ad6cf24418b353cc758d08aedbb243e09f6a16"
   },
   "cs_cashflows": {
     "by_instrument": {
