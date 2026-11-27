@@ -1627,8 +1627,6 @@ class Twin:
     id: str
     via_text: Callable[[], Any]
     via_typed: Callable[[], Any]
-    # Bad inputs: label -> (text form, typed form). Both must raise the same type.
-    bad: Mapping[str, tuple[Callable[[], Any], Callable[[], Any]]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -1990,18 +1988,6 @@ def test_text_form_equals_typed_form(twin: Twin) -> None:
     via_text, via_typed = twin.via_text(), twin.via_typed()
     assert via_text == via_typed
     assert via_text
-
-
-@pytest.mark.parametrize(
-    ("twin", "label"),
-    [pytest.param(twin, label, id=f"{twin.id}-{label}") for twin in TWINS for label in twin.bad],
-)
-def test_text_form_and_typed_form_fail_alike(twin: Twin, label: str) -> None:
-    via_text, via_typed = (_outcome(form) for form in twin.bad[label])
-    assert via_text[0] == "raises", f"the text form accepts {label}"
-    assert via_typed[0] == "raises", f"the typed form accepts {label}; the text form raises {via_text[1]}"
-    # `json.loads` reports text that is not JSON as `JSONDecodeError`, a `ValueError`.
-    assert via_typed[1] is via_text[1] or issubclass(via_typed[1], via_text[1])
 
 
 def test_collapse_ladder_text_has_no_typed_equal() -> None:

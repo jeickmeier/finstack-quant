@@ -185,10 +185,9 @@ contract, pinned by `tests/parity/test_return_shapes.py` and mirrored by
 | `json` | A JSON `str` — legal **only** on a `*_json`-suffixed wire surface, and every such surface must have a typed twin |
 | `scalar` / `list` / `dict` | Plain Python values |
 
-The text of a result comes from `to_json()`. A typed member has no `*_json`
-twin: the `*_json` names that remain are the validators and the few members
-listed with their reason in `scripts/check_python_input_forms.py`, which fails
-on any other.
+The text of a result comes from `to_json()`. A `*_json` name exists only
+where `scripts/check_python_input_forms.py` lists it with its reason (the
+validators and a few members). The check fails on any other.
 
 Every result wrapper carries:
 

@@ -434,7 +434,7 @@ fn extract_discount_curve_map(
 /// PortfolioCashflows
 ///     Typed wrapper around the full cashflow ladder. Use
 ///     ``to_json()``/``from_json()`` for round-tripping and typed accessors
-///     (``events_json``, ``by_date_json``, ``collapse_to_base_by_date_kind``)
+///     (``events``, ``by_date``, ``collapse_to_base_by_date_kind``)
 ///     to drill in without re-parsing.
 ///
 /// Raises
