@@ -51,8 +51,10 @@ def test_dcf_tearsheet_renders_all_sections() -> None:
     assert "USD" in html
 
 
-def test_dcf_tearsheet_accepts_json_valuation() -> None:
-    html = dcf_tearsheet(json.dumps(_VAL), generated=dt.date(2026, 6, 22)).to_html()
+def test_dcf_tearsheet_refuses_json_text_valuation() -> None:
+    with pytest.raises(TypeError, match="valuation must be a typed contract or a dict; got str"):
+        dcf_tearsheet(json.dumps(_VAL), generated=dt.date(2026, 6, 22))
+    html = dcf_tearsheet(json.loads(json.dumps(_VAL)), generated=dt.date(2026, 6, 22)).to_html()
     assert "DCF Valuation" in html
     assert "Equity Bridge" in html
 
@@ -80,7 +82,7 @@ def test_dcf_tearsheet_rejects_bad_valuation() -> None:
     with pytest.raises(TypeError):
         dcf_tearsheet(12345)
     with pytest.raises(TypeError):
-        dcf_tearsheet("[1, 2, 3]")  # valid JSON, not an object
+        dcf_tearsheet("[1, 2, 3]")  # a string is not read as JSON text
 
 
 def test_dcf_tearsheet_zero_net_debt_renders_bridge() -> None:

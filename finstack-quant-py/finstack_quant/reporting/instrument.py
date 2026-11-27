@@ -3,7 +3,7 @@
 Pure formatter — reads the already-priced ``result`` (scalar metrics incl.
 ``bucketed_*::curve::tenor`` composite keys, covenants), parses ``result.to_json()``
 read-only for meta/details, and renders the optional ``cashflows`` DataFrame and
-``definition`` JSON. It never prices.
+``definition`` dict. It never prices.
 
 Examples:
 --------
@@ -323,7 +323,6 @@ def _cashflow_blocks(
 # Task 6: Assembly — instrument_tearsheet public API
 
 ALL_SECTIONS = ["definition", "valuation", "keyrate", "cashflows", "schedule", "payoff", "survival", "covenants"]
-_MISSING_DEFINITION = object()
 
 # Headline KPI metric ids per type (label comes from _metric_cell).
 # Reconciliation: "default_probability" replaced with "default01" for CDS.
@@ -354,17 +353,6 @@ _ANALYTICS_GROUPS: dict[str, list[list[str]]] = {
         ["rho", "vanna", "volga", "charm"],
     ],
 }
-
-
-def _parse_definition_once(definition: Any) -> tuple[Any, json.JSONDecodeError | None]:
-    if definition is None:
-        return _MISSING_DEFINITION, None
-    if not isinstance(definition, str):
-        return definition, None
-    try:
-        return json.loads(definition), None
-    except json.JSONDecodeError as error:
-        return definition, error
 
 
 def _kpis(result: Any, itype: str) -> list[KPI]:
@@ -405,11 +393,9 @@ def _analytics_section(result: Any, itype: str) -> Section:
     return Section("Valuation & Analytics", f'<div class="statgrid">{cols_html}</div>')
 
 
-def _definition_section(definition: Any, definition_error: json.JSONDecodeError | None) -> Section | None:
-    if definition is _MISSING_DEFINITION:
+def _definition_section(definition: Any) -> Section | None:
+    if definition is None:
         return None
-    if definition_error is not None:
-        raise definition_error
     cols = _definition_terms(definition)
     cols_html = "".join(tables.kv_table([(k, v, "") for k, v in col]) for col in cols if col)
     return Section("Definition", f'<div class="statgrid">{cols_html}</div>')
@@ -457,14 +443,11 @@ def _cashflow_sections(cashflows: Any, theme: Theme) -> list[Section]:
 
 def _payoff_section(
     definition: Any,
-    definition_error: json.JSONDecodeError | None,
     _result: Any,
     theme: Theme,
 ) -> Section | None:
-    if definition is _MISSING_DEFINITION:
+    if definition is None:
         return None
-    if definition_error is not None:
-        raise definition_error
     if definition.get("type") != "equity_option":
         return None
     spec = definition.get("spec", {})
@@ -539,7 +522,6 @@ def _build_sections(
     result: Any,
     cashflows: Any,
     definition: Any,
-    definition_error: json.JSONDecodeError | None,
     parsed: dict[str, Any],
     itype: str,
     wanted: list[str],
@@ -547,7 +529,7 @@ def _build_sections(
 ) -> list[Section]:
     """Dispatch section builders and collect the ordered list of Section objects."""
     secs: list[Section] = []
-    if "definition" in wanted and (s := _definition_section(definition, definition_error)):
+    if "definition" in wanted and (s := _definition_section(definition)):
         secs.append(s)
     if "valuation" in wanted:
         secs.append(_analytics_section(result, itype))
@@ -555,7 +537,7 @@ def _build_sections(
         secs.append(s)
     if "keyrate" in wanted and (s := _keyrate_section(result, itype, theme)):
         secs.append(s)
-    if "payoff" in wanted and (s := _payoff_section(definition, definition_error, result, theme)):
+    if "payoff" in wanted and (s := _payoff_section(definition, result, theme)):
         secs.append(s)
     if "cashflows" in wanted or "schedule" in wanted:
         secs.extend(
@@ -593,8 +575,10 @@ def instrument_tearsheet(
     cashflows : Any
         Optional InstrumentCashflowEnvelope, cashflow DataFrame, or ladder and
         frame pair. Each row must give its currency.
-    definition : Any
-        Optional instrument-definition payload used to enrich the rendered sheet.
+    definition : dict or None
+        Optional instrument definition (the ``instrument`` object of an
+        envelope: ``{"type": ..., "spec": {...}}``) used to enrich the
+        rendered sheet. Load JSON text with ``json.loads`` first.
     title : str or None
         Optional main report heading; ``None`` uses the instrument identifier.
     subtitle : str or None
@@ -616,14 +600,11 @@ def instrument_tearsheet(
     ValueError
         If ``sections`` contains an unknown name or a cashflow row lacks an explicit currency.
     TypeError
-        If ``result`` is an instrument JSON string or mapping instead of a
-        precomputed valuation result, or cashflows cannot supply a DataFrame.
-    json.JSONDecodeError
-        If an instrument, valuation result, or requested definition contains
-        malformed JSON.
+        If ``result`` is a string or mapping instead of a precomputed
+        valuation result, or cashflows cannot supply a DataFrame.
     AttributeError
         If a requested definition or payoff section receives a definition that
-        does not decode to a JSON object.
+        is not a mapping (a string included: it is not read as JSON text).
 
     Examples:
     --------
@@ -660,7 +641,6 @@ def instrument_tearsheet(
     wanted = _resolve_sections(sections, ALL_SECTIONS, valid_label="valid")
 
     parsed = _parse_result(result)
-    definition, definition_error = _parse_definition_once(definition)
     itype = definition.get("type", "") if isinstance(definition, dict) else ""
 
     if hasattr(cashflows, "calendar_year_ladder_by_currency"):
@@ -673,7 +653,7 @@ def instrument_tearsheet(
     if frame is not None and not hasattr(frame, "iterrows"):
         raise TypeError("cashflows must supply a DataFrame")
 
-    secs = _build_sections(result, cashflows, definition, definition_error, parsed, itype, wanted, theme)
+    secs = _build_sections(result, cashflows, definition, parsed, itype, wanted, theme)
 
     as_of = parsed.get("as_of") or ""
     type_label = itype.replace("_", " ").title() if itype else "Instrument"

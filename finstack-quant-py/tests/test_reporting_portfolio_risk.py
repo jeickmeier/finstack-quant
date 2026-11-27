@@ -64,8 +64,10 @@ def test_portfolio_risk_tearsheet_renders_all_sections() -> None:
     assert "Breach" in html
 
 
-def test_portfolio_risk_tearsheet_accepts_json() -> None:
-    html = portfolio_risk_tearsheet(json.dumps(_DECOMP), generated=dt.date(2026, 6, 23)).to_html()
+def test_portfolio_risk_tearsheet_refuses_json_text() -> None:
+    with pytest.raises(TypeError, match="decomposition must be a typed contract or a dict; got str"):
+        portfolio_risk_tearsheet(json.dumps(_DECOMP), generated=dt.date(2026, 6, 23))
+    html = portfolio_risk_tearsheet(_DECOMP, generated=dt.date(2026, 6, 23)).to_html()
     assert "VaR Contributions" in html
 
 

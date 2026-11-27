@@ -122,8 +122,8 @@ def scenario_tearsheet(
     Parameters
     ----------
     tornado : list[TornadoEntry | dict], optional
-        ``generate_tornado_entries`` output (typed entries, dicts or JSON
-        objects with ``parameter_id``/``downside``/``upside``), in Rust order.
+        ``generate_tornado_entries`` output (typed entries or dicts with
+        ``parameter_id``/``downside``/``upside``), in Rust order.
     scenarios : dict or sequence of ScenarioPnlBatchItem, optional
         A mapping from scenario names to numeric metric values or typed
         ScenarioPnl results, or an ordered portfolio scenario P&L batch.
@@ -131,8 +131,8 @@ def scenario_tearsheet(
         the comparison.
     monte_carlo : MonteCarloResults or dict, optional
         A typed result with the 5th, 50th and 95th percentiles configured, or a pre-extracted fan: ``{"periods": [...], "p_low": [...], "p_mid": [...], "p_high": [...]}``.
-    variance : VarianceReport | dict | str, optional
-        A ``run_variance`` result (typed, dict, or JSON).
+    variance : VarianceReport | dict, optional
+        A ``run_variance`` result (typed or dict).
     breach_probability : float, optional
         Fraction (e.g. ``0.12``) used for the breach KPI and the MC caption.
     target_metric : str, optional
@@ -155,7 +155,7 @@ def scenario_tearsheet(
             percentiles are unavailable.
         TypeError: If ``scenarios`` is neither a mapping nor a labeled scenario
             batch, ``tornado`` does not supply tornado entries, or
-            ``variance`` is not a variance report, dict, or JSON string.
+            ``variance`` is neither a variance report nor a dict.
 
     Returns:
     -------

@@ -146,8 +146,8 @@ def credit_tearsheet(
 
     Parameters
     ----------
-    assessment : dict | str
-        A structured ``credit_assessment`` result (dict or JSON string) with
+    assessment : CreditAssessment | dict
+        A structured ``credit_assessment`` result (typed or dict) with
         ``leverage_ratio``, ``interest_coverage``, ``free_cash_flow``, ``as_of``,
         and a ``series`` of per-period points.
     results : StatementResult | str | dict, optional
@@ -176,7 +176,7 @@ def credit_tearsheet(
     ValueError
         If ``sections`` contains an unknown section name.
     TypeError
-        If ``assessment`` is neither a dict nor a JSON string.
+        If ``assessment`` is neither a typed result nor a dict.
 
     Returns:
     -------

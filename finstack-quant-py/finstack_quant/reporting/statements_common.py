@@ -136,19 +136,22 @@ class StatementView:
 
 
 def json_or_dict(obj: Any, *, noun: str = "value") -> dict[str, Any]:
-    """Normalise a typed contract, dict, or JSON-object string into a dict.
+    """Normalise a typed contract or a dict into a dict.
+
+    A string is not read as JSON text: load it first with ``json.loads`` or
+    the typed class's ``from_json``.
 
     Raises:
-        TypeError: if ``obj`` is not a typed contract, dict, or string, or its
-            JSON does not decode to an object.
+        TypeError: if ``obj`` is neither a typed contract nor a dict, or the
+            typed contract does not serialise to an object.
 
     Parameters
     ----------
     obj : Any
-        Typed contract exposing ``to_json()``, mapping object, or JSON-object
-        string to normalize into a dictionary.
+        Typed contract exposing ``to_json()`` or a mapping object to normalize
+        into a dictionary.
     noun : str
-        Reader-facing noun used in type and JSON-decoding error messages.
+        Reader-facing noun used in type error messages.
 
     Returns:
     -------
@@ -158,19 +161,20 @@ def json_or_dict(obj: Any, *, noun: str = "value") -> dict[str, Any]:
     Examples:
     --------
     >>> from finstack_quant.reporting.statements_common import json_or_dict
-    >>> json_or_dict('{"id":"demo"}')
+    >>> json_or_dict({"id": "demo"})
     {'id': 'demo'}
+    >>> json_or_dict('{"id": "demo"}')
+    Traceback (most recent call last):
+    ...
+    TypeError: value must be a typed contract or a dict; got str
     """
     if isinstance(obj, dict):
         return obj
-    if isinstance(obj, str):
-        data = json.loads(obj)
-    elif hasattr(obj, "to_json"):
-        data = json.loads(obj.to_json())
-    else:
-        raise TypeError(f"{noun} must be a typed contract, dict, or JSON string; got {type(obj).__name__}")
+    if isinstance(obj, str) or not hasattr(obj, "to_json"):
+        raise TypeError(f"{noun} must be a typed contract or a dict; got {type(obj).__name__}")
+    data = json.loads(obj.to_json())
     if not isinstance(data, dict):
-        raise TypeError(f"{noun} JSON must decode to an object; got {type(data).__name__}")
+        raise TypeError(f"{noun} must serialise to an object; got {type(data).__name__}")
     return data
 
 
@@ -178,7 +182,7 @@ def tornado_entries(tornado: Any, *, noun: str = "tornado") -> list[tuple[Any, A
     """Read ``(parameter_id, downside, upside)`` rows from tornado entries.
 
     Each entry is a typed ``TornadoEntry`` (``generate_tornado_entries``
-    output), a dict, or a JSON-object string, normalised through
+    output) or a dict, normalised through
     :func:`json_or_dict`. Rows keep the input order, which for Rust output is
     the swing ranking.
 
@@ -199,10 +203,8 @@ def tornado_entries(tornado: Any, *, noun: str = "tornado") -> list[tuple[Any, A
     Raises:
     ------
     TypeError
-        If ``tornado`` is not a list or tuple, or an entry is not a typed
-        entry, dict, or JSON-object string.
-    json.JSONDecodeError
-        If an entry is a string that is not valid JSON.
+        If ``tornado`` is not a list or tuple, or an entry is neither a typed
+        entry nor a dict.
 
     Examples:
     --------
@@ -218,21 +220,20 @@ def tornado_entries(tornado: Any, *, noun: str = "tornado") -> list[tuple[Any, A
 
 
 def parse_statement(results: Any) -> StatementView:
-    """Build a :class:`StatementView` from a ``StatementResult``, JSON, or dict.
+    """Build a :class:`StatementView` from a ``StatementResult`` or its dict.
 
-    Accepts a ``StatementResult`` object (anything exposing ``to_json()``), a
-    JSON string, an already-parsed ``dict``, or a :class:`StatementView`
-    (returned unchanged).
+    Accepts a ``StatementResult`` object (anything exposing ``to_json()``), an
+    already-parsed ``dict``, or a :class:`StatementView` (returned unchanged).
+    Load JSON text with ``StatementResult.from_json`` first.
 
     Raises:
         TypeError: if ``results`` is none of the accepted types.
-        json.JSONDecodeError: if ``results`` is a string that is not valid JSON.
 
     Parameters
     ----------
     results : Any
-        ``StatementResult``, canonical JSON, parsed dictionary, or existing
-        ``StatementView`` to expose through the common lookup interface.
+        ``StatementResult``, parsed dictionary, or existing ``StatementView``
+        to expose through the common lookup interface.
 
     Returns:
     -------
@@ -251,10 +252,8 @@ def parse_statement(results: Any) -> StatementView:
     """
     if isinstance(results, StatementView):
         return results
-    if not isinstance(results, (str, dict)) and not hasattr(results, "to_json"):
-        raise TypeError(
-            f"results must be a StatementResult, JSON string, dict, or StatementView; got {type(results).__name__}"
-        )
+    if isinstance(results, str) or (not isinstance(results, dict) and not hasattr(results, "to_json")):
+        raise TypeError(f"results must be a StatementResult, dict, or StatementView; got {type(results).__name__}")
     data = json_or_dict(results, noun="results")
     meta = data.get("meta")
     numeric_mode = meta.get("numeric_mode") if isinstance(meta, dict) else None
@@ -325,9 +324,8 @@ def variance_table(variance: Any) -> str | None:
     Parameters
     ----------
     variance : Any
-        Typed ``VarianceReport`` (``run_variance`` output), its dict form, or
-        its JSON text, normalised through :func:`json_or_dict`; ``None``
-        renders nothing.
+        Typed ``VarianceReport`` (``run_variance`` output) or its dict form,
+        normalised through :func:`json_or_dict`; ``None`` renders nothing.
 
     Returns:
     -------
@@ -337,9 +335,7 @@ def variance_table(variance: Any) -> str | None:
     Raises:
     ------
     TypeError
-        If ``variance`` is not a typed report, dict, or JSON-object string.
-    json.JSONDecodeError
-        If ``variance`` is a string that is not valid JSON.
+        If ``variance`` is neither a typed report nor a dict.
 
     Examples:
     --------

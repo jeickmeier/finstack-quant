@@ -253,15 +253,12 @@ def test_instrument_tearsheet_bond_with_definition_and_cashflows() -> None:
     assert "Maturity" in html  # definition table
 
 
-def test_instrument_tearsheet_unknown_section_raises_before_definition_parse() -> None:
+def test_instrument_tearsheet_unknown_section_raises_before_the_definition_is_read() -> None:
     import datetime as dt
 
     from finstack_quant.reporting import instrument_tearsheet
 
-    with (
-        patch.object(ins, "_parse_definition_once", wraps=ins._parse_definition_once) as parse_definition,
-        pytest.raises(ValueError, match="unknown section") as exc_info,
-    ):
+    with pytest.raises(ValueError, match="unknown section") as exc_info:
         instrument_tearsheet(
             _fake_bond_result(),
             definition="{",
@@ -273,72 +270,47 @@ def test_instrument_tearsheet_unknown_section_raises_before_definition_parse() -
         "unknown section(s): ['aaa', 'zzz']; valid: "
         "['definition', 'valuation', 'keyrate', 'cashflows', 'schedule', 'payoff', 'survival', 'covenants']"
     )
-    parse_definition.assert_not_called()
 
 
-def test_invalid_definition_is_parsed_once_and_re_raises_exact_error() -> None:
+def test_definition_text_is_not_parsed_as_json() -> None:
+    """A string definition is a non-mapping value; JSON text is loaded with ``json.loads`` first."""
     import datetime as dt
 
     from finstack_quant.reporting import instrument_tearsheet
 
-    raw = "{"
+    definition = {"type": "bond", "spec": {"id": "BOND-1"}}
+    text = json.dumps(definition)
+    generated = dt.date(2026, 6, 19)
     loads = ins.json.loads
     with (
         patch.object(ins.json, "loads", wraps=loads) as parse_json,
-        pytest.raises(json.JSONDecodeError) as exc_info,
+        pytest.raises(AttributeError, match="'str' object has no attribute 'get'"),
     ):
-        instrument_tearsheet(
-            _fake_bond_result(),
-            definition=raw,
-            sections=["definition"],
-            generated=dt.date(2026, 6, 19),
-        )
+        instrument_tearsheet(_fake_bond_result(), definition=text, sections=["definition"], generated=generated)
+    assert all(call.args[0] != text for call in parse_json.call_args_list)
 
-    assert sum(call.args[0] == raw for call in parse_json.call_args_list) == 1
-    assert exc_info.value.doc == raw
-    assert exc_info.value.pos == 1
-    assert str(exc_info.value) == "Expecting property name enclosed in double quotes: line 1 column 2 (char 1)"
-
-
-def test_invalid_definition_json_preserves_section_gating() -> None:
-    import datetime as dt
-
-    from finstack_quant.reporting import instrument_tearsheet
-
-    generated = dt.date(2026, 6, 19)
-    nondependent = ["valuation", "keyrate", "cashflows", "schedule", "survival", "covenants"]
-    for sections in ([], ["valuation"], nondependent):
-        expected = instrument_tearsheet(
-            _fake_bond_result(), definition=None, sections=sections, generated=generated
-        ).to_html()
-        actual = instrument_tearsheet(
-            _fake_bond_result(), definition="{", sections=sections, generated=generated
-        ).to_html()
-        assert actual == expected
-
-    for sections in (["definition"], ["payoff"], ["payoff", "definition"]):
-        with pytest.raises(json.JSONDecodeError) as exc_info:
-            instrument_tearsheet(_fake_bond_result(), definition="{", sections=sections, generated=generated)
-        assert str(exc_info.value) == "Expecting property name enclosed in double quotes: line 1 column 2 (char 1)"
-
-    with pytest.raises(json.JSONDecodeError):
-        instrument_tearsheet(_fake_bond_result(), definition="{", generated=generated)
+    loaded = instrument_tearsheet(
+        _fake_bond_result(), definition=json.loads(text), sections=["definition"], generated=generated
+    ).to_html()
+    typed = instrument_tearsheet(
+        _fake_bond_result(), definition=definition, sections=["definition"], generated=generated
+    ).to_html()
+    assert loaded == typed
+    assert "Definition" in loaded
 
 
 @pytest.mark.parametrize(
     ("definition", "type_name"),
     [
-        pytest.param("null", "NoneType", id="json-null"),
-        pytest.param("[]", "list", id="json-list"),
-        pytest.param("true", "bool", id="json-bool"),
-        pytest.param("1", "int", id="json-int"),
-        pytest.param('"text"', "str", id="json-string"),
+        pytest.param("{", "str", id="malformed-json-text"),
+        pytest.param('{"type": "bond"}', "str", id="json-object-text"),
+        pytest.param("null", "str", id="json-null-text"),
         pytest.param([], "list", id="raw-list"),
         pytest.param(1, "int", id="raw-int"),
         pytest.param(object(), "object", id="raw-object"),
     ],
 )
-def test_non_object_definitions_preserve_attribute_error_matrix(definition: object, type_name: str) -> None:
+def test_non_mapping_definitions_preserve_attribute_error_matrix(definition: object, type_name: str) -> None:
     import datetime as dt
 
     from finstack_quant.reporting import instrument_tearsheet
@@ -357,16 +329,14 @@ def test_non_object_definitions_preserve_attribute_error_matrix(definition: obje
         with pytest.raises(AttributeError) as exc_info:
             instrument_tearsheet(_fake_bond_result(), definition=definition, sections=sections, generated=generated)
         assert str(exc_info.value) == f"'{type_name}' object has no attribute 'get'"
+    with pytest.raises(AttributeError):
+        instrument_tearsheet(_fake_bond_result(), definition=definition, generated=generated)
 
 
-def test_raw_none_definition_remains_missing() -> None:
+def test_none_definition_is_missing() -> None:
     import datetime as dt
 
     from finstack_quant.reporting import instrument_tearsheet
-
-    parsed, error = ins._parse_definition_once(None)
-    assert parsed is ins._MISSING_DEFINITION
-    assert error is None
 
     html = instrument_tearsheet(
         _fake_bond_result(),
@@ -450,7 +420,7 @@ def _bond_definition() -> dict:
     }
 
 
-def test_valid_definition_parses_once_and_preserves_exact_rendering() -> None:
+def test_valid_definition_preserves_exact_rendering_and_its_loaded_text_matches() -> None:
     import datetime as dt
 
     from finstack_quant.reporting import instrument_tearsheet
@@ -458,13 +428,12 @@ def test_valid_definition_parses_once_and_preserves_exact_rendering() -> None:
     definition = _bond_definition()
     definition_json = json.dumps(definition)
     generated = dt.date(2026, 6, 19)
-    loads = ins.json.loads
-    with patch.object(ins.json, "loads", wraps=loads) as parse_json:
-        dict_html = instrument_tearsheet(_fake_bond_result(), definition=definition, generated=generated).to_html()
-        json_html = instrument_tearsheet(_fake_bond_result(), definition=definition_json, generated=generated).to_html()
+    dict_html = instrument_tearsheet(_fake_bond_result(), definition=definition, generated=generated).to_html()
+    loaded_html = instrument_tearsheet(
+        _fake_bond_result(), definition=json.loads(definition_json), generated=generated
+    ).to_html()
 
-    assert sum(call.args[0] == definition_json for call in parse_json.call_args_list) == 1
-    assert json_html == dict_html
+    assert loaded_html == dict_html
     assert len(dict_html.encode()) == 11498
     assert (
         hashlib.sha256(dict_html.encode()).hexdigest()

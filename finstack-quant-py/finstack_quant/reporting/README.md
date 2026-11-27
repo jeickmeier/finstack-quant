@@ -81,8 +81,9 @@ Every `*_tearsheet` returns a `TearSheet` and takes the same keyword-only tail:
 
 Positional inputs differ by sheet, and `scenario_tearsheet` has none — it is
 entirely keyword-driven. Several accept either a typed binding object or its
-canonical JSON/dict payload (normalized through `statements_common.json_or_dict`,
-`parse_statement`, or the wrapper's own `from_json`). Three do not:
+canonical dict payload (normalized through `statements_common.json_or_dict` or
+`parse_statement`); JSON text is loaded first with the class's `from_json` or
+`json.loads`. Three do not:
 `performance_tearsheet` and `benchmark_tearsheet` need a live
 `analytics.Performance`, and `instrument_tearsheet` raises `TypeError` on a `str`
 or `dict` rather than re-parsing a `ValuationResult`.

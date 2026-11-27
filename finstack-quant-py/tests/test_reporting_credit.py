@@ -55,9 +55,12 @@ def test_credit_tearsheet_renders_all_sections() -> None:
     assert "EBITDA Build" in html
 
 
-def test_credit_tearsheet_accepts_json_assessment() -> None:
+def test_credit_tearsheet_refuses_json_text_and_accepts_its_loaded_dict() -> None:
     res = _results()
-    html = credit_tearsheet(_assessment(res).to_json(), results=res, generated=dt.date(2026, 6, 22)).to_html()
+    text = _assessment(res).to_json()
+    with pytest.raises(TypeError, match="assessment must be a typed contract or a dict; got str"):
+        credit_tearsheet(text, results=res, generated=dt.date(2026, 6, 22))
+    html = credit_tearsheet(json.loads(text), results=res, generated=dt.date(2026, 6, 22)).to_html()
     assert "Credit Assessment" in html
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 from typing import Any
 
 import pytest
@@ -38,8 +39,11 @@ def test_statement_tearsheet_renders_sections_and_kpis() -> None:
     assert "Margins" in html
 
 
-def test_statement_tearsheet_accepts_json_input() -> None:
-    html = statement_tearsheet(_results().to_json(), generated=dt.date(2026, 6, 22)).to_html()
+def test_statement_tearsheet_refuses_json_text_input() -> None:
+    text = _results().to_json()
+    with pytest.raises(TypeError, match="results must be a StatementResult, dict, or StatementView; got str"):
+        statement_tearsheet(text, generated=dt.date(2026, 6, 22))
+    html = statement_tearsheet(json.loads(text), generated=dt.date(2026, 6, 22)).to_html()
     assert "Income Statement" in html
 
 

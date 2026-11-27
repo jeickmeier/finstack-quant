@@ -67,8 +67,10 @@ def test_portfolio_tearsheet_renders_all_sections() -> None:
     assert "Cashflow Ladder" in html
 
 
-def test_portfolio_tearsheet_accepts_json() -> None:
-    html = portfolio_tearsheet(json.dumps(_VAL), generated=dt.date(2026, 6, 23)).to_html()
+def test_portfolio_tearsheet_refuses_json_text() -> None:
+    with pytest.raises(TypeError, match="valuation must be a typed contract or a dict; got str"):
+        portfolio_tearsheet(json.dumps(_VAL), generated=dt.date(2026, 6, 23))
+    html = portfolio_tearsheet(json.loads(json.dumps(_VAL)), generated=dt.date(2026, 6, 23)).to_html()
     assert "Holdings" in html
 
 

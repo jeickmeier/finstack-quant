@@ -181,7 +181,7 @@ def attribution_tearsheet(
 ) -> TearSheet:
     """Render precomputed instrument or portfolio P&L attribution.
 
-    Pass a precomputed ``PnlAttribution`` object or its canonical JSON/dict
+    Pass a precomputed ``PnlAttribution`` object or its canonical dict
     payload. ``sections`` selects a subset of ``ALL_SECTIONS``.
 
     Parameters
@@ -209,7 +209,7 @@ def attribution_tearsheet(
     ------
     ValueError
         If no precomputed attribution is supplied, ``sections`` contains an
-        unknown name, an attribution JSON payload cannot be decoded, or any
+        unknown name, an attribution dict does not match the schema, or any
         attribution amount uses a currency different from its total P&L.
 
     Examples:
@@ -222,11 +222,15 @@ def attribution_tearsheet(
     """
     if attribution is None:
         raise ValueError("attribution_tearsheet requires a precomputed PnlAttribution")
-    if isinstance(attribution, (str, dict)):
+    if isinstance(attribution, str):
+        raise TypeError(
+            "attribution_tearsheet takes a PnlAttribution, a PortfolioAttribution or a dict; "
+            "load JSON text with PnlAttribution.from_json"
+        )
+    if isinstance(attribution, dict):
         from finstack_quant.attribution import PnlAttribution
 
-        payload = attribution if isinstance(attribution, str) else json.dumps(attribution)
-        attribution = PnlAttribution.from_json(payload)
+        attribution = PnlAttribution.from_json(json.dumps(attribution))
 
     wanted = _resolve_sections(sections, ALL_SECTIONS, valid_label="valid")
     from finstack_quant.portfolio import PortfolioAttribution

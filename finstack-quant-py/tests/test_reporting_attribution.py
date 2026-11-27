@@ -72,13 +72,13 @@ def test_attribution_tearsheet_section_selection() -> None:
     assert [s.title for s in ts.sections] == ["P&L Attribution"]
 
 
-def test_attribution_tearsheet_json_and_object_match() -> None:
+def test_attribution_tearsheet_dict_and_object_match() -> None:
     from finstack_quant.reporting import attribution_tearsheet
 
-    raw = (DATA / "attribution_bond.json").read_text()
+    raw = json.loads((DATA / "attribution_bond.json").read_text())
     from_obj = attribution_tearsheet(_load_attr(), generated=dt.date(2026, 6, 21)).to_html()
-    from_json = attribution_tearsheet(raw, generated=dt.date(2026, 6, 21)).to_html()
-    assert from_obj == from_json
+    from_dict = attribution_tearsheet(raw, generated=dt.date(2026, 6, 21)).to_html()
+    assert from_obj == from_dict
 
 
 def test_attribution_tearsheet_requires_inputs() -> None:
@@ -163,9 +163,11 @@ def test_attribution_tearsheet_rejects_mixed_currencies(field: str) -> None:
     raw = json.loads((DATA / "attribution_bond.json").read_text())
     amount = raw["carry_detail"]["coupon_income"]["total"] if field == "coupon_income" else raw[field]
     amount["currency"] = "EUR"
-    for supplied in (raw, json.dumps(raw), PnlAttribution.from_json(json.dumps(raw))):
+    for supplied in (raw, PnlAttribution.from_json(json.dumps(raw))):
         with pytest.raises(ValueError, match="Currency mismatch"):
             attribution_tearsheet(supplied)
+    with pytest.raises(TypeError, match=r"load JSON text with PnlAttribution\.from_json"):
+        attribution_tearsheet(json.dumps(raw))
 
 
 def test_credit_detail_preserves_identifiers_and_marks_breakdowns() -> None:

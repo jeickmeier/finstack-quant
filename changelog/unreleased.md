@@ -27,6 +27,7 @@ through a named loader. WASM is unchanged. Results are unchanged. Old → new:
 - `FactorCovarianceForecast.covariance_at('{"n_steps": 4}')`, and the same on `idiosyncratic_vol` and `factor_model_at` → `VolHorizon.n_steps(4)`, `VolHorizon.years(y)`, or `VolHorizon.parse(text)` for a stored descriptor. The labels `"one_step"` and `"unconditional"` are unchanged
 - A JSON array string or a dict where a list of rows is expected (`with_assets`, `hedge_swaps`, CDS index `constituents`, `relative_value_report(universe=)`) is refused: pass the list
 - Covenant `metrics` take a `dict[str, float]` (`CovenantEngine.evaluate` and `evaluate_and_track` also take a pandas Series; `evaluate_engine` takes the dict only); JSON text raises `TypeError`
+- Reporting tear sheets (`statement_tearsheet`, `credit_tearsheet`, `dcf_tearsheet`, `portfolio_tearsheet`, `portfolio_risk_tearsheet`, `scenario_tearsheet`, `attribution_tearsheet`) and `statements_common.json_or_dict` / `parse_statement` take the typed result or its dict; JSON text raises `TypeError` (load it with the class's `from_json` or `json.loads`). `instrument_tearsheet(definition=)` takes the definition dict; a string there is no longer parsed
 
 `validate_scenario_spec` still takes JSON text, because it reports on a spec
 that `ScenarioSpec.from_json` would reject. `net_in_currency_by_date` still

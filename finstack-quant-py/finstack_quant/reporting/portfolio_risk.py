@@ -122,11 +122,11 @@ def portfolio_risk_tearsheet(
 
     Parameters
     ----------
-    decomposition : PositionRiskDecomposition | dict | str
-        A ``position_risk_report(...).decomposition`` result (typed, dict or
-        JSON); its ``var_contributions`` and ``es_contributions`` feed the
+    decomposition : PositionRiskDecomposition | dict
+        A ``position_risk_report(...).decomposition`` result (typed or
+        dict); its ``var_contributions`` and ``es_contributions`` feed the
         VaR and ES sections.
-    budget : dict | str, optional
+    budget : RiskBudgetResult | dict, optional
         An ``evaluate_risk_budget`` result; enables the risk-budget section.
     title : str, optional
         Optional main report heading for the portfolio-risk summary.
@@ -144,7 +144,7 @@ def portfolio_risk_tearsheet(
     ValueError
         If ``sections`` contains an unknown section name.
     TypeError
-        If ``decomposition`` is neither a dict nor a JSON string.
+        If ``decomposition`` is neither a typed result nor a dict.
 
     Returns:
     -------

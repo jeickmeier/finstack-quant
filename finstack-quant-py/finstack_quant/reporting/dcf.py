@@ -121,16 +121,16 @@ def dcf_tearsheet(
 
     Parameters
     ----------
-    valuation : dict | str
-        An ``evaluate_dcf`` result (dict or JSON string). ``enterprise_value``,
+    valuation : CorporateValuationResult | dict
+        An ``evaluate_dcf`` result (typed or dict). ``enterprise_value``,
         ``equity_value`` and ``net_debt`` are ``Money`` wire objects
         (``{"amount": "<decimal string>", "currency": "USD"}``);
         ``equity_value_per_share`` is a plain float.
-    results : StatementResult | str | dict, optional
+    results : StatementResult | dict, optional
         Statement results for the UFCF and forecast-summary sections.
     sensitivity : DcfSensitivityResult | list[TornadoEntry | dict], optional
-        A typed DCF sensitivity result or a list of tornado entries (typed, dicts or JSON
-        objects with ``parameter_id``/``downside``/``upside``) for the
+        A typed DCF sensitivity result or a list of tornado entries (typed or dicts
+        with ``parameter_id``/``downside``/``upside``) for the
         sensitivity tornado, drawn in the given (Rust swing) order.
     ufcf_node : str, default "ufcf"
         Node id holding unlevered free cash flow.
@@ -151,7 +151,7 @@ def dcf_tearsheet(
     ValueError
         If ``sections`` contains an unknown section name.
     TypeError
-        If ``valuation`` is neither a dict nor a JSON string, or
+        If ``valuation`` is neither a typed result nor a dict, or
         ``sensitivity`` does not supply tornado entries.
 
     Returns:

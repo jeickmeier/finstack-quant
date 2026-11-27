@@ -194,14 +194,14 @@ def portfolio_tearsheet(
 
     Parameters
     ----------
-    valuation : PortfolioValuation | dict | str
-        A typed ``value_portfolio`` result, parsed dictionary, or canonical JSON string.
-    metrics : PortfolioMetrics | dict | str, optional
-        A typed ``aggregate_metrics`` result, parsed dictionary, or canonical JSON;
+    valuation : PortfolioValuation | dict
+        A typed ``value_portfolio`` result or its parsed dictionary.
+    metrics : PortfolioMetrics | dict, optional
+        A typed ``aggregate_metrics`` result or its parsed dictionary;
         enables the sensitivities and buckets sections.
-    cashflows : object | dict | str, optional
-        A typed ``aggregate_full_cashflows`` result, parsed dictionary, or canonical
-        JSON; enables the cashflow ladder.
+    cashflows : PortfolioCashflows | dict, optional
+        A typed ``aggregate_full_cashflows`` result or its parsed dictionary;
+        enables the cashflow ladder.
     title : str, optional
         Optional main report heading for the portfolio summary.
     subtitle : str, optional
@@ -218,7 +218,7 @@ def portfolio_tearsheet(
     ValueError
         If ``sections`` contains an unknown section name.
     TypeError
-        If a contract argument is neither typed, a dictionary, nor a JSON string.
+        If a contract argument is neither typed nor a dictionary.
 
     Returns:
     -------

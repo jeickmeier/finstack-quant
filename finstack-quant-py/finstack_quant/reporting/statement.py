@@ -89,15 +89,15 @@ def statement_tearsheet(
 
     Parameters
     ----------
-    results : StatementResult | str | dict
-        Evaluated statement results (object, JSON, or parsed dict).
+    results : StatementResult | dict
+        Evaluated statement results (object or parsed dict).
     line_items : list[str], optional
         Node ids to show in the summary table (default: the standard P&L nodes
         present in ``results``, in canonical order).
     periods : list[str], optional
         Periods (columns) to show (default: all present, ascending).
-    variance : VarianceReport | dict | str, optional
-        A ``run_variance`` result (typed, dict, or JSON); enables the variance section.
+    variance : VarianceReport | dict, optional
+        A ``run_variance`` result (typed or dict); enables the variance section.
     title : str, optional
         Optional main report heading; defaults derive from the statement data.
     subtitle : str, optional
@@ -111,7 +111,7 @@ def statement_tearsheet(
 
     Raises:
         ValueError: If ``sections`` contains an unknown section name.
-        TypeError: If ``variance`` is not a variance report, dict, or JSON string.
+        TypeError: If ``variance`` is neither a variance report nor a dict.
 
     Returns:
     -------
