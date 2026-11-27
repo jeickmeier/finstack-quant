@@ -2,6 +2,15 @@
 
 ## Itemized changes
 
+### Python: calibration steps take a dict or the typed params class
+
+Each per-kind `CalibrationStep` method (`discount`, `forward`, `hazard`, and
+the ten others) takes `params` as a dict of wire fields or as that kind's
+params class (`DiscountCurveParams`, ...). The typed class was accepted before
+without being documented. Passing another kind's class now raises `TypeError`;
+it used to fail with an "unknown field" `ValueError`. Only the dict form takes
+an omitted identifier such as `curve_id` from the step `id`.
+
 ### Python: a typed form replaces its JSON-text twin
 
 Where a Python function or member returned JSON text beside a typed form of

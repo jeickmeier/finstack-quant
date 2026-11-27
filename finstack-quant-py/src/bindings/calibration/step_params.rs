@@ -33,13 +33,21 @@ macro_rules! define_step_params {
             }
         )*
 
-        pub(super) fn extract(value: &Bound<'_, PyAny>) -> PyResult<StepParams> {
+        /// The step parameters a native params object holds, or `None` when
+        /// `value` is not one of the params classes.
+        pub(super) fn typed(value: &Bound<'_, PyAny>) -> Option<StepParams> {
             $(
                 if let Ok(params) = value.cast::<$name>() {
-                    return Ok(StepParams::$variant(params.borrow().inner.clone()));
+                    return Some(StepParams::$variant(params.borrow().inner.clone()));
                 }
             )*
-            Err(PyTypeError::new_err("expected a native calibration step parameter object"))
+            None
+        }
+
+        pub(super) fn extract(value: &Bound<'_, PyAny>) -> PyResult<StepParams> {
+            typed(value).ok_or_else(|| {
+                PyTypeError::new_err("expected a native calibration step parameter object")
+            })
         }
 
         pub(super) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {

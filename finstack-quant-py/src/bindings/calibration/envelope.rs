@@ -19,6 +19,7 @@ use finstack_quant_calibration::api::schema::{
     CalibrationEnvelope, CalibrationPlan, CalibrationStep, StepWithQuotes,
 };
 use indexmap::IndexMap;
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use serde_json::{Map, Value};
@@ -96,12 +97,26 @@ impl PyCalibrationStep {
     /// Rust `CalibrationStep::from_wire_fields` owns the omitted-field
     /// defaults (quote set and produced-object identifiers fall back to `id`)
     /// and the strict deserialization.
+    ///
+    /// A native params object must be the params class of `kind`; it builds
+    /// the step the way the constructor does.
     fn build(
         kind: &str,
         id: &str,
         params: &Bound<'_, PyAny>,
         quote_set: Option<String>,
     ) -> PyResult<Self> {
+        if let Some(typed) = step_params::typed(params) {
+            if typed.kind_str() != kind {
+                return Err(PyTypeError::new_err(format!(
+                    "CalibrationStep.{kind} takes a dict or the {kind} step's params class, not {}",
+                    params.get_type().name()?
+                )));
+            }
+            return CalibrationStep::new(id, typed, quote_set.as_deref())
+                .map(Self::from_inner)
+                .map_err(core_to_py);
+        }
         let fields: Map<String, Value> =
             py_to_serde(params.py(), params, &format!("{kind} step params"))?;
         let step = CalibrationStep::from_wire_fields(kind, id, quote_set.as_deref(), fields)

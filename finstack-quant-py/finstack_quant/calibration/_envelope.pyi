@@ -16,14 +16,29 @@ from finstack_quant.calibration._quotes.rates_vol import (
     VolQuote,
 )
 
-from finstack_quant.calibration._step_params import StepParams
+from finstack_quant.calibration._step_params import (
+    BaseCorrelationParams,
+    CapFloorHullWhiteStepParams,
+    DiscountCurveParams,
+    ForwardCurveParams,
+    HazardCurveParams,
+    HullWhiteStepParams,
+    InflationCurveParams,
+    ParametricCurveParams,
+    StudentTParams,
+    SviSurfaceParams,
+    SwaptionVolParams,
+    VolSurfaceParams,
+    XccyBasisParams,
+    StepParams,
+)
 
 class CalibrationStep:
     """One calibration step: a target kind, parameters, and a named quote set.
 
     Each constructor corresponds to a Rust ``StepParams`` variant and takes the
-    step ``id``, a ``params`` dict holding that variant's wire
-    fields, and an optional ``quote_set``. Quote payloads belong to
+    step ``id``, that variant's ``params`` (a dict of its wire fields, or its
+    typed params class), and an optional ``quote_set``. Quote payloads belong to
     ``CalibrationEnvelope.market_data`` and their IDs to ``plan.quote_sets``.
 
     Examples:
@@ -58,7 +73,9 @@ class CalibrationStep:
         ...
 
     @staticmethod
-    def discount(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
+    def discount(
+        id: str, params: dict[str, Any] | DiscountCurveParams, quote_set: str | None = None
+    ) -> CalibrationStep:
         """Build a discount-curve bootstrap step.
 
         Parameters
@@ -66,7 +83,11 @@ class CalibrationStep:
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set`` and
             ``curve_id``.
-        params : dict[str, Any]
+        params : dict[str, Any] | DiscountCurveParams
+            The step's parameters: a dict of its wire fields, or a ``DiscountCurveParams`` built from
+            the same fields. Only the dict form fills an omitted produced-object identifier from
+            ``id``; the typed class needs it spelled. The dict form:
+
             Wire fields of the ``discount`` step as a dict, keyed as in the
             Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
 
@@ -104,7 +125,8 @@ class CalibrationStep:
             If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
             schema, or a value has the wrong shape or an unknown label.
         TypeError
-            If a ``params`` value is not JSON-serializable.
+            If a ``params`` value is not JSON-serializable, or ``params`` is the params class of
+            another step kind.
 
         Examples:
         --------
@@ -116,7 +138,7 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def forward(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
+    def forward(id: str, params: dict[str, Any] | ForwardCurveParams, quote_set: str | None = None) -> CalibrationStep:
         """Build a projection (forward) curve calibration step.
 
         Parameters
@@ -124,7 +146,11 @@ class CalibrationStep:
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set`` and
             ``curve_id``.
-        params : dict[str, Any]
+        params : dict[str, Any] | ForwardCurveParams
+            The step's parameters: a dict of its wire fields, or a ``ForwardCurveParams`` built from
+            the same fields. Only the dict form fills an omitted produced-object identifier from
+            ``id``; the typed class needs it spelled. The dict form:
+
             Wire fields of the ``forward`` step as a dict, keyed as in the
             Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
 
@@ -162,7 +188,8 @@ class CalibrationStep:
             If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
             schema, or a value has the wrong shape or an unknown label.
         TypeError
-            If a ``params`` value is not JSON-serializable.
+            If a ``params`` value is not JSON-serializable, or ``params`` is the params class of
+            another step kind.
 
         Examples:
         --------
@@ -180,7 +207,7 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def hazard(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
+    def hazard(id: str, params: dict[str, Any] | HazardCurveParams, quote_set: str | None = None) -> CalibrationStep:
         """Build a credit hazard-curve bootstrap step.
 
         Parameters
@@ -188,7 +215,11 @@ class CalibrationStep:
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set`` and
             ``curve_id``.
-        params : dict[str, Any]
+        params : dict[str, Any] | HazardCurveParams
+            The step's parameters: a dict of its wire fields, or a ``HazardCurveParams`` built from
+            the same fields. Only the dict form fills an omitted produced-object identifier from
+            ``id``; the typed class needs it spelled. The dict form:
+
             Wire fields of the ``hazard`` step as a dict, keyed as in the
             Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
 
@@ -228,7 +259,8 @@ class CalibrationStep:
             If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
             schema, or a value has the wrong shape or an unknown label.
         TypeError
-            If a ``params`` value is not JSON-serializable.
+            If a ``params`` value is not JSON-serializable, or ``params`` is the params class of
+            another step kind.
 
         Examples:
         --------
@@ -247,7 +279,9 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def inflation(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
+    def inflation(
+        id: str, params: dict[str, Any] | InflationCurveParams, quote_set: str | None = None
+    ) -> CalibrationStep:
         """Build an inflation-curve bootstrap step.
 
         Parameters
@@ -255,7 +289,11 @@ class CalibrationStep:
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set`` and
             ``curve_id``.
-        params : dict[str, Any]
+        params : dict[str, Any] | InflationCurveParams
+            The step's parameters: a dict of its wire fields, or a ``InflationCurveParams`` built from
+            the same fields. Only the dict form fills an omitted produced-object identifier from
+            ``id``; the typed class needs it spelled. The dict form:
+
             Wire fields of the ``inflation`` step as a dict, keyed as in the
             Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
 
@@ -298,7 +336,8 @@ class CalibrationStep:
             If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
             schema, or a value has the wrong shape or an unknown label.
         TypeError
-            If a ``params`` value is not JSON-serializable.
+            If a ``params`` value is not JSON-serializable, or ``params`` is the params class of
+            another step kind.
 
         Examples:
         --------
@@ -323,7 +362,9 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def vol_surface(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
+    def vol_surface(
+        id: str, params: dict[str, Any] | VolSurfaceParams, quote_set: str | None = None
+    ) -> CalibrationStep:
         """Build an equity/FX SABR volatility-surface fit step from option vol quotes.
 
         Parameters
@@ -331,7 +372,11 @@ class CalibrationStep:
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set`` and
             ``vol_surface_id``.
-        params : dict[str, Any]
+        params : dict[str, Any] | VolSurfaceParams
+            The step's parameters: a dict of its wire fields, or a ``VolSurfaceParams`` built from
+            the same fields. Only the dict form fills an omitted produced-object identifier from
+            ``id``; the typed class needs it spelled. The dict form:
+
             Wire fields of the ``vol_surface`` step as a dict, keyed as in
             the Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
 
@@ -366,7 +411,8 @@ class CalibrationStep:
             If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
             schema, or a value has the wrong shape or an unknown label.
         TypeError
-            If a ``params`` value is not JSON-serializable.
+            If a ``params`` value is not JSON-serializable, or ``params`` is the params class of
+            another step kind.
 
         Examples:
         --------
@@ -382,7 +428,9 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def swaption_vol(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
+    def swaption_vol(
+        id: str, params: dict[str, Any] | SwaptionVolParams, quote_set: str | None = None
+    ) -> CalibrationStep:
         """Build a swaption volatility-cube (SABR) fit step.
 
         Parameters
@@ -390,7 +438,11 @@ class CalibrationStep:
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set`` and
             ``vol_surface_id``.
-        params : dict[str, Any]
+        params : dict[str, Any] | SwaptionVolParams
+            The step's parameters: a dict of its wire fields, or a ``SwaptionVolParams`` built from
+            the same fields. Only the dict form fills an omitted produced-object identifier from
+            ``id``; the typed class needs it spelled. The dict form:
+
             Wire fields of the ``swaption_vol`` step as a dict, keyed as in
             the Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
 
@@ -435,7 +487,8 @@ class CalibrationStep:
             If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
             schema, or a value has the wrong shape or an unknown label.
         TypeError
-            If a ``params`` value is not JSON-serializable.
+            If a ``params`` value is not JSON-serializable, or ``params`` is the params class of
+            another step kind.
 
         Examples:
         --------
@@ -452,14 +505,20 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def base_correlation(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
+    def base_correlation(
+        id: str, params: dict[str, Any] | BaseCorrelationParams, quote_set: str | None = None
+    ) -> CalibrationStep:
         """Build an index-tranche base-correlation bootstrap step.
 
         Parameters
         ----------
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set``.
-        params : dict[str, Any]
+        params : dict[str, Any] | BaseCorrelationParams
+            The step's parameters: a dict of its wire fields, or a ``BaseCorrelationParams`` built from
+            the same fields. Only the dict form fills an omitted produced-object identifier from
+            ``id``; the typed class needs it spelled. The dict form:
+
             Wire fields of the ``base_correlation`` step as a dict, keyed as
             in the Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted.
             Keys:
@@ -503,7 +562,8 @@ class CalibrationStep:
             If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
             schema, or a value has the wrong shape or an unknown label.
         TypeError
-            If a ``params`` value is not JSON-serializable.
+            If a ``params`` value is not JSON-serializable, or ``params`` is the params class of
+            another step kind.
 
         Examples:
         --------
@@ -524,14 +584,18 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def student_t(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
+    def student_t(id: str, params: dict[str, Any] | StudentTParams, quote_set: str | None = None) -> CalibrationStep:
         """Build a Student-t copula degrees-of-freedom fit step for one tranche.
 
         Parameters
         ----------
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set``.
-        params : dict[str, Any]
+        params : dict[str, Any] | StudentTParams
+            The step's parameters: a dict of its wire fields, or a ``StudentTParams`` built from
+            the same fields. Only the dict form fills an omitted produced-object identifier from
+            ``id``; the typed class needs it spelled. The dict form:
+
             Wire fields of the ``student_t`` step as a dict, keyed as in the
             Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
 
@@ -560,7 +624,8 @@ class CalibrationStep:
             If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
             schema, or a value has the wrong shape or an unknown label.
         TypeError
-            If a ``params`` value is not JSON-serializable.
+            If a ``params`` value is not JSON-serializable, or ``params`` is the params class of
+            another step kind.
 
         Examples:
         --------
@@ -576,14 +641,20 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def hull_white(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
+    def hull_white(
+        id: str, params: dict[str, Any] | HullWhiteStepParams, quote_set: str | None = None
+    ) -> CalibrationStep:
         """Build a Hull-White one-factor swaption calibration step.
 
         Parameters
         ----------
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set``.
-        params : dict[str, Any]
+        params : dict[str, Any] | HullWhiteStepParams
+            The step's parameters: a dict of its wire fields, or a ``HullWhiteStepParams`` built from
+            the same fields. Only the dict form fills an omitted produced-object identifier from
+            ``id``; the typed class needs it spelled. The dict form:
+
             Wire fields of the ``hull_white`` step as a dict, keyed as in the
             Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
 
@@ -612,7 +683,8 @@ class CalibrationStep:
             If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
             schema, or a value has the wrong shape or an unknown label.
         TypeError
-            If a ``params`` value is not JSON-serializable.
+            If a ``params`` value is not JSON-serializable, or ``params`` is the params class of
+            another step kind.
 
         Examples:
         --------
@@ -630,14 +702,20 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def cap_floor_hull_white(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
+    def cap_floor_hull_white(
+        id: str, params: dict[str, Any] | CapFloorHullWhiteStepParams, quote_set: str | None = None
+    ) -> CalibrationStep:
         """Build a Hull-White one-factor cap/floor calibration step.
 
         Parameters
         ----------
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set``.
-        params : dict[str, Any]
+        params : dict[str, Any] | CapFloorHullWhiteStepParams
+            The step's parameters: a dict of its wire fields, or a ``CapFloorHullWhiteStepParams`` built from
+            the same fields. Only the dict form fills an omitted produced-object identifier from
+            ``id``; the typed class needs it spelled. The dict form:
+
             Wire fields of the ``cap_floor_hull_white`` step as a dict, keyed
             as in the Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted.
             Keys:
@@ -677,7 +755,8 @@ class CalibrationStep:
             If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
             schema, or a value has the wrong shape or an unknown label.
         TypeError
-            If a ``params`` value is not JSON-serializable.
+            If a ``params`` value is not JSON-serializable, or ``params`` is the params class of
+            another step kind.
 
         Examples:
         --------
@@ -697,7 +776,9 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def svi_surface(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
+    def svi_surface(
+        id: str, params: dict[str, Any] | SviSurfaceParams, quote_set: str | None = None
+    ) -> CalibrationStep:
         """Build an SVI volatility-surface fit step from option vol quotes.
 
         Parameters
@@ -705,7 +786,11 @@ class CalibrationStep:
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set`` and
             ``vol_surface_id``.
-        params : dict[str, Any]
+        params : dict[str, Any] | SviSurfaceParams
+            The step's parameters: a dict of its wire fields, or a ``SviSurfaceParams`` built from
+            the same fields. Only the dict form fills an omitted produced-object identifier from
+            ``id``; the typed class needs it spelled. The dict form:
+
             Wire fields of the ``svi_surface`` step as a dict, keyed as in
             the Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
 
@@ -738,7 +823,8 @@ class CalibrationStep:
             If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
             schema, or a value has the wrong shape or an unknown label.
         TypeError
-            If a ``params`` value is not JSON-serializable.
+            If a ``params`` value is not JSON-serializable, or ``params`` is the params class of
+            another step kind.
 
         Examples:
         --------
@@ -754,7 +840,7 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def xccy_basis(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
+    def xccy_basis(id: str, params: dict[str, Any] | XccyBasisParams, quote_set: str | None = None) -> CalibrationStep:
         """Build a cross-currency basis (foreign discount curve) bootstrap step.
 
         Parameters
@@ -762,7 +848,11 @@ class CalibrationStep:
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set`` and
             ``curve_id``.
-        params : dict[str, Any]
+        params : dict[str, Any] | XccyBasisParams
+            The step's parameters: a dict of its wire fields, or a ``XccyBasisParams`` built from
+            the same fields. Only the dict form fills an omitted produced-object identifier from
+            ``id``; the typed class needs it spelled. The dict form:
+
             Wire fields of the ``xccy_basis`` step as a dict, keyed as in the
             Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
 
@@ -798,7 +888,8 @@ class CalibrationStep:
             If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
             schema, or a value has the wrong shape or an unknown label.
         TypeError
-            If a ``params`` value is not JSON-serializable.
+            If a ``params`` value is not JSON-serializable, or ``params`` is the params class of
+            another step kind.
 
         Examples:
         --------
@@ -816,7 +907,9 @@ class CalibrationStep:
         """
 
     @staticmethod
-    def parametric(id: str, params: dict[str, Any], quote_set: str | None = None) -> CalibrationStep:
+    def parametric(
+        id: str, params: dict[str, Any] | ParametricCurveParams, quote_set: str | None = None
+    ) -> CalibrationStep:
         """Build a parametric (Nelson-Siegel / Svensson) single-curve fit step.
 
         Parameters
@@ -824,7 +917,11 @@ class CalibrationStep:
         id : str
             Unique step identifier; also the residual key in the result and the default ``quote_set`` and
             ``curve_id``.
-        params : dict[str, Any]
+        params : dict[str, Any] | ParametricCurveParams
+            The step's parameters: a dict of its wire fields, or a ``ParametricCurveParams`` built from
+            the same fields. Only the dict form fills an omitted produced-object identifier from
+            ``id``; the typed class needs it spelled. The dict form:
+
             Wire fields of the ``parametric`` step as a dict, keyed as in the
             Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
 
@@ -853,7 +950,8 @@ class CalibrationStep:
             If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
             schema, or a value has the wrong shape or an unknown label.
         TypeError
-            If a ``params`` value is not JSON-serializable.
+            If a ``params`` value is not JSON-serializable, or ``params`` is the params class of
+            another step kind.
 
         Examples:
         --------
