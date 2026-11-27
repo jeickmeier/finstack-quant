@@ -4,10 +4,11 @@ use super::capital_structure::PyCapitalStructureCashflows;
 use super::monte_carlo::{PyMonteCarloResults, extract_config};
 use super::parse_period_id;
 use crate::bindings::core::dates::periods::PyPeriod;
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::{PyArrowTable, PyLabeledSeries};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::extract::{extract_market_ref, extract_model_ref};
+use crate::bindings::extract::extract_model_ref;
 use crate::bindings::macros::wire_methods;
 use crate::errors::statements_to_py;
 use finstack_quant_statements::evaluator::PeriodDateConvention;
@@ -584,7 +585,7 @@ impl PyEvaluator {
     /// model : FinancialModelSpec | str
     ///     The model specification to evaluate — a typed model or its
     ///     canonical JSON.
-    /// market : MarketContext | str
+    /// market : MarketContext
     ///     Market data context used for instrument pricing — typed or its
     ///     canonical JSON.
     /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
@@ -611,7 +612,7 @@ impl PyEvaluator {
     ///     missing from ``market``.
     /// ValueError
     ///     If ``as_of`` or ``observation_cutoff`` is not date-like, the
-    ///     model/market JSON is malformed, a cutoff date is used on a model
+    ///     model JSON is malformed, a cutoff date is used on a model
     ///     with no ``source_snapshot`` or with an undated observation in an
     ///     actual period, an observation hidden by the cutoff has no forecast
     ///     or formula to fall back on, or evaluation fails.
@@ -622,7 +623,7 @@ impl PyEvaluator {
         &mut self,
         py: Python<'_>,
         model: &Bound<'_, PyAny>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         as_of: &Bound<'_, PyAny>,
         observation_cutoff: &Bound<'_, PyAny>,
     ) -> PyResult<PyStatementResult> {
@@ -634,9 +635,9 @@ impl PyEvaluator {
             _ => ObservationCutoff::Through(py_to_date(observation_cutoff)?),
         };
         let model = extract_model_ref(model)?;
-        let market = extract_market_ref(py, market)?;
+        let market = &market.inner;
         let model_inner: &finstack_quant_statements::types::FinancialModelSpec = &model;
-        let market_inner: &finstack_quant_core::market_data::context::MarketContext = &market;
+        let market_inner: &finstack_quant_core::market_data::context::MarketContext = market;
         let evaluator = &mut self.inner;
         let result = py
             .detach(|| evaluator.evaluate_with_market(model_inner, market_inner, as_of, cutoff))
@@ -686,7 +687,7 @@ impl PyEvaluator {
         py: Python<'_>,
         model: &Bound<'_, PyAny>,
         config: &Bound<'_, PyAny>,
-        market: Option<&Bound<'_, PyAny>>,
+        market: Option<PyRef<'_, PyMarketContext>>,
         as_of: Option<&Bound<'_, PyAny>>,
         observation_cutoff: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyMonteCarloResults> {
@@ -695,7 +696,7 @@ impl PyEvaluator {
         let model = extract_model_ref(model)?;
         let config = extract_config(config)?;
         let model_inner: &finstack_quant_statements::types::FinancialModelSpec = &model;
-        let run = match (market, as_of) {
+        let run = match (market.as_ref(), as_of) {
             (Some(market), Some(as_of)) => {
                 let cutoff = match observation_cutoff {
                     None => ObservationCutoff::FullSnapshot,
@@ -704,7 +705,7 @@ impl PyEvaluator {
                         _ => ObservationCutoff::Through(py_to_date(cutoff)?),
                     },
                 };
-                Some((extract_market_ref(py, market)?, py_to_date(as_of)?, cutoff))
+                Some((&market.inner, py_to_date(as_of)?, cutoff))
             }
             (None, None) if observation_cutoff.is_none() => None,
             _ => {

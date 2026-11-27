@@ -67,7 +67,7 @@ def _json(value: Any) -> Any:
     return json.loads(value.to_json())
 
 
-def _metric(instrument: Any, market: MarketContext | str, as_of: datetime.date | str, metric_id: str) -> float:
+def _metric(instrument: Any, market: MarketContext, as_of: datetime.date | str, metric_id: str) -> float:
     """One metric of a typed instrument, read off ``price_instrument``."""
     return ins.price_instrument(instrument, market, as_of, metrics=[metric_id])[metric_id]
 
@@ -299,7 +299,8 @@ def build_cases() -> dict[str, Any]:
 
     # -- rates -------------------------------------------------------------
     swap = build_irs()
-    rates_market = rates_cases._market_json()
+    rates_market_json = rates_cases._market_json()
+    rates_market = MarketContext.from_json(rates_market_json)
     swap_result = ins.price_instrument(swap, rates_market, "2024-01-15", metrics=["dv01"])
     conventions_swap = ins.InterestRateSwap.from_conventions({
         "id": "IRS-CONV",
@@ -314,7 +315,7 @@ def build_cases() -> dict[str, Any]:
     })
     swaption = ins.Swaption.example()
     cases["rates"] = {
-        "market": rates_market,
+        "market": rates_market_json,
         "swap": swap.to_json(),
         "price": swap_result.price,
         "dv01": _metric(swap, rates_market, "2024-01-15", "dv01"),

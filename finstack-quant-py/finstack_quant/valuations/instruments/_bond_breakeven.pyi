@@ -434,7 +434,7 @@ class BondBreakevenLadder:
 
 def bond_breakeven_ladder(
     bond: Bond,
-    market: MarketContext | str,
+    market: MarketContext,
     as_of: date | str,
     horizons: Sequence[Tenor | str],
     config: BondBreakevenConfig | str,
@@ -445,7 +445,7 @@ def bond_breakeven_ladder(
     ----------
     bond : Bond
         Typed bond whose native pricing conventions and cashflows are used.
-    market : MarketContext or str
+    market : MarketContext
         Market snapshot containing the pricing curves and risk inputs.
     as_of : date or str
         Valuation date or ISO date string anchoring the horizons.

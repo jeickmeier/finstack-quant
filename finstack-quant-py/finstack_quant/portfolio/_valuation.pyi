@@ -629,7 +629,7 @@ class PortfolioValuation:
 
 def value_portfolio(
     portfolio: Portfolio | str,
-    market: MarketContext | str,
+    market: MarketContext,
     strict_risk: bool | None = None,
     metrics: list[str] | None = None,
 ) -> PortfolioValuation:
@@ -643,8 +643,8 @@ def value_portfolio(
     ----------
     portfolio : Portfolio or str
         Built portfolio or canonical ``PortfolioSpec`` JSON to value.
-    market : MarketContext or str
-        Market context object or JSON supplying curves, quotes, and FX data.
+    market : MarketContext
+        Market context supplying curves, quotes, and FX data.
     strict_risk : bool or None, default None
         Whether absent or failed risk calculations abort the valuation rather
         than being recorded as diagnostics. ``None`` uses the Rust

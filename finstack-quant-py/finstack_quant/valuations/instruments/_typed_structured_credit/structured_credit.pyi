@@ -1000,7 +1000,7 @@ class StructuredCredit:
         ...
     def price_stochastic(
         self,
-        market: MarketContext | str,
+        market: MarketContext,
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         num_paths: int | None = None,
         antithetic: bool | None = None,
@@ -1014,7 +1014,7 @@ class StructuredCredit:
 
         Parameters
         ----------
-        market : MarketContext | str
+        market : MarketContext
             Market context with the deal's discount curve and every curve the
             collateral references.
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
@@ -1050,7 +1050,7 @@ class StructuredCredit:
         ...
     def run_simulation(
         self,
-        market: MarketContext | str,
+        market: MarketContext,
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
     ) -> SimulationRun:
         """
@@ -1058,7 +1058,7 @@ class StructuredCredit:
 
         Parameters
         ----------
-        market : MarketContext | str
+        market : MarketContext
             Market context with the deal's discount curve and every curve the
             collateral references.
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str

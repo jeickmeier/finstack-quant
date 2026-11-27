@@ -169,10 +169,12 @@ class TestDateArguments:
     """Date-valued parameters accept an ISO string or a `datetime.date`."""
 
     @staticmethod
-    def _market() -> str:
+    def _market() -> Any:
         import json
 
-        return json.dumps({
+        from finstack_quant.core.market_data import MarketContext
+
+        text = json.dumps({
             "schema_version": 1,
             "curves": [
                 {
@@ -196,6 +198,7 @@ class TestDateArguments:
             "vol_cubes": [],
             "hierarchy": None,
         })
+        return MarketContext.from_json(text)
 
     @staticmethod
     def _bond() -> Any:

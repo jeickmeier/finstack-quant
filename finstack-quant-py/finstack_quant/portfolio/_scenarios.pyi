@@ -105,7 +105,7 @@ class ScenarioAttributionView:
 def attribute_scenario_pnl(
     portfolio: Portfolio | str,
     scenario: ScenarioSpec,
-    market: MarketContext | str,
+    market: MarketContext,
     *,
     method: str | dict[str, object] | None = None,
 ) -> ScenarioAttributionView:
@@ -117,8 +117,8 @@ def attribute_scenario_pnl(
         Opening holdings and valuation date, or their canonical JSON document.
     scenario : ScenarioSpec or str
         Ordered shocks, including any explicit date or instrument changes.
-    market : MarketContext or str
-        Unshocked inputs, or their canonical JSON document.
+    market : MarketContext
+        Unshocked inputs.
     method : str or dict or None
         Native factor method, defaulting to parallel attribution.
 
@@ -604,7 +604,7 @@ class ScenarioRevalueView:
 def apply_scenario_and_revalue(
     portfolio: Portfolio | str,
     scenario: ScenarioSpec,
-    market: MarketContext | str,
+    market: MarketContext,
     *,
     options: dict[str, object] | str | None = None,
 ) -> ScenarioRevalueView:
@@ -618,8 +618,8 @@ def apply_scenario_and_revalue(
     scenario : ScenarioSpec
         :class:`~finstack_quant.scenarios.ScenarioSpec` describing market-data
         shocks. Load JSON text with ``ScenarioSpec.from_json``.
-    market : MarketContext or str
-        Base market context object or JSON to shock before revaluation.
+    market : MarketContext
+        Base market context to shock before revaluation.
     options : dict[str, object] | str | None
         Portfolio valuation options as a mapping or JSON object. Omit for
         standard metrics and strict risk. Use ``{"metrics": {"mode": "only", "metrics": []}}`` for PV
@@ -633,9 +633,10 @@ def apply_scenario_and_revalue(
     Raises
     ------
     TypeError
-        If ``portfolio`` or ``market`` is neither its typed wrapper nor a JSON string.
+        If ``portfolio`` is neither a ``Portfolio`` nor a JSON string, or
+        ``scenario`` or ``market`` is not its typed class.
     ValueError
-        If portfolio, scenario, or market JSON is malformed or schema-incompatible.
+        If the portfolio JSON is malformed or schema-incompatible.
     PortfolioError
         If portfolio construction, scenario application, market lookup, FX
         conversion, or valuation fails.
@@ -656,7 +657,7 @@ def apply_scenario_and_revalue(
 def scenario_pnl(
     portfolio: Portfolio | str,
     scenario: ScenarioSpec,
-    market: MarketContext | str,
+    market: MarketContext,
 ) -> ScenarioPnlBatchItem:
     """
     Compute the profit and loss attributable to a scenario.
@@ -676,8 +677,8 @@ def scenario_pnl(
         :class:`~finstack_quant.scenarios.ScenarioSpec` describing the
         market-data shocks whose profit-and-loss impact is measured. Load JSON
         text with ``ScenarioSpec.from_json``.
-    market : MarketContext or str
-        Unshocked market context object or JSON used as the base leg and as the
+    market : MarketContext
+        Unshocked market context used as the base leg and as the
         source the scenario operations are applied to.
 
     Returns
@@ -693,7 +694,8 @@ def scenario_pnl(
     Raises
     ------
     TypeError
-        If ``portfolio`` or ``market`` is neither its typed wrapper nor a JSON string.
+        If ``portfolio`` is neither a ``Portfolio`` nor a JSON string, or
+        ``scenario`` or ``market`` is not its typed class.
     ValueError
         If a JSON input is malformed or does not match its serialized schema.
     PortfolioError
@@ -715,7 +717,7 @@ def scenario_pnl(
 def scenario_pnl_batch(
     portfolio: Portfolio | str,
     scenarios: list[ScenarioSpec],
-    market: MarketContext | str,
+    market: MarketContext,
 ) -> list[ScenarioPnlBatchItem]:
     """
     Compute ordered scenario P&L results while reusing one base valuation.
@@ -735,8 +737,8 @@ def scenario_pnl_batch(
         Ordered ``ScenarioSpec`` objects. Order is preserved exactly; an empty
         batch returns an empty list without valuation. Load JSON text with
         ``ScenarioSpec.from_json``.
-    market : MarketContext or str
-        Unshocked market context or canonical market JSON used for the shared
+    market : MarketContext
+        Unshocked market context used for the shared
         base valuation and each scenario application.
 
     Returns

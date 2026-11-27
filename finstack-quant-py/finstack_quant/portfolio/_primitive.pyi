@@ -214,7 +214,7 @@ class PortfolioPrimitiveExposureReport:
 
 def primitive_exposures(
     portfolio: Portfolio | str,
-    market: MarketContext | str,
+    market: MarketContext,
     metrics: list[str],
 ) -> PortfolioPrimitiveExposureReport:
     """
@@ -230,7 +230,7 @@ def primitive_exposures(
     portfolio : Portfolio | str
         Built portfolio or ``PortfolioSpec`` JSON; ``base_currency`` is the
         reporting currency.
-    market : MarketContext | str
+    market : MarketContext
         Complete market for primitive valuation and FX conversion.
     metrics : list[str]
         Additive metric ids to report per primitive (e.g. ``"dv01"``); pass

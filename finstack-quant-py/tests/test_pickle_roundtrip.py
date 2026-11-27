@@ -190,11 +190,12 @@ class TestRoundTrips:
 
     def test_valuation_result(self) -> None:
         from finstack_quant.core.currency import Currency
+        from finstack_quant.core.market_data import MarketContext
         from finstack_quant.core.money import Money
         from finstack_quant.core.types import Rate
         from finstack_quant.valuations.instruments import Bond, price_instrument
 
-        market = json.dumps({
+        market_json = json.dumps({
             "schema_version": 1,
             "curves": [
                 {
@@ -227,6 +228,7 @@ class TestRoundTrips:
             StubKind.SHORT_FRONT,
             "USD-OIS",
         )
+        market = MarketContext.from_json(market_json)
         result = price_instrument(bond.to_json(), market, datetime.date(2024, 1, 1))
         restored = pickle.loads(pickle.dumps(result))  # noqa: S301
         assert restored.price == result.price

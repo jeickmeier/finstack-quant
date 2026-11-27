@@ -916,15 +916,15 @@ class CompositeSpec:
         ...
 
     def initialize(
-        self, market: MarketContext | str, as_of: DateLike, history: Observations | None = None
+        self, market: MarketContext, as_of: DateLike, history: Observations | None = None
     ) -> CompositeRebalanceResult:
         """
         Resolve immutable quantities from information available through a date.
 
         Parameters
         ----------
-        market : MarketContext | str
-            Complete current market object or canonical market JSON.
+        market : MarketContext
+            Complete current market object.
         as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
             Effective date as a date-like value or ISO-8601 string.
         history : list[dict[str, Any]] | str | None
@@ -1209,15 +1209,15 @@ class CompositeInstrument:
         ...
 
     def rebalance(
-        self, market: MarketContext | str, as_of: DateLike, history: Observations | None = None
+        self, market: MarketContext, as_of: DateLike, history: Observations | None = None
     ) -> CompositeRebalanceResult:
         """
         Explicitly return a distinct resolved state and primitive trade deltas.
 
         Parameters
         ----------
-        market : MarketContext | str
-            Complete rebalance-date market object or canonical JSON.
+        market : MarketContext
+            Complete rebalance-date market.
         as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
             Effective date for the new state.
         history : list[dict[str, Any]] | str | None
@@ -1237,14 +1237,14 @@ class CompositeInstrument:
         ...
 
     def primitive_exposures(
-        self, market: MarketContext | str, as_of: datetime.date | str, metrics: list[str] | None = None
+        self, market: MarketContext, as_of: datetime.date | str, metrics: list[str] | None = None
     ) -> CompositeExposureReport:
         """
         Price recursive primitive paths and report net/gross value and risk.
 
         Parameters
         ----------
-        market : MarketContext | str
+        market : MarketContext
             Complete valuation and FX market context.
         as_of : datetime.date | str
             Valuation date used for prices, metrics, and FX conversion.

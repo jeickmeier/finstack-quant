@@ -202,9 +202,9 @@ def test_compatibility_build_spec_path_releases_gil() -> None:
 
 def test_value_portfolio_json_inputs_release_gil_and_preserve_result() -> None:
     portfolio_json = _portfolio_spec_json(3_000)
-    market_json = _market().to_json()
+    market = _market()
 
-    valuation = _assert_releases_gil(lambda: value_portfolio(portfolio_json, market_json, metrics=[]))
+    valuation = _assert_releases_gil(lambda: value_portfolio(portfolio_json, market, metrics=[]))
     result = json.loads(valuation.to_json())
 
     assert len(result["position_values"]) == 3_000

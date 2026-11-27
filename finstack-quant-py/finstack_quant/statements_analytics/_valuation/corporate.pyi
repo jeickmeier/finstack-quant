@@ -638,7 +638,7 @@ def evaluate_dcf(
         complete trailing-year sum replaces ``terminal_metric`` on an
         exit-multiple terminal; actual period boundaries must cover one
         complete contiguous calendar year) and the sensitivity knobs. ``None`` uses every default.
-    market : MarketContext | str | None
+    market : MarketContext | None
         Market context used for statement evaluation (capital-structure curve
         lookups); DCF discounting stays WACC-only. Requires ``as_of``.
     as_of : datetime.date | str | None
@@ -1058,7 +1058,7 @@ def run_corporate_analysis(
           per-period LTV denominator in reporting currency; scalar,
           foreign-currency or non-finite values are rejected. Missing or
           non-positive values or an omitted node leave LTV unavailable.
-    market : MarketContext | str | None
+    market : MarketContext | None
         Market context for statement evaluation and instrument pricing (not
         WACC discounting); requires ``options["as_of"]``.
 

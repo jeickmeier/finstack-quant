@@ -8,7 +8,7 @@ from finstack_quant.portfolio._optimization.spec_result import PortfolioOptimiza
 
 def optimize_portfolio(
     spec: PortfolioOptimizationSpec,
-    market: MarketContext | str,
+    market: MarketContext,
 ) -> PortfolioOptimizationResult:
     """
     Optimize portfolio weights using the LP-based optimizer.
@@ -17,8 +17,8 @@ def optimize_portfolio(
     ----------
     spec : PortfolioOptimizationSpec
         Typed portfolio definition, objective, constraints, and solver policy.
-    market : MarketContext or str
-        Market context object or JSON used to value positions and calculate metrics.
+    market : MarketContext
+        Market context used to value positions and calculate metrics.
 
     Returns
     -------
@@ -28,9 +28,7 @@ def optimize_portfolio(
     Raises
     ------
     TypeError
-        If ``market`` is neither a ``MarketContext`` nor a JSON string.
-    ValueError
-        If supplied market JSON is malformed or schema-incompatible.
+        If ``market`` is not a ``MarketContext``.
     PortfolioError
         If the embedded portfolio specification cannot be constructed, a
         constraint is invalid (non-finite inputs, a negative budget or turnover

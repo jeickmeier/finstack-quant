@@ -6,8 +6,9 @@
 
 use super::PyValuationResult;
 use crate::bindings::core::config::PyFinstackConfig;
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::extract::{extract_instrument, extract_market};
+use crate::bindings::extract::extract_instrument;
 use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::module_utils::{
     opt_spec_from_py, py_to_json_string, py_to_serde, spec_from_py,
@@ -425,7 +426,7 @@ pub(crate) fn price_extras_from_py(
 fn price_instrument(
     py: Python<'_>,
     instrument: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     as_of: &Bound<'_, PyAny>,
     model: &str,
     metrics: Option<Vec<String>>,
@@ -601,7 +602,7 @@ fn list_models_grouped() -> std::collections::BTreeMap<String, Vec<String>> {
 fn instrument_cashflows(
     py: Python<'_>,
     instrument: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     as_of: &Bound<'_, PyAny>,
     model: &str,
 ) -> PyResult<PyInstrumentCashflowEnvelope> {
@@ -610,7 +611,7 @@ fn instrument_cashflows(
     let instrument = py
         .detach(move || instrument.into_parsed(None, None))
         .map_err(core_to_py)?;
-    let market = extract_market(py, market)?;
+    let market = market.inner.clone();
     let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
     let model = model.to_owned();
     py.detach(move || {
@@ -834,13 +835,13 @@ pub(crate) const EXPORTS: &[&str] = &[
 pub(crate) fn price_prepared(
     py: Python<'_>,
     instrument: finstack_quant_valuations::pricer::ParsedInstrument,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     as_of: &Bound<'_, PyAny>,
     model: &str,
     metrics: Option<Vec<String>>,
     extras: PriceExtras,
 ) -> PyResult<PyValuationResult> {
-    let market = extract_market(py, market)?;
+    let market = market.inner.clone();
     let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
     let model = model.to_owned();
     let metrics = metrics.unwrap_or_default();
@@ -871,18 +872,18 @@ pub(crate) fn price_prepared(
 ///
 /// * `py` - GIL token; the pricer runs with the GIL released.
 /// * `instrument` - Owned native Rust instrument, validated before pricing.
-/// * `market` - `MarketContext` object or market-context JSON string.
+/// * `market` - `MarketContext` object.
 /// * `as_of` - Valuation date (date-like or ISO string).
 /// * `model` - Model key (`"default"` selects the instrument-native model).
 pub(crate) fn typed_option_greeks<'py>(
     py: Python<'py>,
     instrument: Box<dyn finstack_quant_valuations::instruments::Instrument>,
-    market: &Bound<'py, PyAny>,
+    market: PyRef<'py, PyMarketContext>,
     as_of: &Bound<'py, PyAny>,
     model: &str,
     extras: PriceExtras,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let market = extract_market(py, market)?;
+    let market = market.inner.clone();
     let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
     let model = model.to_owned();
     let pairs = py

@@ -145,7 +145,7 @@ class FxDigitalOption:
 
     def greeks(
         self,
-        market: MarketContext | str,
+        market: MarketContext,
         as_of: date | str,
         model: str = "default",
         extras: PriceExtras | dict[str, Any] | str | None = None,
@@ -154,7 +154,7 @@ class FxDigitalOption:
 
         Parameters
         ----------
-        market : MarketContext or str
+        market : MarketContext
             Snapshot containing the configured FX, carry and volatility inputs.
         as_of : date or str
             Valuation date used to determine the remaining option life and observed state.

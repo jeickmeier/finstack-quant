@@ -744,7 +744,7 @@ class PortfolioMarginResult:
 
 def portfolio_margin(
     portfolio: Portfolio | str,
-    market: MarketContext | str,
+    market: MarketContext,
     as_of: datetime.date | str,
     current_im_collateral: dict[str, Money] | None = None,
 ) -> PortfolioMarginResult:
@@ -763,8 +763,8 @@ def portfolio_margin(
         A :class:`Portfolio` object, or a JSON-serialized ``PortfolioSpec``.
         Its positions that carry margin metadata form the netting sets and its
         base currency is the reporting currency.
-    market : MarketContext or str
-        Market data (object or JSON) for VM and SIMM sensitivity extraction,
+    market : MarketContext
+        Market data for VM and SIMM sensitivity extraction,
         including the FX matrix needed to report netting sets in the base
         currency.
     as_of : datetime.date or str

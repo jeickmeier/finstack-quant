@@ -9,13 +9,14 @@ use pyo3::prelude::*;
 use finstack_quant_factor::{FactorId, FactorModelConfig};
 use finstack_quant_portfolio::factor_model::FactorModel;
 
-use crate::bindings::extract::{extract_market_ref, extract_portfolio_ref};
+use crate::bindings::extract::extract_portfolio_ref;
 use crate::bindings::models::factor::config::PyFactorModelConfig;
 use crate::bindings::portfolio::sensitivity::PySensitivityMatrix;
 use crate::errors::{portfolio_to_py, serde_json_to_py};
 
 use super::assignment::PyFactorAssignmentReport;
 use super::whatif::{PyStressPnl, PyStressResult, PyWhatIfResult, parse_position_changes};
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::models::factor::risk::PyRiskDecomposition;
 
 /// Convert ``dict``, ``pandas.Series``, 2-column DataFrame/Arrow table, or
@@ -137,7 +138,7 @@ impl PyFactorModel {
     /// ----------
     /// portfolio : Portfolio | str
     ///     Built ``Portfolio`` or ``PortfolioSpec`` JSON.
-    /// market : MarketContext | str
+    /// market : MarketContext
     ///     Market used to resolve credit-index aggregates into their curve
     ///     dependencies.
     ///
@@ -157,11 +158,11 @@ impl PyFactorModel {
         &self,
         py: Python<'_>,
         portfolio: &Bound<'_, PyAny>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
     ) -> PyResult<PyFactorAssignmentReport> {
         let portfolio = extract_portfolio_ref(py, portfolio)?;
-        let market = extract_market_ref(py, market)?;
-        let (portfolio, market) = (&*portfolio, &*market);
+        let market = &market.inner;
+        let (portfolio, market) = (&*portfolio, market);
         let inner = &self.inner;
         py.detach(move || inner.assign_factors(portfolio, market))
             .map(PyFactorAssignmentReport::from_inner)
@@ -175,7 +176,7 @@ impl PyFactorModel {
     /// portfolio : Portfolio | str
     ///     Portfolio whose ``base_currency`` is the reporting currency of every
     ///     sensitivity.
-    /// market : MarketContext | str
+    /// market : MarketContext
     ///     Market bumped by the sensitivity engine; must hold the FX needed for
     ///     cross-currency positions.
     /// as_of : datetime.date | str
@@ -197,13 +198,13 @@ impl PyFactorModel {
         &self,
         py: Python<'_>,
         portfolio: &Bound<'_, PyAny>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<PySensitivityMatrix> {
         let portfolio = extract_portfolio_ref(py, portfolio)?;
-        let market = extract_market_ref(py, market)?;
+        let market = &market.inner;
         let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
-        let (portfolio, market) = (&*portfolio, &*market);
+        let (portfolio, market) = (&*portfolio, market);
         let base_currency = portfolio.base_currency;
         let inner = &self.inner;
         py.detach(move || inner.compute_sensitivities(portfolio, market, as_of))
@@ -217,7 +218,7 @@ impl PyFactorModel {
     /// ----------
     /// portfolio : Portfolio | str
     ///     Portfolio to analyze.
-    /// market : MarketContext | str
+    /// market : MarketContext
     ///     Market used for sensitivity generation.
     /// as_of : datetime.date | str
     ///     Valuation date of the analysis.
@@ -239,13 +240,13 @@ impl PyFactorModel {
         &self,
         py: Python<'_>,
         portfolio: &Bound<'_, PyAny>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<PyRiskDecomposition> {
         let portfolio = extract_portfolio_ref(py, portfolio)?;
-        let market = extract_market_ref(py, market)?;
+        let market = &market.inner;
         let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
-        let (portfolio, market) = (&*portfolio, &*market);
+        let (portfolio, market) = (&*portfolio, market);
         let inner = &self.inner;
         py.detach(move || inner.analyze(portfolio, market, as_of))
             .map(PyRiskDecomposition::from_inner)
@@ -258,7 +259,7 @@ impl PyFactorModel {
     /// ----------
     /// portfolio : Portfolio | str
     ///     Portfolio the baseline is computed for and the changes apply to.
-    /// market : MarketContext | str
+    /// market : MarketContext
     ///     Market used to value positions and compute sensitivities.
     /// as_of : datetime.date | str
     ///     Valuation date of the analysis.
@@ -283,15 +284,15 @@ impl PyFactorModel {
         &self,
         py: Python<'_>,
         portfolio: &Bound<'_, PyAny>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         as_of: &Bound<'_, PyAny>,
         changes: &Bound<'_, PyAny>,
     ) -> PyResult<PyWhatIfResult> {
         let portfolio = extract_portfolio_ref(py, portfolio)?;
-        let market = extract_market_ref(py, market)?;
+        let market = &market.inner;
         let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
         let changes = parse_position_changes(py, changes)?;
-        let (portfolio, market) = (&*portfolio, &*market);
+        let (portfolio, market) = (&*portfolio, market);
         let inner = &self.inner;
         py.detach(move || inner.position_what_if(portfolio, market, as_of, &changes))
             .map(PyWhatIfResult::from_inner)
@@ -304,7 +305,7 @@ impl PyFactorModel {
     /// ----------
     /// portfolio : Portfolio | str
     ///     Portfolio whose P&L and stressed risk are evaluated.
-    /// market : MarketContext | str
+    /// market : MarketContext
     ///     Baseline market to shock.
     /// as_of : datetime.date | str
     ///     Valuation date for both endpoints.
@@ -329,15 +330,15 @@ impl PyFactorModel {
         &self,
         py: Python<'_>,
         portfolio: &Bound<'_, PyAny>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         as_of: &Bound<'_, PyAny>,
         stresses: &Bound<'_, PyAny>,
     ) -> PyResult<PyStressResult> {
         let portfolio = extract_portfolio_ref(py, portfolio)?;
-        let market = extract_market_ref(py, market)?;
+        let market = &market.inner;
         let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
         let stresses = to_stresses(stresses)?;
-        let (portfolio, market) = (&*portfolio, &*market);
+        let (portfolio, market) = (&*portfolio, market);
         let inner = &self.inner;
         py.detach(move || inner.factor_stress(portfolio, market, as_of, &stresses))
             .map(PyStressResult::from_inner)
@@ -350,7 +351,7 @@ impl PyFactorModel {
     /// ----------
     /// portfolio : Portfolio | str
     ///     Portfolio whose position P&L is evaluated.
-    /// market : MarketContext | str
+    /// market : MarketContext
     ///     Baseline market to shock.
     /// as_of : datetime.date | str
     ///     Valuation date for both endpoints.
@@ -375,15 +376,15 @@ impl PyFactorModel {
         &self,
         py: Python<'_>,
         portfolio: &Bound<'_, PyAny>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         as_of: &Bound<'_, PyAny>,
         stresses: &Bound<'_, PyAny>,
     ) -> PyResult<PyStressPnl> {
         let portfolio = extract_portfolio_ref(py, portfolio)?;
-        let market = extract_market_ref(py, market)?;
+        let market = &market.inner;
         let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
         let stresses = to_stresses(stresses)?;
-        let (portfolio, market) = (&*portfolio, &*market);
+        let (portfolio, market) = (&*portfolio, market);
         let inner = &self.inner;
         py.detach(move || inner.factor_stress_pnl(portfolio, market, as_of, &stresses))
             .map(PyStressPnl::from_inner)

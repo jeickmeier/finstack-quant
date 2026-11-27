@@ -2,9 +2,10 @@
 
 use super::inputs::{PyDcfInputs, extract_dcf_options, extract_terminal_value};
 use super::sensitivity::{PyCorporateValuationResult, PyDcfSensitivityResult};
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::extract::{extract_market_opt, extract_model_ref};
+use crate::bindings::extract::extract_model_ref;
 use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::statements::checks::PyCheckReport;
 use crate::bindings::statements::evaluator::PyStatementResult;
@@ -358,7 +359,7 @@ pub(super) fn evaluate_dcf<'py>(
     model: &Bound<'py, PyAny>,
     inputs: &Bound<'py, PyAny>,
     options: Option<&Bound<'py, PyAny>>,
-    market: Option<&Bound<'py, PyAny>>,
+    market: Option<PyRef<'py, PyMarketContext>>,
     as_of: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<PyCorporateValuationResult> {
     let model = extract_model_ref(model)?.into_owned();
@@ -367,7 +368,7 @@ pub(super) fn evaluate_dcf<'py>(
         Err(_) => crate::bindings::module_utils::spec_from_py(py, inputs, "DcfInputs")?,
     };
     let options = extract_dcf_options(py, options)?;
-    let market = extract_market_opt(py, market)?;
+    let market = market.map(|market| market.inner.clone());
     let as_of = as_of
         .map(crate::bindings::date_utils::py_to_date)
         .transpose()?;
@@ -657,13 +658,13 @@ pub(super) fn run_corporate_analysis<'py>(
     py: Python<'py>,
     model: &Bound<'py, PyAny>,
     options: Option<&Bound<'py, PyAny>>,
-    market: Option<&Bound<'py, PyAny>>,
+    market: Option<PyRef<'py, PyMarketContext>>,
 ) -> PyResult<PyCorporateAnalysis> {
     let model = extract_model_ref(model)?.into_owned();
     let options: CorporateAnalysisOptions =
         crate::bindings::module_utils::opt_spec_from_py(py, options, "CorporateAnalysisOptions")?
             .unwrap_or_default();
-    let market = extract_market_opt(py, market)?;
+    let market = market.map(|market| market.inner.clone());
 
     let inner = py
         .detach(move || {

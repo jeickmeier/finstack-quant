@@ -694,8 +694,8 @@ class PortfolioAttribution:
 
 def attribute_portfolio_pnl(
     portfolio: Portfolio | str,
-    market_t0: MarketContext | str,
-    market_t1: MarketContext | str,
+    market_t0: MarketContext,
+    market_t1: MarketContext,
     as_of_t0: datetime.date | str,
     as_of_t1: datetime.date | str,
     method: str | dict[str, Any],
@@ -708,10 +708,10 @@ def attribute_portfolio_pnl(
     ----------
     portfolio : Portfolio or str
         Built portfolio or canonical ``PortfolioSpec`` JSON being attributed.
-    market_t0 : MarketContext or str
-        Opening market context object or JSON at the start of the P&L interval.
-    market_t1 : MarketContext or str
-        Closing market context object or JSON at the end of the P&L interval.
+    market_t0 : MarketContext
+        Opening market context at the start of the P&L interval.
+    market_t1 : MarketContext
+        Closing market context at the end of the P&L interval.
     as_of_t0 : datetime.date | str
         ISO-8601 opening valuation date associated with ``market_t0``.
     as_of_t1 : datetime.date | str

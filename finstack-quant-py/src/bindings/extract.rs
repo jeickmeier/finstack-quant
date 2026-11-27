@@ -15,7 +15,6 @@
 
 use pyo3::prelude::*;
 
-use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::portfolio::container::PyPortfolio;
 use crate::bindings::portfolio::valuation::PyPortfolioValuation;
 use crate::bindings::statements::evaluator::PyStatementResult;
@@ -394,73 +393,6 @@ pub fn extract_results_ref<'py>(obj: &Bound<'py, PyAny>) -> PyResult<ResultAcces
     let inner: finstack_quant_statements::evaluator::StatementResult =
         serde_json::from_str(&json).map_err(to_py)?;
     Ok(ResultAccess::Owned(Box::new(inner)))
-}
-
-/// Extract a [`MarketContext`] from a `MarketContext` Python object
-/// (fast path) or canonical state JSON (strict contract loader, as
-/// `MarketContext.from_json`).
-///
-/// Always produces an owned value — prefer [`extract_market_ref`] when only
-/// a reference is needed.
-pub fn extract_market(
-    py: Python<'_>,
-    obj: &Bound<'_, PyAny>,
-) -> PyResult<finstack_quant_core::market_data::context::MarketContext> {
-    if let Ok(ctx) = obj.cast::<PyMarketContext>() {
-        return Ok(ctx.borrow().inner.clone());
-    }
-    let json: String = obj.extract()?;
-    crate::bindings::core::market_data::context::load_market_json(py, &json)
-}
-
-/// Extract an optional [`MarketContext`] from `Option<&Bound<'_, PyAny>>`.
-///
-/// Returns `Ok(None)` when `obj` is `None`.
-pub fn extract_market_opt(
-    py: Python<'_>,
-    obj: Option<&Bound<'_, PyAny>>,
-) -> PyResult<Option<finstack_quant_core::market_data::context::MarketContext>> {
-    match obj {
-        Some(o) => extract_market(py, o).map(Some),
-        None => Ok(None),
-    }
-}
-
-// MarketContext — borrow-preferring access
-
-/// Access to a [`MarketContext`] without cloning on the typed fast path.
-///
-/// `MarketContext` holds `HashMap`s of `Arc`s; its `Clone` reallocates the
-/// backing storage and bumps every `Arc` refcount. In tight pipelines
-/// (replay, chained valuation), avoiding that per-call allocation is
-/// measurable.
-pub enum MarketAccess<'py> {
-    Borrowed(PyRef<'py, PyMarketContext>),
-    Owned(Box<finstack_quant_core::market_data::context::MarketContext>),
-}
-
-impl std::ops::Deref for MarketAccess<'_> {
-    type Target = finstack_quant_core::market_data::context::MarketContext;
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Borrowed(r) => &r.inner,
-            Self::Owned(m) => m.as_ref(),
-        }
-    }
-}
-
-/// Borrow a [`MarketContext`] from a typed Python object, or load canonical
-/// state JSON through the strict contract loader while releasing the GIL.
-pub fn extract_market_ref<'py>(
-    py: Python<'py>,
-    obj: &Bound<'py, PyAny>,
-) -> PyResult<MarketAccess<'py>> {
-    if let Ok(ctx) = obj.cast::<PyMarketContext>() {
-        return Ok(MarketAccess::Borrowed(ctx.borrow()));
-    }
-    let json: String = obj.extract()?;
-    let inner = crate::bindings::core::market_data::context::load_market_json(py, &json)?;
-    Ok(MarketAccess::Owned(Box::new(inner)))
 }
 
 // Portfolio — borrow-preferring access

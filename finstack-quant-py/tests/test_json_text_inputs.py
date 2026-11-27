@@ -763,6 +763,7 @@ CASES = [
         lambda market: price_instrument(_bond(), market, AS_OF, metrics=["dv01", "ytm"]),
         MarketContext.from_json,
         lambda: _market().to_json(),
+        rejects_text=TypeError,
     ),
     Case(
         "financial_model_spec",

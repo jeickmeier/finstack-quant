@@ -125,9 +125,12 @@ def test_scenario_pnl_batch_matches_standalone_and_accepts_json_or_typed_inputs(
 
     assert batch == expected
     assert [item["scenario_id"] for item in batch] == ["up_10bp", "down_15bp"]
-    # JSON portfolio/market inputs reach the same answer as the typed handles.
-    from_json = scenario_pnl_batch(_portfolio_json(), scenarios, market.to_json())
+    # A JSON portfolio and a market loaded from JSON reach the same answer as the typed handles.
+    from_json = scenario_pnl_batch(_portfolio_json(), scenarios, MarketContext.from_json(market.to_json()))
     assert [json.loads(item.to_json()) for item in from_json] == batch
+    # Market JSON text is not a market: it goes through the loader.
+    with pytest.raises(TypeError, match="MarketContext"):
+        scenario_pnl_batch(_portfolio_json(), scenarios, market.to_json())
     assert scenario_pnl_batch(portfolio, [], market) == []
     # Scenarios are a list of `ScenarioSpec`; JSON text is not one.
     with pytest.raises(TypeError):

@@ -408,7 +408,7 @@ class PortfolioMetrics:
 
 def aggregate_metrics(
     valuation: PortfolioValuation | str,
-    market: MarketContext | str,
+    market: MarketContext,
 ) -> PortfolioMetrics:
     """
     Aggregate portfolio metrics from a valuation.
@@ -422,8 +422,8 @@ def aggregate_metrics(
     valuation : PortfolioValuation or str
         Typed valuation or canonical valuation JSON to aggregate; its base
         currency and ``as_of`` set the aggregation currency and FX date.
-    market : MarketContext or str
-        Market context object or JSON supplying the FX spots that convert
+    market : MarketContext
+        Market context supplying the FX spots that convert
         out-of-base metrics.
 
     Returns
@@ -436,7 +436,8 @@ def aggregate_metrics(
     Raises
     ------
     TypeError
-        If ``valuation`` or ``market`` is neither its typed wrapper nor a JSON string.
+        If ``valuation`` is neither a ``PortfolioValuation`` nor a JSON string,
+        or ``market`` is not a ``MarketContext``.
     ValueError
         If supplied JSON is invalid.
     KeyError

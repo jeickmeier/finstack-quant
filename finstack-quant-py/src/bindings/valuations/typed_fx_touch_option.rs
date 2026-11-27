@@ -14,6 +14,7 @@ use pyo3::types::PyDict;
 
 use super::convert::attributes_from_py;
 use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_trait_methods};
+use crate::bindings::core::market_data::context::PyMarketContext;
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_touch_option", "FxTouchOption")]
 #[pyclass(
@@ -49,7 +50,7 @@ impl PyFxTouchOption {
     fn greeks<'py>(
         &self,
         py: Python<'py>,
-        market: &Bound<'py, PyAny>,
+        market: PyRef<'py, PyMarketContext>,
         as_of: &Bound<'py, PyAny>,
         model: &str,
         extras: Option<&Bound<'py, PyAny>>,

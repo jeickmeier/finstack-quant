@@ -371,7 +371,7 @@ class HorizonResult:
 
 def compute_horizon_return(
     instrument: Any,
-    market: MarketContext | str,
+    market: MarketContext,
     as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
     scenario: ScenarioSpec,
     method: str | Mapping[str, Any] | None = None,
@@ -387,8 +387,8 @@ def compute_horizon_return(
         Typed instrument (``Bond``, ``CreditDefaultSwap``,
         ``InterestRateSwap``, ...) or a canonical v1 instrument envelope JSON
         string.
-    market : MarketContext | str
-        ``MarketContext`` object or JSON string; never mutated.
+    market : MarketContext
+        ``MarketContext``; never mutated.
     as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
         Valuation date (ISO 8601 accepted).
     scenario : ScenarioSpec

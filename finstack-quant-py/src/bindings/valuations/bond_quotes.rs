@@ -8,8 +8,8 @@ use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_c
 };
 
 use super::instruments::PyBond;
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::date_utils::py_to_date;
-use crate::bindings::extract::extract_market;
 use crate::errors::core_to_py;
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._bond_quotes", "BondQuoteSet")]
@@ -103,11 +103,11 @@ crate::bindings::macros::py_getters!(PyBondQuoteSet |s| {
 fn compute_quotes(
     py: Python<'_>,
     bond: PyRef<'_, PyBond>,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     as_of: &Bound<'_, PyAny>,
     quote_input: &Bound<'_, PyAny>,
 ) -> PyResult<PyBondQuoteSet> {
-    let market = extract_market(py, market)?;
+    let market = market.inner.clone();
     let as_of = py_to_date(as_of)?;
     let quote_input: BondQuoteInput =
         crate::bindings::module_utils::spec_from_py(py, quote_input, "BondQuoteInput")?;

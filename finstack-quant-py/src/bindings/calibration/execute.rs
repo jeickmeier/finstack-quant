@@ -3,6 +3,7 @@
 use super::envelope::PyCalibrationEnvelope;
 use super::report::PyCalibrationValidationReport;
 use super::result::PyCalibrationResult;
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::module_utils::py_to_json_string;
 use finstack_quant_calibration::api::engine::{self, ExecuteError};
 use finstack_quant_calibration::api::errors::EnvelopeError;
@@ -202,7 +203,7 @@ pub(super) fn calibrate(
 ///     Typed Bermudan swaption instrument or its canonical instrument JSON
 ///     envelope (any typed instrument object accepted by the pricing helpers
 ///     is unwrapped the same way).
-/// market : MarketContext | str
+/// market : MarketContext
 ///     Market carrying the required discount and swaption-volatility inputs.
 /// as_of : datetime.date | str
 ///     Valuation date used for tenor and expiry construction.
@@ -226,11 +227,11 @@ pub(super) fn calibrate(
 pub(super) fn calibrate_bermudan_lmm_base_vol(
     py: Python<'_>,
     instrument: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     as_of: &Bound<'_, PyAny>,
 ) -> PyResult<f64> {
     let instrument_json = crate::bindings::extract::extract_instrument_json(instrument)?;
-    let market = crate::bindings::extract::extract_market(py, market)?;
+    let market = market.inner.clone();
     let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     py.detach(move || {
         finstack_quant_calibration::calibrate_bermudan_lmm_base_vol_from_json(

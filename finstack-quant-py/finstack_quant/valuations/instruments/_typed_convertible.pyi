@@ -306,7 +306,7 @@ class ConvertibleBond:
         130.0
         """
         ...
-    def parity(self, market: MarketContext | str) -> float:
+    def parity(self, market: MarketContext) -> float:
         """
         Conversion value divided by notional (mirrors Rust
         ``ConvertibleBond::parity``). Ordinary conversion uses the effective
@@ -315,7 +315,7 @@ class ConvertibleBond:
 
         Parameters
         ----------
-        market : MarketContext | str
+        market : MarketContext
             Market carrying the underlying equity price.
 
         Returns
@@ -332,7 +332,7 @@ class ConvertibleBond:
             or non-finite.
         """
         ...
-    def conversion_premium(self, market: MarketContext | str, bond_price: float) -> float:
+    def conversion_premium(self, market: MarketContext, bond_price: float) -> float:
         """
         Conversion premium over parity (mirrors Rust
         ``ConvertibleBond::conversion_premium``):
@@ -341,7 +341,7 @@ class ConvertibleBond:
 
         Parameters
         ----------
-        market : MarketContext | str
+        market : MarketContext
             Market carrying the underlying equity price.
         bond_price : float
             Observed bond price in notional currency units per bond.
@@ -362,7 +362,7 @@ class ConvertibleBond:
         ...
     def greeks(
         self,
-        market: MarketContext | str,
+        market: MarketContext,
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
     ) -> dict[str, float]:
         """
@@ -375,7 +375,7 @@ class ConvertibleBond:
 
         Parameters
         ----------
-        market : MarketContext | str
+        market : MarketContext
             Market carrying the curves, equity price and volatility. An active
             instrument volatility override takes precedence; otherwise surface
             volatility is sampled at the contractual conversion strike. Floating

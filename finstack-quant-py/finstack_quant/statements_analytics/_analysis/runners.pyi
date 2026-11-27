@@ -196,7 +196,7 @@ def evaluate_scenario_set(model: Any, scenario_set: Any) -> ScenarioResults:
     """
 
 def evaluate_scenario_set_with_market(
-    model: Any, scenario_set: Any, market: MarketContext | str, as_of: Any
+    model: Any, scenario_set: Any, market: MarketContext, as_of: Any
 ) -> ScenarioResults:
     """Evaluate all scenarios in a scenario set against a market as of a date.
 
@@ -212,9 +212,8 @@ def evaluate_scenario_set_with_market(
         A ``FinancialModelSpec`` object or a JSON string.
     scenario_set : ScenarioSet | str
         A typed scenario set or its JSON serialization.
-    market : MarketContext | str
-        Curves, fixings and FX the instruments are priced from, typed or its
-        canonical JSON.
+    market : MarketContext
+        Curves, fixings and FX the instruments are priced from.
     as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
         Valuation date for the instruments' cashflows and the cutoff for
         explicit-value visibility; ISO ``YYYY-MM-DD`` strings are accepted.

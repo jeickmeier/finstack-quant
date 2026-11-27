@@ -10,7 +10,7 @@ from finstack_quant.valuations.instruments._pricing import _InstrumentInput
 
 def calculate_simm(
     instruments: Sequence[_InstrumentInput],
-    market: MarketContext | str,
+    market: MarketContext,
     as_of: date | str,
     *,
     version: str | None = None,
@@ -27,8 +27,8 @@ def calculate_simm(
     instruments : Sequence[_InstrumentInput]
         Typed instruments or canonical instrument envelopes from the same
         netting set. Each trade contributes at its own notional and direction.
-    market : MarketContext | str
-        Market snapshot or canonical market JSON containing each trade's risk
+    market : MarketContext
+        Market snapshot containing each trade's risk
         factors, including any referenced curves and fixings.
     as_of : date | str
         Valuation date supplied as a Python date or ISO-8601 date text.

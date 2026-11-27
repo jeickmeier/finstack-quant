@@ -8,10 +8,10 @@ use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_c
 
 use super::convert::{enum_to_py_string, money_to_py};
 use super::instruments::PyBond;
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::extract::extract_market;
 use crate::errors::core_to_py;
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._bond_workout", "BondWorkoutRow")]
@@ -161,10 +161,10 @@ crate::bindings::macros::py_getters!(PyBondWorkoutLadder |s| {
 fn bond_workout_ladder(
     py: Python<'_>,
     bond: PyRef<'_, PyBond>,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     as_of: &Bound<'_, PyAny>,
 ) -> PyResult<PyBondWorkoutLadder> {
-    let market = extract_market(py, market)?;
+    let market = market.inner.clone();
     let as_of = py_to_date(as_of)?;
     let bond = bond.inner.clone();
     let inner = py

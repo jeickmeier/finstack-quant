@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from finstack_quant.core.market_data import MarketContext
 from finstack_quant.valuations.instruments import price_instrument
 
 
@@ -26,7 +27,11 @@ def test_seasoned_accrued_precedes_projected_losses(cdr: float) -> None:
     f = fixture()
     f["instrument"]["instrument"]["spec"]["default_spec"]["cdr"] = cdr
     result = price_instrument(
-        json.dumps(f["instrument"]), json.dumps(f["market"]), "2024-02-15", "discounting", ["accrued"]
+        json.dumps(f["instrument"]),
+        MarketContext.from_json(json.dumps(f["market"])),
+        "2024-02-15",
+        "discounting",
+        ["accrued"],
     )
     # 100m opening face * 6% annual coupon * 45 actual/360 days.
     assert result.get_metric("accrued") == pytest.approx(750_000.0, abs=1e-6)
@@ -38,7 +43,11 @@ def test_effective_model_rates() -> None:
     spec["prepayment_spec"]["cpr"] = 0.36
     spec["default_spec"]["cdr"] = 0.07
     result = price_instrument(
-        json.dumps(f["instrument"]), json.dumps(f["market"]), f["as_of"], "discounting", ["cpr", "cdr"]
+        json.dumps(f["instrument"]),
+        MarketContext.from_json(json.dumps(f["market"])),
+        f["as_of"],
+        "discounting",
+        ["cpr", "cdr"],
     )
     assert result.get_metric("cpr") == pytest.approx(0.36, abs=1e-12)
     assert result.get_metric("cdr") == pytest.approx(0.07, abs=1e-12)
@@ -50,7 +59,11 @@ def test_recovery_risk_uses_credit_model_recovery() -> None:
     spec["default_spec"]["cdr"] = 0.03
     spec["recovery_spec"]["rate"] = 0.55
     result = price_instrument(
-        json.dumps(f["instrument"]), json.dumps(f["market"]), f["as_of"], "discounting", ["recovery01"]
+        json.dumps(f["instrument"]),
+        MarketContext.from_json(json.dumps(f["market"])),
+        f["as_of"],
+        "discounting",
+        ["recovery01"],
     )
     assert abs(result.get_metric("recovery01")) > 1.0
 
@@ -72,9 +85,10 @@ def test_clean_dirty_settlement_target_and_typed_date() -> None:
     builder = StructuredCredit.builder()
     assert builder.quote_settlement_date(date(2024, 5, 15)) is builder
     as_of = "2024-02-15"
+    market = MarketContext.from_json(json.dumps(f["market"]))
     base = price_instrument(
         json.dumps(f["instrument"]),
-        json.dumps(f["market"]),
+        market,
         as_of,
         "discounting",
         ["accrued", "clean_price", "dirty_price"],
@@ -85,7 +99,7 @@ def test_clean_dirty_settlement_target_and_typed_date() -> None:
     dirty = base.get_metric("dirty_price") * 1_000_000
     assert clean * 1_000_000 + accrued == pytest.approx(dirty, abs=1e-6)
     tranche_id = spec["tranches"]["tranches"][0]["id"]
-    metrics = tranche_metrics(deal, tranche_id, json.dumps(f["market"]), as_of, clean)
+    metrics = tranche_metrics(deal, tranche_id, market, as_of, clean)
     assert abs(metrics.z_spread_bp) < 1e-6
     assert metrics.spread_duration == pytest.approx(-metrics.cs01 / (dirty * 1e-4), abs=1e-10)
     config = {
@@ -99,14 +113,14 @@ def test_clean_dirty_settlement_target_and_typed_date() -> None:
         "seed": 42,
         "tolerance": 1e-10,
     }
-    oas = tranche_oas(deal, tranche_id, json.dumps(f["market"]), as_of, clean, config)
+    oas = tranche_oas(deal, tranche_id, market, as_of, clean, config)
     assert abs(oas.oas) < 1e-8
     assert oas.model_price == pytest.approx(clean, abs=1e-8)
     for quote in [{"quoted_clean_price_pct": clean}, {"quoted_dirty_price_currency": dirty}]:
         spec["instrument_pricing_overrides"] = {"market_quotes": quote}
         priced = price_instrument(
             json.dumps(f["instrument"]),
-            json.dumps(f["market"]),
+            market,
             as_of,
             "discounting",
             ["z_spread", "cs01", "spread_duration"],

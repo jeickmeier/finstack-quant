@@ -170,7 +170,7 @@ def calibrate(
 
 def calibrate_bermudan_lmm_base_vol(
     instrument: Any,
-    market: MarketContext | str,
+    market: MarketContext,
     as_of: Any,
 ) -> float:
     """Calibrate the explicit Bermudan LMM loading scale from the market surface.
@@ -180,7 +180,7 @@ def calibrate_bermudan_lmm_base_vol(
     instrument : Swaption | str
         Typed Bermudan swaption instrument or its canonical instrument JSON
         envelope.
-    market : MarketContext | str
+    market : MarketContext
         Market carrying the required discount and swaption-volatility inputs.
     as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
         Valuation date used for tenor and expiry construction.
@@ -203,8 +203,9 @@ def calibrate_bermudan_lmm_base_vol(
     Examples:
     --------
     >>> from finstack_quant.calibration import calibrate_bermudan_lmm_base_vol
-    >>> calibrate_bermudan_lmm_base_vol("{}", "{}", "2025-01-01")
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> calibrate_bermudan_lmm_base_vol("{}", MarketContext(), "2025-01-01")
     Traceback (most recent call last):
-    finstack_quant.portfolio.ContractValidationError: ...
+    ValueError: ...
 
     """

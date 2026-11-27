@@ -73,7 +73,7 @@ def test_instrument_cashflows_deposit_reconciles_with_price() -> None:
         assert col in df.columns
 
     # total_pv reconciles with price_instrument within rounding.
-    pr = price_instrument(inst_json, market.to_json(), "2025-01-15", model="discounting")
+    pr = price_instrument(inst_json, market, "2025-01-15", model="discounting")
     price = float(pr.price)
     assert abs(envelope.total_pv - price) < 0.01
 
@@ -233,7 +233,7 @@ def test_revolving_credit_custom_metrics_use_as_of_balance() -> None:
     # must not enter the as-of metrics.
     result = price_instrument(
         _revolving_credit_json(),
-        _revolving_credit_market().to_json(),
+        _revolving_credit_market(),
         "2024-03-01",
         "discounting",
         ["utilization_rate", "available_capacity"],
@@ -243,10 +243,11 @@ def test_revolving_credit_custom_metrics_use_as_of_balance() -> None:
 
 
 def test_revolving_credit_rejects_events_on_or_before_the_valuation_date() -> None:
+    market = _revolving_credit_market()
     with pytest.raises(ValueError, match="simulation anchor"):
         price_instrument(
             _revolving_credit_json(),
-            _revolving_credit_market().to_json(),
+            market,
             "2024-07-01",
             "discounting",
             ["utilization_rate"],

@@ -47,6 +47,7 @@ def test_direct_hazard_shock_and_retired_mode_rejection() -> None:
 
     fixture = json.loads((FIXTURES / "production_cds_option.json").read_text())
     hazard = next(curve for curve in fixture["market"]["curves"] if curve["type"] == "hazard")
+    market = MarketContext.from_json(json.dumps(fixture["market"]))
     legacy = {
         "id": "legacy",
         "hazard_bump_mode": "first_order_shift",
@@ -60,12 +61,12 @@ def test_direct_hazard_shock_and_retired_mode_rejection() -> None:
         "operations": [{"kind": "curve_parallel_bp", "curve_kind": "par_cds", "curve_id": hazard["id"], "bp": 10}],
     }
     with pytest.raises(ValueError, match=r"(?i)calibration|recipe"):
-        apply_scenario(ScenarioSpec.from_json(json.dumps(par_cds)), json.dumps(fixture["market"]), fixture["as_of"])
+        apply_scenario(ScenarioSpec.from_json(json.dumps(par_cds)), market, fixture["as_of"])
 
     with pytest.raises((ValueError, RuntimeError), match=r"(?i)calibration|recipe"):
         price_instrument(
             json.dumps(fixture["instrument"]),
-            json.dumps(fixture["market"]),
+            market,
             fixture["as_of"],
             metrics=["cs01"],
         )
@@ -111,7 +112,7 @@ def test_frn_time_roll_preserves_raw_index_excluding_coupon_spread() -> None:
     }
     result = apply_scenario(
         ScenarioSpec.from_json(json.dumps(scenario)),
-        json.dumps(market),
+        MarketContext.from_json(json.dumps(market)),
         fixture["as_of"],
         None,
         [json.dumps(instrument)],

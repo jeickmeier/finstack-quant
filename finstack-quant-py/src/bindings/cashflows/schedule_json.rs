@@ -10,6 +10,7 @@ use pyo3::prelude::*;
 
 use crate::bindings::core::cashflow::{PyCashFlow, extract_cf_kind};
 use crate::bindings::core::dates::daycount::PyDayCount;
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::money::PyMoney;
 
 #[doc = pydoc!("finstack_quant.cashflows._schedule_json", "build_cashflow_schedule_json")]
@@ -42,12 +43,12 @@ pub(super) fn build_cashflow_schedule_json(
 pub(super) fn build_cashflow_schedule(
     py: Python<'_>,
     spec: &Bound<'_, PyAny>,
-    market: Option<&Bound<'_, PyAny>>,
+    market: Option<PyRef<'_, PyMarketContext>>,
     as_of: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyCashFlowSchedule> {
     let spec: CashflowScheduleBuildSpec =
         crate::bindings::module_utils::spec_from_py(py, spec, "CashflowScheduleBuildSpec")?;
-    let market = crate::bindings::extract::extract_market_opt(py, market)?;
+    let market = market.map(|market| market.inner.clone());
     let as_of = as_of
         .map(crate::bindings::date_utils::py_to_date)
         .transpose()?;

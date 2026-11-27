@@ -5,7 +5,6 @@ use crate::bindings::cashflows::builder::specs::{
 };
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::extract::extract_market;
 use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::valuations::convert::{
     attributes_from_py, enum_to_py_string, typed_list_from_py,
@@ -29,6 +28,7 @@ use super::{
     PyStochasticPricingResult, PyTrancheCashflows, PyTrancheStructure, PyWaterfall,
 };
 
+use crate::bindings::core::market_data::context::PyMarketContext;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCreditBuilder;
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit")]
@@ -80,12 +80,12 @@ impl PyStructuredCredit {
     fn price_stochastic(
         &self,
         py: Python<'_>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         as_of: &Bound<'_, PyAny>,
         num_paths: Option<usize>,
         antithetic: Option<bool>,
     ) -> PyResult<PyStochasticPricingResult> {
-        let market = extract_market(py, market)?;
+        let market = market.inner.clone();
         let as_of = py_to_date(as_of)?;
         let deal = self.inner.clone();
         let inner = py
@@ -99,10 +99,10 @@ impl PyStructuredCredit {
     fn run_simulation(
         &self,
         py: Python<'_>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<PySimulationRun> {
-        let market = extract_market(py, market)?;
+        let market = market.inner.clone();
         let as_of = py_to_date(as_of)?;
         let deal = self.inner.clone();
         let inner = py
@@ -167,10 +167,10 @@ impl PyStructuredCredit {
         &self,
         py: Python<'_>,
         tranche_id: &str,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<PyTrancheCashflows> {
-        let market = extract_market(py, market)?;
+        let market = market.inner.clone();
         let as_of = py_to_date(as_of)?;
         let deal = self.inner.clone();
         let tranche_id = tranche_id.to_string();
@@ -186,11 +186,11 @@ impl PyStructuredCredit {
     fn equity_metrics(
         &self,
         py: Python<'_>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         as_of: &Bound<'_, PyAny>,
         purchase_price_pct: Option<f64>,
     ) -> PyResult<PyEquityMetrics> {
-        let market = extract_market(py, market)?;
+        let market = market.inner.clone();
         let as_of = py_to_date(as_of)?;
         let deal = self.inner.clone();
         let inner = py

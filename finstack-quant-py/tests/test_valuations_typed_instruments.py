@@ -10,6 +10,7 @@ import pytest
 
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, StubKind, Tenor
+from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.core.types import Bps, Rate
 from finstack_quant.valuations import ValuationResult
@@ -21,8 +22,8 @@ from finstack_quant.valuations.instruments import (
 )
 
 
-def _market_json() -> str:
-    return json.dumps({
+def _market() -> MarketContext:
+    text = json.dumps({
         "schema_version": 1,
         "curves": [
             {
@@ -46,6 +47,7 @@ def _market_json() -> str:
         "vol_cubes": [],
         "hierarchy": None,
     })
+    return MarketContext.from_json(text)
 
 
 def _fixed_bond() -> Bond:
@@ -165,21 +167,21 @@ class TestBondTyped:
 
     def test_price_instrument_typed_equals_json(self) -> None:
         bond = _fixed_bond()
-        market = _market_json()
+        market = _market()
         typed = price_instrument(bond, market, "2024-06-30")
         via_json = price_instrument(bond.to_json(), market, "2024-06-30")
         assert _without_timestamp(typed) == _without_timestamp(via_json)
 
     def test_price_instrument_accepts_typed(self) -> None:
         bond = _fixed_bond()
-        market = _market_json()
+        market = _market()
         typed = price_instrument(bond, market, "2024-06-30", "discounting", ["ytm", "dv01"])
         via_json = price_instrument(bond.to_json(), market, "2024-06-30", "discounting", ["ytm", "dv01"])
         assert _without_timestamp(typed) == _without_timestamp(via_json)
 
     def test_price_instrument_returns_typed_result(self) -> None:
         """``price_instrument`` hands back a ``ValuationResult``, not JSON."""
-        result = price_instrument(_fixed_bond(), _market_json(), "2024-06-30")
+        result = price_instrument(_fixed_bond(), _market(), "2024-06-30")
 
         assert isinstance(result, ValuationResult)
         assert not isinstance(result, str)
@@ -194,7 +196,7 @@ class TestBondTyped:
 
     def test_price_instrument_returns_typed_result_with_metrics(self) -> None:
         """``price_instrument`` hands back a ``ValuationResult`` with requested metrics."""
-        result = price_instrument(_fixed_bond(), _market_json(), "2024-06-30", "discounting", ["ytm", "dv01"])
+        result = price_instrument(_fixed_bond(), _market(), "2024-06-30", "discounting", ["ytm", "dv01"])
 
         assert isinstance(result, ValuationResult)
         assert not isinstance(result, str)
@@ -207,7 +209,7 @@ class TestBondTyped:
 
     def test_instrument_cashflows_accepts_typed(self) -> None:
         bond = _fixed_bond()
-        market = _market_json()
+        market = _market()
         typed = instrument_cashflows(bond, market, "2024-06-30", "discounting").to_json()
         via_json = instrument_cashflows(bond.to_json(), market, "2024-06-30", "discounting").to_json()
         assert json.loads(typed) == json.loads(via_json)
@@ -240,7 +242,7 @@ class TestTermLoanTyped:
 
     def test_price_instrument_typed_equals_json(self) -> None:
         loan = TermLoan.example()
-        market = _market_json()
+        market = _market()
         typed = price_instrument(loan, market, "2024-06-30")
         via_json = price_instrument(loan.to_json(), market, "2024-06-30")
         assert _without_timestamp(typed) == _without_timestamp(via_json)
@@ -248,5 +250,6 @@ class TestTermLoanTyped:
 
 class TestUnionExtraction:
     def test_non_string_non_instrument_raises_type_error(self) -> None:
+        market = _market()
         with pytest.raises(TypeError, match="typed instrument instance"):
-            price_instrument(12345, _market_json(), "2024-06-30")
+            price_instrument(12345, market, "2024-06-30")

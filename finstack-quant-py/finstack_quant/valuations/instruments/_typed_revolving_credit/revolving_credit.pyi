@@ -177,7 +177,7 @@ class RevolvingCredit:
         ...
     def price_with_paths(
         self,
-        market: MarketContext | str,
+        market: MarketContext,
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
     ) -> EnhancedMonteCarloResult:
         """
@@ -185,7 +185,7 @@ class RevolvingCredit:
 
         Parameters
         ----------
-        market : MarketContext | str
+        market : MarketContext
             Market context with the discount curve, the index forward curve and
             fixings for floating facilities, and the hazard curve for
             market-anchored spread processes.
@@ -211,7 +211,7 @@ class RevolvingCredit:
         ...
     def expected_cashflows(
         self,
-        market: MarketContext | str,
+        market: MarketContext,
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
     ) -> CashFlowSchedule:
         """
@@ -219,7 +219,7 @@ class RevolvingCredit:
 
         Parameters
         ----------
-        market : MarketContext | str
+        market : MarketContext
             Market context with the curves the schedule projects from.
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date; flows are projected from this date.

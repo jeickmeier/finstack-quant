@@ -260,9 +260,7 @@ class CreditDefaultSwap:
         'CORP-HAZARD'
         """
         ...
-    def par_spread(
-        self, market: MarketContext | str, as_of: datetime.date | datetime.datetime | pd.Timestamp | str
-    ) -> float:
+    def par_spread(self, market: MarketContext, as_of: datetime.date | datetime.datetime | pd.Timestamp | str) -> float:
         """
         Par spread implied by the market, in basis points (mirrors Rust
         ``CreditDefaultSwap::par_spread``): the running spread at which the
@@ -271,7 +269,7 @@ class CreditDefaultSwap:
 
         Parameters
         ----------
-        market : MarketContext | str
+        market : MarketContext
             Market carrying the discount and hazard curves named by the CDS.
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date.

@@ -8,8 +8,9 @@
 //! in this module; each wrapper's `to_json` still yields the wire payload,
 //! and `from_json` decodes it back.
 
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::extract::{extract_instrument, extract_market};
+use crate::bindings::extract::extract_instrument;
 use crate::bindings::table_builders::{TableBuilder, serde_rows_to_arrow_table};
 use crate::errors::{core_to_py, display_to_py, serde_json_to_py, value_error};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
@@ -51,12 +52,12 @@ fn tranche_discount_margin(
     py: Python<'_>,
     instrument: &Bound<'_, PyAny>,
     tranche_id: &str,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     as_of: &Bound<'_, PyAny>,
     market_price_pct: f64,
 ) -> PyResult<f64> {
     let deal = extract_structured_credit(py, instrument)?;
-    let market = extract_market(py, market)?;
+    let market = market.inner.clone();
     let tranche_id = tranche_id.to_owned();
     let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     py.detach(move || {
@@ -75,11 +76,11 @@ fn tranche_breakeven_cdr(
     py: Python<'_>,
     instrument: &Bound<'_, PyAny>,
     tranche_id: &str,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     as_of: &Bound<'_, PyAny>,
 ) -> PyResult<f64> {
     let deal = extract_structured_credit(py, instrument)?;
-    let market = extract_market(py, market)?;
+    let market = market.inner.clone();
     let tranche_id = tranche_id.to_owned();
     let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     py.detach(move || sc::tranche_breakeven_cdr(&deal, &tranche_id, &market, as_of))
@@ -97,13 +98,13 @@ fn tranche_oas(
     py: Python<'_>,
     instrument: &Bound<'_, PyAny>,
     tranche_id: &str,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     as_of: &Bound<'_, PyAny>,
     market_price_pct: f64,
     config: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyOasResult> {
     let deal = extract_structured_credit(py, instrument)?;
-    let market = extract_market(py, market)?;
+    let market = market.inner.clone();
     let tranche_id = tranche_id.to_owned();
     let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     let config: OasConfig = match config.filter(|value| !value.is_none()) {
@@ -140,13 +141,13 @@ fn tranche_metrics(
     py: Python<'_>,
     instrument: &Bound<'_, PyAny>,
     tranche_id: &str,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     as_of: &Bound<'_, PyAny>,
     market_price_pct: Option<f64>,
     metrics: Option<Vec<String>>,
 ) -> PyResult<PyTrancheMetrics> {
     let deal = extract_structured_credit(py, instrument)?;
-    let market = extract_market(py, market)?;
+    let market = market.inner.clone();
     let tranche_id = tranche_id.to_owned();
     let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     let metric_ids = metrics
@@ -180,12 +181,12 @@ fn tranche_scenario_table(
     py: Python<'_>,
     instrument: &Bound<'_, PyAny>,
     tranche_id: &str,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     as_of: &Bound<'_, PyAny>,
     grid: &Bound<'_, PyAny>,
 ) -> PyResult<PyScenarioTable> {
     let deal = extract_structured_credit(py, instrument)?;
-    let market = extract_market(py, market)?;
+    let market = market.inner.clone();
     let tranche_id = tranche_id.to_owned();
     let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     let grid_json = crate::bindings::module_utils::py_to_json_string(py, grid, "ScenarioGrid")?;

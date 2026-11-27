@@ -6,7 +6,6 @@ use pyo3::types::{PyDict, PyString};
 
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::extract::extract_market;
 use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
 use crate::errors::core_to_py;
@@ -23,6 +22,7 @@ use super::convert::{
 };
 use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_trait_methods};
 
+use crate::bindings::core::market_data::context::PyMarketContext;
 use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBondBuilder;
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConversionSpec")]
@@ -242,20 +242,18 @@ impl PyConvertibleBond {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.parity")]
     #[pyo3(text_signature = "($self, market)")]
-    fn parity(&self, py: Python<'_>, market: &Bound<'_, PyAny>) -> PyResult<f64> {
-        let market = extract_market(py, market)?;
-        self.inner.parity(&market).map_err(core_to_py)
+    fn parity(&self, market: PyRef<'_, PyMarketContext>) -> PyResult<f64> {
+        self.inner.parity(&market.inner).map_err(core_to_py)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.conversion_premium")]
     #[pyo3(text_signature = "($self, market, bond_price)")]
     fn conversion_premium(
         &self,
-        py: Python<'_>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         bond_price: f64,
     ) -> PyResult<f64> {
-        let market = extract_market(py, market)?;
+        let market = market.inner.clone();
         self.inner
             .conversion_premium(&market, bond_price)
             .map_err(core_to_py)
@@ -266,10 +264,10 @@ impl PyConvertibleBond {
     fn greeks<'py>(
         &self,
         py: Python<'py>,
-        market: &Bound<'py, PyAny>,
+        market: PyRef<'py, PyMarketContext>,
         as_of: &Bound<'py, PyAny>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let market = extract_market(py, market)?;
+        let market = market.inner.clone();
         let as_of = py_to_date(as_of)?;
         let greeks = self.inner.greeks(&market, as_of).map_err(core_to_py)?;
         serde_to_py(py, &greeks)

@@ -8,9 +8,9 @@ use finstack_quant_valuations::instruments::fixed_income::convertible::{
 
 use super::convert::enum_to_py_string;
 use super::typed_convertible::PyConvertibleBond;
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::extract::extract_market;
 use crate::errors::core_to_py;
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._convertible_spot_ladder", "ConvertibleSpotRow")]
@@ -161,7 +161,7 @@ crate::bindings::macros::py_getters!(PyConvertibleSpotLadder |s| {
 fn convertible_spot_ladder(
     py: Python<'_>,
     bond: PyRef<'_, PyConvertibleBond>,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     as_of: &Bound<'_, PyAny>,
     spots: Option<Vec<f64>>,
     model: Option<&str>,
@@ -170,7 +170,7 @@ fn convertible_spot_ladder(
         .map(finstack_quant_valuations::pricer::parse_model_key)
         .transpose()
         .map_err(core_to_py)?;
-    let market = extract_market(py, market)?;
+    let market = market.inner.clone();
     let as_of = py_to_date(as_of)?;
     let bond = bond.inner.clone();
     let inner = py

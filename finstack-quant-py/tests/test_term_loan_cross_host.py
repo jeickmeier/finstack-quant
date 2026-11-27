@@ -12,17 +12,19 @@ from pathlib import Path
 
 import pytest
 
+from finstack_quant.core.market_data import MarketContext
 from finstack_quant.valuations.instruments import instrument_cashflows, price_instrument
 
 ROOT = Path(__file__).parents[2]
 INSTRUMENT = (ROOT / "finstack-quant/valuations/tests/instruments/json_examples/term_loan.json").read_text()
 PINNED = json.loads((Path(__file__).parent / "fixtures" / "term_loan_cross_host.json").read_text())
+MARKET = MarketContext.from_json(json.dumps(PINNED["market"]))
 
 
 def test_oid_eir_rate_matches_the_value_pinned_for_both_hosts() -> None:
     result = price_instrument(
         INSTRUMENT,
-        json.dumps(PINNED["market"]),
+        MARKET,
         PINNED["as_of"],
         PINNED["model"],
         ["oid_eir_rate"],
@@ -33,7 +35,7 @@ def test_oid_eir_rate_matches_the_value_pinned_for_both_hosts() -> None:
 def test_cashflow_balances_match_the_values_pinned_for_both_hosts() -> None:
     envelope = instrument_cashflows(
         INSTRUMENT,
-        json.dumps(PINNED["market"]),
+        MARKET,
         PINNED["as_of"],
         PINNED["model"],
     )

@@ -9,7 +9,7 @@ use serde::Serialize;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::extract::{extract_market_ref, extract_portfolio_ref};
+use crate::bindings::extract::extract_portfolio_ref;
 use crate::bindings::macros::tabular_methods;
 use crate::bindings::margin::im::PySimmSensitivities;
 use crate::bindings::margin::types::{PyImCollateralResult, PyImMethodology, PyNettingSetId};
@@ -18,6 +18,7 @@ use crate::errors::portfolio_to_py;
 use finstack_quant_portfolio::{margin::NettingSetMargin, margin::PortfolioMarginResult};
 
 use crate::bindings::core::config::PyFinstackConfig;
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::margin::PyFrtbSensitivities;
 use crate::bindings::module_utils::{parse_currency, py_to_serde};
@@ -386,7 +387,7 @@ tabular_methods!(PyPortfolioMarginResult);
 /// ----------
 /// portfolio : Portfolio | str
 ///     A :class:`Portfolio` object or a JSON-serialized ``PortfolioSpec``.
-/// market : MarketContext | str
+/// market : MarketContext
 ///     Market data for VM and SIMM sensitivity extraction, and the FX
 ///     matrix for base-currency reporting.
 /// as_of : datetime.date | str
@@ -414,12 +415,12 @@ tabular_methods!(PyPortfolioMarginResult);
 fn portfolio_margin(
     py: Python<'_>,
     portfolio: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     as_of: &Bound<'_, PyAny>,
     current_im_collateral: Option<HashMap<String, PyMoney>>,
 ) -> PyResult<PyPortfolioMarginResult> {
     let portfolio = extract_portfolio_ref(py, portfolio)?;
-    let market = extract_market_ref(py, market)?;
+    let market = &market.inner;
     let as_of = py_to_date(as_of)?;
     let collateral: finstack_quant_core::FxHashMap<String, finstack_quant_core::money::Money> =
         current_im_collateral
@@ -428,7 +429,7 @@ fn portfolio_margin(
             .map(|(csa_id, money)| (csa_id, money.inner))
             .collect();
     let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
-    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let market_ref: &finstack_quant_core::market_data::context::MarketContext = market;
     let inner = py
         .detach(|| {
             finstack_quant_portfolio::margin::portfolio_margin(
@@ -519,18 +520,18 @@ impl PyGirrQuoteDelta {
 fn girr_quote_delta(
     py: Python<'_>,
     portfolio: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     pricing: &PyFinstackConfig,
     targets: Vec<Py<PyGirrQuoteTarget>>,
 ) -> PyResult<PyGirrQuoteDelta> {
     let portfolio = extract_portfolio_ref(py, portfolio)?;
-    let market = extract_market_ref(py, market)?;
+    let market = &market.inner;
     let targets = targets
         .into_iter()
         .map(|target| target.borrow(py).inner.clone())
         .collect::<Vec<_>>();
     let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
-    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let market_ref: &finstack_quant_core::market_data::context::MarketContext = market;
     let inner = py
         .detach(|| girr_quote_delta_rs(portfolio_ref, market_ref, &pricing.inner, &targets))
         .map_err(portfolio_to_py)?;
@@ -647,18 +648,18 @@ impl PyCsrQuoteDelta {
 fn csr_quote_delta(
     py: Python<'_>,
     portfolio: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     pricing: &PyFinstackConfig,
     sources: Vec<Py<PyCsrQuoteSource>>,
 ) -> PyResult<PyCsrQuoteDelta> {
     let portfolio = extract_portfolio_ref(py, portfolio)?;
-    let market = extract_market_ref(py, market)?;
+    let market = &market.inner;
     let sources = sources
         .into_iter()
         .map(|source| source.borrow(py).inner.clone())
         .collect::<Vec<_>>();
     let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
-    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let market_ref: &finstack_quant_core::market_data::context::MarketContext = market;
     let inner = py
         .detach(|| csr_quote_delta_rs(portfolio_ref, market_ref, &pricing.inner, &sources))
         .map_err(portfolio_to_py)?;
@@ -754,14 +755,14 @@ impl PyPortfolioFrtbSensitivitiesResult {
 fn portfolio_frtb_sensitivities(
     py: Python<'_>,
     portfolio: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     pricing: &PyFinstackConfig,
     config: &PyPortfolioFrtbConfig,
 ) -> PyResult<PyPortfolioFrtbSensitivitiesResult> {
     let portfolio = extract_portfolio_ref(py, portfolio)?;
-    let market = extract_market_ref(py, market)?;
+    let market = &market.inner;
     let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
-    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let market_ref: &finstack_quant_core::market_data::context::MarketContext = market;
     let inner = py
         .detach(|| {
             finstack_quant_portfolio::margin::portfolio_frtb_sensitivities(

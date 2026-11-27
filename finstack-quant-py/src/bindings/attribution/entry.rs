@@ -10,7 +10,7 @@ use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{extract_date_iso, py_to_date};
-use crate::bindings::extract::{extract_instrument, extract_market_ref};
+use crate::bindings::extract::extract_instrument;
 use crate::bindings::module_utils::{py_to_serde, spec_from_py};
 use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::core_to_py;
@@ -143,9 +143,9 @@ pub(crate) fn attribute_pnl_many(
 /// ----------
 /// instrument : Bond | InterestRateSwap | ... | str
 ///     Typed instrument wrapper or canonical instrument envelope JSON.
-/// market_t0 : MarketContext | str
+/// market_t0 : MarketContext
 ///     Opening market state.
-/// market_t1 : MarketContext | str
+/// market_t1 : MarketContext
 ///     Closing market state.
 /// as_of_t0 : datetime.date | datetime.datetime | pandas.Timestamp | str
 ///     Opening valuation date.
@@ -162,7 +162,7 @@ pub(crate) fn attribute_pnl_many(
 /// Raises
 /// ------
 /// ValueError
-///     If the instrument JSON, a market, a date, or the currency is
+///     If the instrument JSON, a date, or the currency is
 ///     malformed, or pricing fails validation.
 /// KeyError
 ///     If a curve or FX rate needed for pricing or conversion is missing.
@@ -182,8 +182,8 @@ pub(crate) fn attribute_pnl_many(
 pub(crate) fn pnl_bridge(
     py: Python<'_>,
     instrument: &Bound<'_, PyAny>,
-    market_t0: &Bound<'_, PyAny>,
-    market_t1: &Bound<'_, PyAny>,
+    market_t0: PyRef<'_, PyMarketContext>,
+    market_t1: PyRef<'_, PyMarketContext>,
     as_of_t0: &Bound<'_, PyAny>,
     as_of_t1: &Bound<'_, PyAny>,
     target_currency: &Bound<'_, PyAny>,
@@ -194,13 +194,13 @@ pub(crate) fn pnl_bridge(
                 .into_boxed()
                 .map_err(core_to_py)?,
         );
-    let market_t0 = extract_market_ref(py, market_t0)?;
-    let market_t1 = extract_market_ref(py, market_t1)?;
+    let market_t0 = &market_t0.inner;
+    let market_t1 = &market_t1.inner;
     let as_of_t0 = py_to_date(as_of_t0)?;
     let as_of_t1 = py_to_date(as_of_t1)?;
     let currency = extract_currency(target_currency)?;
-    let m0: &finstack_quant_core::market_data::context::MarketContext = &market_t0;
-    let m1: &finstack_quant_core::market_data::context::MarketContext = &market_t1;
+    let m0: &finstack_quant_core::market_data::context::MarketContext = market_t0;
+    let m1: &finstack_quant_core::market_data::context::MarketContext = market_t1;
     let pnl = py
         .detach(|| {
             finstack_quant_attribution::pnl_bridge(

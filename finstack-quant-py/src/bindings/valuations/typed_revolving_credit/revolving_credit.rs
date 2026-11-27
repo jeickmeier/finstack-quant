@@ -8,7 +8,6 @@ use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::extract::extract_market;
 use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
 use crate::bindings::valuations::convert::{
@@ -30,6 +29,7 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
 
 use super::PyEnhancedMonteCarloResult;
 
+use crate::bindings::core::market_data::context::PyMarketContext;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditBuilder;
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit")]
@@ -76,10 +76,10 @@ impl PyRevolvingCredit {
     fn price_with_paths(
         &self,
         py: Python<'_>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<PyEnhancedMonteCarloResult> {
-        let market = extract_market(py, market)?;
+        let market = market.inner.clone();
         let as_of = py_to_date(as_of)?;
         let facility = self.inner.clone();
         let inner = py
@@ -93,10 +93,10 @@ impl PyRevolvingCredit {
     fn expected_cashflows(
         &self,
         py: Python<'_>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<PyCashFlowSchedule> {
-        let market = extract_market(py, market)?;
+        let market = market.inner.clone();
         let as_of = py_to_date(as_of)?;
         let facility = self.inner.clone();
         let schedule = py

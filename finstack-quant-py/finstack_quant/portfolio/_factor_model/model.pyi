@@ -23,7 +23,7 @@ class FactorModel:
     sensitivity engine, so repeated assignment, sensitivity, decomposition,
     what-if and stress calls reuse one validated model. Portfolio arguments
     accept a built :class:`Portfolio` or ``PortfolioSpec`` JSON; market
-    arguments accept a ``MarketContext`` or its JSON; ``as_of`` accepts a
+    arguments take a ``MarketContext``; ``as_of`` accepts a
     date-like object or an ISO 8601 string.
 
     Examples
@@ -145,7 +145,7 @@ class FactorModel:
         """
         ...
 
-    def assign_factors(self, portfolio: Portfolio | str, market: MarketContext | str) -> FactorAssignmentReport:
+    def assign_factors(self, portfolio: Portfolio | str, market: MarketContext) -> FactorAssignmentReport:
         """
         Match every position's market dependencies to the configured factors.
 
@@ -153,7 +153,7 @@ class FactorModel:
         ----------
         portfolio : Portfolio | str
             Built portfolio or ``PortfolioSpec`` JSON.
-        market : MarketContext | str
+        market : MarketContext
             Market used to resolve credit-index aggregates into their curve
             dependencies.
 
@@ -174,7 +174,7 @@ class FactorModel:
     def compute_sensitivities(
         self,
         portfolio: Portfolio | str,
-        market: MarketContext | str,
+        market: MarketContext,
         as_of: datetime.date | str,
     ) -> SensitivityMatrix:
         """
@@ -185,7 +185,7 @@ class FactorModel:
         portfolio : Portfolio | str
             Portfolio whose ``base_currency`` is the reporting currency of
             every sensitivity.
-        market : MarketContext | str
+        market : MarketContext
             Market bumped by the sensitivity engine; must hold the FX needed
             for cross-currency positions.
         as_of : datetime.date | str
@@ -208,7 +208,7 @@ class FactorModel:
     def analyze(
         self,
         portfolio: Portfolio | str,
-        market: MarketContext | str,
+        market: MarketContext,
         as_of: datetime.date | str,
     ) -> RiskDecomposition:
         """
@@ -218,7 +218,7 @@ class FactorModel:
         ----------
         portfolio : Portfolio | str
             Portfolio to analyze.
-        market : MarketContext | str
+        market : MarketContext
             Market used for sensitivity generation.
         as_of : datetime.date | str
             Valuation date of the analysis.
@@ -241,7 +241,7 @@ class FactorModel:
     def position_what_if(
         self,
         portfolio: Portfolio | str,
-        market: MarketContext | str,
+        market: MarketContext,
         as_of: datetime.date | str,
         changes: list[dict[str, Any]] | str,
     ) -> WhatIfResult:
@@ -252,7 +252,7 @@ class FactorModel:
         ----------
         portfolio : Portfolio | str
             Portfolio the baseline is computed for and the changes apply to.
-        market : MarketContext | str
+        market : MarketContext
             Market used to value positions and compute sensitivities.
         as_of : datetime.date | str
             Valuation date of the analysis.
@@ -278,7 +278,7 @@ class FactorModel:
     def factor_stress(
         self,
         portfolio: Portfolio | str,
-        market: MarketContext | str,
+        market: MarketContext,
         as_of: datetime.date | str,
         stresses: Mapping[str, float] | pd.Series | pd.DataFrame | pl.DataFrame | Sequence[tuple[str, float]] | Any,
     ) -> StressResult:
@@ -289,7 +289,7 @@ class FactorModel:
         ----------
         portfolio : Portfolio | str
             Portfolio whose P&L and stressed risk are evaluated.
-        market : MarketContext | str
+        market : MarketContext
             Baseline market to shock.
         as_of : datetime.date | str
             Valuation date for both endpoints.
@@ -318,7 +318,7 @@ class FactorModel:
     def factor_stress_pnl(
         self,
         portfolio: Portfolio | str,
-        market: MarketContext | str,
+        market: MarketContext,
         as_of: datetime.date | str,
         stresses: Mapping[str, float] | pd.Series | pd.DataFrame | pl.DataFrame | Sequence[tuple[str, float]] | Any,
     ) -> StressPnl:
@@ -329,7 +329,7 @@ class FactorModel:
         ----------
         portfolio : Portfolio | str
             Portfolio whose position P&L is evaluated.
-        market : MarketContext | str
+        market : MarketContext
             Baseline market to shock.
         as_of : datetime.date | str
             Valuation date for both endpoints.

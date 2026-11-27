@@ -11,7 +11,6 @@ use pyo3::types::PyDict;
 use crate::bindings::core::currency::PyCurrency;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::extract::extract_market;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::Instrument;
@@ -25,6 +24,7 @@ use super::convert::{
 use super::pricing::typed_option_greeks;
 use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_trait_methods};
 
+use crate::bindings::core::market_data::context::PyMarketContext;
 use finstack_quant_valuations::instruments::fx::fx_forward::FxForwardBuilder;
 use finstack_quant_valuations::instruments::fx::fx_option::FxOptionBuilder;
 
@@ -114,11 +114,10 @@ impl PyFxForward {
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn market_forward_rate(
         &self,
-        py: Python<'_>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<f64> {
-        let market = extract_market(py, market)?;
+        let market = market.inner.clone();
         let as_of = py_to_date(as_of)?;
         self.inner
             .market_forward_rate(&market, as_of)
@@ -432,12 +431,11 @@ impl PyFxOption {
     #[pyo3(text_signature = "($self, market, as_of, target_price)")]
     fn implied_vol(
         &self,
-        py: Python<'_>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         as_of: &Bound<'_, PyAny>,
         target_price: f64,
     ) -> PyResult<f64> {
-        let market = extract_market(py, market)?;
+        let market = market.inner.clone();
         let as_of = py_to_date(as_of)?;
         self.inner
             .implied_vol(&market, as_of, target_price)
@@ -449,7 +447,7 @@ impl PyFxOption {
     fn greeks<'py>(
         &self,
         py: Python<'py>,
-        market: &Bound<'py, PyAny>,
+        market: PyRef<'py, PyMarketContext>,
         as_of: &Bound<'py, PyAny>,
         model: &str,
         extras: Option<&Bound<'py, PyAny>>,

@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 
+from finstack_quant.core.market_data import MarketContext
 from finstack_quant.valuations import instruments
 
 # Builders reused from the per-family test modules (import the helpers).
@@ -95,8 +96,8 @@ def test_typed_instance_is_accepted_by_price_instrument_dispatch(name: str, fact
     """
     instance = factory()
     try:
-        instruments.price_instrument(instance, "{}", "2024-01-01", "default")
+        instruments.price_instrument(instance, MarketContext(), "2024-01-01", "default")
     except TypeError as exc:  # pragma: no cover - dispatch regression
         pytest.fail(f"typed {name} rejected by dispatch: {exc}")
-    except ValueError:
+    except (KeyError, RuntimeError):
         pass  # empty market: expected downstream failure, dispatch worked

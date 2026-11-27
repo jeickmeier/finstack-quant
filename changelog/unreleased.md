@@ -13,6 +13,8 @@ through a named loader. WASM is unchanged. Results are unchanged. Old → new:
 - `scenario_pnl_batch(portfolio, "[...]", market)` or a list holding JSON strings → a list of `ScenarioSpec` objects
 - `config=config_json` on `apply_scenario` and `compute_horizon_return` → `config=FinstackConfig.from_json(config_json)`; a wrong type there is now `TypeError`, not `ValueError`
 - `OperationSpec.hierarchy_*(target_json, ...)` → `HierarchyTarget.from_json(target_json)`
+- Markets: every `market` argument (pricing, cashflows, attribution, portfolio valuation, risk, margin, scenarios, calibration, statement analytics; 68 parameters) → pass a `MarketContext`; for JSON text, `MarketContext.from_json(market_json)`. Passing `market.to_json()` back in no longer works: pass `market`
+- `replay_portfolio` snapshots given as `(date, market)` pairs take a `MarketContext` in each pair
 
 `validate_scenario_spec` still takes JSON text, because it reports on a spec
 that `ScenarioSpec.from_json` would reject.

@@ -1,10 +1,10 @@
 //! Python bindings for portfolio valuation: `value_portfolio`, `PortfolioValuation`
 //! and `PositionValue`.
 
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::date_to_py;
-use crate::bindings::extract::extract_market_ref;
 use crate::bindings::extract::extract_portfolio_ref;
 use crate::bindings::macros::tabular_methods;
 use crate::bindings::table_builders::TableBuilder;
@@ -357,8 +357,8 @@ tabular_methods!(PyPortfolioValuation);
 /// portfolio : Portfolio | str
 ///     A :class:`Portfolio` object (fast path, no rebuild) or a
 ///     JSON-serialized ``PortfolioSpec`` string.
-/// market : MarketContext | str
-///     A ``MarketContext`` object or a JSON string.
+/// market : MarketContext
+///     A ``MarketContext``.
 /// strict_risk : bool | None
 ///     ``None`` uses the Rust ``PortfolioValuationOptions`` default, ``True``:
 ///     any risk metric failure aborts the entire valuation. Set ``False``
@@ -386,12 +386,12 @@ tabular_methods!(PyPortfolioValuation);
 fn value_portfolio(
     py: Python<'_>,
     portfolio: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     strict_risk: Option<bool>,
     metrics: Option<Vec<String>>,
 ) -> PyResult<PyPortfolioValuation> {
     let portfolio = extract_portfolio_ref(py, portfolio)?;
-    let market = extract_market_ref(py, market)?;
+    let market = &market.inner;
     let config = finstack_quant_core::config::FinstackConfig::default();
     let mut options = finstack_quant_portfolio::valuation::PortfolioValuationOptions {
         // Strict parse shared with WASM: an unknown metric name is a ValueError
@@ -411,7 +411,7 @@ fn value_portfolio(
     // before entering the closure — these are `Send + Sync` and therefore
     // `Ungil`. No Python state is touched inside.
     let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
-    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let market_ref: &finstack_quant_core::market_data::context::MarketContext = market;
     let valuation = py
         .detach(|| {
             finstack_quant_portfolio::valuation::value_portfolio(

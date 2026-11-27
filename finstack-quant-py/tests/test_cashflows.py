@@ -17,6 +17,7 @@ from finstack_quant.cashflows import (
 )
 from finstack_quant.cashflows.accrual import AccrualConfig, accrued_interest_amount
 from finstack_quant.cashflows.builder import CashFlowSchedule
+from finstack_quant.core.market_data import MarketContext
 from finstack_quant.valuations.instruments import Bond, price_instrument
 
 
@@ -161,8 +162,9 @@ def test_cashflows_namespace_build_validate_accrual_and_price_bond() -> None:
     instrument = json.loads(bond.to_json())
     assert instrument["instrument"]["type"] == "bond"
 
-    result = price_instrument(bond, _market_json(), "2024-09-03", "discounting")
-    wire_result = price_instrument(bond.to_json(), _market_json(), "2024-09-03", "discounting")
+    market = MarketContext.from_json(_market_json())
+    result = price_instrument(bond, market, "2024-09-03", "discounting")
+    wire_result = price_instrument(bond.to_json(), market, "2024-09-03", "discounting")
     assert result.value.amount == wire_result.value.amount
     assert result.instrument_id == "CUSTOM-CF"
     assert result.currency == "USD"

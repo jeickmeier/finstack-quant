@@ -12,7 +12,7 @@ from finstack_quant.valuations.instruments._pricing import MarketHistory
 
 def calculate_var(
     instruments: list[Any],
-    market: MarketContext | str,
+    market: MarketContext,
     history: MarketHistory | dict[str, Any] | str,
     as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
     config: dict[str, Any] | str | None = None,
@@ -34,7 +34,7 @@ def calculate_var(
     instruments : list[Bond | InterestRateSwap | ... | str]
         Typed instruments or ``finstack_quant.instrument/1`` envelopes. An
         empty list returns zero VaR and ES.
-    market : MarketContext | str
+    market : MarketContext
         Unshocked base market every scenario perturbs.
     history : MarketHistory | dict[str, Any] | str
         Historical risk-factor shifts; a non-empty portfolio needs at least

@@ -329,7 +329,7 @@ class EquityOption:
         ...
     def implied_vol(
         self,
-        market: MarketContext | str,
+        market: MarketContext,
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         target_price: float,
     ) -> float:
@@ -341,7 +341,7 @@ class EquityOption:
 
         Parameters
         ----------
-        market : MarketContext | str
+        market : MarketContext
             Market carrying the discount curve, spot and (optional) dividend yield.
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date strictly before expiry and observed exercise.
@@ -368,7 +368,7 @@ class EquityOption:
 
     def greeks(
         self,
-        market: MarketContext | str,
+        market: MarketContext,
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         extras: PriceExtras | dict[str, Any] | str | None = None,
@@ -380,8 +380,8 @@ class EquityOption:
 
         Parameters
         ----------
-        market : MarketContext | str
-            Market context object or its JSON string.
+        market : MarketContext
+            Market context.
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date.
         model : str, default "default"

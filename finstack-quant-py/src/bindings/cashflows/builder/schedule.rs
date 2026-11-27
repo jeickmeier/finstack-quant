@@ -29,6 +29,7 @@ use crate::errors::{core_to_py, display_to_py};
 use super::orchestrator::PyCashFlowBuilder;
 use super::specs::PyNotional;
 use crate::bindings::cashflows::fixings::PyProjectedFixing;
+use crate::bindings::core::market_data::context::PyMarketContext;
 
 #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowMeta")]
 #[pyclass(
@@ -392,14 +393,14 @@ impl PyCashFlowSchedule {
         &self,
         py: Python<'py>,
         periods: Vec<PyRef<'_, PyPeriod>>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         disc_curve_id: &str,
         base: &Bound<'_, PyAny>,
         credit_curve_id: Option<&str>,
     ) -> PyResult<PyPeriodAggregation> {
         let periods: Vec<finstack_quant_core::dates::Period> =
             periods.iter().map(|p| p.inner.clone()).collect();
-        let market = crate::bindings::extract::extract_market(py, market)?;
+        let market = market.inner.clone();
         let base = py_to_date(base)?;
         let disc_id = CurveId::from(disc_curve_id);
         let hazard_id = credit_curve_id.map(CurveId::from);

@@ -174,9 +174,17 @@ def test_calculate_on_an_unmargined_portfolio_reports_no_netting_sets() -> None:
     assert list(frame.columns) == NETTING_SET_COLUMNS
     assert len(frame) == 0
 
-    # A repeated run is identical, and accepts a date object and JSON inputs.
-    again = portfolio_margin(portfolio, _market().to_json(), date.fromisoformat(AS_OF), current_im_collateral={})
+    # A repeated run is identical, and accepts a date object and a market loaded from JSON.
+    again = portfolio_margin(
+        portfolio,
+        MarketContext.from_json(_market().to_json()),
+        date.fromisoformat(AS_OF),
+        current_im_collateral={},
+    )
     assert again.to_json() == result.to_json()
+    # Market JSON text is not a market: it goes through the loader.
+    with pytest.raises(TypeError, match="MarketContext"):
+        portfolio_margin(portfolio, _market().to_json(), date.fromisoformat(AS_OF), current_im_collateral={})
 
 
 def test_calculate_rejects_collateral_for_an_unknown_csa() -> None:

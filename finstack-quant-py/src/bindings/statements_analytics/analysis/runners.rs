@@ -1,5 +1,6 @@
 //! Sensitivity, variance, scenario, backtest, and goal-seek Python runners.
 
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::table::PyLabeledSeries;
 use crate::bindings::extract::{extract_model_ref, extract_results_ref};
 use crate::bindings::macros::wire_methods;
@@ -297,7 +298,7 @@ pub(super) fn evaluate_scenario_set(
 ///     A ``FinancialModelSpec`` object or a JSON string.
 /// scenario_set : ScenarioSet | str
 ///     A typed scenario set or its JSON serialization.
-/// market : MarketContext | str
+/// market : MarketContext
 ///     Curves, fixings and FX the instruments are priced from, typed or its
 ///     canonical JSON.
 /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
@@ -340,15 +341,15 @@ pub(super) fn evaluate_scenario_set_with_market(
     py: Python<'_>,
     model: &Bound<'_, PyAny>,
     scenario_set: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     as_of: &Bound<'_, PyAny>,
 ) -> PyResult<PyScenarioResults> {
     let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     let model = extract_model_ref(model)?;
-    let market = crate::bindings::extract::extract_market_ref(py, market)?;
+    let market = &market.inner;
     let scenario_set = extract_scenario_set(scenario_set)?;
     let model_inner: &finstack_quant_statements::types::FinancialModelSpec = &model;
-    let market_inner: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let market_inner: &finstack_quant_core::market_data::context::MarketContext = market;
     let inner = py
         .detach(|| scenario_set.evaluate_all_with_market(model_inner, market_inner, as_of))
         .map_err(statements_to_py)?;
@@ -795,11 +796,13 @@ pub(super) fn goal_seek(
     py: Python<'_>,
     model: &Bound<'_, PyAny>,
     spec: &PyGoalSeekSpec,
-    market: Option<&Bound<'_, PyAny>>,
+    market: Option<PyRef<'_, PyMarketContext>>,
 ) -> PyResult<PyGoalSeekResult> {
     let model = extract_model_ref(model)?.into_owned();
     let spec = spec.inner.clone();
-    let market = crate::bindings::extract::extract_market_opt(py, market)?.unwrap_or_default();
+    let market = market
+        .map(|market| market.inner.clone())
+        .unwrap_or_default();
     let inner = py
         .detach(move || {
             finstack_quant_statements_analytics::analysis::goal_seek(&model, &spec, &market)

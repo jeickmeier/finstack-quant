@@ -1,9 +1,10 @@
 //! Typed portfolio and instrument path-exposure bindings.
 
 use crate::bindings::core::config::PyFinstackConfig;
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::py_to_date;
-use crate::bindings::extract::{extract_instrument, extract_market_ref, extract_portfolio_ref};
+use crate::bindings::extract::{extract_instrument, extract_portfolio_ref};
 use crate::bindings::margin::PyExposureProfile;
 use crate::bindings::margin::types::{PyCsaSpec, PyNettingSetId};
 use crate::bindings::module_utils::{parse_currency, py_to_serde};
@@ -85,15 +86,15 @@ impl PyExposureSimulationConfig {
 #[doc = pydoc!("finstack_quant.portfolio._exposure", "portfolio_exposure_profile")]
 fn portfolio_exposure_profile(
     portfolio: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     pricing: &PyFinstackConfig,
     spec: &PyExposureSimulationConfig,
 ) -> PyResult<PyExposureProfile> {
     let py = portfolio.py();
     let portfolio = extract_portfolio_ref(py, portfolio)?;
-    let market = extract_market_ref(py, market)?;
+    let market = &market.inner;
     let portfolio: &finstack_quant_portfolio::Portfolio = &portfolio;
-    let market: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let market: &finstack_quant_core::market_data::context::MarketContext = market;
     let inner = py
         .detach(|| {
             margin::portfolio_exposure_profile(portfolio, market, &pricing.inner, &spec.inner)
@@ -107,7 +108,7 @@ fn portfolio_exposure_profile(
 fn instrument_exposure_profile(
     instrument: &Bound<'_, PyAny>,
     currency: &str,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     pricing: &PyFinstackConfig,
     spec: &PyExposureSimulationConfig,
 ) -> PyResult<PyExposureProfile> {
@@ -115,8 +116,8 @@ fn instrument_exposure_profile(
     let instrument = extract_instrument(instrument)?
         .into_parsed(None, None)
         .map_err(core_to_py)?;
-    let market = extract_market_ref(py, market)?;
-    let market: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let market = &market.inner;
+    let market: &finstack_quant_core::market_data::context::MarketContext = market;
     let currency = parse_currency(currency)?;
     let inner = py
         .detach(|| {

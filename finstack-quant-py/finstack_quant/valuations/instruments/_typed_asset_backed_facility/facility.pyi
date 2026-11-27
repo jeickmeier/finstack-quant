@@ -202,7 +202,7 @@ class AssetBackedFacility:
         ...
     def project(
         self,
-        market: MarketContext | str,
+        market: MarketContext,
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
     ) -> FacilityProjection:
         """
@@ -210,7 +210,7 @@ class AssetBackedFacility:
 
         Parameters
         ----------
-        market : MarketContext | str
+        market : MarketContext
             Market context with the curves and fixings the note and the
             collateral need.
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
@@ -233,7 +233,7 @@ class AssetBackedFacility:
         ...
     def facility_irr(
         self,
-        market: MarketContext | str,
+        market: MarketContext,
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
     ) -> float:
         """
@@ -241,7 +241,7 @@ class AssetBackedFacility:
 
         Parameters
         ----------
-        market : MarketContext | str
+        market : MarketContext
             Market context with the curves the projection needs.
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date the investment is dated on.

@@ -136,7 +136,7 @@ class PriceExtras:
 
 def price_instrument(
     instrument: _InstrumentInput,
-    market: MarketContext | str,
+    market: MarketContext,
     as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
     model: str = "default",
     metrics: list[str] | None = None,
@@ -157,8 +157,8 @@ def price_instrument(
         :class:`~finstack_quant.valuations.composite.CompositeInstrument`) or a
         canonical ``finstack_quant.instrument/1`` envelope, as the dict
         :func:`instrument_envelope_from_spec` returns or as JSON text.
-    market : MarketContext or str
-        Typed ``MarketContext`` or serialized market-context JSON.
+    market : MarketContext
+        ``MarketContext``.
     as_of : datetime.date | datetime.datetime | pd.Timestamp | str
         Valuation date, either a date-like object or an ISO 8601 string.
     model : str, default "default"
@@ -1414,7 +1414,7 @@ class MarketHistory:
 
 def instrument_cashflows(
     instrument: _InstrumentInput,
-    market: MarketContext | str,
+    market: MarketContext,
     as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
     model: str,
 ) -> InstrumentCashflowEnvelope:
@@ -1434,8 +1434,8 @@ def instrument_cashflows(
         Typed instrument supported by :func:`price_instrument` or a canonical
         ``finstack_quant.instrument/1`` envelope, as the dict
         :func:`instrument_envelope_from_spec` returns or as JSON text.
-    market : MarketContext | str
-        Typed ``MarketContext`` or serialized market-context JSON.
+    market : MarketContext
+        ``MarketContext``.
     as_of : datetime.date | datetime.datetime | pd.Timestamp | str
         Valuation date, either a date-like object or an ISO 8601 string.
     model : str

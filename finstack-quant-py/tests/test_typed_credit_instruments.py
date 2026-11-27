@@ -9,6 +9,7 @@ import pytest
 
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, Tenor
+from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments import (
@@ -266,8 +267,9 @@ class TestCreditDefaultSwapTyped:
         both sides and pass). See `_cds_hand_written_json`.
         """
         cds = _cds()
-        typed = price_instrument(cds, _market_json(), "2024-01-01", "hazard_rate")
-        via_json = price_instrument(_cds_hand_written_json(), _market_json(), "2024-01-01", "hazard_rate")
+        market = MarketContext.from_json(_market_json())
+        typed = price_instrument(cds, market, "2024-01-01", "hazard_rate")
+        via_json = price_instrument(_cds_hand_written_json(), market, "2024-01-01", "hazard_rate")
         assert _without_timestamp(typed) == _without_timestamp(via_json)
 
 

@@ -412,7 +412,7 @@ class BondQuoteSet:
 
 def compute_quotes(
     bond: Bond,
-    market: MarketContext | str,
+    market: MarketContext,
     as_of: datetime.date | str,
     quote_input: dict[str, float] | str,
 ) -> BondQuoteSet:
@@ -429,8 +429,8 @@ def compute_quotes(
     bond : Bond
         Bond to convert. A bond with exercise rights needs HW1F parameters on the bond
         or in the market, because its ``oas`` is part of the set.
-    market : MarketContext or str
-        Typed ``MarketContext`` or serialized market-context JSON, holding the bond's
+    market : MarketContext
+        ``MarketContext`` holding the bond's
         discount curve, the source of the swap par rates, and any floating index curve.
     as_of : datetime.date | str
         Valuation date, either a date-like object or an ISO 8601 string. The quote

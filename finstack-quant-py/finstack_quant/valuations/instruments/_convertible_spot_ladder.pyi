@@ -561,7 +561,7 @@ class ConvertibleSpotLadder:
 
 def convertible_spot_ladder(
     bond: ConvertibleBond,
-    market: MarketContext | str,
+    market: MarketContext,
     as_of: datetime.date | str,
     spots: list[float] | None = None,
     model: str | None = None,
@@ -579,8 +579,8 @@ def convertible_spot_ladder(
     bond : ConvertibleBond
         Convertible to value. Its ``metric_pricing_overrides.bump_config`` sets the
         spot bump behind delta (default 1% of each row's share price).
-    market : MarketContext or str
-        Typed ``MarketContext`` or serialized market-context JSON holding the bond's
+    market : MarketContext
+        ``MarketContext`` holding the bond's
         discount curve, share price, volatility and any dividend yield, hazard curve
         and floating index.
     as_of : datetime.date | str

@@ -14,6 +14,7 @@ use super::specs::{
     PyAmortizationSpec, PyCouponType, PyFeeSpec, PyFixedCouponSpec, PyFloatingCouponSpec,
     PyPrincipalExchange, PyStepUpCouponSpec, date_decimal_pairs,
 };
+use crate::bindings::core::market_data::context::PyMarketContext;
 
 #[doc = pydoc!("finstack_quant.cashflows.builder._orchestrator", "CashFlowBuilder")]
 #[pyclass(
@@ -221,9 +222,9 @@ impl PyCashFlowBuilder {
     fn build(
         &self,
         py: Python<'_>,
-        market: Option<&Bound<'_, PyAny>>,
+        market: Option<PyRef<'_, PyMarketContext>>,
     ) -> PyResult<PyCashFlowSchedule> {
-        let market = crate::bindings::extract::extract_market_opt(py, market)?;
+        let market = market.map(|market| market.inner.clone());
         let builder = self.inner.clone();
         py.detach(move || builder.build(market.as_ref()))
             .map(PyCashFlowSchedule::from_inner)
@@ -234,10 +235,10 @@ impl PyCashFlowBuilder {
     fn build_as_of(
         &self,
         py: Python<'_>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<PyCashFlowSchedule> {
-        let market = crate::bindings::extract::extract_market(py, market)?;
+        let market = market.inner.clone();
         let as_of = py_to_date(as_of)?;
         let builder = self.inner.clone();
         py.detach(move || builder.build_as_of(&market, as_of))

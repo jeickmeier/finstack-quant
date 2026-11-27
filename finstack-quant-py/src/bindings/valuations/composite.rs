@@ -6,9 +6,10 @@
 //! ``fixed_quantity`` without historical observations.
 
 use crate::bindings::core::currency::{PyCurrency, extract_currency};
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::extract::{extract_instrument, extract_market};
+use crate::bindings::extract::extract_instrument;
 use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::json_bridge::{deserialize_json_with_context, serialize_json_with_context};
 use crate::bindings::module_utils::opt_spec_from_py;
@@ -402,11 +403,11 @@ impl PyCompositeSpec {
     fn initialize(
         &self,
         py: Python<'_>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         as_of: &Bound<'_, PyAny>,
         history: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyCompositeRebalanceResult> {
-        let market = extract_market(py, market)?;
+        let market = market.inner.clone();
         let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
         let history = observations_from_py(py, history, "composite market history")?;
         self.inner
@@ -514,11 +515,11 @@ impl PyCompositeInstrument {
     fn rebalance(
         &self,
         py: Python<'_>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         as_of: &Bound<'_, PyAny>,
         history: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyCompositeRebalanceResult> {
-        let market = extract_market(py, market)?;
+        let market = market.inner.clone();
         let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
         let history = observations_from_py(py, history, "composite market history")?;
         self.inner
@@ -536,12 +537,11 @@ impl PyCompositeInstrument {
     #[pyo3(signature = (market, as_of, metrics=None))]
     fn primitive_exposures(
         &self,
-        py: Python<'_>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         as_of: &Bound<'_, PyAny>,
         metrics: Option<Vec<String>>,
     ) -> PyResult<PyCompositeExposureReport> {
-        let market = extract_market(py, market)?;
+        let market = market.inner.clone();
         let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
         let metrics = metrics
             .unwrap_or_default()

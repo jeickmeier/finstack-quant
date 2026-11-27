@@ -10,6 +10,7 @@ import pytest
 
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, Tenor
+from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments import (
@@ -182,8 +183,9 @@ class TestInterestRateSwapTyped:
         both sides and pass). See `_payer_swap_hand_written_json`.
         """
         swap = _payer_swap()
-        typed = price_instrument(swap, _market_json(), "2024-01-01", "discounting")
-        via_json = price_instrument(_payer_swap_hand_written_json(), _market_json(), "2024-01-01", "discounting")
+        market = MarketContext.from_json(_market_json())
+        typed = price_instrument(swap, market, "2024-01-01", "discounting")
+        via_json = price_instrument(_payer_swap_hand_written_json(), market, "2024-01-01", "discounting")
         assert _without_timestamp(typed) == _without_timestamp(via_json)
 
     def test_builder_setters_accept_keyword_value(self) -> None:

@@ -550,7 +550,7 @@ class FactorPnlProfile:
 def compute_factor_sensitivities(
     portfolio: Portfolio | str,
     factors: list[FactorDefinition] | str | list[dict[str, Any]] | pd.DataFrame,
-    market: MarketContext | str,
+    market: MarketContext,
     as_of: datetime.date | str,
     bump_config: str | dict[str, Any] | None = None,
 ) -> SensitivityMatrix:
@@ -574,7 +574,7 @@ def compute_factor_sensitivities(
         ``DataFrame``. Every factor must map to market data; credit hierarchy
         factors (``Credit`` with an empty ``curve_ids`` list) are rejected, use
         :meth:`FactorModel.compute_sensitivities` for them.
-    market : MarketContext | str
+    market : MarketContext
         Market to bump, including the FX needed for cross-currency positions.
     as_of : datetime.date | str
         Valuation date for pricing and spot FX.
@@ -590,7 +590,8 @@ def compute_factor_sensitivities(
     Raises
     ------
     TypeError
-        If ``portfolio`` or ``market`` is neither a handle nor a JSON string.
+        If ``portfolio`` is neither a handle nor a JSON string, or ``market``
+        is not a ``MarketContext``.
     ValueError
         If the portfolio spec, factors, bump configuration or date is malformed,
         a factor is a credit hierarchy factor, or a factor cannot be bumped or
@@ -612,7 +613,7 @@ def compute_factor_sensitivities(
 def compute_pnl_profiles(
     portfolio: Portfolio | str,
     factors: list[FactorDefinition] | str | list[dict[str, Any]] | pd.DataFrame,
-    market: MarketContext | str,
+    market: MarketContext,
     as_of: datetime.date | str,
     bump_config: str | dict[str, Any] | None = None,
     n_points: int | None = None,
@@ -633,7 +634,7 @@ def compute_pnl_profiles(
         ``FactorDefinition`` array, in returned profile order (same accepted
         forms and credit-hierarchy restriction as
         :func:`compute_factor_sensitivities`).
-    market : MarketContext | str
+    market : MarketContext
         Market reused by every scenario.
     as_of : datetime.date | str
         Valuation date for pricing and spot FX.
@@ -651,7 +652,8 @@ def compute_pnl_profiles(
     Raises
     ------
     TypeError
-        If ``portfolio`` or ``market`` is neither a handle nor a JSON string.
+        If ``portfolio`` is neither a handle nor a JSON string, or ``market``
+        is not a ``MarketContext``.
     ValueError
         If the portfolio spec, factors, bump configuration or date is malformed;
         a factor is a credit hierarchy factor; ``n_points`` is less than ``3``,

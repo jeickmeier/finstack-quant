@@ -1,7 +1,8 @@
 //! Dated leveraged buyout authoring and results.
 
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::extract::{extract_market_opt, extract_model_ref};
+use crate::bindings::extract::extract_model_ref;
 use crate::bindings::module_utils::fields_from_py;
 use crate::errors::statements_to_py;
 use finstack_quant_statements_analytics::analysis as native;
@@ -323,11 +324,11 @@ fn evaluate_dated_lbo<'py>(
     py: Python<'py>,
     model: &Bound<'py, PyAny>,
     request: &PyDatedLboRequest,
-    market: Option<&Bound<'py, PyAny>>,
+    market: Option<PyRef<'py, PyMarketContext>>,
 ) -> PyResult<PyDatedLboResult> {
     let model = extract_model_ref(model)?.into_owned();
     let request = request.inner.clone();
-    let market = extract_market_opt(py, market)?;
+    let market = market.map(|market| market.inner.clone());
     let inner = py
         .detach(move || native::evaluate_dated_lbo(&model, &request, market.as_ref()))
         .map_err(statements_to_py)?;

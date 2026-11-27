@@ -655,7 +655,7 @@ class ApplicationResult:
 
 def apply_scenario(
     scenario: ScenarioSpec,
-    market: MarketContext | str,
+    market: MarketContext,
     as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
     model: FinancialModelSpec | str | None = None,
     instruments: Sequence[Any] | None = None,
@@ -668,8 +668,8 @@ def apply_scenario(
     ----------
     scenario : ScenarioSpec
         Scenario to apply. Load JSON text with ``ScenarioSpec.from_json``.
-    market : MarketContext | str
-        ``MarketContext`` object or JSON ``MarketContext`` string. Never
+    market : MarketContext
+        ``MarketContext``. Never
         mutated; the result carries a modified copy.
     model : FinancialModelSpec | str | None, default None
         Copied financial model or canonical JSON; omit for market-only scenarios.

@@ -2,10 +2,10 @@
 //! `net_in_currency_by_date` and `PortfolioCashflows`.
 
 use crate::bindings::core::currency::extract_currency;
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::py_to_date;
 use crate::bindings::extract::extract_cashflows_ref;
-use crate::bindings::extract::extract_market_ref;
 use crate::bindings::extract::extract_portfolio_ref;
 use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::macros::tabular_methods;
@@ -93,7 +93,7 @@ impl PyPortfolioCashflows {
     fn collapse(
         &self,
         py: Python<'_>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         base_currency: &Bound<'_, PyAny>,
         as_of: &Bound<'_, PyAny>,
         discount_curves: Option<&Bound<'_, PyDict>>,
@@ -103,11 +103,11 @@ impl PyPortfolioCashflows {
             IndexMap<finstack_quant_core::cashflow::CFKind, finstack_quant_core::money::Money>,
         >,
     > {
-        let market = crate::bindings::extract::extract_market_ref(py, market)?;
+        let market = &market.inner;
         let ccy = extract_currency(base_currency)?;
         let as_of_date = py_to_date(as_of)?;
         let curves = extract_discount_curve_map(discount_curves)?;
-        let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
+        let market_ref: &finstack_quant_core::market_data::context::MarketContext = market;
         let cashflows = &self.inner;
         py.detach(|| {
             cashflows.collapse_to_base_by_date_kind(market_ref, ccy, as_of_date, curves.as_ref())
@@ -294,7 +294,7 @@ impl PyPortfolioCashflows {
     ///
     /// Parameters
     /// ----------
-    /// market : MarketContext | str
+    /// market : MarketContext
     ///     Market supplying FX spot and discount curves.
     /// base_currency : Currency | str
     ///     Target currency of the collapsed ladder.
@@ -323,7 +323,7 @@ impl PyPortfolioCashflows {
     fn collapse_to_base_by_date_kind<'py>(
         &self,
         py: Python<'py>,
-        market: &Bound<'py, PyAny>,
+        market: PyRef<'py, PyMarketContext>,
         base_currency: &Bound<'py, PyAny>,
         as_of: &Bound<'py, PyAny>,
         discount_curves: Option<&Bound<'py, PyDict>>,
@@ -358,7 +358,7 @@ impl PyPortfolioCashflows {
     fn collapse_to_base_by_date_kind_json(
         &self,
         py: Python<'_>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         base_currency: &Bound<'_, PyAny>,
         as_of: &Bound<'_, PyAny>,
         discount_curves: Option<&Bound<'_, PyDict>>,
@@ -446,8 +446,8 @@ fn extract_discount_curve_map(
 /// portfolio : Portfolio | str
 ///     A :class:`Portfolio` object (fast path, no rebuild) or a
 ///     JSON-serialized ``PortfolioSpec`` string.
-/// market : MarketContext | str
-///     A ``MarketContext`` object or a JSON string used to build
+/// market : MarketContext
+///     A ``MarketContext`` used to build
 ///     instrument schedules.
 /// allow_partial : bool | None
 ///     ``None`` uses the Rust ``CashflowAggregationOptions`` default,
@@ -474,13 +474,13 @@ fn extract_discount_curve_map(
 fn aggregate_full_cashflows(
     py: Python<'_>,
     portfolio: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     allow_partial: Option<bool>,
 ) -> PyResult<PyPortfolioCashflows> {
     let portfolio = extract_portfolio_ref(py, portfolio)?;
-    let market = extract_market_ref(py, market)?;
+    let market = &market.inner;
     let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
-    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let market_ref: &finstack_quant_core::market_data::context::MarketContext = market;
     let mut options = finstack_quant_portfolio::cashflows::CashflowAggregationOptions::default();
     if let Some(allow_partial) = allow_partial {
         options.allow_partial = allow_partial;

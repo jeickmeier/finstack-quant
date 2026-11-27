@@ -2,7 +2,7 @@
 
 use crate::bindings::attribution::PyPnlAttribution;
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::extract::{extract_instrument, extract_market};
+use crate::bindings::extract::extract_instrument;
 use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::macros::tabular_methods;
 use crate::bindings::table_builders::TableBuilder;
@@ -12,6 +12,7 @@ use pyo3::prelude::*;
 use super::engine::PyApplicationReport;
 use super::spec::PyScenarioSpec;
 use crate::bindings::core::config::PyFinstackConfig;
+use crate::bindings::core::market_data::context::PyMarketContext;
 
 /// Compute horizon total return under a scenario.
 ///
@@ -24,8 +25,8 @@ use crate::bindings::core::config::PyFinstackConfig;
 /// instrument : Instrument | str
 ///     Typed instrument (``Bond``, ``CreditDefaultSwap``, ``InterestRateSwap``,
 ///     ...) or a canonical v1 instrument envelope JSON string.
-/// market : MarketContext | str
-///     A ``MarketContext`` object or JSON string. Never mutated; the scenario
+/// market : MarketContext
+///     A ``MarketContext``. Never mutated; the scenario
 ///     is applied to an internal copy.
 /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
 ///     Valuation date (ISO 8601 accepted, e.g. ``"2025-01-15"``).
@@ -86,7 +87,7 @@ use crate::bindings::core::config::PyFinstackConfig;
 #[pyo3(signature = (instrument, market, as_of, scenario, method = None, config = None, calendar_id = None))]
 pub(crate) fn compute_horizon_return<'py>(
     instrument: &Bound<'py, PyAny>,
-    market: &Bound<'py, PyAny>,
+    market: PyRef<'py, PyMarketContext>,
     as_of: &Bound<'py, PyAny>,
     scenario: PyRef<'py, PyScenarioSpec>,
     method: Option<&Bound<'py, PyAny>>,
@@ -103,7 +104,7 @@ pub(crate) fn compute_horizon_return<'py>(
         Arc::from(boxed.into_boxed());
 
     // Owned copy so the compute can run without the GIL.
-    let market_ctx = extract_market(py, market)?;
+    let market_ctx = market.inner.clone();
     let date = crate::bindings::date_utils::py_to_date(as_of)?;
     let scenario = scenario.inner.clone();
     let attribution_method: finstack_quant_attribution::AttributionMethod = method

@@ -9,7 +9,6 @@ use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::extract::extract_market;
 use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::valuations::convert::{
     attributes_from_py, day_count_from_py, money_from_py, money_to_py,
@@ -32,6 +31,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::Bor
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::CreditModelConfig;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::DealFees;
 
+use crate::bindings::core::market_data::context::PyMarketContext;
 use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacilityBuilder;
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility")]
@@ -91,10 +91,10 @@ impl PyAssetBackedFacility {
     fn project(
         &self,
         py: Python<'_>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<PyFacilityProjection> {
-        let market = extract_market(py, market)?;
+        let market = market.inner.clone();
         let as_of = py_to_date(as_of)?;
         let facility = self.inner.clone();
         let inner = py
@@ -107,11 +107,10 @@ impl PyAssetBackedFacility {
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn facility_irr(
         &self,
-        py: Python<'_>,
-        market: &Bound<'_, PyAny>,
+        market: PyRef<'_, PyMarketContext>,
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<f64> {
-        let market = extract_market(py, market)?;
+        let market = market.inner.clone();
         let as_of = py_to_date(as_of)?;
         self.inner.facility_irr(&market, as_of).map_err(core_to_py)
     }

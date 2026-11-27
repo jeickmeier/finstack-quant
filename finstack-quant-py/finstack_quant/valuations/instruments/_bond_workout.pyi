@@ -560,7 +560,7 @@ class BondWorkoutLadder:
         """
         ...
 
-def bond_workout_ladder(bond: Bond, market: MarketContext | str, as_of: datetime.date | str) -> BondWorkoutLadder:
+def bond_workout_ladder(bond: Bond, market: MarketContext, as_of: datetime.date | str) -> BondWorkoutLadder:
     """
     Yield and I-spread to every call, put and maturity exit of a bond, with the worst marked.
 
@@ -575,8 +575,8 @@ def bond_workout_ladder(bond: Bond, market: MarketContext | str, as_of: datetime
     bond : Bond
         Bond to walk. A bond with exercise rights must carry
         ``quoted_clean_price_pct``; one with none falls back to its model price.
-    market : MarketContext or str
-        Typed ``MarketContext`` or serialized market-context JSON, holding the
+    market : MarketContext
+        ``MarketContext`` holding the
         bond's discount curve (the source of the swap par rates) and any floating
         index and make-whole reference curves.
     as_of : datetime.date | str

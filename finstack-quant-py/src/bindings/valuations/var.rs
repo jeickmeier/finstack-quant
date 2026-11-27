@@ -6,8 +6,9 @@
 //! takes the quantile of the summed P&L, so diversification is preserved.
 
 use super::pricing::PyMarketHistory;
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::extract::{InstrumentArg, extract_instrument, extract_market};
+use crate::bindings::extract::{InstrumentArg, extract_instrument};
 use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
 use crate::bindings::table_builders::TableBuilder;
 use crate::errors::core_to_py;
@@ -33,7 +34,7 @@ fn extract_history(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<MarketHis
 fn calculate_var(
     py: Python<'_>,
     instruments: Vec<Bound<'_, PyAny>>,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     history: &Bound<'_, PyAny>,
     as_of: &Bound<'_, PyAny>,
     config: Option<&Bound<'_, PyAny>>,
@@ -45,7 +46,7 @@ fn calculate_var(
         .collect::<PyResult<Vec<InstrumentArg>>>()?;
     let history = extract_history(py, history)?;
     let config: VarConfig = opt_spec_from_py(py, config, "VarConfig")?.unwrap_or_default();
-    let market = extract_market(py, market)?;
+    let market = market.inner.clone();
     let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     let model = model.to_owned();
     py.detach(move || {

@@ -100,6 +100,7 @@ def test_bucketed_series_renders_rust_buckets_as_reported() -> None:
 
 
 def test_keyrate_section_shows_every_rust_vega_bucket() -> None:
+    from finstack_quant.core.market_data import MarketContext
     from finstack_quant.valuations.instruments import price_instrument
 
     fixture = json.loads((REPO_ROOT / "finstack-quant/valuations/tests/fixtures/production_equity.json").read_text())
@@ -108,7 +109,7 @@ def test_keyrate_section_shows_every_rust_vega_bucket() -> None:
     spec["strike"] = 120.0
     result = price_instrument(
         json.dumps(fixture["instrument"]),
-        json.dumps(fixture["market"]),
+        MarketContext.from_json(json.dumps(fixture["market"])),
         fixture["as_of"],
         "black76",
         ["vega", "bucketed_vega"],

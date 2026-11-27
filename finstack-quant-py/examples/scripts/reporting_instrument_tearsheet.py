@@ -74,9 +74,9 @@ def main() -> None:
 
     metrics = ["dirty_price", "clean_price", "accrued", "ytm", "duration_mod", "dv01", "bucketed_dv01"]
     result = price_instrument(
-        bond, mc.to_json(), as_of, model="discounting", metrics=metrics
+        bond, mc, as_of, model="discounting", metrics=metrics
     )
-    cashflows = instrument_cashflows(bond, mc.to_json(), as_of, "discounting").to_pandas()
+    cashflows = instrument_cashflows(bond, mc, as_of, "discounting").to_pandas()
 
     ts = reporting.instrument_tearsheet(
         result,

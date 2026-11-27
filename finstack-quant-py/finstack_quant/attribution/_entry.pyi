@@ -234,8 +234,8 @@ def attribute_pnl_many(inputs: AttributionInputs | Mapping[str, Any] | str, inst
 
 def pnl_bridge(
     instrument: object,
-    market_t0: MarketContext | str,
-    market_t1: MarketContext | str,
+    market_t0: MarketContext,
+    market_t1: MarketContext,
     as_of_t0: datetime.date | str,
     as_of_t1: datetime.date | str,
     target_currency: Currency | str,
@@ -251,9 +251,9 @@ def pnl_bridge(
     ----------
     instrument : object
         Typed instrument wrapper or canonical instrument envelope JSON.
-    market_t0 : MarketContext | str
+    market_t0 : MarketContext
         Opening market state.
-    market_t1 : MarketContext | str
+    market_t1 : MarketContext
         Closing market state.
     as_of_t0 : datetime.date | datetime.datetime | pandas.Timestamp | str
         Opening valuation date.
@@ -270,8 +270,8 @@ def pnl_bridge(
     Raises
     ------
     ValueError
-        If the instrument JSON, a market, a date, or the currency is
-        malformed, or pricing fails validation.
+        If the instrument JSON, a date, or the currency is malformed, or
+        pricing fails validation.
     KeyError
         If a curve or FX rate needed for pricing or conversion is missing.
     RuntimeError
@@ -280,8 +280,10 @@ def pnl_bridge(
     Examples
     --------
     >>> from finstack_quant.attribution import pnl_bridge
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> market = MarketContext()
     >>> try:
-    ...     pnl_bridge("{}", "{}", "{}", "2025-01-15", "2025-01-16", "USD")
+    ...     pnl_bridge("{}", market, market, "2025-01-15", "2025-01-16", "USD")
     ... except ValueError as exc:
     ...     "instrument envelope" in str(exc)
     True

@@ -1,8 +1,9 @@
 //! Standalone instrument initial margin bindings.
 
 use crate::bindings::core::currency::extract_currency;
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::date_utils::py_to_date;
-use crate::bindings::extract::{extract_instrument, extract_market};
+use crate::bindings::extract::extract_instrument;
 use crate::bindings::margin::PyImResult;
 use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, value_error};
@@ -14,7 +15,7 @@ use pyo3::prelude::*;
 #[pyo3(signature = (instruments, market, as_of, *, version=None, mpor_days=None, currency=None))]
 fn calculate_simm(
     instruments: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     as_of: &Bound<'_, PyAny>,
     version: Option<&str>,
     mpor_days: Option<u32>,
@@ -28,7 +29,7 @@ fn calculate_simm(
                 .map_err(core_to_py)
         })
         .collect::<PyResult<Vec<_>>>()?;
-    let market = extract_market(market.py(), market)?;
+    let market = market.inner.clone();
     let date = py_to_date(as_of)?;
     let version = version
         .map(str::parse::<SimmVersion>)

@@ -359,18 +359,24 @@ class TestConvertedMoney:
 
 
 class TestMarketJsonArguments:
-    """A market passed as JSON text goes through the strict contract loader."""
+    """Market JSON text goes through the strict contract loader, ``MarketContext.from_json``.
+
+    A function taking a market refuses the text itself.
+    """
 
     def test_unversioned_market_json_is_a_contract_error(self) -> None:
         from finstack_quant.calibration import calibrate_bermudan_lmm_base_vol
+        from finstack_quant.core.market_data import MarketContext
         from finstack_quant.portfolio import ContractValidationError
 
         with pytest.raises(ContractValidationError):
+            MarketContext.from_json("{}")
+        with pytest.raises(TypeError, match="MarketContext"):
             calibrate_bermudan_lmm_base_vol("{}", "{}", "2025-01-01")
 
     def test_overdeep_market_json_hits_the_load_limit(self) -> None:
-        from finstack_quant.calibration import calibrate_bermudan_lmm_base_vol
+        from finstack_quant.core.market_data import MarketContext
         from finstack_quant.portfolio import ContractLimitExceededError
 
         with pytest.raises(ContractLimitExceededError):
-            calibrate_bermudan_lmm_base_vol("{}", "[" * 200 + "]" * 200, "2025-01-01")
+            MarketContext.from_json("[" * 200 + "]" * 200)

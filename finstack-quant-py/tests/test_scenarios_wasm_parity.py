@@ -17,6 +17,7 @@ from typing import Any
 
 import pytest
 
+from finstack_quant.core.market_data import MarketContext
 from finstack_quant.scenarios import (
     Compounding,
     CurveKind,
@@ -120,7 +121,7 @@ def test_horizon_explain_and_factor_contribution_match_the_shared_golden() -> No
     golden = GOLDEN["horizon"]
     result = compute_horizon_return(
         json.dumps(golden["instrument"]),
-        json.dumps(golden["market"]),
+        MarketContext.from_json(json.dumps(golden["market"])),
         golden["as_of"],
         ScenarioSpec.from_json(json.dumps(golden["scenario"])),
     )

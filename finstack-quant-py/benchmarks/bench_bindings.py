@@ -1376,9 +1376,9 @@ class TestPortfolioCompoundWorkflow:
         """JSON inputs, 500 deposits: every call re-parses + rebuilds."""
 
         def _run():
-            val = value_portfolio(_BENCH_SPEC_JSON_500, _BENCH_MARKET_JSON, strict_risk=True)
-            agg = aggregate_metrics(val, _BENCH_MARKET_JSON)
-            cf = aggregate_full_cashflows(_BENCH_SPEC_JSON_500, _BENCH_MARKET_JSON)
+            val = value_portfolio(_BENCH_SPEC_JSON_500, MarketContext.from_json(_BENCH_MARKET_JSON), strict_risk=True)
+            agg = aggregate_metrics(val, MarketContext.from_json(_BENCH_MARKET_JSON))
+            cf = aggregate_full_cashflows(_BENCH_SPEC_JSON_500, MarketContext.from_json(_BENCH_MARKET_JSON))
             return val, agg, cf
 
         _assert_deposit_workflow(_run(), 500)
@@ -1413,8 +1413,12 @@ class TestPortfolioCompoundWorkflow:
 
     def test_value_500_deposits_json_inputs(self, benchmark) -> None:
         """Pure value_portfolio with JSON inputs and typed output, 500 deposits."""
-        _assert_deposit_valuation(value_portfolio(_BENCH_SPEC_JSON_500, _BENCH_MARKET_JSON, strict_risk=True), 500)
-        result = benchmark(value_portfolio, _BENCH_SPEC_JSON_500, _BENCH_MARKET_JSON, strict_risk=True)
+
+        def _run():
+            return value_portfolio(_BENCH_SPEC_JSON_500, MarketContext.from_json(_BENCH_MARKET_JSON), strict_risk=True)
+
+        _assert_deposit_valuation(_run(), 500)
+        result = benchmark(_run)
         _assert_deposit_valuation(result, 500)
 
 

@@ -1053,7 +1053,7 @@ class ScenarioTable:
 def tranche_discount_margin(
     instrument: StructuredCredit | str,
     tranche_id: str,
-    market: MarketContext | str,
+    market: MarketContext,
     as_of: datetime.date | str,
     market_price_pct: float,
 ) -> float:
@@ -1073,8 +1073,8 @@ def tranche_discount_margin(
     tranche_id : str
         Identifier of the floating-rate tranche whose contractual cashflows
         are spread-discounted.
-    market : MarketContext or str
-        Typed ``MarketContext`` or serialized market-context JSON supplying
+    market : MarketContext
+        ``MarketContext`` supplying
         the discount curve and any forward curves or historical fixings
         required for cashflow projection.
     as_of : datetime.date | str
@@ -1102,9 +1102,10 @@ def tranche_discount_margin(
 
     Examples
     --------
+    >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.valuations.instruments import tranche_discount_margin
     >>> try:
-    ...     tranche_discount_margin("{}", "A", "{}", "2026-01-01", 100.0)
+    ...     tranche_discount_margin("{}", "A", MarketContext(), "2026-01-01", 100.0)
     ... except ValueError as exc:
     ...     print("schema" in str(exc))
     True
@@ -1115,7 +1116,7 @@ def tranche_discount_margin(
 def tranche_breakeven_cdr(
     instrument: StructuredCredit | str,
     tranche_id: str,
-    market: MarketContext | str,
+    market: MarketContext,
     as_of: datetime.date | str,
 ) -> float:
     """Solve the constant default rate at which a tranche first takes a writedown.
@@ -1127,8 +1128,8 @@ def tranche_breakeven_cdr(
         ``StructuredCredit`` instance.
     tranche_id : str
         Identifier of the tranche within the deal.
-    market : MarketContext or str
-        Typed ``MarketContext`` or serialized market-context JSON supplying
+    market : MarketContext
+        ``MarketContext`` supplying
         curves and fixings.
     as_of : datetime.date | str
         Valuation date, either a date-like object or an ISO 8601 string.
@@ -1148,9 +1149,10 @@ def tranche_breakeven_cdr(
 
     Examples
     --------
+    >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.valuations.instruments import tranche_breakeven_cdr
     >>> try:
-    ...     tranche_breakeven_cdr("{}", "A", "{}", "2026-01-01")
+    ...     tranche_breakeven_cdr("{}", "A", MarketContext(), "2026-01-01")
     ... except ValueError as exc:
     ...     print("schema" in str(exc))
     True
@@ -1161,7 +1163,7 @@ def tranche_breakeven_cdr(
 def tranche_oas(
     instrument: StructuredCredit | str,
     tranche_id: str,
-    market: MarketContext | str,
+    market: MarketContext,
     as_of: datetime.date | str,
     market_price_pct: float,
     config: dict[str, Any] | str | None = None,
@@ -1175,8 +1177,8 @@ def tranche_oas(
         ``StructuredCredit`` instance.
     tranche_id : str
         Identifier of the tranche within the deal.
-    market : MarketContext or str
-        Typed ``MarketContext`` or serialized market-context JSON supplying
+    market : MarketContext
+        ``MarketContext`` supplying
         curves and fixings.
     as_of : datetime.date | str
         Valuation date, either a date-like object or an ISO 8601 string.
@@ -1203,9 +1205,10 @@ def tranche_oas(
 
     Examples
     --------
+    >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.valuations.instruments import tranche_oas
     >>> try:
-    ...     tranche_oas("{}", "A", "{}", "2026-01-01", 100.0)
+    ...     tranche_oas("{}", "A", MarketContext(), "2026-01-01", 100.0)
     ... except ValueError as exc:
     ...     print("schema" in str(exc))
     True
@@ -1216,7 +1219,7 @@ def tranche_oas(
 def tranche_metrics(
     instrument: StructuredCredit | str,
     tranche_id: str,
-    market: MarketContext | str,
+    market: MarketContext,
     as_of: datetime.date | str,
     market_price_pct: float | None = None,
     metrics: list[str] | None = None,
@@ -1235,8 +1238,8 @@ def tranche_metrics(
         ``StructuredCredit`` instance.
     tranche_id : str
         Identifier of the tranche within the deal.
-    market : MarketContext or str
-        Typed ``MarketContext`` or serialized market-context JSON supplying
+    market : MarketContext
+        ``MarketContext`` supplying
         curves and fixings.
     as_of : datetime.date | str
         Valuation date, either a date-like object or an ISO 8601 string.
@@ -1266,9 +1269,10 @@ def tranche_metrics(
 
     Examples
     --------
+    >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.valuations.instruments import tranche_metrics
     >>> try:
-    ...     tranche_metrics("{}", "A", "{}", "2026-01-01")
+    ...     tranche_metrics("{}", "A", MarketContext(), "2026-01-01")
     ... except ValueError as exc:
     ...     print("schema" in str(exc))
     True
@@ -1279,7 +1283,7 @@ def tranche_metrics(
 def tranche_scenario_table(
     instrument: StructuredCredit | str,
     tranche_id: str,
-    market: MarketContext | str,
+    market: MarketContext,
     as_of: datetime.date | str,
     grid: dict[str, Any] | str,
 ) -> ScenarioTable:
@@ -1292,8 +1296,8 @@ def tranche_scenario_table(
         ``StructuredCredit`` instance.
     tranche_id : str
         Identifier of the tranche within the deal.
-    market : MarketContext or str
-        Typed ``MarketContext`` or serialized market-context JSON supplying
+    market : MarketContext
+        ``MarketContext`` supplying
         curves and fixings.
     as_of : datetime.date | str
         Valuation date, either a date-like object or an ISO 8601 string.
@@ -1317,9 +1321,10 @@ def tranche_scenario_table(
 
     Examples
     --------
+    >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.valuations.instruments import tranche_scenario_table
     >>> try:
-    ...     tranche_scenario_table("{}", "A", "{}", "2026-01-01", "{}")
+    ...     tranche_scenario_table("{}", "A", MarketContext(), "2026-01-01", "{}")
     ... except ValueError as exc:
     ...     print("schema" in str(exc))
     True

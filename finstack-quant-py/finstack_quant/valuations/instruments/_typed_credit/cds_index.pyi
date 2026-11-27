@@ -320,9 +320,7 @@ class CdsIndex:
         ('isda_na', 125, 1.0)
         """
         ...
-    def par_spread(
-        self, market: MarketContext | str, as_of: datetime.date | datetime.datetime | pd.Timestamp | str
-    ) -> float:
+    def par_spread(self, market: MarketContext, as_of: datetime.date | datetime.datetime | pd.Timestamp | str) -> float:
         """
         Par spread of the index in basis points (mirrors Rust
         ``CdsIndex::par_spread``; risky-annuity denominator in ``single_curve``
@@ -330,7 +328,7 @@ class CdsIndex:
 
         Parameters
         ----------
-        market : MarketContext | str
+        market : MarketContext
             Market carrying the discount and hazard curves the index names.
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date.
@@ -345,19 +343,17 @@ class CdsIndex:
         KeyError
             If a curve is missing from ``market``.
         ValueError
-            If ``as_of`` or the market JSON is invalid.
+            If ``as_of`` is invalid.
         """
         ...
-    def risky_pv01(
-        self, market: MarketContext | str, as_of: datetime.date | datetime.datetime | pd.Timestamp | str
-    ) -> float:
+    def risky_pv01(self, market: MarketContext, as_of: datetime.date | datetime.datetime | pd.Timestamp | str) -> float:
         """
         Risky PV01 (risky annuity) of the premium leg (mirrors Rust
         ``CdsIndex::risky_pv01``): PV of 1bp running on the surviving notional.
 
         Parameters
         ----------
-        market : MarketContext | str
+        market : MarketContext
             Market carrying the discount and hazard curves the index names.
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date.
@@ -372,10 +368,10 @@ class CdsIndex:
         KeyError
             If a curve is missing from ``market``.
         ValueError
-            If ``as_of`` or the market JSON is invalid.
+            If ``as_of`` is invalid.
         """
         ...
-    def cs01(self, market: MarketContext | str, as_of: datetime.date | datetime.datetime | pd.Timestamp | str) -> float:
+    def cs01(self, market: MarketContext, as_of: datetime.date | datetime.datetime | pd.Timestamp | str) -> float:
         """
         Credit spread sensitivity (mirrors Rust ``CdsIndex::cs01`` with the cached
         recalibration provider): the hazard curve(s) are rebootstrapped after a
@@ -384,7 +380,7 @@ class CdsIndex:
 
         Parameters
         ----------
-        market : MarketContext | str
+        market : MarketContext
             Market carrying the discount and hazard curves the index names.
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date.

@@ -139,8 +139,8 @@ def test_attribute_portfolio_pnl_accepts_json_extractors_and_tracks_fx_translati
     )
     from_json = attribute_portfolio_pnl(
         _portfolio_json("EUR"),
-        market_t0.to_json(),
-        market_t1.to_json(),
+        MarketContext.from_json(market_t0.to_json()),
+        MarketContext.from_json(market_t1.to_json()),
         AS_OF_T0,
         AS_OF_T1,
         "parallel",
@@ -149,6 +149,11 @@ def test_attribute_portfolio_pnl_accepts_json_extractors_and_tracks_fx_translati
     assert typed.fx_translation_pnl.currency == Currency("USD")
     assert typed.fx_translation_pnl.amount > 0.0
     assert json.loads(typed.to_json()) == json.loads(from_json.to_json())
+    # Market JSON text is not a market: it goes through the loader.
+    with pytest.raises(TypeError, match="MarketContext"):
+        attribute_portfolio_pnl(_portfolio_json("EUR"), market_t0.to_json(), market_t1, AS_OF_T0, AS_OF_T1, "parallel")
+    with pytest.raises(TypeError, match="MarketContext"):
+        attribute_portfolio_pnl(_portfolio_json("EUR"), market_t0, market_t1.to_json(), AS_OF_T0, AS_OF_T1, "parallel")
 
 
 def test_position_dataframe_is_position_id_plus_the_rust_wide_row() -> None:

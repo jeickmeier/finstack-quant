@@ -3,8 +3,9 @@
 //! Wraps `finstack_quant_portfolio::sensitivity` to expose delta-based and
 //! full-repricing factor sensitivities from Python, with Arrow table export.
 
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::extract::{extract_market_ref, extract_portfolio_ref, extract_records_json};
+use crate::bindings::extract::{extract_portfolio_ref, extract_records_json};
 use crate::bindings::macros::tabular_methods;
 use crate::bindings::table_builders::TableBuilder;
 use crate::errors::{core_to_py, display_to_py, serde_json_to_py};
@@ -312,7 +313,7 @@ fn extract_bump_config(
 /// factors : str | list | pandas.DataFrame
 ///     ``FactorDefinition`` array (JSON or records). Every factor must map to
 ///     market data; credit hierarchy factors need ``FactorModel``.
-/// market : MarketContext | str
+/// market : MarketContext
 ///     Market to bump, including FX for cross-currency positions.
 /// as_of : datetime.date | str
 ///     Valuation date for pricing and spot FX.
@@ -329,16 +330,16 @@ fn compute_factor_sensitivities(
     py: Python<'_>,
     portfolio: &Bound<'_, PyAny>,
     factors: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     as_of: &Bound<'_, PyAny>,
     bump_config: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PySensitivityMatrix> {
     let portfolio = extract_portfolio_ref(py, portfolio)?;
     let factors = extract_factors(py, factors)?;
-    let market = extract_market_ref(py, market)?;
+    let market = &market.inner;
     let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     let bump_config = extract_bump_config(py, bump_config)?;
-    let (portfolio, market) = (&*portfolio, &*market);
+    let (portfolio, market) = (&*portfolio, market);
     let base_currency = portfolio.base_currency;
     py.detach(move || {
         finstack_quant_portfolio::sensitivity::compute_factor_sensitivities(
@@ -362,7 +363,7 @@ fn compute_factor_sensitivities(
 ///     profile columns and its ``base_currency`` the reporting currency.
 /// factors : str | list | pandas.DataFrame
 ///     ``FactorDefinition`` array (JSON or records).
-/// market : MarketContext | str
+/// market : MarketContext
 ///     Market reused by every scenario.
 /// as_of : datetime.date | str
 ///     Valuation date for pricing and spot FX.
@@ -382,17 +383,17 @@ fn compute_pnl_profiles(
     py: Python<'_>,
     portfolio: &Bound<'_, PyAny>,
     factors: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     as_of: &Bound<'_, PyAny>,
     bump_config: Option<&Bound<'_, PyAny>>,
     n_points: Option<usize>,
 ) -> PyResult<Vec<PyFactorPnlProfile>> {
     let portfolio = extract_portfolio_ref(py, portfolio)?;
     let factors = extract_factors(py, factors)?;
-    let market = extract_market_ref(py, market)?;
+    let market = &market.inner;
     let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     let bump_config = extract_bump_config(py, bump_config)?;
-    let (portfolio, market) = (&*portfolio, &*market);
+    let (portfolio, market) = (&*portfolio, market);
     py.detach(move || {
         finstack_quant_portfolio::sensitivity::compute_pnl_profiles(
             portfolio,

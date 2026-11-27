@@ -326,7 +326,7 @@ fn extract_replay_config(
 }
 
 /// Resolve the snapshot timeline from a JSON array string, a list of
-/// ``{"date", "market"}`` dicts, or a list of ``(date, MarketContext | str)``
+/// ``{"date", "market"}`` dicts, or a list of ``(date, MarketContext)``
 /// tuples.
 ///
 /// Tuples are converted to typed `(Date, MarketContext)` pairs and passed to
@@ -359,7 +359,11 @@ fn extract_replay_timeline(
                     )
                 })?;
             let date = crate::bindings::date_utils::py_to_date(&date)?;
-            let market = crate::bindings::extract::extract_market(py, &market)?;
+            let market = market
+                .extract::<PyRef<'_, crate::bindings::core::market_data::context::PyMarketContext>>(
+                )?
+                .inner
+                .clone();
             pairs.push((date, market));
         }
         return ReplayTimeline::new(pairs).map_err(portfolio_to_py);
@@ -380,7 +384,7 @@ fn extract_replay_timeline(
 /// portfolio : Portfolio | str
 ///     A :class:`Portfolio` object (fast path) or a JSON-serialized
 ///     ``PortfolioSpec`` string.
-/// snapshots : list[tuple[date, MarketContext | str]] | list[dict] | str
+/// snapshots : list[tuple[date, MarketContext]] | list[dict] | str
 ///     Dated market snapshots in ascending date order: ``(date, market)``
 ///     pairs (dates as ``datetime.date`` or ISO strings), JSON-shaped
 ///     ``{"date": "YYYY-MM-DD", "market": {...}}`` dicts, or the canonical

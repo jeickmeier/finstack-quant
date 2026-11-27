@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 use finstack_quant_portfolio::optimization as opt;
 
 use super::spec_result::{PyPortfolioOptimizationResult, PyPortfolioOptimizationSpec};
+use crate::bindings::core::market_data::context::PyMarketContext;
 
 /// Run the optimizer against a typed :class:`PortfolioOptimizationSpec`.
 ///
@@ -13,10 +14,10 @@ use super::spec_result::{PyPortfolioOptimizationResult, PyPortfolioOptimizationS
 pub(super) fn optimize_portfolio(
     py: Python<'_>,
     spec: &PyPortfolioOptimizationSpec,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
 ) -> PyResult<PyPortfolioOptimizationResult> {
     let spec = spec.inner.clone();
-    let market = crate::bindings::extract::extract_market(py, market)?;
+    let market = market.inner.clone();
     let config = finstack_quant_core::config::FinstackConfig::default();
     // Release the GIL for the (potentially multi-second) LP solve. The owned
     // spec and market move into the closure so it stays `Send` with no pyclass

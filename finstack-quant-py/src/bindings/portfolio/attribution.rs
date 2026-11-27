@@ -1,9 +1,10 @@
 //! Portfolio-level P&L attribution bindings.
 
 use crate::bindings::attribution::pnl_attribution::{PyPnlAttribution, WIDE_COLUMNS};
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::extract::{extract_market_ref, extract_portfolio_ref};
+use crate::bindings::extract::extract_portfolio_ref;
 use crate::bindings::macros::tabular_methods;
 use crate::bindings::module_utils::py_to_json_string;
 use crate::bindings::table_builders::{
@@ -397,8 +398,8 @@ tabular_methods!(PyPortfolioAttribution);
 #[pyo3(signature = (portfolio, market_t0, market_t1, as_of_t0, as_of_t1, method, config=None))]
 fn attribute_portfolio_pnl(
     portfolio: &Bound<'_, PyAny>,
-    market_t0: &Bound<'_, PyAny>,
-    market_t1: &Bound<'_, PyAny>,
+    market_t0: PyRef<'_, PyMarketContext>,
+    market_t1: PyRef<'_, PyMarketContext>,
     as_of_t0: &Bound<'_, PyAny>,
     as_of_t1: &Bound<'_, PyAny>,
     method: &Bound<'_, PyAny>,
@@ -406,8 +407,8 @@ fn attribute_portfolio_pnl(
 ) -> PyResult<PyPortfolioAttribution> {
     let py = portfolio.py();
     let portfolio = extract_portfolio_ref(py, portfolio)?;
-    let market_t0 = extract_market_ref(py, market_t0)?;
-    let market_t1 = extract_market_ref(py, market_t1)?;
+    let market_t0 = &market_t0.inner;
+    let market_t1 = &market_t1.inner;
     let as_of_t0 = crate::bindings::date_utils::py_to_date(as_of_t0)?;
     let as_of_t1 = crate::bindings::date_utils::py_to_date(as_of_t1)?;
 
@@ -432,8 +433,8 @@ fn attribute_portfolio_pnl(
     })?;
 
     let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
-    let market_t0_ref: &finstack_quant_core::market_data::context::MarketContext = &market_t0;
-    let market_t1_ref: &finstack_quant_core::market_data::context::MarketContext = &market_t1;
+    let market_t0_ref: &finstack_quant_core::market_data::context::MarketContext = market_t0;
+    let market_t1_ref: &finstack_quant_core::market_data::context::MarketContext = market_t1;
     let result = py
         .detach(|| {
             finstack_quant_portfolio::attribution::attribute_portfolio_pnl(

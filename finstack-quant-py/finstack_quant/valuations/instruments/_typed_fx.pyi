@@ -402,7 +402,7 @@ class FxForward:
         """
         ...
     def market_forward_rate(
-        self, market: MarketContext | str, as_of: datetime.date | datetime.datetime | pd.Timestamp | str
+        self, market: MarketContext, as_of: datetime.date | datetime.datetime | pd.Timestamp | str
     ) -> float:
         """
         Covered-interest-parity forward rate implied by the market (mirrors Rust
@@ -410,7 +410,7 @@ class FxForward:
 
         Parameters
         ----------
-        market : MarketContext | str
+        market : MarketContext
             Market carrying both discount curves and the FX matrix (or an
             explicit ``quoted_spot`` on the instrument).
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
@@ -426,7 +426,7 @@ class FxForward:
         KeyError
             If a discount curve or the FX spot is missing from ``market``.
         ValueError
-            If the market JSON or ``as_of`` is invalid.
+            If ``as_of`` is invalid.
         """
         ...
     @property
@@ -1361,7 +1361,7 @@ class FxOption:
         ...
     def implied_vol(
         self,
-        market: MarketContext | str,
+        market: MarketContext,
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         target_price: float,
     ) -> float:
@@ -1371,7 +1371,7 @@ class FxOption:
 
         Parameters
         ----------
-        market : MarketContext | str
+        market : MarketContext
             Market carrying both discount curves and the FX spot.
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date.
@@ -1395,7 +1395,7 @@ class FxOption:
 
     def greeks(
         self,
-        market: MarketContext | str,
+        market: MarketContext,
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         extras: PriceExtras | dict[str, Any] | str | None = None,
@@ -1407,8 +1407,8 @@ class FxOption:
 
         Parameters
         ----------
-        market : MarketContext | str
-            Market context object or its JSON string.
+        market : MarketContext
+            Market context.
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date.
         model : str, default "default"

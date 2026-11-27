@@ -8,6 +8,7 @@ import math
 
 import pytest
 
+from finstack_quant.core.market_data import MarketContext
 from finstack_quant.valuations.instruments import (
     instrument_cashflows,
     list_standard_metrics_grouped,
@@ -127,7 +128,7 @@ def _structured_credit_json() -> str:
     return _instrument_json({"type": "structured_credit", "spec": spec})
 
 
-def _market_json(include_discount: bool = True) -> str:
+def _market(include_discount: bool = True) -> MarketContext:
     curves: list[dict[str, object]] = []
     if include_discount:
         curves.append({
@@ -139,7 +140,7 @@ def _market_json(include_discount: bool = True) -> str:
             "interp_style": "monotone_convex",
             "extrapolation": "extend",
         })
-    return json.dumps({
+    text = json.dumps({
         "schema_version": 1,
         "curves": curves,
         "fx": None,
@@ -153,10 +154,11 @@ def _market_json(include_discount: bool = True) -> str:
         "vol_cubes": [],
         "hierarchy": None,
     })
+    return MarketContext.from_json(text)
 
 
-def _tarn_market_json() -> str:
-    return json.dumps({
+def _tarn_market() -> MarketContext:
+    text = json.dumps({
         "schema_version": 1,
         "curves": [
             {
@@ -190,6 +192,7 @@ def _tarn_market_json() -> str:
         "vol_cubes": [],
         "hierarchy": None,
     })
+    return MarketContext.from_json(text)
 
 
 def _flat_black_surface_json(surface_id: str, vol: float) -> dict[str, object]:
@@ -204,8 +207,8 @@ def _flat_black_surface_json(surface_id: str, vol: float) -> dict[str, object]:
     }
 
 
-def _cms_spread_market_json() -> str:
-    return json.dumps({
+def _cms_spread_market() -> MarketContext:
+    text = json.dumps({
         "schema_version": 1,
         "curves": [
             {
@@ -248,6 +251,7 @@ def _cms_spread_market_json() -> str:
         "vol_cubes": [],
         "hierarchy": None,
     })
+    return MarketContext.from_json(text)
 
 
 def _tarn_json() -> str:
@@ -509,7 +513,7 @@ def test_validate_instrument_json_accepts_focused_nested_overrides() -> None:
 def test_tarn_json_prices_with_hull_white_mc() -> None:
     result = price_instrument(
         _tarn_json(),
-        _tarn_market_json(),
+        _tarn_market(),
         "2025-01-01",
         "monte_carlo_hull_white_1f",
     )
@@ -522,7 +526,7 @@ def test_tarn_json_prices_with_hull_white_mc() -> None:
 def test_snowball_json_prices_with_hull_white_mc() -> None:
     result = price_instrument(
         _snowball_json(),
-        _tarn_market_json(),
+        _tarn_market(),
         "2025-01-01",
         "monte_carlo_hull_white_1f",
     )
@@ -535,7 +539,7 @@ def test_snowball_json_prices_with_hull_white_mc() -> None:
 def test_inverse_floater_json_prices_with_discounting() -> None:
     result = price_instrument(
         _inverse_floater_json(),
-        _tarn_market_json(),
+        _tarn_market(),
         "2025-01-01",
         "discounting",
     )
@@ -546,7 +550,7 @@ def test_inverse_floater_json_prices_with_discounting() -> None:
 def test_callable_range_accrual_json_prices_with_hull_white_mc() -> None:
     result = price_instrument(
         _callable_range_accrual_json(),
-        _tarn_market_json(),
+        _tarn_market(),
         "2025-01-01",
         "monte_carlo_hull_white_1f",
     )
@@ -559,7 +563,7 @@ def test_callable_range_accrual_json_prices_with_hull_white_mc() -> None:
 def test_cms_spread_option_json_prices_with_static_replication() -> None:
     result = price_instrument(
         _cms_spread_option_json(),
-        _cms_spread_market_json(),
+        _cms_spread_market(),
         "2025-01-01",
         "static_replication",
     )
@@ -571,7 +575,7 @@ def test_cms_spread_option_json_prices_with_static_replication() -> None:
 def test_structured_credit_stochastic_json_details_include_all_tranches() -> None:
     result = price_instrument(
         _structured_credit_json(),
-        _market_json(),
+        _market(),
         "2024-01-01",
         "structured_credit_stochastic",
     )
@@ -589,10 +593,11 @@ def test_structured_credit_stochastic_rejects_one_independent_estimator(antithet
     instrument = json.loads(_structured_credit_json())
     config = instrument["instrument"]["spec"]["instrument_pricing_overrides"]["model_config"]
     config.update(mc_paths=1, mc_antithetic=antithetic)
+    market = _market()
     with pytest.raises(ValueError, match="at least two independent estimators"):
         price_instrument(
             json.dumps(instrument),
-            _market_json(),
+            market,
             "2024-01-01",
             "structured_credit_stochastic",
         )
@@ -600,10 +605,11 @@ def test_structured_credit_stochastic_rejects_one_independent_estimator(antithet
 
 def test_structured_credit_stochastic_json_missing_market_data_raises() -> None:
     # Missing market data preserves its lookup error, mapped to Python KeyError.
+    market = _market(include_discount=False)
     with pytest.raises(KeyError, match="USD-OIS"):
         price_instrument(
             _structured_credit_json(),
-            _market_json(include_discount=False),
+            market,
             "2024-01-01",
             "structured_credit_stochastic",
         )
@@ -613,7 +619,8 @@ def test_python_pricing_routes_validate_instrument_before_other_inputs() -> None
     payload = json.loads(_structured_credit_json())
     payload["instrument"]["spec"]["cleanup_call_decimal"] = -0.5
     invalid = json.dumps(payload)
-    market = "not-market-json"
+    # An empty market: a route that reached for market data first would raise KeyError.
+    market = MarketContext()
 
     calls = [
         lambda: price_instrument(invalid, market, "not-a-date", "not-a-model"),
@@ -646,7 +653,7 @@ def test_structured_credit_waterfall_rules_prices_through_json() -> None:
     payload["instrument"]["spec"]["waterfall_rules"] = {"afc": {"capped_tranches": ["SR"]}}
     result = price_instrument(
         json.dumps(payload),
-        _market_json(),
+        _market(),
         "2024-01-01",
         "structured_credit_stochastic",
     )
@@ -729,9 +736,10 @@ def test_commodity_spot_cash_claim_survives_json_replay() -> None:
     market["surfaces"] = []
     market["prices"] = {}
     encoded = validate_instrument_json(json.dumps(envelope))
-    value = price_instrument(encoded, json.dumps(market), "2024-01-15", model="black76")
+    loaded = MarketContext.from_json(json.dumps(market))
+    value = price_instrument(encoded, loaded, "2024-01-15", model="black76")
     assert float(value.price) == pytest.approx(10_000.0, abs=1e-8)
-    paid = price_instrument(encoded, json.dumps(market), "2024-01-21", model="black76")
+    paid = price_instrument(encoded, loaded, "2024-01-21", model="black76")
     assert float(paid.price) == 0.0
 
 

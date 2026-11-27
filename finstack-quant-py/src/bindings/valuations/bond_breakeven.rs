@@ -2,9 +2,9 @@
 
 use super::instruments::PyBond;
 use crate::bindings::core::dates::tenor::{PyTenor, extract_tenor};
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::extract::extract_market_ref;
 use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
 use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::{
@@ -124,12 +124,12 @@ crate::bindings::macros::tabular_methods!(
 fn bond_breakeven_ladder(
     py: Python<'_>,
     bond: &PyBond,
-    market: &Bound<'_, PyAny>,
+    market: PyRef<'_, PyMarketContext>,
     as_of: &Bound<'_, PyAny>,
     horizons: Vec<Bound<'_, PyAny>>,
     config: &Bound<'_, PyAny>,
 ) -> PyResult<PyBondBreakevenLadder> {
-    let market = extract_market_ref(py, market)?;
+    let market = &market.inner;
     let as_of = py_to_date(as_of)?;
     let horizons = horizons
         .iter()
@@ -137,7 +137,7 @@ fn bond_breakeven_ladder(
         .collect::<PyResult<Vec<_>>>()?;
     let config = crate::bindings::module_utils::spec_from_py(py, config, "breakeven config")?;
     let bond = &bond.inner;
-    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let market_ref: &finstack_quant_core::market_data::context::MarketContext = market;
     py.detach(|| {
         quote_conversions::bond_breakeven_ladder(
             bond,

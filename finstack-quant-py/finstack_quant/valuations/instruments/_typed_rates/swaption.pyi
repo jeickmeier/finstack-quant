@@ -178,14 +178,14 @@ class Swaption:
         """
         ...
     def forward_swap_rate(
-        self, market: MarketContext | str, as_of: datetime.date | datetime.datetime | pd.Timestamp | str
+        self, market: MarketContext, as_of: datetime.date | datetime.datetime | pd.Timestamp | str
     ) -> float:
         """
         Forward swap rate of the underlying (mirrors Rust ``Swaption::forward_swap_rate``).
 
         Parameters
         ----------
-        market : MarketContext | str
+        market : MarketContext
             Market context holding the discount and forward curves.
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date.

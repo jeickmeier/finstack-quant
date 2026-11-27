@@ -428,7 +428,7 @@ class PortfolioCashflows:
 
     def collapse_to_base_by_date_kind(
         self,
-        market: MarketContext | str,
+        market: MarketContext,
         base_currency: Currency | str,
         as_of: datetime.date | str,
         discount_curves: dict[str, str] | None = None,
@@ -442,8 +442,8 @@ class PortfolioCashflows:
 
         Parameters
         ----------
-        market : MarketContext or str
-            Market context object or JSON providing the FX matrix and
+        market : MarketContext
+            Market context providing the FX matrix and
             discount curves used for spot and CIP-forward conversion.
         base_currency : Currency | str
             Currency into which each classified cashflow is converted.
@@ -464,10 +464,9 @@ class PortfolioCashflows:
         Raises
         ------
         TypeError
-            If ``market`` is neither a ``MarketContext`` nor a JSON string.
+            If ``market`` is not a ``MarketContext``.
         ValueError
-            If the market JSON, currency, date, or a ``discount_curves`` key is
-            invalid.
+            If the currency, date, or a ``discount_curves`` key is invalid.
         PortfolioError
             If an FX rate, discount curve, or discount factor required for
             base-currency conversion is unavailable.
@@ -476,7 +475,7 @@ class PortfolioCashflows:
 
     def collapse_to_base_by_date_kind_json(
         self,
-        market: MarketContext | str,
+        market: MarketContext,
         base_currency: Currency | str,
         as_of: datetime.date | str,
         discount_curves: dict[str, str] | None = None,
@@ -486,8 +485,8 @@ class PortfolioCashflows:
 
         Parameters
         ----------
-        market : MarketContext or str
-            Market context object or JSON providing FX and discount curves.
+        market : MarketContext
+            Market context providing FX and discount curves.
         base_currency : Currency | str
             Target currency of the collapsed ladder.
         as_of : datetime.date | str
@@ -526,7 +525,7 @@ class PortfolioCashflows:
 
 def aggregate_full_cashflows(
     portfolio: Portfolio | str,
-    market: MarketContext | str,
+    market: MarketContext,
     allow_partial: bool | None = None,
 ) -> PortfolioCashflows:
     """
@@ -543,8 +542,8 @@ def aggregate_full_cashflows(
     ----------
     portfolio : Portfolio or str
         Built portfolio or canonical ``PortfolioSpec`` JSON to expand.
-    market : MarketContext or str
-        Market context object or JSON needed for instrument cashflow generation.
+    market : MarketContext
+        Market context needed for instrument cashflow generation.
     allow_partial : bool or None, default None
         ``None`` uses the Rust ``CashflowAggregationOptions`` default,
         ``False``: any schedule-construction issue aborts the call. When
@@ -559,7 +558,8 @@ def aggregate_full_cashflows(
     Raises
     ------
     TypeError
-        If ``portfolio`` or ``market`` is neither its typed wrapper nor a JSON string.
+        If ``portfolio`` is neither a ``Portfolio`` nor a JSON string, or
+        ``market`` is not a ``MarketContext``.
     ValueError
         If supplied JSON is malformed or cashflow aggregation cannot represent
         a monetary result.

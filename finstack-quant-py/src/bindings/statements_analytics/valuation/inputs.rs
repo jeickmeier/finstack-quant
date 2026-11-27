@@ -1,8 +1,9 @@
 //! DCF specification, bridge, discount, and request Python bindings.
 
 use super::sensitivity::PyCorporateValuationResult;
+use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::extract::{extract_market_opt, extract_model_ref};
+use crate::bindings::extract::extract_model_ref;
 use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::macros::wire_methods;
 use crate::errors::{serde_json_to_py, statements_to_py};
@@ -522,11 +523,11 @@ pub(super) fn evaluate_corporate_dcf<'py>(
     py: Python<'py>,
     model: &Bound<'py, PyAny>,
     request: &PyCorporateDcfRequest,
-    market: Option<&Bound<'py, PyAny>>,
+    market: Option<PyRef<'py, PyMarketContext>>,
 ) -> PyResult<PyCorporateValuationResult> {
     let model = extract_model_ref(model)?.into_owned();
     let request = request.inner.clone();
-    let market = extract_market_opt(py, market)?;
+    let market = market.map(|market| market.inner.clone());
     let inner = py
         .detach(move || {
             finstack_quant_statements_analytics::analysis::evaluate_corporate_dcf(

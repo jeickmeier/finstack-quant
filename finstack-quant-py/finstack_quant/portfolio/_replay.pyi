@@ -602,7 +602,7 @@ class ReplayResult:
 
 def replay_portfolio(
     portfolio: Portfolio | str,
-    snapshots: list[tuple[datetime.date | str, MarketContext | str]] | list[dict[str, Any]] | str,
+    snapshots: list[tuple[datetime.date | str, MarketContext]] | list[dict[str, Any]] | str,
     config: ReplayConfig | dict[str, Any] | str,
 ) -> ReplayResult:
     """
@@ -612,7 +612,7 @@ def replay_portfolio(
     ----------
     portfolio : Portfolio or str
         Typed :class:`Portfolio` or JSON ``PortfolioSpec``.
-    snapshots : list[tuple[date, MarketContext | str]] | list[dict] | str
+    snapshots : list[tuple[date, MarketContext]] | list[dict] | str
         Dated market snapshots in ascending order: ``(date, market)`` pairs
         (dates as ``datetime.date`` or ISO strings), JSON-shaped
         ``{"date": "YYYY-MM-DD", "market": {...}}`` dicts, or the canonical

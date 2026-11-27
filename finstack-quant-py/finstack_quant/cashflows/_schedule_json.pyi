@@ -83,7 +83,7 @@ class ScheduleBuildOpts:
 
 def build_cashflow_schedule(
     spec: dict[str, Any] | str,
-    market: MarketContext | str | None = None,
+    market: MarketContext | None = None,
     as_of: datetime.date | str | None = None,
 ) -> CashFlowSchedule:
     """
@@ -98,8 +98,8 @@ def build_cashflow_schedule(
         ``payment_program``, ``fees``, ``principal_events``,
         ``principal_exchange``). Each principal event requires economic ``date``
         and cash ``payment_date``; these dates may differ after payment adjustment.
-    market : MarketContext or str, optional
-        Market context (or its JSON) for floating-rate projection. Every
+    market : MarketContext, optional
+        Market context for floating-rate projection. Every
         floating coupon needs its forward curve, even when supplied
         observations cover it, unless an explicit fallback applies. Explicit
         fallback covers any failed coupon projection, never supplied
