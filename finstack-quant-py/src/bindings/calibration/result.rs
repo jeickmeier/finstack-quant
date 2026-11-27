@@ -33,7 +33,6 @@ use std::sync::OnceLock;
 pub struct PyCalibrationResult {
     pub(crate) inner: CalibrationResultEnvelope,
     cached_json: OnceLock<String>,
-    cached_market_json: OnceLock<String>,
 }
 
 impl Clone for PyCalibrationResult {
@@ -47,7 +46,6 @@ impl PyCalibrationResult {
         Self {
             inner,
             cached_json: OnceLock::new(),
-            cached_market_json: OnceLock::new(),
         }
     }
 }
@@ -148,21 +146,6 @@ impl PyCalibrationResult {
         let ctx =
             MarketContext::try_from(self.inner.result.final_market.clone()).map_err(core_to_py)?;
         Ok(PyMarketContext::from_inner(ctx))
-    }
-
-    /// The calibrated market serialized as a JSON string.
-    ///
-    /// Validates the state through the same ``MarketContext`` conversion as
-    /// the ``market`` getter before serializing.
-    #[getter]
-    fn market_json<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyString>> {
-        if let Some(value) = self.cached_market_json.get() {
-            return Ok(PyString::new(py, value));
-        }
-        MarketContext::try_from(self.inner.result.final_market.clone()).map_err(core_to_py)?;
-        cached_json(py, &self.cached_market_json, || {
-            serde_json::to_string(&self.inner.result.final_market)
-        })
     }
 
     /// Plan-level aggregated report.

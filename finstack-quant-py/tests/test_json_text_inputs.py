@@ -44,6 +44,7 @@ from finstack_quant.calibration import (
     CalibrationConfig,
     CalibrationEnvelope,
     CalibrationPlan,
+    CalibrationResultEnvelope,
     CalibrationStep,
     CdsQuote,
     CdsTrancheQuote,
@@ -145,6 +146,7 @@ from finstack_quant.statements_analytics import (
     score_relative_value,
 )
 from finstack_quant.valuations.composite import (
+    CompositeHistoryResult,
     CompositeLegSpec,
     CompositeSpec,
     RebalanceRule,
@@ -508,7 +510,7 @@ def _datum_text(make: Callable[[], Any]) -> str:
 
 def _prior_curve_text() -> str:
     """A calibrated discount curve as a ``prior_market`` object: tagged with ``kind``."""
-    curve = json.loads(calibrate(json.loads(_calibration_envelope())).market_json)["curves"][0]
+    curve = json.loads(calibrate(json.loads(_calibration_envelope())).market.to_json())["curves"][0]
     del curve["type"]
     return json.dumps({"kind": "discount_curve", **curve})
 
@@ -1901,56 +1903,64 @@ REPLACEMENTS = [
         lambda: dt.date(2025, 2, 28),
         bad={"invalid-day": (lambda: dt.date(2025, 2, 30), ValueError)},
     ),
+    # A removed `*_json` member: the typed member holds what `to_json()` writes for that field.
+    Replacement(
+        "CalibrationResultEnvelope.market_json",
+        (CalibrationResultEnvelope, "market_json"),
+        lambda: json.loads(_calibration_market_text()),
+        lambda: json.loads(_calibration_result().to_json())["result"]["final_market"],
+    ),
+    Replacement(
+        "PortfolioCashflows.events_json",
+        (PortfolioCashflows, "events_json"),
+        lambda: _portfolio_cashflows().events,
+        lambda: json.loads(_portfolio_cashflows().to_json())["events"],
+    ),
+    Replacement(
+        "PortfolioCashflows.by_date_json",
+        (PortfolioCashflows, "by_date_json"),
+        lambda: _portfolio_cashflows().by_date,
+        lambda: json.loads(_portfolio_cashflows().to_json())["by_date"],
+    ),
+    Replacement(
+        "PortfolioCashflows.issues_json",
+        (PortfolioCashflows, "issues_json"),
+        lambda: _portfolio_cashflows().issues,
+        lambda: json.loads(_portfolio_cashflows().to_json())["issues"],
+    ),
+    Replacement(
+        "CorkscrewReport.data_json",
+        (CorkscrewReport, "data_json"),
+        lambda: _corkscrew_report().data,
+        lambda: json.loads(_corkscrew_report().to_json())["data"],
+    ),
+    Replacement(
+        "ScorecardReport.data_json",
+        (ScorecardReport, "data_json"),
+        lambda: _scorecard_report().data,
+        lambda: json.loads(_scorecard_report().to_json())["data"],
+    ),
+    Replacement(
+        "ScorecardMetric.thresholds_json",
+        (ScorecardMetric, "thresholds_json"),
+        lambda: _scorecard_metric().thresholds,
+        lambda: {key: tuple(band) for key, band in json.loads(_scorecard_metric().to_json())["thresholds"].items()},
+    ),
+    Replacement(
+        "CompositeHistoryResult.row_json",
+        (CompositeHistoryResult, "row_json"),
+        lambda: [_composite_history().row(index) for index in range(2)],
+        lambda: json.loads(_composite_history().to_json()),
+        bad={"row-out-of-range": (lambda: _composite_history().row(9), IndexError)},
+    ),
 ]
 
+# The pair that is still alive: the text member is held for an owner decision.
 TWINS = [
-    Twin(
-        "CalibrationResultEnvelope.market_json",
-        lambda: _calibration_result().market_json,
-        _calibration_market_text,
-    ),
     Twin(
         "PortfolioAttribution.by_position_json",
         lambda: json.loads(_portfolio_attribution().by_position_json()),
         lambda: {key: json.loads(value.to_json()) for key, value in _portfolio_attribution().by_position.items()},
-    ),
-    Twin(
-        "PortfolioCashflows.events_json",
-        lambda: json.loads(_portfolio_cashflows().events_json()),
-        lambda: _portfolio_cashflows().events,
-    ),
-    Twin(
-        "PortfolioCashflows.by_date_json",
-        lambda: json.loads(_portfolio_cashflows().by_date_json()),
-        lambda: _portfolio_cashflows().by_date,
-    ),
-    Twin(
-        "PortfolioCashflows.issues_json",
-        lambda: json.loads(_portfolio_cashflows().issues_json()),
-        lambda: _portfolio_cashflows().issues,
-    ),
-    Twin(
-        "CorkscrewReport.data_json",
-        lambda: json.loads(_corkscrew_report().data_json()),
-        lambda: _corkscrew_report().data,
-    ),
-    Twin(
-        "ScorecardReport.data_json",
-        lambda: json.loads(_scorecard_report().data_json()),
-        lambda: _scorecard_report().data,
-    ),
-    Twin(
-        "ScorecardMetric.thresholds_json",
-        lambda: json.loads(_scorecard_metric().thresholds_json()),
-        lambda: {key: list(band) for key, band in _scorecard_metric().thresholds.items()},
-    ),
-    Twin(
-        "CompositeHistoryResult.row_json",
-        lambda: [json.loads(_composite_history().row_json(index)) for index in range(2)],
-        lambda: [_composite_history().row(index) for index in range(2)],
-        bad={
-            "row-out-of-range": (lambda: _composite_history().row_json(9), lambda: _composite_history().row(9)),
-        },
     ),
 ]
 
@@ -1960,7 +1970,8 @@ def test_removed_text_form_is_gone_and_its_typed_form_works(replacement: Replace
     owner, name = replacement.removed
     assert not hasattr(owner, name)
     value = replacement.call()
-    assert value
+    # Not vacuous: the form carries some data, except for the list of issues of a clean book.
+    assert value or replacement.id == "PortfolioCashflows.issues_json"
     assert value == replacement.expected()
 
 
@@ -1978,8 +1989,7 @@ def test_typed_form_rejects_bad_input(replacement: Replacement, label: str) -> N
 def test_text_form_equals_typed_form(twin: Twin) -> None:
     via_text, via_typed = twin.via_text(), twin.via_typed()
     assert via_text == via_typed
-    # Not vacuous: the pair carries some data, except for the list of issues of a clean book.
-    assert via_text or twin.id == "PortfolioCashflows.issues_json"
+    assert via_text
 
 
 @pytest.mark.parametrize(

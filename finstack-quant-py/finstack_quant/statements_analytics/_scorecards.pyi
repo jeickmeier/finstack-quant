@@ -149,22 +149,6 @@ class ScorecardMetric:
             the metric formula; an empty dictionary when no bands are configured.
         """
         ...
-    def thresholds_json(self) -> str:
-        """
-        Serialize rating-label thresholds to JSON.
-
-        Returns
-        -------
-        str
-            JSON object mapping rating labels to two-element lower and upper
-            threshold arrays.
-
-        Raises
-        ------
-        ValueError
-            If the thresholds cannot be serialized to JSON.
-        """
-        ...
     def to_json(self) -> str:
         """
         Serialize this object to canonical JSON.
@@ -401,7 +385,7 @@ class ScorecardReport:
     """
     Report produced by ``CreditScorecardExtension.execute``.
 
-    ``data_json()`` includes the rated ``period``, the ``partial`` flag, and
+    ``data`` includes the rated ``period``, the ``partial`` flag, and
     ``weight_coverage`` alongside the per-metric scores and rating.
 
     With no usable positive-weight evidence, status is ``"failed"`` and the
@@ -496,22 +480,6 @@ class ScorecardReport:
         ------
         ValueError
             If the payload cannot be converted through canonical JSON.
-        """
-        ...
-    def data_json(self) -> str:
-        """
-        Serialize report payload fields to JSON.
-
-        Returns
-        -------
-        str
-            JSON serialization of the structured scorecard payload, including
-            the rated period, metric scores, rating, partial flag, and weight coverage.
-
-        Raises
-        ------
-        ValueError
-            If the payload cannot be serialized to JSON.
         """
         ...
     def to_json(self) -> str:

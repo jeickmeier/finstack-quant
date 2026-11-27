@@ -204,22 +204,6 @@ impl PyPortfolioCashflows {
         finstack_quant_core::wire::serde_label(&self.inner.fx_collapse_policy).map_err(core_to_py)
     }
 
-    /// JSON for the flat ``events`` vector only.
-    #[pyo3(text_signature = "(self)")]
-    fn events_json(&self, py: Python<'_>) -> PyResult<String> {
-        let events = &self.inner.events;
-        py.detach(|| serde_json::to_string(events))
-            .map_err(display_to_py)
-    }
-
-    /// JSON for the ``by_date`` currency/kind totals only.
-    #[pyo3(text_signature = "(self)")]
-    fn by_date_json(&self, py: Python<'_>) -> PyResult<String> {
-        let by_date = &self.inner.by_date;
-        py.detach(|| serde_json::to_string(by_date))
-            .map_err(display_to_py)
-    }
-
     /// Export the extraction ``issues`` as an :class:`~finstack_quant.core.table.ArrowTable`.
     ///
     /// Columns: ``position_id``, ``instrument_id``, ``instrument_type``,
@@ -246,14 +230,6 @@ impl PyPortfolioCashflows {
             .utf8("instrument_type", instrument_types)?
             .utf8("message", messages)?
             .build()
-    }
-
-    /// JSON for the ``issues`` vector only.
-    #[pyo3(text_signature = "(self)")]
-    fn issues_json(&self, py: Python<'_>) -> PyResult<String> {
-        let issues = &self.inner.issues;
-        py.detach(|| serde_json::to_string(issues))
-            .map_err(display_to_py)
     }
 
     /// Net same-currency cashflow amounts across kinds for each payment date.

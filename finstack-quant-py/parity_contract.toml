@@ -2575,6 +2575,9 @@ statementResultToTableWide = "twin of Python StatementResult.to_arrow(orient='wi
 [parity.js."valuations".wasm_only]
 valuationResultToJson = "twin of Python ValuationResult.to_json (WASM results are plain objects)"
 
+[parity.js."valuations.composite".wasm_only]
+compositeHistoryResultRowJson = "Rust CompositeHistoryRow JSON serializer; WASM history results are plain row arrays, so it is a free function taking the rows. Python reads the same row with CompositeHistoryResult.row(index)"
+
 [parity.js."valuations.instruments".wasm_only]
 futureOptionTerms = "Validated constructor twin of Python FutureOptionTerms; WASM options take native terms documents"
 listedFutureTerms = "Validated constructor twin of Python ListedFutureTerms; the native terms are plain objects in WASM"
@@ -2589,7 +2592,6 @@ priceInstrumentWithMarket = "WASM core.MarketContext-handle variant of priceInst
 
 [parity.members."finstack_quant.valuations.composite.CompositeHistoryResult"]
 excluded = { dates = "literal", row = "literal" }
-renames = { row_json = { js = "valuations.composite.compositeHistoryResultRowJson", reason = "WASM history results are plain row arrays; the row serializer is a free function taking the rows" } }
 
 [parity.members."finstack_quant.valuations.composite.CompositeInstrument"]
 excluded = { id = "literal", execution_trades_table = "arrow" }
@@ -3132,7 +3134,7 @@ excluded = { by_position_json = "literal", to_position_table = "arrow" }
 renames = { explain = { js = "portfolio.portfolioAttributionExplainText", reason = "WASM results are plain objects; the Rust PortfolioAttribution::explain method is a free function taking the object" }, pct_of_total_by_bucket = { js = "portfolio.portfolioAttributionPctOfTotalByBucket", reason = "WASM results are plain objects; the Rust PortfolioAttribution::pct_of_total_by_bucket method is a free function taking the object" }, reconciliation_check = { js = "portfolio.portfolioAttributionReconciliationCheck", reason = "WASM results are plain objects; the Rust PortfolioAttribution::reconciliation_check method is a free function taking the object" } }
 
 [parity.members."finstack_quant.portfolio.PortfolioCashflows"]
-excluded = { by_date_json = "literal", events_json = "literal", issues_json = "literal", to_issues_table = "arrow" }
+excluded = { to_issues_table = "arrow" }
 renames = { collapse_to_base_by_date_kind = { js = "portfolio.collapseToBaseByDateKind", reason = "WASM results are plain objects; the Rust PortfolioCashflows::collapse_to_base_by_date_kind method is a free function taking the object" }, collapse_to_base_by_date_kind_json = { js = "portfolio.collapseToBaseByDateKind", reason = "Python-only JSON-string exit of collapse_to_base_by_date_kind; the WASM function returns the same ladder as a plain object" }, net_in_currency_by_date = { js = "portfolio.netInCurrencyByDate", reason = "WASM results are plain objects; the Rust PortfolioCashflows::net_in_currency_by_date method is a free function taking the object" } }
 
 [parity.members."finstack_quant.portfolio.PortfolioMetrics"]
@@ -3273,7 +3275,7 @@ excluded = { float64 = "literal" }
 excluded = { from_str = "literal", value = "literal" }
 
 [parity.members."finstack_quant.statements_analytics.CorkscrewReport"]
-excluded = { data_json = "literal", to_validations_table = "arrow" }
+excluded = { to_validations_table = "arrow" }
 
 [parity.members."finstack_quant.statements_analytics.LeaseGrowthConvention"]
 excluded = { from_str = "literal", value = "literal" }
@@ -3281,11 +3283,8 @@ excluded = { from_str = "literal", value = "literal" }
 [parity.members."finstack_quant.statements_analytics.ManagementFeeBase"]
 excluded = { from_str = "literal", value = "literal" }
 
-[parity.members."finstack_quant.statements_analytics.ScorecardMetric"]
-excluded = { thresholds_json = "literal" }
-
 [parity.members."finstack_quant.statements_analytics.ScorecardReport"]
-excluded = { data_json = "literal", to_metric_scores_table = "arrow" }
+excluded = { to_metric_scores_table = "arrow" }
 
 [parity.members."finstack_quant.statements_analytics.Stage"]
 excluded = { from_str = "literal" }

@@ -1899,7 +1899,7 @@ class CompositeHistoryResult:
     ...         {"date": "2025-01-02", "state": _state},
     ...     ],
     ... )
-    >>> (len(_history), json.loads(_history.row_json(0))["return_index"])
+    >>> (len(_history), _history.row(0)["return_index"])
     (2, 100.0)
     """
 
@@ -2106,8 +2106,7 @@ class CompositeHistoryResult:
         Returns
         -------
         dict[str, Any]
-            The selected row in its canonical serde shape (what
-            ``json.loads(self.row_json(index))`` returns): value, cashflows,
+            The selected row in its canonical serde shape: value, cashflows,
             P&L, return, exposures and rebalance trades.
 
         Raises
@@ -2116,29 +2115,6 @@ class CompositeHistoryResult:
             If ``index`` is outside the result bounds.
         ValueError
             If the selected row cannot be converted.
-        """
-        ...
-
-    def row_json(self, index: int) -> str:
-        """
-        Serialize one zero-based dated history row; JSON twin of :meth:`row`.
-
-        Parameters
-        ----------
-        index : int
-            Zero-based row index in chronological order.
-
-        Returns
-        -------
-        str
-            JSON for the selected value, P&L, return, exposure, and trade row.
-
-        Raises
-        ------
-        IndexError
-            If ``index`` is outside the result bounds.
-        ValueError
-            If the selected row cannot be serialized.
         """
         ...
 

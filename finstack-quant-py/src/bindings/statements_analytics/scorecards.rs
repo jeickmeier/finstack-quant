@@ -16,7 +16,6 @@ use crate::bindings::pydoc::pydoc;
 use crate::bindings::statements::evaluator::PyStatementResult;
 use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::bindings::table_builders::serde_rows_to_arrow_table;
-use crate::errors::display_to_py;
 use finstack_quant_statements_analytics::extensions as rust_scorecards;
 use pyo3::prelude::*;
 
@@ -136,11 +135,6 @@ impl PyScorecardMetric {
             .iter()
             .map(|(k, v)| (k.clone(), *v))
             .collect()
-    }
-
-    /// JSON-serialized thresholds (`{"AAA": [0.0, 1.0], ...}`).
-    fn thresholds_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner.thresholds).map_err(display_to_py)
     }
 
     fn __repr__(&self) -> String {
@@ -304,12 +298,6 @@ impl PyScorecardReport {
     #[getter]
     fn data<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.data)
-    }
-
-    /// Return the structured data payload as a JSON string (the wire form of
-    /// ``data``).
-    fn data_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner.data).map_err(display_to_py)
     }
 
     /// Export the per-metric scores as an ``ArrowTable``.

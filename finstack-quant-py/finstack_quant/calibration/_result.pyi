@@ -48,22 +48,6 @@ class CalibrationResultEnvelope:
         """
 
     @property
-    def market_json(self) -> str:
-        """
-        The calibrated market as canonical ``MarketContext`` JSON.
-
-        Returns
-        -------
-        str
-            The calibrated market as canonical ``MarketContext`` JSON.
-
-        Raises
-        ------
-        ValueError
-            If the underlying value cannot be serialized to JSON.
-        """
-
-    @property
     def report(self) -> CalibrationReport:
         """
         Plan-level calibration report aggregated across steps.

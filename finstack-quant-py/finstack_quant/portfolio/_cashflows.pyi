@@ -107,7 +107,7 @@ class PortfolioCashflows:
     Typed wrapper around a ``PortfolioCashflows`` ladder.
 
     Returned by :func:`aggregate_full_cashflows`; survives multiple drill-in
-    calls (``events_json``, ``by_date_json``, ``issues_json``,
+    calls (:attr:`events`, :attr:`by_date`, :attr:`issues`,
     :meth:`collapse_to_base_by_date_kind`) without re-parsing.
 
     Examples
@@ -180,48 +180,6 @@ class PortfolioCashflows:
         ------
         ValueError
             If the value cannot be serialized to JSON.
-        """
-        ...
-
-    def events_json(self) -> str:
-        """
-        Return all dated cashflow events as JSON.
-        Returns
-        -------
-        str
-            Compact JSON array of all dated cashflow events in ladder order.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    def by_date_json(self) -> str:
-        """
-        Return cashflows grouped by date as JSON.
-        Returns
-        -------
-        str
-            Compact JSON for totals grouped by payment date, currency, and cashflow kind.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    def issues_json(self) -> str:
-        """
-        Return cashflow aggregation or FX-conversion issues as JSON.
-        Returns
-        -------
-        str
-            Compact JSON array of cashflow-schedule extraction issues.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
         """
         ...
 

@@ -501,22 +501,6 @@ class CorkscrewReport:
             If the payload cannot be converted through canonical JSON.
         """
         ...
-    def data_json(self) -> str:
-        """
-        Serialize report payload fields to JSON.
-
-        Returns
-        -------
-        str
-            JSON serialization of the structured reconciliation payload,
-            including account-level balance checks and differences.
-
-        Raises
-        ------
-        ValueError
-            If the payload cannot be serialized to JSON.
-        """
-        ...
     def to_json(self) -> str:
         """
         Serialize this object to canonical JSON.

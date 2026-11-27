@@ -808,14 +808,6 @@ impl PyCompositeHistoryResult {
         serde_to_py(py, self.history_row(index)?)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeHistoryResult.row_json")]
-    fn row_json(&self, index: usize) -> PyResult<String> {
-        serialize_json_with_context(
-            self.history_row(index)?,
-            "failed to serialize CompositeHistoryRow",
-        )
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeHistoryResult.to_json")]
     fn to_json(&self) -> PyResult<String> {
         serialize_json_with_context(&self.inner, "failed to serialize composite history")

@@ -14,6 +14,11 @@ JSON entry points. Results are unchanged. Old → new:
 - `features.transform_panel_json(spec_json)` → `transform_panel(PanelTransformSpec.from_json(spec_json)).to_json()`
 - `covenants.evaluate_engine(engine_json, metrics, as_of)` → `CovenantEngine.from_json(engine_json).evaluate(metrics, as_of)`
 - `core.dates.create_date(year, month, day)` → `datetime.date(year, month, day)`
+- `CalibrationResultEnvelope.market_json` → `result.market.to_json()`
+- `PortfolioCashflows.events_json()` / `by_date_json()` / `issues_json()` → the `events`, `by_date` and `issues` properties, which hold what `to_json()` writes under those keys
+- `CorkscrewReport.data_json()` and `ScorecardReport.data_json()` → the `data` property
+- `ScorecardMetric.thresholds_json()` → the `thresholds` property (each band is a `(lower, upper)` tuple)
+- `CompositeHistoryResult.row_json(index)` → `row(index)`
 
 ### Python: a string argument is a value, not a JSON document
 
@@ -870,7 +875,7 @@ Wire changes. Each field below is now nullable; every value that exists is uncha
 - Always-zero metrics: repo `collateral_haircut01` / `collateral_price01` and CDS tranche `tail_dependence`.
 - Setters that shadowed builders or public fields (swaption, cap/floor, IR future, Bermudan schedule, basis swap, structured credit, pool asset, tranche, FX spot, CDS index and option, `ValuationResult::with_covenant(s)`).
 - Dead public API with no callers, including `extract_risk_factors`, `ListedDeliveryObligation`, `CdsPricerConfig`, the CDS index `*_detailed` results, `StructuredCredit::{generate_cashflows, apply_deal_defaults}`, `BasketCalculator`, `CompositeInstrument::new`, `instrument_cashflows_json` and `format_bucket_label_cow` (`format_bucket_label` returns `Cow`).
-- Python `ValuationResult.{price_decimal, metric_keys, metric_count}`, the composite JSON twins `execution_trades_json` / `trades_json` / `instrument_json` (`CompositeHistoryResult.row` is the typed twin of `row_json`), and WASM `weightingMethodFixedQuantity`, `weightingMethodNotionalWeighted`, `rebalanceRuleManual` and the FX bare-spec constructor.
+- Python `ValuationResult.{price_decimal, metric_keys, metric_count}`, the composite JSON twins `execution_trades_json` / `trades_json` / `instrument_json` (`CompositeHistoryResult.row` reads a history row), and WASM `weightingMethodFixedQuantity`, `weightingMethodNotionalWeighted`, `rebalanceRuleManual` and the FX bare-spec constructor.
 
 ### Statements: one path per capability
 
