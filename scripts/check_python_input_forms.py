@@ -1,19 +1,22 @@
 """Reject a Python parameter that takes a typed object or the same object as text.
 
 In the Python API a ``str`` argument is a value: a label, a code, a date, an id.
-It is never a JSON document. A class that can be loaded from JSON text has a
-named loader (``from_json`` or ``from_spec``), so a parameter annotated
-``Class | str`` offers two ways to pass one value.
+It is never a JSON document. JSON text enters through a named loader
+(``T.from_json``, ``Portfolio.from_spec``) or ``json.loads``, so a parameter
+annotated ``Class | str`` offers two ways to pass one value.
 
 This check reads the ``.pyi`` stubs under ``finstack-quant-py/finstack_quant``.
 It fails on any parameter whose annotation holds ``str`` in the same union as a
-class that defines such a loader. Two short lists are exempt, each entry with
-its reason: classes for which a string is a label, and the parameters whose
-subject is the JSON text itself. An entry that no longer matches anything is
-also an error, so the lists cannot go stale.
+class the package defines. Module-level type aliases are expanded first. Two
+lists are exempt, each entry with its reason: the classes for which a string
+is a label, and the parameters whose subject is the JSON text itself. An entry
+that no longer matches anything is also an error, so the lists cannot go
+stale.
 
-The check sees annotations only. ``finstack-quant-py/tests/test_json_text_inputs.py``
-proves the runtime behaviour.
+The check sees annotations only, and it does not judge ``dict | str``, where
+the string is a label for some parameters.
+``finstack-quant-py/tests/test_json_text_inputs.py`` proves the runtime
+behaviour.
 """
 
 from __future__ import annotations
@@ -28,17 +31,45 @@ import sys
 REPO_ROOT = Path(__file__).resolve().parents[1]
 STUB_ROOT = REPO_ROOT / "finstack-quant-py" / "finstack_quant"
 
-LOADER_METHODS = frozenset({"from_json", "from_spec"})
+_VARIANT = "a variant name"
 
 # Classes whose string form is a label or a number in text, not a document.
 LABEL_CLASSES: dict[str, str] = {
     "Bps": "a basis-point amount in text",
+    "BusinessDayConvention": _VARIANT,
+    "CFKind": _VARIANT,
+    "CollateralAssetClass": _VARIANT,
+    "Compounding": _VARIANT,
     "CreditRating": "a rating label such as 'BBB+'",
+    "CrossSectionalOp": _VARIANT,
     "Currency": "an ISO 4217 code",
+    "CurveKind": _VARIANT,
+    "DayCount": "a day-count name such as 'act_365f'",
+    "FeeAccrualBasis": _VARIANT,
     "FeeBase": "the label of a fee base without parameters",
+    "FloatingLegCompounding": _VARIANT,
+    "FloatingRateFallback": _VARIANT,
+    "FxConversionPolicy": _VARIANT,
+    "GridMode": _VARIANT,
+    "HolidayCalendar": "a calendar code such as 'nyse'",
+    "ImMethodology": _VARIANT,
+    "LeaseGrowthConvention": _VARIANT,
     "Money": "a decimal amount in text",
+    "NodeType": _VARIANT,
+    "OvernightIndexConstraintApplication": _VARIANT,
+    "PairwiseOp": _VARIANT,
     "Rate": "a decimal rate in text",
-    "RoundingMode": "a rounding-mode name",
+    "RiskMeasure": "one of the two measures without parameters",
+    "RollRule": _VARIANT,
+    "RoundingMode": _VARIANT,
+    "Stage": _VARIANT,
+    "StubKind": _VARIANT,
+    "Tenor": "a tenor such as '3M'",
+    "TenorMatchMode": _VARIANT,
+    "TenorUnit": _VARIANT,
+    "TimeRollMode": _VARIANT,
+    "TimeSeriesOp": _VARIANT,
+    "VolHorizon": "the label 'one_step' or 'unconditional'",
 }
 
 # Parameters whose subject is the JSON text: (stub path under the package, qualified name, parameter).
@@ -60,7 +91,7 @@ class Finding:
     line: int
     owner: str
     parameter: str
-    class_name: str
+    classes: tuple[str, ...]
 
     def format(self, root: Path) -> str:
         """Render the finding in compiler-style form.
@@ -79,38 +110,11 @@ class Finding:
             shown = self.path.relative_to(root)
         except ValueError:
             shown = self.path
+        named = ", ".join(self.classes[:3]) + (", ..." if len(self.classes) > 3 else "")
         return (
-            f"{shown}:{self.line}: {self.owner}({self.parameter}) takes `{self.class_name} | str`; "
-            f"a str is a value, so drop `str` and load JSON text with `{self.class_name}.from_json`"
+            f"{shown}:{self.line}: {self.owner}({self.parameter}) takes `str` beside {named}; "
+            "a str is a value, so drop `str` and load JSON text with the class's loader or `json.loads`"
         )
-
-
-def _union_levels(annotation: ast.expr) -> Iterator[list[ast.expr]]:
-    """Yield the members of every union inside an annotation, one list per union."""
-    if isinstance(annotation, ast.BinOp) and isinstance(annotation.op, ast.BitOr):
-        members: list[ast.expr] = []
-        stack = [annotation]
-        while stack:
-            node = stack.pop()
-            if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
-                stack.extend((node.right, node.left))
-            else:
-                members.append(node)
-        yield members
-        for member in members:
-            yield from _union_levels(member)
-    elif isinstance(annotation, ast.Subscript):
-        elements = annotation.slice.elts if isinstance(annotation.slice, ast.Tuple) else [annotation.slice]
-        if _name(annotation.value) in {"Union", "Optional"}:
-            yield list(elements)
-        for element in elements:
-            yield from _union_levels(element)
-    elif isinstance(annotation, ast.Constant) and isinstance(annotation.value, str):
-        try:
-            quoted = ast.parse(annotation.value, mode="eval").body
-        except SyntaxError:
-            return
-        yield from _union_levels(quoted)
 
 
 def _name(node: ast.expr) -> str | None:
@@ -122,8 +126,73 @@ def _name(node: ast.expr) -> str | None:
     return None
 
 
-def loader_classes(trees: dict[Path, ast.Module]) -> set[str]:
-    """Collect the names of the classes that define a JSON loader.
+def type_aliases(tree: ast.Module) -> dict[str, ast.expr]:
+    """Collect the module-level type aliases of one stub.
+
+    Parameters
+    ----------
+    tree : ast.Module
+        Parsed stub module.
+
+    Returns:
+    -------
+    dict[str, ast.expr]
+        Alias name to the annotation it stands for (``X = A | B``,
+        ``X: TypeAlias = A | B`` and ``type X = A | B``).
+    """
+    aliases: dict[str, ast.expr] = {}
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            aliases[node.targets[0].id] = node.value
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.value is not None:
+            aliases[node.target.id] = node.value
+        elif isinstance(node, ast.TypeAlias):
+            aliases[node.name.id] = node.value
+    return aliases
+
+
+def _union_members(annotation: ast.expr, aliases: dict[str, ast.expr], seen: frozenset[str]) -> list[ast.expr] | None:
+    """Return the members of ``annotation`` if it is a union, expanding aliases; else ``None``."""
+    if isinstance(annotation, ast.BinOp) and isinstance(annotation.op, ast.BitOr):
+        sides = [annotation.left, annotation.right]
+    elif isinstance(annotation, ast.Subscript) and _name(annotation.value) in {"Union", "Optional"}:
+        sides = list(annotation.slice.elts) if isinstance(annotation.slice, ast.Tuple) else [annotation.slice]
+    else:
+        return None
+    members: list[ast.expr] = []
+    for side in sides:
+        members.extend(_flatten(side, aliases, seen))
+    return members
+
+
+def _flatten(node: ast.expr, aliases: dict[str, ast.expr], seen: frozenset[str]) -> list[ast.expr]:
+    """Return ``node`` as union members: itself, or the members it stands for."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        try:
+            node = ast.parse(node.value, mode="eval").body
+        except SyntaxError:
+            return [node]
+    name = _name(node)
+    if name in aliases and name not in seen:
+        return _flatten(aliases[name], aliases, seen | {name})
+    nested = _union_members(node, aliases, seen)
+    return [node] if nested is None else nested
+
+
+def _union_levels(annotation: ast.expr, aliases: dict[str, ast.expr]) -> Iterator[list[ast.expr]]:
+    """Yield the members of every union inside an annotation, one list per union."""
+    members = _flatten(annotation, aliases, frozenset())
+    if len(members) > 1:
+        yield members
+    for member in members:
+        if isinstance(member, ast.Subscript):
+            elements = member.slice.elts if isinstance(member.slice, ast.Tuple) else [member.slice]
+            for element in elements:
+                yield from _union_levels(element, aliases)
+
+
+def package_classes(trees: dict[Path, ast.Module]) -> set[str]:
+    """Collect the names of the classes the stubs define.
 
     Parameters
     ----------
@@ -133,16 +202,9 @@ def loader_classes(trees: dict[Path, ast.Module]) -> set[str]:
     Returns:
     -------
     set[str]
-        Names of the classes with a ``from_json`` or ``from_spec`` method.
+        Name of every class defined anywhere in the stubs.
     """
-    names: set[str] = set()
-    for tree in trees.values():
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ClassDef) and any(
-                isinstance(item, ast.FunctionDef) and item.name in LOADER_METHODS for item in node.body
-            ):
-                names.add(node.name)
-    return names
+    return {node.name for tree in trees.values() for node in ast.walk(tree) if isinstance(node, ast.ClassDef)}
 
 
 def _parameters(function: ast.FunctionDef) -> Iterator[ast.arg]:
@@ -164,35 +226,38 @@ def _functions(body: Sequence[ast.stmt], owner: tuple[str, ...]) -> Iterator[tup
             yield ".".join((*owner, node.name)), node
 
 
-def find_typed_or_text(trees: dict[Path, ast.Module], loaders: set[str]) -> list[Finding]:
-    """List every parameter annotated with ``str`` beside a loadable class.
+def find_typed_or_text(trees: dict[Path, ast.Module], classes: set[str]) -> list[Finding]:
+    """List every parameter annotated with ``str`` beside a package class.
 
     Parameters
     ----------
     trees : dict[Path, ast.Module]
         Parsed stub modules keyed by their path.
-    loaders : set[str]
-        Names of the classes that define a JSON loader.
+    classes : set[str]
+        Names of the classes the package defines.
 
     Returns:
     -------
     list[Finding]
-        One finding per parameter and class, before any exemption is applied.
+        One finding per parameter, before any exemption is applied.
     """
+    shared: dict[str, ast.expr] = {}
+    for tree in trees.values():
+        shared.update(type_aliases(tree))
     findings: list[Finding] = []
     for path, tree in trees.items():
+        aliases = {**shared, **type_aliases(tree)}
         for owner, function in _functions(tree.body, ()):
             for parameter in _parameters(function):
                 if parameter.annotation is None:
                     continue
-                classes: set[str] = set()
-                for members in _union_levels(parameter.annotation):
+                beside: set[str] = set()
+                for members in _union_levels(parameter.annotation, aliases):
                     names = {_name(member) for member in members}
                     if "str" in names:
-                        classes.update(name for name in names if name in loaders)
-                findings.extend(
-                    Finding(path, parameter.lineno, owner, parameter.arg, class_name) for class_name in sorted(classes)
-                )
+                        beside.update(name for name in names if name in classes)
+                if beside:
+                    findings.append(Finding(path, parameter.lineno, owner, parameter.arg, tuple(sorted(beside))))
     return findings
 
 
@@ -210,18 +275,22 @@ def check(stub_root: Path) -> list[str]:
         One line per violation or stale exemption; empty when the tree is clean.
     """
     trees = {path: ast.parse(path.read_text(encoding="utf-8")) for path in sorted(stub_root.rglob("*.pyi"))}
-    findings = find_typed_or_text(trees, loader_classes(trees))
     used_labels: set[str] = set()
     used_text: set[tuple[str, str, str]] = set()
     diagnostics: list[str] = []
-    for finding in findings:
+    for finding in find_typed_or_text(trees, package_classes(trees)):
         key = (finding.path.relative_to(stub_root).as_posix(), finding.owner, finding.parameter)
         if key in TEXT_PARAMETERS:
             used_text.add(key)
-        elif finding.class_name in LABEL_CLASSES:
-            used_labels.add(finding.class_name)
-        else:
-            diagnostics.append(finding.format(stub_root.parent.parent))
+            continue
+        used_labels.update(name for name in finding.classes if name in LABEL_CLASSES)
+        documents = tuple(name for name in finding.classes if name not in LABEL_CLASSES)
+        if documents:
+            diagnostics.append(
+                Finding(finding.path, finding.line, finding.owner, finding.parameter, documents).format(
+                    stub_root.parent.parent
+                )
+            )
     diagnostics.extend(
         f"LABEL_CLASSES entry {name!r} matches no parameter; remove it"
         for name in sorted(set(LABEL_CLASSES) - used_labels)
