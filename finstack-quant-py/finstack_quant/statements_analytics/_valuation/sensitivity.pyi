@@ -219,8 +219,8 @@ def dcf_sensitivity_on_results(
     ...
 
 def dcf_sensitivity_grid(
-    model: FinancialModelSpec | str,
-    results: StatementResult | str,
+    model: FinancialModelSpec,
+    results: StatementResult,
     request: CorporateDcfRequest,
     axes: DcfSensitivityGridSpec,
 ) -> DcfSensitivityGridResult:
@@ -228,9 +228,9 @@ def dcf_sensitivity_grid(
 
     Parameters
     ----------
-    model : FinancialModelSpec or str
+    model : FinancialModelSpec
         Unchanged source model used to generate results.
-    results : StatementResult or str
+    results : StatementResult
         The same statement run at the requested observation and valuation dates.
     request : CorporateDcfRequest
         Baseline assumptions and valuation horizon.
@@ -380,8 +380,8 @@ class DcfDistributionResult:
         ...
 
 def evaluate_dcf_monte_carlo(
-    model: FinancialModelSpec | str,
-    results: StatementResult | str,
+    model: FinancialModelSpec,
+    results: StatementResult,
     paths: MonteCarloResults,
     request: CorporateDcfRequest,
 ) -> DcfDistributionResult:
@@ -389,9 +389,9 @@ def evaluate_dcf_monte_carlo(
 
     Parameters
     ----------
-    model : FinancialModelSpec or str
+    model : FinancialModelSpec
         The original model with the same identity as the baseline and simulation.
-    results : StatementResult or str
+    results : StatementResult
         Verified baseline with the matching information cutoff and opening balances.
     paths : MonteCarloResults
         Simulation that retained full samples for each selected forecast cash-flow node.

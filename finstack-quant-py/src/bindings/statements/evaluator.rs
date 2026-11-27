@@ -1,15 +1,15 @@
 //! Python wrappers for the statement evaluator and results.
 
 use super::capital_structure::PyCapitalStructureCashflows;
-use super::monte_carlo::{PyMonteCarloResults, extract_config};
+use super::monte_carlo::{PyMonteCarloConfig, PyMonteCarloResults};
 use super::parse_period_id;
 use crate::bindings::core::dates::periods::PyPeriod;
 use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::{PyArrowTable, PyLabeledSeries};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::extract::extract_model_ref;
 use crate::bindings::macros::wire_methods;
+use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::errors::statements_to_py;
 use finstack_quant_statements::evaluator::PeriodDateConvention;
 use pyo3::exceptions::PyKeyError;
@@ -120,12 +120,11 @@ impl PyStatementResult {
     ///
     /// Parameters
     /// ----------
-    /// model : FinancialModelSpec | str
-    ///     The model these results were evaluated from, typed or its
-    ///     canonical JSON. It supplies the period dates and the formulas of
-    ///     ``"formula"`` nodes.
-    /// spec : RollupSpec | str
-    ///     Target frequency and per-node methods, typed or its JSON.
+    /// model : FinancialModelSpec
+    ///     The model these results were evaluated from. It supplies the
+    ///     period dates and the formulas of ``"formula"`` nodes.
+    /// spec : RollupSpec
+    ///     Target frequency and per-node methods.
     ///
     /// Returns
     /// -------
@@ -139,7 +138,7 @@ impl PyStatementResult {
     /// Raises
     /// ------
     /// ValueError
-    ///     If the JSON is malformed, the target frequency is not a whole
+    ///     If the target frequency is not a whole
     ///     multiple of the model's, a target period is incomplete, a method
     ///     names an unknown node, a ``"formula"`` node has no formula or reads
     ///     ``cs.*`` values, or a re-evaluated formula fails.
@@ -161,12 +160,12 @@ impl PyStatementResult {
     fn rollup(
         &self,
         py: Python<'_>,
-        model: &Bound<'_, PyAny>,
-        spec: &Bound<'_, PyAny>,
+        model: PyRef<'_, PyFinancialModelSpec>,
+        spec: PyRef<'_, super::rollup::PyRollupSpec>,
     ) -> PyResult<Self> {
-        let model = extract_model_ref(model)?;
-        let spec = super::rollup::extract_rollup_spec(spec)?;
-        let model_inner: &finstack_quant_statements::types::FinancialModelSpec = &model;
+        let model = &model.inner;
+        let spec = spec.inner.clone();
+        let model_inner: &finstack_quant_statements::types::FinancialModelSpec = model;
         let result = &self.inner;
         let inner = py
             .detach(|| result.rollup(model_inner, &spec))
@@ -538,9 +537,8 @@ impl PyEvaluator {
     ///
     /// Parameters
     /// ----------
-    /// model : FinancialModelSpec | str
-    ///     The model specification to evaluate — a typed model or its
-    ///     canonical JSON.
+    /// model : FinancialModelSpec
+    ///     The model specification to evaluate.
     ///
     /// Returns
     /// -------
@@ -554,7 +552,7 @@ impl PyEvaluator {
     ///     If a formula references a node that does not exist, or a
     ///     capital-structure instrument needs market data.
     /// ValueError
-    ///     If the model JSON is malformed or evaluation fails (cyclic
+    ///     If evaluation fails (cyclic
     ///     dependencies, invalid formulas, forecast parameter errors).
     /// RuntimeError
     ///     If capital-structure processing fails.
@@ -562,10 +560,10 @@ impl PyEvaluator {
     fn evaluate(
         &mut self,
         py: Python<'_>,
-        model: &Bound<'_, PyAny>,
+        model: PyRef<'_, PyFinancialModelSpec>,
     ) -> PyResult<PyStatementResult> {
-        let model = extract_model_ref(model)?;
-        let model_inner: &finstack_quant_statements::types::FinancialModelSpec = &model;
+        let model = &model.inner;
+        let model_inner: &finstack_quant_statements::types::FinancialModelSpec = model;
         let evaluator = &mut self.inner;
         let result = py
             .detach(|| evaluator.evaluate(model_inner))
@@ -582,12 +580,10 @@ impl PyEvaluator {
     ///
     /// Parameters
     /// ----------
-    /// model : FinancialModelSpec | str
-    ///     The model specification to evaluate — a typed model or its
-    ///     canonical JSON.
+    /// model : FinancialModelSpec
+    ///     The model specification to evaluate.
     /// market : MarketContext
-    ///     Market data context used for instrument pricing — typed or its
-    ///     canonical JSON.
+    ///     Market data context used for instrument pricing.
     /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
     ///     Valuation date for pricing the capital structure; ISO
     ///     ``YYYY-MM-DD`` strings are accepted.
@@ -611,8 +607,8 @@ impl PyEvaluator {
     ///     If a formula references an unknown node or a required curve is
     ///     missing from ``market``.
     /// ValueError
-    ///     If ``as_of`` or ``observation_cutoff`` is not date-like, the
-    ///     model JSON is malformed, a cutoff date is used on a model
+    ///     If ``as_of`` or ``observation_cutoff`` is not date-like, a
+    ///     cutoff date is used on a model
     ///     with no ``source_snapshot`` or with an undated observation in an
     ///     actual period, an observation hidden by the cutoff has no forecast
     ///     or formula to fall back on, or evaluation fails.
@@ -622,7 +618,7 @@ impl PyEvaluator {
     fn evaluate_with_market(
         &mut self,
         py: Python<'_>,
-        model: &Bound<'_, PyAny>,
+        model: PyRef<'_, PyFinancialModelSpec>,
         market: PyRef<'_, PyMarketContext>,
         as_of: &Bound<'_, PyAny>,
         observation_cutoff: &Bound<'_, PyAny>,
@@ -634,9 +630,9 @@ impl PyEvaluator {
             Ok(mode) if mode == "full_snapshot" => ObservationCutoff::FullSnapshot,
             _ => ObservationCutoff::Through(py_to_date(observation_cutoff)?),
         };
-        let model = extract_model_ref(model)?;
+        let model = &model.inner;
         let market = &market.inner;
-        let model_inner: &finstack_quant_statements::types::FinancialModelSpec = &model;
+        let model_inner: &finstack_quant_statements::types::FinancialModelSpec = model;
         let market_inner: &finstack_quant_core::market_data::context::MarketContext = market;
         let evaluator = &mut self.inner;
         let result = py
@@ -655,10 +651,10 @@ impl PyEvaluator {
     ///
     /// Parameters
     /// ----------
-    /// model : FinancialModelSpec | str
-    ///     A typed model or its canonical JSON.
-    /// config : MonteCarloConfig | str
-    ///     Typed configuration or JSON with ``n_paths``, ``seed``,
+    /// model : FinancialModelSpec
+    ///     The model.
+    /// config : MonteCarloConfig
+    ///     Configuration with ``n_paths``, ``seed``,
     ///     ``metrics``, optional ``percentiles`` (decimal fractions in
     ///     [0, 1]) and optional ``include_path_data``.
     /// market, as_of, observation_cutoff
@@ -685,17 +681,17 @@ impl PyEvaluator {
     fn evaluate_monte_carlo(
         &mut self,
         py: Python<'_>,
-        model: &Bound<'_, PyAny>,
-        config: &Bound<'_, PyAny>,
+        model: PyRef<'_, PyFinancialModelSpec>,
+        config: PyRef<'_, PyMonteCarloConfig>,
         market: Option<PyRef<'_, PyMarketContext>>,
         as_of: Option<&Bound<'_, PyAny>>,
         observation_cutoff: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyMonteCarloResults> {
         use finstack_quant_statements::evaluator::{MonteCarloContext, ObservationCutoff};
 
-        let model = extract_model_ref(model)?;
-        let config = extract_config(config)?;
-        let model_inner: &finstack_quant_statements::types::FinancialModelSpec = &model;
+        let model = &model.inner;
+        let config = config.inner.clone();
+        let model_inner: &finstack_quant_statements::types::FinancialModelSpec = model;
         let run = match (market.as_ref(), as_of) {
             (Some(market), Some(as_of)) => {
                 let cutoff = match observation_cutoff {

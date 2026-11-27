@@ -91,7 +91,7 @@ def test_precomputed_checks_cannot_relabel_explicit_money_as_scalar() -> None:
     assert result_payload["node_value_types"]["assets"] == {"type": "monetary", "currency": "USD"}
     result_payload["node_value_types"] = {node: {"type": "scalar"} for node in model_payload["nodes"]}
     with pytest.raises(ValueError, match="result units"):
-        run_checks(model, suite, json.dumps(result_payload))
+        run_checks(model, suite, s.StatementResult.from_json(json.dumps(result_payload)))
 
 
 @pytest.mark.parametrize(("side", "fixed_rate", "forward_rate"), [("receive", 0.01, -0.01), ("pay", -0.02, 0.01)])

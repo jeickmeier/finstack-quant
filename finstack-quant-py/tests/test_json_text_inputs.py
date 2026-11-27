@@ -770,12 +770,14 @@ CASES = [
         lambda model: _capital_structure(_results(), model),
         FinancialModelSpec.from_json,
         lambda: _model().to_json(),
+        rejects_text=TypeError,
     ),
     Case(
         "financial_model_spec_in_scenario",
         lambda model: apply_scenario(_scenario(), _market(), AS_OF, model=model),
         FinancialModelSpec.from_json,
         lambda: _model().to_json(),
+        rejects_text=TypeError,
     ),
     Case(
         "statement_result",
@@ -783,6 +785,7 @@ CASES = [
         StatementResult.from_json,
         lambda: _results().to_json(),
         malformed={**MALFORMED, "unsupported-schema-version": _results_text_with_schema_version(999)},
+        rejects_text=TypeError,
     ),
     Case(
         "portfolio",
@@ -978,6 +981,7 @@ CASES = [
         lambda config: run_sensitivity(_analysis_model(), config),
         SensitivityConfig.from_json,
         lambda: _sensitivity_config().to_json(),
+        rejects_text=TypeError,
     ),
     Case(
         "sensitivity_result",
@@ -985,12 +989,14 @@ CASES = [
         SensitivityResult.from_json,
         lambda: run_sensitivity(_analysis_model(), _sensitivity_config()).to_json(),
         stable=_itself,
+        rejects_text=TypeError,
     ),
     Case(
         "variance_config",
         _variance,
         VarianceConfig.from_json,
         lambda: VarianceConfig("base", "comparison", ["profit"], ["2025Q1", "2025Q2"]).to_json(),
+        rejects_text=TypeError,
     ),
     Case(
         "scenario_set",
@@ -998,18 +1004,21 @@ CASES = [
         ScenarioSet.from_json,
         lambda: ScenarioSet({"base": {}, "downside": {"revenue": 90.0}}, {"downside": "base"}).to_json(),
         stable=_json_without_eval_time,
+        rejects_text=TypeError,
     ),
     Case(
         "monte_carlo_config",
         lambda config: Evaluator().evaluate_monte_carlo(_analysis_model(), config),
         MonteCarloConfig.from_json,
         lambda: MonteCarloConfig(4, 123, ["revenue"], [0.5]).to_json(),
+        rejects_text=TypeError,
     ),
     Case(
         "rollup_spec",
         lambda spec: Evaluator().evaluate(_analysis_model()).rollup(_analysis_model(), spec),
         RollupSpec.from_json,
         lambda: RollupSpec("semi_annual", dict.fromkeys([*ANALYSIS_VALUES, "profit"], "sum")).to_json(),
+        rejects_text=TypeError,
     ),
     Case(
         "check_suite_spec",

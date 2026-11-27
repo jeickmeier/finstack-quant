@@ -96,6 +96,7 @@ from finstack_quant.statements import (
     FinancialModelSpec,
     ModelBuilder,
     NormalizationConfig,
+    StatementResult,
     normalize,
     parse_and_compile,
     parse_formula,
@@ -103,6 +104,9 @@ from finstack_quant.statements import (
 from finstack_quant.statements_analytics import (
     DependencyTracer,
     GoalSeekSpec,
+    ScenarioSet,
+    SensitivityConfig,
+    VarianceConfig,
     backtest_forecast,
     evaluate_scenario_set,
     explain_formula,
@@ -1181,17 +1185,17 @@ class TestStatementsAnalyticsBenchmarks:
     """Sensitivity analysis and forecast backtesting."""
 
     def test_run_sensitivity_json(self, benchmark) -> None:
-        benchmark.pedantic(
-            run_sensitivity,
-            args=(_MODEL_JSON, SENSITIVITY_CONFIG_JSON),
-            rounds=20,
-            warmup_rounds=2,
-        )
+        def _run():
+            return run_sensitivity(
+                FinancialModelSpec.from_json(_MODEL_JSON), SensitivityConfig.from_json(SENSITIVITY_CONFIG_JSON)
+            )
+
+        benchmark.pedantic(_run, rounds=20, warmup_rounds=2)
 
     def test_run_sensitivity_typed(self, benchmark) -> None:
         benchmark.pedantic(
             run_sensitivity,
-            args=(_MODEL_SPEC, SENSITIVITY_CONFIG_JSON),
+            args=(_MODEL_SPEC, SensitivityConfig.from_json(SENSITIVITY_CONFIG_JSON)),
             rounds=20,
             warmup_rounds=2,
         )
@@ -1202,33 +1206,35 @@ class TestStatementsAnalyticsBenchmarks:
         benchmark(backtest_forecast, actual, forecast)
 
     def test_run_variance_json(self, benchmark) -> None:
-        benchmark.pedantic(
-            run_variance,
-            args=(_EVAL_RESULT_JSON, _COMPARISON_RESULT_JSON, VARIANCE_CONFIG_JSON),
-            rounds=20,
-            warmup_rounds=2,
-        )
+        def _run():
+            return run_variance(
+                StatementResult.from_json(_EVAL_RESULT_JSON),
+                StatementResult.from_json(_COMPARISON_RESULT_JSON),
+                VarianceConfig.from_json(VARIANCE_CONFIG_JSON),
+            )
+
+        benchmark.pedantic(_run, rounds=20, warmup_rounds=2)
 
     def test_run_variance_typed(self, benchmark) -> None:
         benchmark.pedantic(
             run_variance,
-            args=(_EVAL_RESULT, _COMPARISON_RESULT, VARIANCE_CONFIG_JSON),
+            args=(_EVAL_RESULT, _COMPARISON_RESULT, VarianceConfig.from_json(VARIANCE_CONFIG_JSON)),
             rounds=20,
             warmup_rounds=2,
         )
 
     def test_evaluate_scenario_set_json(self, benchmark) -> None:
-        benchmark.pedantic(
-            evaluate_scenario_set,
-            args=(_MODEL_JSON, SCENARIO_SET_JSON),
-            rounds=20,
-            warmup_rounds=2,
-        )
+        def _run():
+            return evaluate_scenario_set(
+                FinancialModelSpec.from_json(_MODEL_JSON), ScenarioSet.from_json(SCENARIO_SET_JSON)
+            )
+
+        benchmark.pedantic(_run, rounds=20, warmup_rounds=2)
 
     def test_evaluate_scenario_set_typed(self, benchmark) -> None:
         benchmark.pedantic(
             evaluate_scenario_set,
-            args=(_MODEL_SPEC, SCENARIO_SET_JSON),
+            args=(_MODEL_SPEC, ScenarioSet.from_json(SCENARIO_SET_JSON)),
             rounds=20,
             warmup_rounds=2,
         )
@@ -1236,7 +1242,7 @@ class TestStatementsAnalyticsBenchmarks:
     def test_goal_seek_json(self, benchmark) -> None:
         def _seek():
             return goal_seek(
-                _MODEL_JSON,
+                FinancialModelSpec.from_json(_MODEL_JSON),
                 GoalSeekSpec(
                     target={"node": "gross_profit", "period": "2025Q1"},
                     target_value=50.0,
@@ -1275,8 +1281,8 @@ class TestStatementsAnalyticsBenchmarks:
 
     def test_dependency_tracer_json(self, benchmark) -> None:
         def _trace():
-            tree = DependencyTracer(_MODEL_JSON).dependency_tree("gross_profit")
-            deps = DependencyTracer(_MODEL_JSON).direct_dependencies("gross_profit")
+            tree = DependencyTracer(FinancialModelSpec.from_json(_MODEL_JSON)).dependency_tree("gross_profit")
+            deps = DependencyTracer(FinancialModelSpec.from_json(_MODEL_JSON)).direct_dependencies("gross_profit")
             return tree, deps
 
         benchmark(_trace)
@@ -1290,7 +1296,15 @@ class TestStatementsAnalyticsBenchmarks:
         benchmark(_trace)
 
     def test_explain_formula_json(self, benchmark) -> None:
-        benchmark(explain_formula, _MODEL_JSON, _EVAL_RESULT_JSON, "gross_profit", "2025Q1")
+        def _run():
+            return explain_formula(
+                FinancialModelSpec.from_json(_MODEL_JSON),
+                StatementResult.from_json(_EVAL_RESULT_JSON),
+                "gross_profit",
+                "2025Q1",
+            )
+
+        benchmark(_run)
 
     def test_explain_formula_typed(self, benchmark) -> None:
         benchmark(explain_formula, _MODEL_SPEC, _EVAL_RESULT, "gross_profit", "2025Q1")

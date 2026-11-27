@@ -108,7 +108,16 @@ def test_a_short_window_gives_no_ratios() -> None:
 
 def test_wire_forms_round_trip() -> None:
     model, results = _model()
-    summary = capital_structure_summary(results.to_json(), model.to_json(), json.dumps(FULL_YEAR))
+    summary = capital_structure_summary(
+        StatementResult.from_json(results.to_json()),
+        FinancialModelSpec.from_json(model.to_json()),
+        json.dumps(FULL_YEAR),
+    )
+    # Result and model JSON text are not typed inputs: they go through the loaders.
+    with pytest.raises(TypeError, match="StatementResult"):
+        capital_structure_summary(results.to_json(), model, json.dumps(FULL_YEAR))
+    with pytest.raises(TypeError, match="FinancialModelSpec"):
+        capital_structure_summary(results, model.to_json(), json.dumps(FULL_YEAR))
     assert CapitalStructureSummary.from_json(summary.to_json()).to_dict() == summary.to_dict()
     assert pickle.loads(pickle.dumps(summary)).to_json() == summary.to_json()  # noqa: S301
     tranche = CapitalStructureTranche.from_json(summary.tranches[0].to_json())

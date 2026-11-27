@@ -26,8 +26,8 @@ class DependencyTracer:
 
     Parameters
     ----------
-    model : FinancialModelSpec or str
-        ``FinancialModelSpec`` object or JSON string.
+    model : FinancialModelSpec
+        ``FinancialModelSpec``.
 
     Examples
     --------
@@ -43,19 +43,19 @@ class DependencyTracer:
 
     """
 
-    def __init__(self, model: FinancialModelSpec | str) -> None:
+    def __init__(self, model: FinancialModelSpec) -> None:
         """
         Create a dependency tracer for the given model.
 
         Parameters
         ----------
-        model : FinancialModelSpec or str
-            ``FinancialModelSpec`` object or JSON string.
+        model : FinancialModelSpec
+            ``FinancialModelSpec``.
 
         Raises
         ------
         ValueError
-            If model JSON is malformed or its dependency graph is invalid.
+            If the model's dependency graph is invalid.
 
         """
         ...
@@ -112,13 +112,13 @@ class DependencyTracer:
         """
         ...
 
-    def dependency_tree_detailed(self, results: StatementResult | str, node_id: str, period: str) -> str:
+    def dependency_tree_detailed(self, results: StatementResult, node_id: str, period: str) -> str:
         """
         Return an ASCII dependency tree annotated with values for one period.
 
         Parameters
         ----------
-        results : StatementResult or str
+        results : StatementResult
             Statement results to annotate with.
         node_id : str
             Root node to trace.
@@ -134,7 +134,7 @@ class DependencyTracer:
         Raises
         ------
         ValueError
-            If results JSON or period is invalid, or node_id cannot be traced.
+            If period is invalid, or node_id cannot be traced.
 
         """
         ...
@@ -614,15 +614,15 @@ class Explanation:
         ValueError: ...
         """
 
-def explain_formula(model: Any, results: Any, node_id: str, period: str) -> Explanation:
+def explain_formula(model: FinancialModelSpec, results: StatementResult, node_id: str, period: str) -> Explanation:
     """Explain a formula for a specific node and period.
 
     Parameters
     ----------
-    model : FinancialModelSpec | str
-        A ``FinancialModelSpec`` object or a JSON string.
-    results : StatementResult | str
-        A ``StatementResult`` object or a JSON string.
+    model : FinancialModelSpec
+        A ``FinancialModelSpec``.
+    results : StatementResult
+        A ``StatementResult``.
     node_id : str
         Node whose formula to explain.
     period : str
@@ -640,7 +640,7 @@ def explain_formula(model: Any, results: Any, node_id: str, period: str) -> Expl
     KeyError
         If ``node_id`` is not in the model or has no value at ``period``.
     ValueError
-        If ``period`` does not parse or a payload is malformed JSON.
+        If ``period`` does not parse.
 
     Examples
     --------

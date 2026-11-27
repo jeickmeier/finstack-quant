@@ -2,8 +2,8 @@
 
 use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::table::PyLabeledSeries;
-use crate::bindings::extract::{extract_model_ref, extract_results_ref};
 use crate::bindings::macros::wire_methods;
+use crate::bindings::statements::evaluator::PyStatementResult;
 use crate::bindings::statements::parse_period_id;
 use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::bindings::statements_analytics::typed::{
@@ -13,46 +13,6 @@ use crate::bindings::statements_analytics::typed::{
 use crate::errors::{serde_json_to_py, statements_to_py};
 use finstack_quant_statements_analytics::analysis::{ForecastMetrics, GoalSeekResult};
 use pyo3::prelude::*;
-
-fn extract_sensitivity_config(
-    value: &Bound<'_, PyAny>,
-) -> PyResult<finstack_quant_statements_analytics::analysis::SensitivityConfig> {
-    if let Ok(config) = value.extract::<PyRef<'_, PySensitivityConfig>>() {
-        return Ok(config.inner.clone());
-    }
-    serde_json::from_str(value.extract::<&str>()?)
-        .map_err(|e| serde_json_to_py(e, "invalid SensitivityConfig JSON"))
-}
-
-fn extract_sensitivity_result(
-    value: &Bound<'_, PyAny>,
-) -> PyResult<finstack_quant_statements_analytics::analysis::SensitivityResult> {
-    if let Ok(result) = value.extract::<PyRef<'_, PySensitivityResult>>() {
-        return Ok(result.inner.clone());
-    }
-    serde_json::from_str(value.extract::<&str>()?)
-        .map_err(|e| serde_json_to_py(e, "invalid SensitivityResult JSON"))
-}
-
-fn extract_variance_config(
-    value: &Bound<'_, PyAny>,
-) -> PyResult<finstack_quant_statements_analytics::analysis::VarianceConfig> {
-    if let Ok(config) = value.extract::<PyRef<'_, PyVarianceConfig>>() {
-        return Ok(config.inner.clone());
-    }
-    serde_json::from_str(value.extract::<&str>()?)
-        .map_err(|e| serde_json_to_py(e, "invalid VarianceConfig JSON"))
-}
-
-fn extract_scenario_set(
-    value: &Bound<'_, PyAny>,
-) -> PyResult<finstack_quant_statements_analytics::analysis::ScenarioSet> {
-    if let Ok(scenario_set) = value.extract::<PyRef<'_, PyScenarioSet>>() {
-        return Ok(scenario_set.inner.clone());
-    }
-    serde_json::from_str(value.extract::<&str>()?)
-        .map_err(|e| serde_json_to_py(e, "invalid ScenarioSet JSON"))
-}
 
 /// Run sensitivity analysis on a financial model.
 ///
@@ -65,10 +25,10 @@ fn extract_scenario_set(
 ///
 /// Parameters
 /// ----------
-/// model : FinancialModelSpec | str
-///     A ``FinancialModelSpec`` object or a JSON string.
-/// config : SensitivityConfig | str
-///     A typed configuration or its JSON serialization.
+/// model : FinancialModelSpec
+///     A ``FinancialModelSpec``.
+/// config : SensitivityConfig
+///     The configuration.
 ///
 /// Returns
 /// -------
@@ -98,11 +58,11 @@ fn extract_scenario_set(
 #[pyfunction]
 pub(super) fn run_sensitivity(
     py: Python<'_>,
-    model: &Bound<'_, PyAny>,
-    config: &Bound<'_, PyAny>,
+    model: PyRef<'_, PyFinancialModelSpec>,
+    config: PyRef<'_, PySensitivityConfig>,
 ) -> PyResult<PySensitivityResult> {
-    let model = extract_model_ref(model)?.into_owned();
-    let config = extract_sensitivity_config(config)?;
+    let model = model.inner.clone();
+    let config = config.inner.clone();
     py.detach(move || {
         let inner = finstack_quant_statements_analytics::analysis::run_sensitivity(&model, &config)
             .map_err(statements_to_py)?;
@@ -114,8 +74,8 @@ pub(super) fn run_sensitivity(
 ///
 /// Parameters
 /// ----------
-/// result : SensitivityResult | str
-///     A typed sensitivity result or its JSON serialization.
+/// result : SensitivityResult
+///     The sensitivity result.
 /// metric_node : str
 ///     Node to extract tornado entries for.
 /// period : str
@@ -134,7 +94,7 @@ pub(super) fn run_sensitivity(
 /// Raises
 /// ------
 /// ValueError
-///     If ``period`` does not parse, ``result`` is malformed JSON, a
+///     If ``period`` does not parse, a
 ///     one-at-a-time run's scenario does not contain exactly one perturbed
 ///     parameter, its unperturbed baseline is absent, the target metric/period
 ///     is missing, or a metric value or impact is non-finite.
@@ -154,11 +114,11 @@ pub(super) fn run_sensitivity(
 #[pyfunction]
 #[pyo3(text_signature = "(result, metric_node, period)")]
 pub(super) fn generate_tornado_entries(
-    result: &Bound<'_, PyAny>,
+    result: PyRef<'_, PySensitivityResult>,
     metric_node: &str,
     period: &str,
 ) -> PyResult<Option<Vec<PyTornadoEntry>>> {
-    let result = extract_sensitivity_result(result)?;
+    let result = result.inner.clone();
     let period_id = parse_period_id(period)?;
     let entries = finstack_quant_statements_analytics::analysis::generate_tornado_entries(
         &result,
@@ -178,12 +138,12 @@ pub(super) fn generate_tornado_entries(
 ///
 /// Parameters
 /// ----------
-/// base : StatementResult | str
-///     A ``StatementResult`` object or a JSON string.
-/// comparison : StatementResult | str
-///     A ``StatementResult`` object or a JSON string.
-/// config : VarianceConfig | str
-///     A typed configuration or its JSON serialization.
+/// base : StatementResult
+///     A ``StatementResult``.
+/// comparison : StatementResult
+///     A ``StatementResult``.
+/// config : VarianceConfig
+///     The configuration.
 ///
 /// Returns
 /// -------
@@ -211,13 +171,13 @@ pub(super) fn generate_tornado_entries(
 #[pyfunction]
 pub(super) fn run_variance(
     py: Python<'_>,
-    base: &Bound<'_, PyAny>,
-    comparison: &Bound<'_, PyAny>,
-    config: &Bound<'_, PyAny>,
+    base: PyRef<'_, PyStatementResult>,
+    comparison: PyRef<'_, PyStatementResult>,
+    config: PyRef<'_, PyVarianceConfig>,
 ) -> PyResult<PyVarianceReport> {
-    let base = extract_results_ref(base)?.into_owned();
-    let comparison = extract_results_ref(comparison)?.into_owned();
-    let config = extract_variance_config(config)?;
+    let base = base.inner.clone();
+    let comparison = comparison.inner.clone();
+    let config = config.inner.clone();
     py.detach(move || {
         let inner = finstack_quant_statements_analytics::analysis::run_variance(
             &base,
@@ -238,10 +198,10 @@ pub(super) fn run_variance(
 ///
 /// Parameters
 /// ----------
-/// model : FinancialModelSpec | str
-///     A ``FinancialModelSpec`` object or a JSON string.
-/// scenario_set : ScenarioSet | str
-///     A typed scenario set or its JSON serialization.
+/// model : FinancialModelSpec
+///     A ``FinancialModelSpec``.
+/// scenario_set : ScenarioSet
+///     The scenario set.
 ///
 /// Returns
 /// -------
@@ -271,11 +231,11 @@ pub(super) fn run_variance(
 #[pyfunction]
 pub(super) fn evaluate_scenario_set(
     py: Python<'_>,
-    model: &Bound<'_, PyAny>,
-    scenario_set: &Bound<'_, PyAny>,
+    model: PyRef<'_, PyFinancialModelSpec>,
+    scenario_set: PyRef<'_, PyScenarioSet>,
 ) -> PyResult<PyScenarioResults> {
-    let model = extract_model_ref(model)?.into_owned();
-    let scenario_set = extract_scenario_set(scenario_set)?;
+    let model = model.inner.clone();
+    let scenario_set = scenario_set.inner.clone();
     py.detach(move || {
         let inner = scenario_set
             .evaluate_all(&model)
@@ -294,13 +254,12 @@ pub(super) fn evaluate_scenario_set(
 ///
 /// Parameters
 /// ----------
-/// model : FinancialModelSpec | str
-///     A ``FinancialModelSpec`` object or a JSON string.
-/// scenario_set : ScenarioSet | str
-///     A typed scenario set or its JSON serialization.
+/// model : FinancialModelSpec
+///     A ``FinancialModelSpec``.
+/// scenario_set : ScenarioSet
+///     The scenario set.
 /// market : MarketContext
-///     Curves, fixings and FX the instruments are priced from, typed or its
-///     canonical JSON.
+///     Curves, fixings and FX the instruments are priced from.
 /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
 ///     Valuation date for the instruments' cashflows and the cutoff for
 ///     explicit-value visibility; ISO ``YYYY-MM-DD`` strings are accepted.
@@ -339,16 +298,16 @@ pub(super) fn evaluate_scenario_set(
 #[pyo3(text_signature = "(model, scenario_set, market, as_of)")]
 pub(super) fn evaluate_scenario_set_with_market(
     py: Python<'_>,
-    model: &Bound<'_, PyAny>,
-    scenario_set: &Bound<'_, PyAny>,
+    model: PyRef<'_, PyFinancialModelSpec>,
+    scenario_set: PyRef<'_, PyScenarioSet>,
     market: PyRef<'_, PyMarketContext>,
     as_of: &Bound<'_, PyAny>,
 ) -> PyResult<PyScenarioResults> {
     let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
-    let model = extract_model_ref(model)?;
+    let model = &model.inner;
     let market = &market.inner;
-    let scenario_set = extract_scenario_set(scenario_set)?;
-    let model_inner: &finstack_quant_statements::types::FinancialModelSpec = &model;
+    let scenario_set = scenario_set.inner.clone();
+    let model_inner: &finstack_quant_statements::types::FinancialModelSpec = model;
     let market_inner: &finstack_quant_core::market_data::context::MarketContext = market;
     let inner = py
         .detach(|| scenario_set.evaluate_all_with_market(model_inner, market_inner, as_of))
@@ -360,8 +319,8 @@ pub(super) fn evaluate_scenario_set_with_market(
 ///
 /// Parameters
 /// ----------
-/// scenario_set : ScenarioSet | str
-///     A typed scenario set or its JSON serialization.
+/// scenario_set : ScenarioSet
+///     The scenario set.
 /// results : ScenarioResults
 ///     Output of ``evaluate_scenario_set`` for the same scenario set.
 /// baseline : str
@@ -403,14 +362,14 @@ pub(super) fn evaluate_scenario_set_with_market(
 #[pyo3(text_signature = "(scenario_set, results, baseline, comparison, metrics, periods)")]
 pub(super) fn scenario_diff(
     py: Python<'_>,
-    scenario_set: &Bound<'_, PyAny>,
+    scenario_set: PyRef<'_, PyScenarioSet>,
     results: PyRef<'_, PyScenarioResults>,
     baseline: &str,
     comparison: &str,
     metrics: Vec<String>,
     periods: Vec<String>,
 ) -> PyResult<PyScenarioDiff> {
-    let scenario_set = extract_scenario_set(scenario_set)?;
+    let scenario_set = scenario_set.inner.clone();
     let results = results.inner.clone();
     let periods = periods
         .iter()
@@ -434,10 +393,10 @@ pub(super) fn scenario_diff(
 ///
 /// Parameters
 /// ----------
-/// base : StatementResult | str
-///     Baseline evaluated statement result, or its JSON serialization.
-/// comparison : StatementResult | str
-///     Comparison evaluated statement result, or its JSON serialization.
+/// base : StatementResult
+///     Baseline evaluated statement result.
+/// comparison : StatementResult
+///     Comparison evaluated statement result.
 /// target_metric : str
 ///     Node identifier whose variance is being explained.
 /// period : str
@@ -477,8 +436,8 @@ pub(super) fn scenario_diff(
     text_signature = "(base, comparison, target_metric, period, drivers, baseline_label, comparison_label)"
 )]
 pub(super) fn variance_bridge(
-    base: &Bound<'_, PyAny>,
-    comparison: &Bound<'_, PyAny>,
+    base: PyRef<'_, PyStatementResult>,
+    comparison: PyRef<'_, PyStatementResult>,
     target_metric: &str,
     period: &str,
     drivers: Vec<String>,
@@ -486,8 +445,8 @@ pub(super) fn variance_bridge(
     comparison_label: &str,
 ) -> PyResult<PyBridgeChart> {
     let py = base.py();
-    let base = extract_results_ref(base)?.into_owned();
-    let comparison = extract_results_ref(comparison)?.into_owned();
+    let base = base.inner.clone();
+    let comparison = comparison.inner.clone();
     let period = parse_period_id(period)?;
     let target_metric = target_metric.to_string();
     let baseline_label = baseline_label.to_string();
@@ -794,11 +753,11 @@ impl PyGoalSeekResult {
 #[pyo3(signature = (model, spec, market=None))]
 pub(super) fn goal_seek(
     py: Python<'_>,
-    model: &Bound<'_, PyAny>,
+    model: PyRef<'_, PyFinancialModelSpec>,
     spec: &PyGoalSeekSpec,
     market: Option<PyRef<'_, PyMarketContext>>,
 ) -> PyResult<PyGoalSeekResult> {
-    let model = extract_model_ref(model)?.into_owned();
+    let model = model.inner.clone();
     let spec = spec.inner.clone();
     let market = market
         .map(|market| market.inner.clone())

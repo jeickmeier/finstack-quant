@@ -82,7 +82,7 @@ def test_pricing_flows_negate_an_outflow_magnitude_once_and_require_every_period
         "node_type": "value",
         "values": {"2025Q1": {"amount": "125.01", "currency": "USD"}},
     }
-    result = Evaluator().evaluate(json.dumps(document))
+    result = Evaluator().evaluate(FinancialModelSpec.from_json(json.dumps(document)))
     selection = {
         "node_id": "capex",
         "currency": "USD",

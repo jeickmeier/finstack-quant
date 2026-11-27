@@ -9,9 +9,10 @@ use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::covenants::{
     PyCovenantEngine, PyCovenantForecastConfig, PyFutureBreach, dated_reports_table,
 };
-use crate::bindings::extract::extract_results_ref;
 use crate::bindings::macros::tabular_methods;
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::statements::evaluator::PyStatementResult;
+use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::core_to_py;
 use finstack_quant_covenants::CovenantForecastConfig;
@@ -23,13 +24,13 @@ use std::collections::BTreeMap;
 #[pyo3(signature = (covenants, results, node_mapping=None))]
 fn evaluate_covenants(
     covenants: PyRef<'_, PyCovenantEngine>,
-    results: &Bound<'_, PyAny>,
+    results: PyRef<'_, PyStatementResult>,
     node_mapping: Option<BTreeMap<String, String>>,
 ) -> PyResult<PyArrowTable> {
-    let results = extract_results_ref(results)?;
+    let results = &results.inner;
     let series = finstack_quant_statements_analytics::analysis::evaluate_covenants(
         &covenants.inner,
-        &results,
+        results,
         node_mapping.as_ref(),
     )
     .map_err(core_to_py)?;
@@ -43,15 +44,15 @@ fn evaluate_covenants(
 )]
 fn forecast_breaches(
     covenants: PyRef<'_, PyCovenantEngine>,
-    results: &Bound<'_, PyAny>,
+    results: PyRef<'_, PyStatementResult>,
     config: Option<PyRef<'_, PyCovenantForecastConfig>>,
     node_mapping: Option<BTreeMap<String, String>>,
 ) -> PyResult<Vec<PyFutureBreach>> {
-    let results = extract_results_ref(results)?;
+    let results = &results.inner;
     let config = config.map_or_else(CovenantForecastConfig::default, |c| c.inner.clone());
     finstack_quant_statements_analytics::analysis::forecast_breaches(
         &covenants.inner,
-        &results,
+        results,
         config,
         node_mapping.as_ref(),
     )
@@ -206,16 +207,16 @@ impl PyStatementCovenantForecast {
 #[pyfunction]
 fn assess_statement_covenants(
     engine: &PyCovenantEngine,
-    model: &Bound<'_, PyAny>,
-    results: &Bound<'_, PyAny>,
+    model: PyRef<'_, PyFinancialModelSpec>,
+    results: PyRef<'_, PyStatementResult>,
     spec: &PyStatementCovenantSpec,
 ) -> PyResult<PyStatementCovenantAssessment> {
-    let model = crate::bindings::extract::extract_model_ref(model)?;
-    let results = extract_results_ref(results)?;
+    let model = &model.inner;
+    let results = &results.inner;
     let inner = finstack_quant_statements_analytics::analysis::assess_statement_covenants(
         &engine.inner,
-        &model,
-        &results,
+        model,
+        results,
         &spec.inner,
     )
     .map_err(core_to_py)?;
@@ -226,17 +227,17 @@ fn assess_statement_covenants(
 #[pyfunction]
 fn forecast_statement_covenants(
     engine: &PyCovenantEngine,
-    model: &Bound<'_, PyAny>,
-    results: &Bound<'_, PyAny>,
+    model: PyRef<'_, PyFinancialModelSpec>,
+    results: PyRef<'_, PyStatementResult>,
     spec: &PyStatementCovenantSpec,
     config: &PyCovenantForecastConfig,
 ) -> PyResult<PyStatementCovenantForecast> {
-    let model = crate::bindings::extract::extract_model_ref(model)?;
-    let results = extract_results_ref(results)?;
+    let model = &model.inner;
+    let results = &results.inner;
     let inner = finstack_quant_statements_analytics::analysis::forecast_statement_covenants(
         &engine.inner,
-        &model,
-        &results,
+        model,
+        results,
         &spec.inner,
         config.inner.clone(),
     )

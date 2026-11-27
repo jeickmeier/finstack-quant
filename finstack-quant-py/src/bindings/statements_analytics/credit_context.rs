@@ -2,9 +2,9 @@
 
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::extract::extract_results_ref;
 use crate::bindings::macros::tabular_methods;
 use crate::bindings::module_utils::fields_from_py;
+use crate::bindings::statements::evaluator::PyStatementResult;
 use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::statements_to_py;
 use finstack_quant_statements_analytics::analysis as native;
@@ -354,10 +354,10 @@ pub(super) fn observations(
 #[pyfunction]
 fn evaluate_credit_context(
     py: Python<'_>,
-    results: &Bound<'_, PyAny>,
+    results: PyRef<'_, PyStatementResult>,
     spec: &PyCreditContextSpec,
 ) -> PyResult<PyCreditContextReport> {
-    let input = extract_results_ref(results)?.into_owned();
+    let input = results.inner.clone();
     let spec = spec.inner.clone();
     let inner = py
         .detach(move || native::evaluate_credit_context(&input, &spec))

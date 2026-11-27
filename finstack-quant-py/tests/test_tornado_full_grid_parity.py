@@ -18,6 +18,7 @@ from finstack_quant.statements import ModelBuilder
 from finstack_quant.statements_analytics import (
     ParameterSpec,
     SensitivityConfig,
+    SensitivityResult,
     generate_tornado_entries,
     run_sensitivity,
 )
@@ -42,7 +43,7 @@ def test_full_grid_pinned_for_both_hosts_has_no_tornado() -> None:
     result = _result("full_grid")
     if os.environ.get("UPDATE_TORNADO_FULL_GRID"):
         FIXTURE.write_text(json.dumps(json.loads(result.to_json()), indent=2) + "\n")
-    assert generate_tornado_entries(FIXTURE.read_text(), "profit", "2025Q2") is None
+    assert generate_tornado_entries(SensitivityResult.from_json(FIXTURE.read_text()), "profit", "2025Q2") is None
 
 
 def test_one_at_a_time_run_still_ranks() -> None:

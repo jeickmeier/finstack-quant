@@ -23,9 +23,11 @@ def test_raw_json_and_typed_model_reject_the_same_dimension_error() -> None:
     payload = json.loads(money_model().to_json())
     payload["nodes"]["total"] = {"node_id": "total", "node_type": "calculated", "formula_text": "usd + eur"}
     text = json.dumps(payload)
-    for load in [s.FinancialModelSpec.from_json, s.Evaluator().evaluate]:
-        with pytest.raises(ValueError, match="Dimensional mismatch"):
-            load(text)
+    with pytest.raises(ValueError, match="Dimensional mismatch"):
+        s.FinancialModelSpec.from_json(text)
+    # Model JSON text is not a model: it goes through the loader.
+    with pytest.raises(TypeError, match="FinancialModelSpec"):
+        s.Evaluator().evaluate(text)
 
 
 @pytest.mark.parametrize("declared", [{"type": "scalar"}, {"type": "monetary", "currency": "USD"}])
@@ -34,7 +36,8 @@ def test_declared_type_cannot_relabel_explicit_money(declared: dict[str, str]) -
     payload["nodes"]["eur"]["value_type"] = declared
     with pytest.raises(ValueError, match=r"declares.*explicit values"):
         s.FinancialModelSpec.from_json(json.dumps(payload))
-    with pytest.raises(ValueError, match=r"declares.*explicit values"):
+    # Model JSON text is not a model: it goes through the loader.
+    with pytest.raises(TypeError, match="FinancialModelSpec"):
         s.Evaluator().evaluate(json.dumps(payload))
 
 

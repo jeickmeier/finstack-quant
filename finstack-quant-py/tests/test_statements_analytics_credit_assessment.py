@@ -38,9 +38,11 @@ def test_credit_assessment_returns_structured_scalars() -> None:
     assert out.free_cash_flow is None  # node absent
 
 
-def test_credit_assessment_accepts_json_and_series_ascending() -> None:
-    # Pass JSON (exercises the JSON-input path).
-    out = credit_assessment(_results().to_json(), "2025Q4")
+def test_credit_assessment_accepts_loaded_results_and_series_ascending() -> None:
+    # Result JSON goes through the loader; the function refuses the text itself.
+    out = credit_assessment(StatementResult.from_json(_results().to_json()), "2025Q4")
+    with pytest.raises(TypeError, match="StatementResult"):
+        credit_assessment(_results().to_json(), "2025Q4")
     periods = [pt.period for pt in out.series]
     assert periods == sorted(periods)
     q4 = next(pt for pt in out.series if pt.period == "2025Q4")

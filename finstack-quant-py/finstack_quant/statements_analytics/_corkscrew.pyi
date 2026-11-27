@@ -720,16 +720,16 @@ class CorkscrewExtension:
         This method does not raise.
         """
         ...
-    def execute(self, model: FinancialModelSpec | str, results: StatementResult | str) -> CorkscrewReport:
+    def execute(self, model: FinancialModelSpec, results: StatementResult) -> CorkscrewReport:
         """
         Validate account roll-forwards against evaluated statement results.
 
         Parameters
         ----------
-        model : FinancialModelSpec or str
-            Model specification object or JSON used to resolve configured nodes.
-        results : StatementResult or str
-            Evaluated statement results object or JSON to reconcile.
+        model : FinancialModelSpec
+            Model specification used to resolve configured nodes.
+        results : StatementResult
+            Evaluated statement results to reconcile.
 
         Returns
         -------

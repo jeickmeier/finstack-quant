@@ -7,7 +7,7 @@ use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::macros::wire_methods;
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::table_builders::TableBuilder;
-use crate::errors::{serde_json_to_py, statements_to_py};
+use crate::errors::statements_to_py;
 use finstack_quant_statements::evaluator::{
     MonteCarloConfig as RustMonteCarloConfig, MonteCarloResults as RustMonteCarloResults,
 };
@@ -394,15 +394,6 @@ impl PyMonteCarloResults {
             })?;
         PyArrowTable::from_envelope(&table)
     }
-}
-
-/// Accept a typed ``MonteCarloConfig`` or its JSON serialization.
-pub(crate) fn extract_config(value: &Bound<'_, PyAny>) -> PyResult<RustMonteCarloConfig> {
-    if let Ok(config) = value.extract::<PyRef<'_, PyMonteCarloConfig>>() {
-        return Ok(config.inner.clone());
-    }
-    serde_json::from_str(value.extract::<&str>()?)
-        .map_err(|e| serde_json_to_py(e, "invalid MonteCarloConfig JSON"))
 }
 
 pub fn register(_py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> {

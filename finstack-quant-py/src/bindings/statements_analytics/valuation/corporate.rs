@@ -5,10 +5,10 @@ use super::sensitivity::{PyCorporateValuationResult, PyDcfSensitivityResult};
 use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::extract::extract_model_ref;
 use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::statements::checks::PyCheckReport;
 use crate::bindings::statements::evaluator::PyStatementResult;
+use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::bindings::statements_analytics::checks::{
     PyCreditMapping, PyThreeStatementMapping, extract_credit_mapping,
     extract_three_statement_mapping,
@@ -356,13 +356,13 @@ tabular_methods!(PyCorporateAnalysis);
 #[pyo3(signature = (model, inputs, options=None, market=None, as_of=None))]
 pub(super) fn evaluate_dcf<'py>(
     py: Python<'py>,
-    model: &Bound<'py, PyAny>,
+    model: PyRef<'py, PyFinancialModelSpec>,
     inputs: &Bound<'py, PyAny>,
     options: Option<&Bound<'py, PyAny>>,
     market: Option<PyRef<'py, PyMarketContext>>,
     as_of: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<PyCorporateValuationResult> {
-    let model = extract_model_ref(model)?.into_owned();
+    let model = model.inner.clone();
     let inputs = match inputs.extract::<PyRef<'_, PyDcfInputs>>() {
         Ok(inputs) => inputs.inner.clone(),
         Err(_) => crate::bindings::module_utils::spec_from_py(py, inputs, "DcfInputs")?,
@@ -395,8 +395,8 @@ pub(super) fn evaluate_dcf<'py>(
 ///
 /// Parameters
 /// ----------
-/// model : FinancialModelSpec | str
-///     A ``FinancialModelSpec`` object or a JSON string; metadata must include
+/// model : FinancialModelSpec
+///     A ``FinancialModelSpec``; metadata must include
 ///     a ``"currency"`` key.
 /// wacc : float
 ///     Baseline WACC in decimal form.
@@ -460,14 +460,14 @@ pub(super) fn evaluate_dcf<'py>(
 ))]
 pub(super) fn dcf_sensitivity<'py>(
     py: Python<'py>,
-    model: &Bound<'py, PyAny>,
+    model: PyRef<'py, PyFinancialModelSpec>,
     wacc: f64,
     terminal_value: &Bound<'py, PyAny>,
     ufcf_node: &str,
     net_debt_override: Option<f64>,
     options: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<PyDcfSensitivityResult> {
-    let model = extract_model_ref(model)?.into_owned();
+    let model = model.inner.clone();
     let terminal_value = extract_terminal_value(py, terminal_value)?;
     let ufcf_node = ufcf_node.to_owned();
     let options = extract_dcf_options(py, options)?;
@@ -497,8 +497,8 @@ pub(super) fn dcf_sensitivity<'py>(
 ///
 /// Parameters
 /// ----------
-/// model : FinancialModelSpec | str
-///     A ``FinancialModelSpec`` object or a JSON string; metadata must include
+/// model : FinancialModelSpec
+///     A ``FinancialModelSpec``; metadata must include
 ///     a ``"currency"`` key.
 /// config : dict | str
 ///     The Rust ``LboConfig`` serde form (the same document WASM
@@ -547,10 +547,10 @@ pub(super) fn dcf_sensitivity<'py>(
 #[pyo3(signature = (model, config))]
 pub(super) fn evaluate_lbo<'py>(
     py: Python<'py>,
-    model: &Bound<'py, PyAny>,
+    model: PyRef<'py, PyFinancialModelSpec>,
     config: &Bound<'py, PyAny>,
 ) -> PyResult<PyLboResult> {
-    let model = extract_model_ref(model)?.into_owned();
+    let model = model.inner.clone();
     let config: LboConfig = crate::bindings::module_utils::spec_from_py(py, config, "config")?;
 
     let inner = py
@@ -656,11 +656,11 @@ pub(super) fn wacc(inputs: PyWaccInputs) -> PyResult<f64> {
 #[pyo3(signature = (model, options=None, market=None))]
 pub(super) fn run_corporate_analysis<'py>(
     py: Python<'py>,
-    model: &Bound<'py, PyAny>,
+    model: PyRef<'py, PyFinancialModelSpec>,
     options: Option<&Bound<'py, PyAny>>,
     market: Option<PyRef<'py, PyMarketContext>>,
 ) -> PyResult<PyCorporateAnalysis> {
-    let model = extract_model_ref(model)?.into_owned();
+    let model = model.inner.clone();
     let options: CorporateAnalysisOptions =
         crate::bindings::module_utils::opt_spec_from_py(py, options, "CorporateAnalysisOptions")?
             .unwrap_or_default();

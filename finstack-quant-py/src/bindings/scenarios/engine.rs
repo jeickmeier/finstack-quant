@@ -2,7 +2,6 @@
 
 use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::extract::extract_model_ref;
 use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::macros::tabular_methods;
 use crate::bindings::statements::types::PyFinancialModelSpec;
@@ -395,8 +394,8 @@ tabular_methods!(PyApplicationResult);
 /// market : MarketContext
 ///     A ``MarketContext``. Never mutated; the result
 ///     carries a modified copy.
-/// model : FinancialModelSpec | str | None, default None
-///     A ``FinancialModelSpec`` object or JSON string; omit for market-only execution.
+/// model : FinancialModelSpec | None, default None
+///     A ``FinancialModelSpec``; omit for market-only execution.
 /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
 ///     Valuation date (ISO 8601 accepted).
 /// instruments : list[Instrument | str] | None, default None
@@ -433,15 +432,13 @@ fn apply_scenario(
     scenario: PyRef<'_, PyScenarioSpec>,
     market: PyRef<'_, PyMarketContext>,
     as_of: &Bound<'_, PyAny>,
-    model: Option<&Bound<'_, PyAny>>,
+    model: Option<PyRef<'_, PyFinancialModelSpec>>,
     instruments: Option<Vec<Bound<'_, PyAny>>>,
     config: Option<PyRef<'_, PyFinstackConfig>>,
 ) -> PyResult<PyApplicationResult> {
     let spec = scenario.inner.clone();
     let mut market = market.inner.clone();
-    let mut model = model
-        .map(|value| extract_model_ref(value).map(|model| model.into_owned()))
-        .transpose()?;
+    let mut model = model.map(|model| model.inner.clone());
     let date = crate::bindings::date_utils::py_to_date(as_of)?;
     let mut instruments = extract_instruments(instruments)?;
     let config = config

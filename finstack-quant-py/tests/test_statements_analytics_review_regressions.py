@@ -10,12 +10,13 @@ import pandas as pd
 import pytest
 
 from finstack_quant.core.table import LabeledSeries
-from finstack_quant.statements import ModelBuilder
+from finstack_quant.statements import FinancialModelSpec, ModelBuilder
 from finstack_quant.statements_analytics import (
     Exposure,
     ForecastMetrics,
     PeerSet,
     SensitivityConfig,
+    SensitivityResult,
     Stage,
     StagingConfig,
     WaccInputs,
@@ -162,7 +163,7 @@ def test_growth_terminal_rejects_annual_identifier_with_stub_dates() -> None:
     }
     with pytest.raises(ValueError, match="calendar bounds"):
         evaluate_dcf(
-            json.dumps(model),
+            FinancialModelSpec.from_json(json.dumps(model)),
             {
                 "wacc": 0.1,
                 "terminal_value": {"type": "gordon_growth", "stable_growth_rate": 0.02},
@@ -196,7 +197,7 @@ def test_growth_terminal_uses_full_year_across_half_year_periods() -> None:
             "schema_version": 1,
         }
         result = evaluate_dcf(
-            json.dumps(model),
+            FinancialModelSpec.from_json(json.dumps(model)),
             {
                 "wacc": 0.1,
                 "terminal_value": {"type": "gordon_growth", "stable_growth_rate": 0.02},
@@ -233,7 +234,7 @@ def test_tornado_rejects_joint_scenarios_mislabeled_as_diagonal_json() -> None:
     document = json.loads(result.to_json())
     document["config"]["mode"] = "diagonal"
     with pytest.raises(ValueError, match="exactly one"):
-        generate_tornado_entries(json.dumps(document), "profit", "2025Q1")
+        generate_tornado_entries(SensitivityResult.from_json(json.dumps(document)), "profit", "2025Q1")
 
 
 def test_binding_requires_values_without_a_rust_default() -> None:

@@ -28,19 +28,19 @@ from finstack_quant.statements_analytics import (
 )
 
 
-def _model_json() -> str:
+def _model() -> statements.FinancialModelSpec:
     b = statements.ModelBuilder("test_model").source_snapshot("goal-seek-test-forecast")
     b.periods("2024Q1..Q2", None)
     b.value("revenue", [("2024Q1", 100_000.0), ("2024Q2", 110_000.0)])
     b.value("cogs", [("2024Q1", 40_000.0), ("2024Q2", 44_000.0)])
     b.compute("gross_profit", "revenue - cogs")
-    return b.build().to_json()
+    return b.build()
 
 
 class TestGoalSeek:
     def test_update_model_false_returns_none(self) -> None:
         outcome = goal_seek(
-            _model_json(),
+            _model(),
             GoalSeekSpec(
                 target={"node": "gross_profit", "period": "2024Q1"},
                 target_value=70_000.0,
@@ -59,7 +59,7 @@ class TestGoalSeek:
 
     def test_update_model_true_returns_model(self) -> None:
         outcome = goal_seek(
-            _model_json(),
+            _model(),
             GoalSeekSpec(
                 target={"node": "gross_profit", "period": "2024Q1"},
                 target_value=70_000.0,
@@ -96,7 +96,7 @@ class TestRunChecks:
                 }
             ],
         }
-        report = run_checks(_model_json(), json.dumps(spec))
+        report = run_checks(_model(), json.dumps(spec))
         assert isinstance(report, statements.CheckReport)
         assert report.total_checks == 1
         assert "revenue_positive" in report.to_json()
@@ -131,12 +131,12 @@ class TestRunChecks:
 
         # Results of another model are not a verified run of this one.
         with pytest.raises(ValueError, match="not a verified run"):
-            run_checks(_model_json(), json.dumps(spec), results)
+            run_checks(_model(), json.dumps(spec), results)
 
 
 class TestCorporateAnalysis:
     def test_corporate_analysis_without_dcf_returns_statement_result(self) -> None:
-        result = run_corporate_analysis(_model_json())
+        result = run_corporate_analysis(_model())
         assert isinstance(result.statement, statements.StatementResult)
         assert result.equity is None
         assert isinstance(result.credit, dict)

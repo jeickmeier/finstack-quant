@@ -277,7 +277,7 @@ class StatementResult:
         """
         ...
 
-    def rollup(self, model: FinancialModelSpec | str, spec: RollupSpec | str) -> StatementResult:
+    def rollup(self, model: FinancialModelSpec, spec: RollupSpec) -> StatementResult:
         """
         Roll these results up to a coarser frequency, such as quarterly to annual.
 
@@ -293,12 +293,11 @@ class StatementResult:
 
         Parameters
         ----------
-        model : FinancialModelSpec | str
-            The model these results were evaluated from, typed or its canonical
-            JSON. It supplies the period dates and the formulas of
+        model : FinancialModelSpec
+            The model these results were evaluated from. It supplies the period dates and the formulas of
             ``"formula"`` nodes.
-        spec : RollupSpec | str
-            Target frequency and per-node methods, typed or its JSON.
+        spec : RollupSpec
+            Target frequency and per-node methods.
 
         Returns
         -------
@@ -314,7 +313,7 @@ class StatementResult:
         Raises
         ------
         ValueError
-            If the JSON is malformed, these results are not a verified run of
+            If these results are not a verified run of
             ``model`` (no provenance, or another model content, source snapshot
             or period plan), the target frequency is not a whole multiple of
             the model's, a target period is incomplete, a method names an

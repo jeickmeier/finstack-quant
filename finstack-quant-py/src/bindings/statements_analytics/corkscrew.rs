@@ -9,9 +9,10 @@
 //! - [`PyCorkscrewReport`] — validation report (status, message, structured data, warnings, errors).
 
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::extract::{extract_model_ref, extract_results_ref};
 use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::statements::evaluator::PyStatementResult;
+use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::display_to_py;
 use finstack_quant_statements_analytics::extensions as rust_corkscrew;
@@ -408,14 +409,14 @@ impl PyCorkscrewExtension {
     /// Run the corkscrew validation against a model and pre-computed statement results.
     fn execute(
         &self,
-        model: &Bound<'_, PyAny>,
-        results: &Bound<'_, PyAny>,
+        model: PyRef<'_, PyFinancialModelSpec>,
+        results: PyRef<'_, PyStatementResult>,
     ) -> PyResult<PyCorkscrewReport> {
-        let model = extract_model_ref(model)?;
-        let results = extract_results_ref(results)?;
+        let model = &model.inner;
+        let results = &results.inner;
         let inner = self
             .inner
-            .execute(&model, &results)
+            .execute(model, results)
             .map_err(crate::errors::statements_to_py)?;
         Ok(PyCorkscrewReport { inner })
     }

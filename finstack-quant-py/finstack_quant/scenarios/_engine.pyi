@@ -657,7 +657,7 @@ def apply_scenario(
     scenario: ScenarioSpec,
     market: MarketContext,
     as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
-    model: FinancialModelSpec | str | None = None,
+    model: FinancialModelSpec | None = None,
     instruments: Sequence[Any] | None = None,
     config: FinstackConfig | None = None,
 ) -> ApplicationResult:
@@ -671,8 +671,8 @@ def apply_scenario(
     market : MarketContext
         ``MarketContext``. Never
         mutated; the result carries a modified copy.
-    model : FinancialModelSpec | str | None, default None
-        Copied financial model or canonical JSON; omit for market-only scenarios.
+    model : FinancialModelSpec | None, default None
+        Copied financial model; omit for market-only scenarios.
     as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
         Valuation date (ISO 8601 accepted).
     instruments : Sequence[Instrument | str] | None, default None
@@ -715,7 +715,8 @@ def apply_scenario(
     --------
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.scenarios import apply_scenario, compose_scenarios
-    >>> model = (
+    >>> from finstack_quant.statements import FinancialModelSpec
+    >>> model = FinancialModelSpec.from_json(
     ...     '{"schema_version":1,"id":"m","periods":{"calendar": "gregorian", "periods": ['
     ...     '{"id":"2025Q1","start":"2025-01-01","end":"2025-04-01",'
     ...     '"is_actual":false}]},"nodes":{"x":{"node_id":"x","node_type":"value",'

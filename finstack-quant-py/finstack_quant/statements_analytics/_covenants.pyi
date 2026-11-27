@@ -27,7 +27,7 @@ class _CovenantObservationBinding(TypedDict):
 
 def evaluate_covenants(
     covenants: CovenantEngine,
-    results: StatementResult | str,
+    results: StatementResult,
     node_mapping: dict[str, str] | None = None,
 ) -> ArrowTable:
     """
@@ -44,8 +44,8 @@ def evaluate_covenants(
 
     Parameters
     ----------
-    results : StatementResult or str
-        Evaluated statement results, typed or as JSON. Node ids are the
+    results : StatementResult
+        Evaluated statement results. Node ids are the
         covenant metric ids (``metric_id``, or each covenant type's
         conventional name); ratios are in turns (``3.5`` means 3.5x) and
         amounts in the model currency. Its ``periods`` give the test dates.
@@ -71,8 +71,7 @@ def evaluate_covenants(
     KeyError
         If a metric an applicable covenant reads has no value in a period.
     ValueError
-        If such a metric is non-finite, the engine is invalid, or ``results``
-        JSON is malformed.
+        If such a metric is non-finite or the engine is invalid.
 
     Examples
     --------
@@ -94,7 +93,7 @@ def evaluate_covenants(
 
 def forecast_breaches(
     covenants: CovenantEngine,
-    results: StatementResult | str,
+    results: StatementResult,
     config: CovenantForecastConfig | None = None,
     node_mapping: dict[str, str] | None = None,
 ) -> list[FutureBreach]:
@@ -111,8 +110,8 @@ def forecast_breaches(
 
     Parameters
     ----------
-    results : StatementResult or str
-        Evaluated statement results, typed or as JSON, holding every metric
+    results : StatementResult
+        Evaluated statement results, holding every metric
         the active numeric covenants read on each test date (ratios in turns).
     covenants : CovenantEngine
         Covenant engine whose effective specifications are forecast.
@@ -133,9 +132,8 @@ def forecast_breaches(
     KeyError
         If a metric an active covenant reads has no value in a period.
     ValueError
-        If such a metric is non-finite, the engine or ``config`` is invalid
-        (for example stochastic mode without ``volatility``), or ``results``
-        JSON is malformed.
+        If such a metric is non-finite, or the engine or ``config`` is invalid
+        (for example stochastic mode without ``volatility``).
 
     Examples
     --------
@@ -443,8 +441,8 @@ class StatementCovenantForecast:
 
 def assess_statement_covenants(
     engine: CovenantEngine,
-    model: FinancialModelSpec | str,
-    results: StatementResult | str,
+    model: FinancialModelSpec,
+    results: StatementResult,
     spec: StatementCovenantSpec,
 ) -> StatementCovenantAssessment:
     """Assess the selected historical and projected reporting dates.
@@ -453,9 +451,9 @@ def assess_statement_covenants(
     ----------
     engine : CovenantEngine
         Contract terms, windows, waiver dates and threshold schedule.
-    model : FinancialModelSpec or str
+    model : FinancialModelSpec
         Statement model with its source and publication dates.
-    results : StatementResult or str
+    results : StatementResult
         Statement run for the exact model and information cutoff.
     spec : StatementCovenantSpec
         Contract scope, test IDs, period IDs and typed named observations.
@@ -503,8 +501,8 @@ def assess_statement_covenants(
 
 def forecast_statement_covenants(
     engine: CovenantEngine,
-    model: FinancialModelSpec | str,
-    results: StatementResult | str,
+    model: FinancialModelSpec,
+    results: StatementResult,
     spec: StatementCovenantSpec,
     config: CovenantForecastConfig,
 ) -> StatementCovenantForecast:
@@ -514,9 +512,9 @@ def forecast_statement_covenants(
     ----------
     engine : CovenantEngine
         Contract terms, windows, waiver dates and threshold schedule.
-    model : FinancialModelSpec or str
+    model : FinancialModelSpec
         Statement model with its source and publication dates.
-    results : StatementResult or str
+    results : StatementResult
         Statement run for the exact model and information cutoff.
     spec : StatementCovenantSpec
         Contract scope, test IDs, forecast period IDs and typed named observations.

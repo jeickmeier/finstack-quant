@@ -5,9 +5,10 @@
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::date_to_py;
-use crate::bindings::extract::{extract_model_ref, extract_results_ref};
 use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::statements::evaluator::PyStatementResult;
+use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::bindings::valuations::convert::enum_to_py_string;
 use crate::errors::statements_to_py;
 use finstack_quant_statements_analytics::analysis::{
@@ -234,16 +235,16 @@ crate::bindings::macros::py_getters!(PyCapitalStructureSummary |s| {
 #[pyo3(text_signature = "(results, model, config)")]
 fn capital_structure_summary<'py>(
     py: Python<'py>,
-    results: &Bound<'py, PyAny>,
-    model: &Bound<'py, PyAny>,
+    results: PyRef<'py, PyStatementResult>,
+    model: PyRef<'py, PyFinancialModelSpec>,
     config: &Bound<'py, PyAny>,
 ) -> PyResult<PyCapitalStructureSummary> {
-    let results = extract_results_ref(results)?;
-    let model = extract_model_ref(model)?;
+    let results = &results.inner;
+    let model = &model.inner;
     let config: CapitalStructureSummaryConfig =
         crate::bindings::module_utils::spec_from_py(py, config, "config")?;
     let inner =
-        analysis::capital_structure_summary(&results, &model, &config).map_err(statements_to_py)?;
+        analysis::capital_structure_summary(results, model, &config).map_err(statements_to_py)?;
     Ok(PyCapitalStructureSummary { inner })
 }
 

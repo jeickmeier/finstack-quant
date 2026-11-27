@@ -15,6 +15,8 @@ through a named loader. WASM is unchanged. Results are unchanged. Old → new:
 - `OperationSpec.hierarchy_*(target_json, ...)` → `HierarchyTarget.from_json(target_json)`
 - Markets: every `market` argument (pricing, cashflows, attribution, portfolio valuation, risk, margin, scenarios, calibration, statement analytics; 68 parameters) → pass a `MarketContext`; for JSON text, `MarketContext.from_json(market_json)`. Passing `market.to_json()` back in no longer works: pass `market`
 - `replay_portfolio` snapshots given as `(date, market)` pairs take a `MarketContext` in each pair
+- Statements: every `model` argument → a `FinancialModelSpec` (`FinancialModelSpec.from_json(text)`); every statement `results`, `base` and `comparison` argument → a `StatementResult` (`StatementResult.from_json(text)`)
+- `Evaluator.evaluate_monte_carlo(config=)`, `StatementResult.rollup(spec=)`, `run_sensitivity(config=)`, `generate_tornado_entries(result=)`, `run_variance(config=)` and the `scenario_set` argument of the scenario-set functions → the typed `MonteCarloConfig`, `RollupSpec`, `SensitivityConfig`, `SensitivityResult`, `VarianceConfig` and `ScenarioSet`, each with its own `from_json`
 
 `validate_scenario_spec` still takes JSON text, because it reports on a spec
 that `ScenarioSpec.from_json` would reject.

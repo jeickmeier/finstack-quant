@@ -2,8 +2,8 @@
 
 use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::extract::extract_model_ref;
 use crate::bindings::module_utils::fields_from_py;
+use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::errors::statements_to_py;
 use finstack_quant_statements_analytics::analysis as native;
 use pyo3::prelude::*;
@@ -322,11 +322,11 @@ impl PyDatedLboResult {
 #[pyo3(signature = (model, request, market=None))]
 fn evaluate_dated_lbo<'py>(
     py: Python<'py>,
-    model: &Bound<'py, PyAny>,
+    model: PyRef<'py, PyFinancialModelSpec>,
     request: &PyDatedLboRequest,
     market: Option<PyRef<'py, PyMarketContext>>,
 ) -> PyResult<PyDatedLboResult> {
-    let model = extract_model_ref(model)?.into_owned();
+    let model = model.inner.clone();
     let request = request.inner.clone();
     let market = market.map(|market| market.inner.clone());
     let inner = py

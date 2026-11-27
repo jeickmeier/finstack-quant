@@ -30,7 +30,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 INPUTS: dict[str, Any] = json.loads((FIXTURES / "statements_parity_inputs.json").read_text())
 EXPECTED_PATH = FIXTURES / "statements_parity_expected.json"
 
-MODEL = json.dumps(INPUTS["model"])
+MODEL = st.FinancialModelSpec.from_json(json.dumps(INPUTS["model"]))
 Q1, Q2 = "2025Q1", "2025Q2"
 
 
@@ -62,9 +62,8 @@ def built_model() -> st.FinancialModelSpec:
 
 def statements_cases() -> dict[str, Any]:
     result = st.Evaluator().evaluate(MODEL)
-    model = st.FinancialModelSpec.from_json(MODEL)
 
-    stochastic = st.Evaluator().evaluate(json.dumps(INPUTS["stochastic_model"]))
+    stochastic = st.Evaluator().evaluate(st.FinancialModelSpec.from_json(json.dumps(INPUTS["stochastic_model"])))
 
     built = built_model()
     built_result = st.Evaluator().evaluate(built)
@@ -89,7 +88,7 @@ def statements_cases() -> dict[str, Any]:
     registry = st.Registry.with_builtins()
     first = registry.metric_ids()[0]
 
-    rollup_model = json.dumps(INPUTS["rollup_model"])
+    rollup_model = st.FinancialModelSpec.from_json(json.dumps(INPUTS["rollup_model"]))
     rollup_spec = st.RollupSpec.declared_methods(rollup_model, "annual")
 
     rollup_results = st.Evaluator().evaluate(rollup_model)
@@ -116,9 +115,9 @@ def statements_cases() -> dict[str, Any]:
         "result.get_money": money(built_result.get_money("cash", Q2)),
         "result.get_money_of_scalar": money(built_result.get_money("revenue", Q2)),
         "result.get_scalar_of_money": built_result.get_scalar("cash", Q2),
-        "model.has_node": [model.has_node("profit"), model.has_node("nope")],
-        "model.get_node": doc(model.get_node("profit")),
-        "model.node_ids": model.node_ids(),
+        "model.has_node": [MODEL.has_node("profit"), MODEL.has_node("nope")],
+        "model.get_node": doc(MODEL.get_node("profit")),
+        "model.node_ids": MODEL.node_ids(),
         "builder.node_ids": built.node_ids(),
         "builder.content_hash": built.content_hash(),
         "builder.values": [
@@ -189,9 +188,9 @@ def statements_cases() -> dict[str, Any]:
 
 def capital_structure_cases() -> dict[str, Any]:
     """Debt stack over a real evaluation: two classes, a pari passu pair and a swap."""
-    model_json = json.dumps(INPUTS["capital_structure_model"])
+    model = st.FinancialModelSpec.from_json(json.dumps(INPUTS["capital_structure_model"]))
     results = st.Evaluator().evaluate_with_market(
-        st.FinancialModelSpec.from_json(model_json),
+        model,
         MarketContext.from_json(json.dumps(INPUTS["capital_structure_market"])),
         INPUTS["capital_structure_as_of"],
         "full_snapshot",
@@ -199,11 +198,11 @@ def capital_structure_cases() -> dict[str, Any]:
     return {
         "full_year": doc(
             sa.capital_structure_summary(
-                results, model_json, {"period": "2025Q4", "ebitda_node": "ebitda", "cash_node": "cash"}
+                results, model, {"period": "2025Q4", "ebitda_node": "ebitda", "cash_node": "cash"}
             )
         ),
         "short_window": doc(
-            sa.capital_structure_summary(results, model_json, {"period": "2025Q3", "ebitda_node": "ebitda"})
+            sa.capital_structure_summary(results, model, {"period": "2025Q3", "ebitda_node": "ebitda"})
         ),
     }
 
@@ -239,22 +238,21 @@ def analytics_cases() -> dict[str, Any]:
     def evaluated(model: st.FinancialModelSpec, node: str, period: str) -> float | None:
         return st.Evaluator().evaluate(model).get(node, period)
 
-    roll_builder = st.ModelBuilder.from_spec(st.FinancialModelSpec.from_json(MODEL))
+    roll_builder = st.ModelBuilder.from_spec(MODEL)
     sa.add_roll_forward_with_opening(roll_builder, "debt", ["revenue"], ["cogs"], 10.0)
     rolled = roll_builder.build()
-    vintage_builder = st.ModelBuilder.from_spec(st.FinancialModelSpec.from_json(MODEL))
+    vintage_builder = st.ModelBuilder.from_spec(MODEL)
     sa.add_vintage_buildup(vintage_builder, "book", "revenue", [1.0, 0.5])
     vintage = vintage_builder.build()
-    model = st.FinancialModelSpec.from_json(MODEL)
-    cash_builder = st.ModelBuilder.from_spec(model)
+    cash_builder = st.ModelBuilder.from_spec(MODEL)
     sa.add_noi_buildup(cash_builder, "total_rev", ["revenue"], "total_exp", ["cogs"], "noi")
     sa.add_ncf_buildup(cash_builder, "noi", ["cogs"], "ncf")
     ncf = cash_builder.build()
     lease = sa.LeaseSpec.from_json(json.dumps(INPUTS["lease"]))
-    rent_builder = st.ModelBuilder.from_spec(model)
+    rent_builder = st.ModelBuilder.from_spec(MODEL)
     sa.add_rent_roll(rent_builder, [lease])
     rent_roll = rent_builder.build()
-    property_builder = st.ModelBuilder.from_spec(model)
+    property_builder = st.ModelBuilder.from_spec(MODEL)
     sa.add_property_operating_statement(property_builder, [lease], [], ["cogs"], [])
     property_model = property_builder.build()
 
@@ -293,9 +291,9 @@ def analytics_cases() -> dict[str, Any]:
         )
 
     samples: list[list[float]] = INPUTS["comps_samples"]
-    lbo_model = json.dumps(INPUTS["lbo_model"])
+    lbo_model = st.FinancialModelSpec.from_json(json.dumps(INPUTS["lbo_model"]))
     lbo_config: dict[str, Any] = INPUTS["lbo_config"]
-    dcf_json = json.dumps(INPUTS["dcf_model"])
+    dcf_spec = st.FinancialModelSpec.from_json(json.dumps(INPUTS["dcf_model"]))
 
     scenario_set = sa.ScenarioSet.from_json(json.dumps(INPUTS["scenario_set"]))
     scenario_results = sa.evaluate_scenario_set(MODEL, scenario_set)
@@ -401,11 +399,11 @@ def analytics_cases() -> dict[str, Any]:
         },
         "dcf_sensitivity": {
             "gordon_growth": doc(
-                sa.dcf_sensitivity(dcf_json, 0.10, sa.TerminalValueSpec.gordon_growth(0.02), "ufcf", 0.0)
+                sa.dcf_sensitivity(dcf_spec, 0.10, sa.TerminalValueSpec.gordon_growth(0.02), "ufcf", 0.0)
             ),
             "exit_multiple": doc(
                 sa.dcf_sensitivity(
-                    dcf_json,
+                    dcf_spec,
                     0.10,
                     sa.TerminalValueSpec.exit_multiple(8.0, 999.0),
                     "ufcf",

@@ -3,9 +3,10 @@
 use super::inputs::{PyCorporateDcfRequest, PyEquityBridge};
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::extract::extract_model_ref;
 use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::statements::evaluator::PyStatementResult;
+use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::bindings::statements_analytics::typed::PyTornadoEntry;
 use crate::bindings::table_builders::{TableBuilder, serde_rows_to_arrow_table};
 use crate::errors::statements_to_py;
@@ -130,13 +131,13 @@ tabular_methods!(
 #[pyfunction]
 pub(super) fn dcf_sensitivity_on_results<'py>(
     py: Python<'py>,
-    model: &Bound<'py, PyAny>,
-    results: &Bound<'py, PyAny>,
+    model: PyRef<'py, PyFinancialModelSpec>,
+    results: PyRef<'py, PyStatementResult>,
     request: &PyCorporateDcfRequest,
     shocks: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let model = extract_model_ref(model)?.into_owned();
-    let results = crate::bindings::extract::extract_results_ref(results)?.into_owned();
+    let model = model.inner.clone();
+    let results = results.inner.clone();
     let request = request.inner.clone();
     let shocks = crate::bindings::module_utils::spec_from_py(py, shocks, "DCF shocks")?;
     let report = py
@@ -153,13 +154,13 @@ pub(super) fn dcf_sensitivity_on_results<'py>(
 #[pyfunction]
 pub(super) fn dcf_sensitivity_grid<'py>(
     py: Python<'py>,
-    model: &Bound<'py, PyAny>,
-    results: &Bound<'py, PyAny>,
+    model: PyRef<'py, PyFinancialModelSpec>,
+    results: PyRef<'py, PyStatementResult>,
     request: &PyCorporateDcfRequest,
     axes: &PyDcfSensitivityGridSpec,
 ) -> PyResult<PyDcfSensitivityGridResult> {
-    let model = extract_model_ref(model)?.into_owned();
-    let results = crate::bindings::extract::extract_results_ref(results)?.into_owned();
+    let model = model.inner.clone();
+    let results = results.inner.clone();
     let request = request.inner.clone();
     let axes = axes.inner.clone();
     let inner = py
@@ -250,13 +251,13 @@ tabular_methods!(
 #[pyfunction]
 pub(super) fn evaluate_dcf_monte_carlo<'py>(
     py: Python<'py>,
-    model: &Bound<'py, PyAny>,
-    results: &Bound<'py, PyAny>,
+    model: PyRef<'py, PyFinancialModelSpec>,
+    results: PyRef<'py, PyStatementResult>,
     paths: &crate::bindings::statements::monte_carlo::PyMonteCarloResults,
     request: &PyCorporateDcfRequest,
 ) -> PyResult<PyDcfDistributionResult> {
-    let model = extract_model_ref(model)?.into_owned();
-    let results = crate::bindings::extract::extract_results_ref(results)?.into_owned();
+    let model = model.inner.clone();
+    let results = results.inner.clone();
     let paths = paths.inner.clone();
     let request = request.inner.clone();
     let inner = py

@@ -751,16 +751,16 @@ class CreditScorecardExtension:
         This method does not raise.
         """
         ...
-    def execute(self, model: FinancialModelSpec | str, results: StatementResult | str) -> ScorecardReport:
+    def execute(self, model: FinancialModelSpec, results: StatementResult) -> ScorecardReport:
         """
         Calculate a credit scorecard against evaluated statement results.
 
         Parameters
         ----------
-        model : FinancialModelSpec or str
-            Model specification object or equivalent JSON used to resolve nodes.
-        results : StatementResult or str
-            Evaluated statement result object or equivalent JSON to rate.
+        model : FinancialModelSpec
+            Model specification used to resolve nodes.
+        results : StatementResult
+            Evaluated statement result to rate.
 
         Returns
         -------

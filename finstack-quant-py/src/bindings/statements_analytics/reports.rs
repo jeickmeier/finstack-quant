@@ -7,8 +7,8 @@
 //! implementation. The `*_text` twins remain for WASM parity.
 
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::extract::extract_results_ref;
 use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::statements::evaluator::PyStatementResult;
 use crate::bindings::statements::parse_period_id;
 use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::core_to_py;
@@ -161,8 +161,8 @@ tabular_methods!(PyCreditAssessment);
 ///
 /// Parameters
 /// ----------
-/// results : StatementResult | str
-///     A ``StatementResult`` object or a JSON string with ``ebitda``,
+/// results : StatementResult
+///     A ``StatementResult`` with ``ebitda``,
 ///     ``total_debt``, ``interest_expense`` and ``free_cash_flow`` nodes.
 /// period : str
 ///     Period identifier for the assessment (``"2025Q4"``, ``"2025M03"``,
@@ -186,7 +186,7 @@ tabular_methods!(PyCreditAssessment);
 /// ------
 /// ValueError
 ///     If ``period`` is not a valid period identifier, is not one of
-///     ``results.periods``, ``results`` is malformed JSON, or the results'
+///     ``results.periods``, or the results'
 ///     period plan is weekly (a weekly plan has no twelve-month window).
 ///
 /// Examples
@@ -200,11 +200,14 @@ tabular_methods!(PyCreditAssessment);
 /// 3.0
 #[pyfunction]
 #[pyo3(text_signature = "(results, period)")]
-fn credit_assessment(results: &Bound<'_, PyAny>, period: &str) -> PyResult<PyCreditAssessment> {
-    let results = extract_results_ref(results)?;
+fn credit_assessment(
+    results: PyRef<'_, PyStatementResult>,
+    period: &str,
+) -> PyResult<PyCreditAssessment> {
+    let results = &results.inner;
     let period = parse_period_id(period)?;
     Ok(PyCreditAssessment {
-        inner: CreditAssessment::compute(&results, period)
+        inner: CreditAssessment::compute(results, period)
             .map_err(crate::errors::statements_to_py)?,
     })
 }
@@ -213,8 +216,8 @@ fn credit_assessment(results: &Bound<'_, PyAny>, period: &str) -> PyResult<PyCre
 ///
 /// Parameters
 /// ----------
-/// results : StatementResult | str
-///     A ``StatementResult`` object or a JSON string.
+/// results : StatementResult
+///     A ``StatementResult``.
 /// period : str
 ///     Period identifier for the assessment (a ``PeriodId``, not a date).
 ///
@@ -228,8 +231,8 @@ fn credit_assessment(results: &Bound<'_, PyAny>, period: &str) -> PyResult<PyCre
 /// Raises
 /// ------
 /// ValueError
-///     If ``period`` is not a valid period identifier, ``results`` is
-///     malformed JSON, ``results`` hold ``ebitda`` or ``interest_expense``
+///     If ``period`` is not a valid period identifier,
+///     ``results`` hold ``ebitda`` or ``interest_expense``
 ///     without a period plan, ``period`` is not in that plan, or the plan
 ///     is weekly.
 ///
@@ -242,10 +245,13 @@ fn credit_assessment(results: &Bound<'_, PyAny>, period: &str) -> PyResult<PyCre
 /// True
 #[pyfunction]
 #[pyo3(text_signature = "(results, period)")]
-fn credit_assessment_report_text(results: &Bound<'_, PyAny>, period: &str) -> PyResult<String> {
-    let results = extract_results_ref(results)?;
+fn credit_assessment_report_text(
+    results: PyRef<'_, PyStatementResult>,
+    period: &str,
+) -> PyResult<String> {
+    let results = &results.inner;
     let period = parse_period_id(period)?;
-    Ok(CreditAssessmentReport::new(&results, period)
+    Ok(CreditAssessmentReport::new(results, period)
         .map_err(crate::errors::statements_to_py)?
         .to_string())
 }
@@ -324,8 +330,8 @@ tabular_methods!(PyPLSummaryReport);
 ///
 /// Parameters
 /// ----------
-/// results : StatementResult | str
-///     A ``StatementResult`` object or a JSON string.
+/// results : StatementResult
+///     A ``StatementResult``.
 /// line_items : list[str]
 ///     Node ids to include as rows.
 /// periods : list[str]
@@ -339,7 +345,7 @@ tabular_methods!(PyPLSummaryReport);
 /// Raises
 /// ------
 /// ValueError
-///     If a period does not parse or ``results`` is malformed JSON.
+///     If a period does not parse.
 ///
 /// Examples
 /// --------
@@ -351,11 +357,11 @@ tabular_methods!(PyPLSummaryReport);
 #[pyfunction]
 #[pyo3(text_signature = "(results, line_items, periods)")]
 fn pl_summary_report(
-    results: &Bound<'_, PyAny>,
+    results: PyRef<'_, PyStatementResult>,
     line_items: Vec<String>,
     periods: Vec<String>,
 ) -> PyResult<PyPLSummaryReport> {
-    let results = extract_results_ref(results)?.into_owned();
+    let results = results.inner.clone();
     let periods = periods
         .iter()
         .map(|p| parse_period_id(p))

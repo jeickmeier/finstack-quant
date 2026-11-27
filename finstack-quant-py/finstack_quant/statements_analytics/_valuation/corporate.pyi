@@ -595,18 +595,18 @@ class CorporateAnalysis:
         """
 
 def evaluate_dcf(
-    model: Any,
+    model: FinancialModelSpec,
     inputs: Mapping[str, Any] | str,
     options: Mapping[str, Any] | str | None = None,
-    market: Any | None = None,
+    market: MarketContext | None = None,
     as_of: Any | None = None,
 ) -> CorporateValuationResult:
     """Evaluate DCF valuation on a financial model.
 
     Parameters
     ----------
-    model : FinancialModelSpec | str
-        A ``FinancialModelSpec`` object or a JSON string; metadata must contain
+    model : FinancialModelSpec
+        A ``FinancialModelSpec``; metadata must contain
         a ``"currency"`` key.
     inputs : dict | str
         The Rust ``DcfInputs`` serde form (the document WASM ``evaluateDcf``
@@ -689,7 +689,7 @@ def evaluate_dcf(
     """
 
 def dcf_sensitivity(
-    model: Any,
+    model: FinancialModelSpec,
     wacc: float,
     terminal_value: Any,
     ufcf_node: str = "ufcf",
@@ -704,8 +704,8 @@ def dcf_sensitivity(
 
     Parameters
     ----------
-    model : FinancialModelSpec | str
-        A ``FinancialModelSpec`` object or a JSON string; metadata must include
+    model : FinancialModelSpec
+        A ``FinancialModelSpec``; metadata must include
         a ``"currency"`` key.
     wacc : float
         Baseline WACC in decimal form.
@@ -771,7 +771,7 @@ def dcf_sensitivity(
     ['parameter_id', 'downside', 'upside', 'swing']
     """
 
-def evaluate_lbo(model: Any, config: Mapping[str, Any] | str) -> LboResult:
+def evaluate_lbo(model: FinancialModelSpec, config: Mapping[str, Any] | str) -> LboResult:
     """Evaluate a leveraged-buyout transaction against a statement model.
 
     Entry enterprise value is priced at the explicitly selected entry period, the sponsor
@@ -782,8 +782,8 @@ def evaluate_lbo(model: Any, config: Mapping[str, Any] | str) -> LboResult:
 
     Parameters
     ----------
-    model : FinancialModelSpec | str
-        A ``FinancialModelSpec`` object or a JSON string; metadata must include
+    model : FinancialModelSpec
+        A ``FinancialModelSpec``; metadata must include
         a ``"currency"`` key.
     config : dict | str
         The Rust ``LboConfig`` serde form (the document WASM ``evaluateLbo``
@@ -1021,9 +1021,9 @@ def wacc(inputs: WaccInputs) -> float:
     """
 
 def run_corporate_analysis(
-    model: Any,
+    model: FinancialModelSpec,
     options: Mapping[str, Any] | str | None = None,
-    market: Any | None = None,
+    market: MarketContext | None = None,
 ) -> CorporateAnalysis:
     """Run the full corporate analysis pipeline.
 
@@ -1033,8 +1033,8 @@ def run_corporate_analysis(
 
     Parameters
     ----------
-    model : FinancialModelSpec | str
-        A ``FinancialModelSpec`` object or a JSON string.
+    model : FinancialModelSpec
+        A ``FinancialModelSpec``.
     options : dict | str | None
         The Rust ``CorporateAnalysisOptions`` serde form, as a dict or JSON
         text. Every key is optional; ``None`` or an omitted key takes the

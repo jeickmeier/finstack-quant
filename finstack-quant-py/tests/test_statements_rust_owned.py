@@ -58,8 +58,8 @@ def quarter(q: int, year: int = 2025) -> dict[str, object]:
     }
 
 
-def goal_seek_model() -> str:
-    return json.dumps({
+def goal_seek_model() -> FinancialModelSpec:
+    document = json.dumps({
         "id": "goal-seek",
         "source_snapshot": "goal-seek-test-forecast",
         "schema_version": 1,
@@ -69,15 +69,16 @@ def goal_seek_model() -> str:
             "profit": {"node_id": "profit", "node_type": "calculated", "formula_text": "revenue * 0.5"},
         },
     })
+    return FinancialModelSpec.from_json(document)
 
 
-def lbo_model() -> str:
+def lbo_model() -> FinancialModelSpec:
     ids = ["2025Q1", "2025Q2", "2025Q3", "2025Q4", "2026Q1"]
 
     def series(values: list[float]) -> dict[str, dict[str, str]]:
         return {pid: usd(v) for pid, v in zip(ids, values, strict=True)}
 
-    return json.dumps({
+    document = json.dumps({
         "id": "lbo",
         "schema_version": 1,
         "meta": {"currency": "USD"},
@@ -91,6 +92,7 @@ def lbo_model() -> str:
             "equity": {"node_id": "equity", "node_type": "value", "values": series([-200, -200, -200, -200, -80])},
         },
     })
+    return FinancialModelSpec.from_json(document)
 
 
 LBO_CONFIG = {
@@ -118,11 +120,11 @@ LBO_CHECK_MAPPINGS = {
 }
 
 
-def dcf_model() -> str:
+def dcf_model() -> FinancialModelSpec:
     def annual(year: int) -> dict[str, object]:
         return {"id": str(year), "start": f"{year}-01-01", "end": f"{year + 1}-01-01", "is_actual": False}
 
-    return json.dumps({
+    document = json.dumps({
         "id": "dcf",
         "schema_version": 1,
         "meta": {"currency": "USD"},
@@ -132,6 +134,7 @@ def dcf_model() -> str:
             "ebitda": {"node_id": "ebitda", "node_type": "value", "values": {"2025": usd(50), "2026": usd(60)}},
         },
     })
+    return FinancialModelSpec.from_json(document)
 
 
 EXIT_MULTIPLE = {"type": "exit_multiple", "terminal_metric": 999.0, "multiple": 8.0}
@@ -306,7 +309,7 @@ def test_evaluate_dcf_exports_the_working_behind_enterprise_value() -> None:
 
 
 def test_explain_formula_reports_the_cell_source() -> None:
-    model = json.dumps({
+    document = json.dumps({
         "id": "explain",
         "schema_version": 1,
         "periods": {"calendar": "gregorian", "periods": [{**quarter(1), "is_actual": True}, quarter(2)]},
@@ -321,7 +324,8 @@ def test_explain_formula_reports_the_cell_source() -> None:
             "gross_profit": {"node_id": "gross_profit", "node_type": "calculated", "formula_text": "revenue - cogs"},
         },
     })
-    results = Evaluator().evaluate(FinancialModelSpec.from_json(model))
+    model = FinancialModelSpec.from_json(document)
+    results = Evaluator().evaluate(model)
 
     actual = explain_formula(model, results, "revenue", "2025Q1")
     assert (actual.source, actual.forecast, actual.breakdown) == ("value", None, [])
@@ -352,7 +356,8 @@ def test_model_ingest_is_rust_from_json() -> None:
     })
     with pytest.raises(ValueError, match="at least one period"):
         FinancialModelSpec.from_json(empty)
-    with pytest.raises(ValueError, match="at least one period"):
+    # Model JSON text is not a model: it goes through the loader.
+    with pytest.raises(TypeError, match="FinancialModelSpec"):
         DependencyTracer(empty)
     with pytest.raises(ValueError, match="validation failed") as malformed:
         FinancialModelSpec.from_json("{")
@@ -385,7 +390,7 @@ def test_non_finite_values_use_the_nan_sentinel() -> None:
     assert restored.mape is None
     assert pickle.loads(pickle.dumps(metrics)).mape is None  # noqa: S301 - trusted in-process round trip
 
-    model = json.dumps({
+    document = json.dumps({
         "id": "lag",
         "schema_version": 1,
         "periods": {"calendar": "gregorian", "periods": [quarter(1), quarter(2)]},
@@ -394,7 +399,8 @@ def test_non_finite_values_use_the_nan_sentinel() -> None:
             "lagged": {"node_id": "lagged", "node_type": "calculated", "formula_text": "lag(revenue, 1)"},
         },
     })
-    results = Evaluator().evaluate(FinancialModelSpec.from_json(model))
+    model = FinancialModelSpec.from_json(document)
+    results = Evaluator().evaluate(model)
     explanation = explain_formula(model, results, "lagged", "2025Q1")
     assert json.loads(explanation.to_json())["final_value"] == "nan"
     # Statement warnings are the serde objects WASM returns, not Debug text.

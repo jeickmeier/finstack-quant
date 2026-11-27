@@ -8,6 +8,7 @@ import pytest
 
 from finstack_quant.statements import (
     Evaluator,
+    FinancialModelSpec,
     ModelBuilder,
     MonteCarloConfig,
     MonteCarloResults,
@@ -138,23 +139,31 @@ def test_analysis_functions_accept_typed_configs_and_return_typed_results() -> N
     assert ScenarioResults.from_json(scenario_results.to_json()).get("missing") is None
 
 
-def test_analysis_functions_retain_json_config_input() -> None:
+def test_analysis_functions_take_json_config_through_the_loader() -> None:
     model = _model()
     config_json = SensitivityConfig(
         "diagonal",
         [("revenue", "2025Q2", 110.0, [100.0, 120.0])],
         ["profit"],
     ).to_json()
-    result = run_sensitivity(model.to_json(), config_json)
+    result = run_sensitivity(FinancialModelSpec.from_json(model.to_json()), SensitivityConfig.from_json(config_json))
     assert isinstance(result, SensitivityResult)
     assert len(result) == 2
+    # JSON text is not a model or a configuration: it goes through the loaders.
+    with pytest.raises(TypeError, match="FinancialModelSpec"):
+        run_sensitivity(model.to_json(), SensitivityConfig.from_json(config_json))
+    with pytest.raises(TypeError, match="SensitivityConfig"):
+        run_sensitivity(model, config_json)
 
 
 def test_statement_monte_carlo_result_is_typed_and_deterministic() -> None:
     model = _model()
     config = MonteCarloConfig(4, 123, ["revenue"], [0.5])
     first = Evaluator().evaluate_monte_carlo(model, config)
-    second = Evaluator().evaluate_monte_carlo(model, config.to_json())
+    second = Evaluator().evaluate_monte_carlo(model, MonteCarloConfig.from_json(config.to_json()))
+    # Configuration JSON text is not a configuration: it goes through the loader.
+    with pytest.raises(TypeError, match="MonteCarloConfig"):
+        Evaluator().evaluate_monte_carlo(model, config.to_json())
     assert isinstance(first, MonteCarloResults)
     assert first.n_paths == 4
     assert first.percentiles == [0.5]

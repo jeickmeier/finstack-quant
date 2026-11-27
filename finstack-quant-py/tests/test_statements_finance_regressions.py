@@ -22,9 +22,11 @@ def test_json_cannot_alias_another_nodes_forecast_cache() -> None:
     payload = json.loads(_model().to_json())
     payload["nodes"]["cost"]["node_id"] = "revenue"
     text = json.dumps(payload)
-    for load in [s.FinancialModelSpec.from_json, s.Evaluator().evaluate]:
-        with pytest.raises(ValueError, match="does not match its embedded node_id"):
-            load(text)
+    with pytest.raises(ValueError, match="does not match its embedded node_id"):
+        s.FinancialModelSpec.from_json(text)
+    # Model JSON text is not a model: it goes through the loader.
+    with pytest.raises(TypeError, match="FinancialModelSpec"):
+        s.Evaluator().evaluate(text)
 
 
 @pytest.mark.parametrize("cell", [300.0, None, float("nan")])

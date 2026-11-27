@@ -844,8 +844,8 @@ class CapitalStructureSummary:
         ...
 
 def capital_structure_summary(
-    results: StatementResult | str,
-    model: FinancialModelSpec | str,
+    results: StatementResult,
+    model: FinancialModelSpec,
     config: dict[str, Any] | str,
 ) -> CapitalStructureSummary:
     """
@@ -869,12 +869,12 @@ def capital_structure_summary(
 
     Parameters
     ----------
-    results : StatementResult or str
-        Evaluated statement results, typed or as JSON, holding ``cs_cashflows`` and both
+    results : StatementResult
+        Evaluated statement results, holding ``cs_cashflows`` and both
         configured nodes. A scalar EBITDA or cash node is read as an amount in the debt
         currency.
-    model : FinancialModelSpec or str
-        Model, typed or as JSON, whose capital structure gives the instruments, their
+    model : FinancialModelSpec
+        Model, whose capital structure gives the instruments, their
         declaration order and the payment classes, and whose periods bound the LTM
         window.
     config : dict or str
@@ -893,7 +893,7 @@ def capital_structure_summary(
     Raises
     ------
     ValueError
-        If ``config``, ``results`` or ``model`` is malformed; the model has no capital
+        If ``config`` is malformed; the model has no capital
         structure, or no debt instruments once hedges are excluded; ``cs_cashflows`` is
         absent; the period is not in the model; a configured node is not in ``results``,
         or the cash node has no value at the period; an instrument has no cashflows at

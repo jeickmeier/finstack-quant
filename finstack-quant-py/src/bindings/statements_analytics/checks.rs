@@ -6,9 +6,10 @@
 //! `run_credit_underwriting_checks`) and the report renderers. Every entry
 //! point accepts the typed object or its canonical JSON string.
 
-use crate::bindings::extract::{extract_model_ref, extract_results_ref};
 use crate::bindings::macros::wire_methods;
 use crate::bindings::statements::checks::{PyCheckReport, PyCheckSuiteSpec};
+use crate::bindings::statements::evaluator::PyStatementResult;
+use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::errors::statements_to_py;
 use finstack_quant_statements::checks::{CheckReport, CheckSuite, CheckSuiteSpec};
 use finstack_quant_statements::types::NodeId;
@@ -519,15 +520,6 @@ fn run_check_suite(
     })
 }
 
-fn optional_results(
-    results: Option<&Bound<'_, PyAny>>,
-) -> PyResult<Option<finstack_quant_statements::evaluator::StatementResult>> {
-    results
-        .map(extract_results_ref)
-        .transpose()
-        .map(|results| results.map(|results| results.into_owned()))
-}
-
 /// Run checks from a suite spec against a model.
 ///
 /// Resolves both built-in and formula checks from the spec, evaluates the
@@ -535,12 +527,12 @@ fn optional_results(
 ///
 /// Parameters
 /// ----------
-/// model : FinancialModelSpec | str
-///     A ``FinancialModelSpec`` object or a JSON string.
+/// model : FinancialModelSpec
+///     A ``FinancialModelSpec``.
 /// spec : CheckSuiteSpec | dict | str
 ///     Typed ``finstack_quant.statements.CheckSuiteSpec``, its serde dict, or
 ///     JSON string.
-/// results : StatementResult | str | None
+/// results : StatementResult | None
 ///     Pre-computed evaluation results, or a rollup of them
 ///     (``StatementResult.rollup``), which is checked at its target periods;
 ///     when provided the model is not re-evaluated. Accounting identity checks require supplied node-unit
@@ -576,14 +568,14 @@ fn optional_results(
 #[pyo3(signature = (model, spec, results=None))]
 fn run_checks(
     py: Python<'_>,
-    model: &Bound<'_, PyAny>,
+    model: PyRef<'_, PyFinancialModelSpec>,
     spec: &Bound<'_, PyAny>,
-    results: Option<&Bound<'_, PyAny>>,
+    results: Option<PyRef<'_, PyStatementResult>>,
 ) -> PyResult<PyCheckReport> {
-    let model = extract_model_ref(model)?.into_owned();
+    let model = model.inner.clone();
     let spec = extract_check_suite_spec(py, spec)?;
     let suite = spec.resolve().map_err(statements_to_py)?;
-    let results = optional_results(results)?;
+    let results = results.map(|results| results.inner.clone());
     run_check_suite(py, model, suite, results)
 }
 
@@ -591,11 +583,11 @@ fn run_checks(
 ///
 /// Parameters
 /// ----------
-/// model : FinancialModelSpec | str
-///     A ``FinancialModelSpec`` object or a JSON string.
+/// model : FinancialModelSpec
+///     A ``FinancialModelSpec``.
 /// mapping : ThreeStatementMapping | dict | str
 ///     Typed node mapping, its serde dict, or JSON string.
-/// results : StatementResult | str | None
+/// results : StatementResult | None
 ///     Pre-computed evaluation results; skips re-evaluation when provided.
 ///     Supplied accounting-node units must agree with the model's declarations
 ///     or explicit monetary values.
@@ -641,15 +633,15 @@ fn run_checks(
 #[pyo3(signature = (model, mapping, results=None))]
 fn run_three_statement_checks(
     py: Python<'_>,
-    model: &Bound<'_, PyAny>,
+    model: PyRef<'_, PyFinancialModelSpec>,
     mapping: &Bound<'_, PyAny>,
-    results: Option<&Bound<'_, PyAny>>,
+    results: Option<PyRef<'_, PyStatementResult>>,
 ) -> PyResult<PyCheckReport> {
-    let model = extract_model_ref(model)?.into_owned();
+    let model = model.inner.clone();
     let mapping = extract_three_statement_mapping(py, mapping)?;
     let suite = finstack_quant_statements_analytics::analysis::three_statement_checks(mapping)
         .map_err(statements_to_py)?;
-    let results = optional_results(results)?;
+    let results = results.map(|results| results.inner.clone());
     run_check_suite(py, model, suite, results)
 }
 
@@ -657,11 +649,11 @@ fn run_three_statement_checks(
 ///
 /// Parameters
 /// ----------
-/// model : FinancialModelSpec | str
-///     A ``FinancialModelSpec`` object or a JSON string.
+/// model : FinancialModelSpec
+///     A ``FinancialModelSpec``.
 /// mapping : CreditMapping | dict | str
 ///     Typed node mapping, its serde dict, or JSON string.
-/// results : StatementResult | str | None
+/// results : StatementResult | None
 ///     Pre-computed evaluation results; skips re-evaluation when provided.
 ///
 /// Returns
@@ -697,15 +689,15 @@ fn run_three_statement_checks(
 #[pyo3(signature = (model, mapping, results=None))]
 fn run_credit_underwriting_checks(
     py: Python<'_>,
-    model: &Bound<'_, PyAny>,
+    model: PyRef<'_, PyFinancialModelSpec>,
     mapping: &Bound<'_, PyAny>,
-    results: Option<&Bound<'_, PyAny>>,
+    results: Option<PyRef<'_, PyStatementResult>>,
 ) -> PyResult<PyCheckReport> {
-    let model = extract_model_ref(model)?.into_owned();
+    let model = model.inner.clone();
     let mapping = extract_credit_mapping(py, mapping)?;
     let suite = finstack_quant_statements_analytics::analysis::credit_underwriting_checks(mapping)
         .map_err(statements_to_py)?;
-    let results = optional_results(results)?;
+    let results = results.map(|results| results.inner.clone());
     run_check_suite(py, model, suite, results)
 }
 

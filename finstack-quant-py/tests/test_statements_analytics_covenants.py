@@ -74,8 +74,11 @@ def test_window_keeps_early_non_finite_leverage_out_of_the_evaluation() -> None:
 def test_json_inputs_and_engine_series_agree() -> None:
     results = _results()
     engine = _engine("2024-10-01")
-    from_json = evaluate_covenants(engine, results.to_json())
+    from_json = evaluate_covenants(engine, StatementResult.from_json(results.to_json()))
     assert from_json.to_pandas().equals(evaluate_covenants(engine, results).to_pandas())
+    # Result JSON text is not a result: it goes through the loader.
+    with pytest.raises(TypeError, match="StatementResult"):
+        evaluate_covenants(engine, results.to_json())
 
 
 def test_required_non_finite_metric_raises_value_error() -> None:

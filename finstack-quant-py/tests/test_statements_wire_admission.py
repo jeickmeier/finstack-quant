@@ -48,8 +48,11 @@ def test_document_loads_to_the_recorded_outcome(case: dict[str, Any]) -> None:
 def test_every_model_taking_entry_point_uses_the_same_loader() -> None:
     duplicate = next(case["document"] for case in CASES if case["name"] == "duplicate_key")
     with pytest.raises(ContractValidationError) as raised:
-        DependencyTracer(duplicate)
+        FinancialModelSpec.from_json(duplicate)
     assert raised.value.report[0]["pointer"] == "/id"
+    # A model-taking entry point takes the loaded model; JSON text is not one.
+    with pytest.raises(TypeError, match="FinancialModelSpec"):
+        DependencyTracer(duplicate)
 
 
 def test_monte_carlo_seed_is_a_decimal_string_on_the_wire() -> None:

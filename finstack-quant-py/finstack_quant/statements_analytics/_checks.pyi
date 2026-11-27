@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 from finstack_quant.statements import CheckConfig, CheckReport
+from finstack_quant.statements import FinancialModelSpec
+from finstack_quant.statements import StatementResult
 
 class CreditMapping:
     """
@@ -800,7 +802,7 @@ def render_check_report_text(report: Any) -> str:
     ValueError: ...
     """
 
-def run_checks(model: Any, spec: Any, results: Any | None = None) -> CheckReport:
+def run_checks(model: FinancialModelSpec, spec: Any, results: StatementResult | None = None) -> CheckReport:
     """Run checks from a suite spec against a model.
 
     Resolves both built-in and formula checks from the spec, evaluates the
@@ -808,12 +810,12 @@ def run_checks(model: Any, spec: Any, results: Any | None = None) -> CheckReport
 
     Parameters
     ----------
-    model : FinancialModelSpec | str
-        A ``FinancialModelSpec`` object or a JSON string.
+    model : FinancialModelSpec
+        A ``FinancialModelSpec``.
     spec : CheckSuiteSpec | dict | str
         Typed ``finstack_quant.statements.CheckSuiteSpec``, its serde dict, or
         JSON string.
-    results : StatementResult | str | None
+    results : StatementResult | None
         Pre-computed evaluation results, or a rollup of them
         (``StatementResult.rollup``), which is checked at its target periods;
         when provided the model is not re-evaluated. Accounting identity checks require supplied node-unit
@@ -827,7 +829,7 @@ def run_checks(model: Any, spec: Any, results: Any | None = None) -> CheckReport
     Raises
     ------
     ValueError
-        If a model, spec, or results payload is malformed, a check configuration
+        If a spec payload is malformed, a check configuration
         is invalid, formula parsing or evaluation fails, accounting operands
         have incompatible currencies/units, or supplied result units conflict
         with the model's declarations or explicit monetary values.
@@ -861,16 +863,18 @@ def run_checks(model: Any, spec: Any, results: Any | None = None) -> CheckReport
     True
     """
 
-def run_credit_underwriting_checks(model: Any, mapping: Any, results: Any | None = None) -> CheckReport:
+def run_credit_underwriting_checks(
+    model: FinancialModelSpec, mapping: Any, results: StatementResult | None = None
+) -> CheckReport:
     """Run the built-in credit-underwriting check suite.
 
     Parameters
     ----------
-    model : FinancialModelSpec | str
-        A ``FinancialModelSpec`` object or a JSON string.
+    model : FinancialModelSpec
+        A ``FinancialModelSpec``.
     mapping : CreditMapping | dict | str
         Typed node mapping, its serde dict, or JSON string.
-    results : StatementResult | str | None
+    results : StatementResult | None
         Pre-computed evaluation results; skips re-evaluation when provided.
 
     Returns
@@ -895,16 +899,18 @@ def run_credit_underwriting_checks(model: Any, mapping: Any, results: Any | None
     True
     """
 
-def run_three_statement_checks(model: Any, mapping: Any, results: Any | None = None) -> CheckReport:
+def run_three_statement_checks(
+    model: FinancialModelSpec, mapping: Any, results: StatementResult | None = None
+) -> CheckReport:
     """Run the built-in three-statement check suite.
 
     Parameters
     ----------
-    model : FinancialModelSpec | str
-        A ``FinancialModelSpec`` object or a JSON string.
+    model : FinancialModelSpec
+        A ``FinancialModelSpec``.
     mapping : ThreeStatementMapping | dict | str
         Typed node mapping, its serde dict, or JSON string.
-    results : StatementResult | str | None
+    results : StatementResult | None
         Pre-computed evaluation results; skips re-evaluation when provided.
         Supplied accounting-node units must agree with the model's declarations
         or explicit monetary values.
@@ -917,7 +923,7 @@ def run_three_statement_checks(model: Any, mapping: Any, results: Any | None = N
     Raises
     ------
     ValueError
-        If a model, mapping, or results payload is malformed, evaluation fails,
+        If a mapping payload is malformed, evaluation fails,
         accounting operands have incompatible currencies/units, or supplied
         result units conflict with model declarations or explicit monetary values.
     KeyError

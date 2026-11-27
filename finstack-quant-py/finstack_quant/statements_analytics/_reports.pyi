@@ -6,6 +6,7 @@ from typing import Any
 import pandas as pd
 import polars as pl
 from finstack_quant.core.table import ArrowTable
+from finstack_quant.statements import StatementResult
 
 class CreditAssessment:
     """Structured credit assessment: leverage, coverage and free cash flow at a
@@ -389,13 +390,13 @@ class PLSummaryReport:
     def __arrow_c_schema__(self) -> object: ...
     def _repr_html_(self) -> str | None: ...
 
-def credit_assessment(results: Any, period: str) -> CreditAssessment:
+def credit_assessment(results: StatementResult, period: str) -> CreditAssessment:
     """Compute a structured credit assessment (leverage, interest coverage, FCF).
 
     Parameters
     ----------
-    results : StatementResult | str
-        A ``StatementResult`` object or a JSON string with ``ebitda``,
+    results : StatementResult
+        A ``StatementResult`` with ``ebitda``,
         ``total_debt``, ``interest_expense`` and ``free_cash_flow`` nodes.
     period : str
         Period identifier for the assessment (``"2025Q4"``, ``"2025M03"``,
@@ -419,7 +420,7 @@ def credit_assessment(results: Any, period: str) -> CreditAssessment:
     ------
     ValueError
         If ``period`` is not a valid period identifier, is not one of
-        ``results.periods``, ``results`` is malformed JSON, or the results'
+        ``results.periods``, or the results'
         period plan is weekly (a weekly plan has no twelve-month window).
 
     Examples
@@ -434,13 +435,13 @@ def credit_assessment(results: Any, period: str) -> CreditAssessment:
     3.0
     """
 
-def credit_assessment_report_text(results: Any, period: str) -> str:
+def credit_assessment_report_text(results: StatementResult, period: str) -> str:
     """Generate a credit assessment report as formatted text.
 
     Parameters
     ----------
-    results : StatementResult | str
-        A ``StatementResult`` object or a JSON string.
+    results : StatementResult
+        A ``StatementResult``.
     period : str
         Period identifier for the assessment (a ``PeriodId``, not a date).
 
@@ -454,8 +455,8 @@ def credit_assessment_report_text(results: Any, period: str) -> str:
     Raises
     ------
     ValueError
-        If ``period`` is not a valid period identifier, ``results`` is
-        malformed JSON, ``results`` hold ``ebitda`` or ``interest_expense``
+        If ``period`` is not a valid period identifier,
+        ``results`` hold ``ebitda`` or ``interest_expense``
         without a period plan, ``period`` is not in that plan, or the plan
         is weekly.
 
@@ -470,13 +471,13 @@ def credit_assessment_report_text(results: Any, period: str) -> str:
     True
     """
 
-def pl_summary_report(results: Any, line_items: list[str], periods: list[str]) -> PLSummaryReport:
+def pl_summary_report(results: StatementResult, line_items: list[str], periods: list[str]) -> PLSummaryReport:
     """Build a P&L summary report for selected line items and periods.
 
     Parameters
     ----------
-    results : StatementResult | str
-        A ``StatementResult`` object or a JSON string.
+    results : StatementResult
+        A ``StatementResult``.
     line_items : list[str]
         Node ids to include as rows.
     periods : list[str]
@@ -490,7 +491,7 @@ def pl_summary_report(results: Any, line_items: list[str], periods: list[str]) -
     Raises
     ------
     ValueError
-        If a period does not parse or ``results`` is malformed JSON.
+        If a period does not parse.
 
     Examples
     --------

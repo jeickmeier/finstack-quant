@@ -54,7 +54,7 @@ class RollupSpec:
         ...
 
     @staticmethod
-    def declared_methods(model: FinancialModelSpec | str, frequency: str) -> RollupSpec:
+    def declared_methods(model: FinancialModelSpec, frequency: str) -> RollupSpec:
         """
         List the rollup methods a model's lines declare.
 
@@ -66,9 +66,8 @@ class RollupSpec:
 
         Parameters
         ----------
-        model : FinancialModelSpec | str
-            Model whose node declarations are listed, typed or its canonical
-            JSON. Nothing is evaluated.
+        model : FinancialModelSpec
+            Model whose node declarations are listed. Nothing is evaluated.
         frequency : str
             Target frequency stored on the spec (``"quarterly"``,
             ``"semi_annual"``, ``"annual"``; surrounding whitespace and ASCII
@@ -84,13 +83,12 @@ class RollupSpec:
         Raises
         ------
         ValueError
-            If ``model`` is malformed JSON or ``frequency`` is not a recognized
-            label.
+            If ``frequency`` is not a recognized label.
 
         Examples
         --------
         >>> import json
-        >>> from finstack_quant.statements import ModelBuilder, RollupSpec
+        >>> from finstack_quant.statements import FinancialModelSpec, ModelBuilder, RollupSpec
         >>> b = ModelBuilder("m")
         >>> _ = b.periods("2025Q1..Q4", None)
         >>> _ = b.value("revenue", [("2025Q1", 100.0)])
@@ -99,7 +97,7 @@ class RollupSpec:
         >>> model = json.loads(b.build().to_json())
         >>> model["nodes"]["cash"]["rollup"] = "period_end"
         >>> model["nodes"]["margin"]["rollup"] = "formula"
-        >>> RollupSpec.declared_methods(json.dumps(model), "annual").methods
+        >>> RollupSpec.declared_methods(FinancialModelSpec.from_json(json.dumps(model)), "annual").methods
         {'cash': 'period_end', 'margin': 'formula'}
 
         """

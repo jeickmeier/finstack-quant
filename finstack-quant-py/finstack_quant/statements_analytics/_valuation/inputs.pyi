@@ -708,7 +708,7 @@ class CorporateDcfRequest:
         ...
 
 def evaluate_corporate_dcf(
-    model: FinancialModelSpec | str,
+    model: FinancialModelSpec,
     request: CorporateDcfRequest,
     market: MarketContext | None = None,
 ) -> CorporateValuationResult:
@@ -716,7 +716,7 @@ def evaluate_corporate_dcf(
 
     Parameters
     ----------
-    model : FinancialModelSpec or str
+    model : FinancialModelSpec
         Model or serialized model with a source snapshot and dated publication metadata.
     request : CorporateDcfRequest
         Effective valuation date, information cutoff, currency and valuation terms.
@@ -760,17 +760,17 @@ def evaluate_corporate_dcf(
     ...
 
 def evaluate_dcf_from_results(
-    model: FinancialModelSpec | str,
-    results: StatementResult | str,
+    model: FinancialModelSpec,
+    results: StatementResult,
     request: CorporateDcfRequest,
 ) -> CorporateValuationResult:
     """Reprice a company from a verified statement snapshot already in memory.
 
     Parameters
     ----------
-    model : FinancialModelSpec or str
+    model : FinancialModelSpec
         Unchanged source model used to generate results.
-    results : StatementResult or str
+    results : StatementResult
         Evaluated observations with a matching run hash, cutoff and effective date.
     request : CorporateDcfRequest
         The authorized statement cut, forecast selection and pricing terms.

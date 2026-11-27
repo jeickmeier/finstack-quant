@@ -1,10 +1,11 @@
 //! Dependency tracing and formula explanation Python bindings.
 
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::extract::{extract_model_ref, extract_results_ref};
 use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::statements::evaluator::PyStatementResult;
 use crate::bindings::statements::parse_period_id;
+use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::{core_to_py, statements_to_py};
 use finstack_quant_statements_analytics::analysis::{DependencyTree, Explanation, ExplanationStep};
@@ -19,7 +20,7 @@ const EXPLANATION_COLUMNS: [(&str, &str); 3] = [
 
 /// Cached dependency tracer that builds the model graph once.
 ///
-/// Construct from a ``FinancialModelSpec`` (or JSON string) and reuse for
+/// Construct from a ``FinancialModelSpec`` and reuse for
 /// multiple introspection queries without rebuilding the dependency graph.
 ///
 /// Examples
@@ -42,15 +43,15 @@ pub(super) struct PyDependencyTracer {
 
 #[pymethods]
 impl PyDependencyTracer {
-    /// Build a tracer from a model (typed object or JSON string).
+    /// Build a tracer from a model.
     ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If the model JSON is malformed or the graph contains a cycle.
+    ///     If the graph contains a cycle.
     #[new]
-    fn new(model: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let model = extract_model_ref(model)?.into_owned();
+    fn new(model: PyRef<'_, PyFinancialModelSpec>) -> PyResult<Self> {
+        let model = model.inner.clone();
         let graph = finstack_quant_statements::evaluator::DependencyGraph::from_model(&model)
             .map_err(statements_to_py)?;
         Ok(Self { model, graph })
@@ -111,11 +112,11 @@ impl PyDependencyTracer {
     ///     If ``period`` does not parse.
     fn dependency_tree_detailed(
         &self,
-        results: &Bound<'_, PyAny>,
+        results: PyRef<'_, PyStatementResult>,
         node_id: &str,
         period: &str,
     ) -> PyResult<String> {
-        let results = extract_results_ref(results)?;
+        let results = &results.inner;
         let pid = parse_period_id(period)?;
         let tracer = finstack_quant_statements_analytics::analysis::DependencyTracer::new(
             &self.model,
@@ -124,7 +125,7 @@ impl PyDependencyTracer {
         let tree = tracer.dependency_tree(node_id).map_err(statements_to_py)?;
         Ok(
             finstack_quant_statements_analytics::analysis::render_tree_detailed(
-                &tree, &results, &pid,
+                &tree, results, &pid,
             ),
         )
     }
@@ -394,10 +395,10 @@ tabular_methods!(PyExplanation);
 ///
 /// Parameters
 /// ----------
-/// model : FinancialModelSpec | str
-///     A ``FinancialModelSpec`` object or a JSON string.
-/// results : StatementResult | str
-///     A ``StatementResult`` object or a JSON string.
+/// model : FinancialModelSpec
+///     A ``FinancialModelSpec``.
+/// results : StatementResult
+///     A ``StatementResult``.
 /// node_id : str
 ///     Node whose formula to explain.
 /// period : str
@@ -415,7 +416,7 @@ tabular_methods!(PyExplanation);
 /// KeyError
 ///     If ``node_id`` is not in the model or has no value at ``period``.
 /// ValueError
-///     If ``period`` does not parse or a payload is malformed JSON.
+///     If ``period`` does not parse.
 ///
 /// Examples
 /// --------
@@ -428,17 +429,17 @@ tabular_methods!(PyExplanation);
 /// 50.0
 #[pyfunction]
 pub(super) fn explain_formula(
-    model: &Bound<'_, PyAny>,
-    results: &Bound<'_, PyAny>,
+    model: PyRef<'_, PyFinancialModelSpec>,
+    results: PyRef<'_, PyStatementResult>,
     node_id: &str,
     period: &str,
 ) -> PyResult<PyExplanation> {
-    let model = extract_model_ref(model)?;
-    let results = extract_results_ref(results)?;
+    let model = &model.inner;
+    let results = &results.inner;
     let pid = parse_period_id(period)?;
 
     let inner = finstack_quant_statements_analytics::analysis::explain_formula(
-        &model, &results, node_id, &pid,
+        model, results, node_id, &pid,
     )
     .map_err(statements_to_py)?;
     Ok(PyExplanation { inner })

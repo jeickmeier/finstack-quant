@@ -19,8 +19,9 @@ from finstack_quant.statements_analytics._typed.results import (
     TornadoEntry,
     VarianceReport,
 )
+from finstack_quant.statements_analytics._typed.config import ScenarioSet, SensitivityConfig, VarianceConfig
 
-def run_sensitivity(model: Any, config: Any) -> SensitivityResult:
+def run_sensitivity(model: FinancialModelSpec, config: SensitivityConfig) -> SensitivityResult:
     """Run sensitivity analysis on a financial model.
 
     Each perturbation replaces its node's value in its one forecast period
@@ -32,10 +33,10 @@ def run_sensitivity(model: Any, config: Any) -> SensitivityResult:
 
     Parameters
     ----------
-    model : FinancialModelSpec | str
-        A ``FinancialModelSpec`` object or a JSON string.
-    config : SensitivityConfig | str
-        A typed configuration or its JSON serialization.
+    model : FinancialModelSpec
+        A ``FinancialModelSpec``.
+    config : SensitivityConfig
+        The configuration.
 
     Returns
     -------
@@ -68,13 +69,13 @@ def run_sensitivity(model: Any, config: Any) -> SensitivityResult:
     2
     """
 
-def generate_tornado_entries(result: Any, metric_node: str, period: str) -> list[TornadoEntry] | None:
+def generate_tornado_entries(result: SensitivityResult, metric_node: str, period: str) -> list[TornadoEntry] | None:
     """Generate tornado chart entries for a sensitivity result.
 
     Parameters
     ----------
-    result : SensitivityResult | str
-        A typed sensitivity result or its JSON serialization.
+    result : SensitivityResult
+        The sensitivity result.
     metric_node : str
         Node to extract tornado entries for.
     period : str
@@ -93,7 +94,7 @@ def generate_tornado_entries(result: Any, metric_node: str, period: str) -> list
     Raises
     ------
     ValueError
-        If ``period`` does not parse, ``result`` is malformed JSON, a
+        If ``period`` does not parse, a
         one-at-a-time run's scenario does not contain exactly one perturbed
         parameter, its unperturbed baseline is absent, the target metric/period
         is missing, or a metric value or impact is non-finite.
@@ -119,17 +120,17 @@ def generate_tornado_entries(result: Any, metric_node: str, period: str) -> list
     ['revenue@2025Q2']
     """
 
-def run_variance(base: Any, comparison: Any, config: Any) -> VarianceReport:
+def run_variance(base: StatementResult, comparison: StatementResult, config: VarianceConfig) -> VarianceReport:
     """Run variance analysis comparing two statement results.
 
     Parameters
     ----------
-    base : StatementResult | str
-        A ``StatementResult`` object or a JSON string.
-    comparison : StatementResult | str
-        A ``StatementResult`` object or a JSON string.
-    config : VarianceConfig | str
-        A typed configuration or its JSON serialization.
+    base : StatementResult
+        A ``StatementResult``.
+    comparison : StatementResult
+        A ``StatementResult``.
+    config : VarianceConfig
+        The configuration.
 
     Returns
     -------
@@ -145,13 +146,20 @@ def run_variance(base: Any, comparison: Any, config: Any) -> VarianceReport:
 
     Examples
     --------
-    >>> from finstack_quant.statements_analytics import run_variance
-    >>> run_variance("{}", "{}", "{}")
-    Traceback (most recent call last):
-    ValueError: ...
+    >>> from finstack_quant.statements import Evaluator, ModelBuilder
+    >>> from finstack_quant.statements_analytics import VarianceConfig, run_variance
+    >>> def results(revenue):
+    ...     b = ModelBuilder("m")
+    ...     _ = b.periods("2025Q1..Q1", None)
+    ...     _ = b.value("revenue", [("2025Q1", revenue)])
+    ...     _ = b.compute("profit", "revenue * 0.5")
+    ...     return Evaluator().evaluate(b.build())
+    >>> cfg = VarianceConfig("base", "actual", ["profit"], ["2025Q1"])
+    >>> run_variance(results(100.0), results(120.0), cfg).rows[0].abs_var
+    10.0
     """
 
-def evaluate_scenario_set(model: Any, scenario_set: Any) -> ScenarioResults:
+def evaluate_scenario_set(model: FinancialModelSpec, scenario_set: ScenarioSet) -> ScenarioResults:
     """Evaluate all scenarios in a scenario set.
 
     Like ``Evaluator.evaluate``, a capital structure is evaluated from an
@@ -161,10 +169,10 @@ def evaluate_scenario_set(model: Any, scenario_set: Any) -> ScenarioResults:
 
     Parameters
     ----------
-    model : FinancialModelSpec | str
-        A ``FinancialModelSpec`` object or a JSON string.
-    scenario_set : ScenarioSet | str
-        A typed scenario set or its JSON serialization.
+    model : FinancialModelSpec
+        A ``FinancialModelSpec``.
+    scenario_set : ScenarioSet
+        The scenario set.
 
     Returns
     -------
@@ -196,7 +204,7 @@ def evaluate_scenario_set(model: Any, scenario_set: Any) -> ScenarioResults:
     """
 
 def evaluate_scenario_set_with_market(
-    model: Any, scenario_set: Any, market: MarketContext, as_of: Any
+    model: FinancialModelSpec, scenario_set: ScenarioSet, market: MarketContext, as_of: Any
 ) -> ScenarioResults:
     """Evaluate all scenarios in a scenario set against a market as of a date.
 
@@ -208,10 +216,10 @@ def evaluate_scenario_set_with_market(
 
     Parameters
     ----------
-    model : FinancialModelSpec | str
-        A ``FinancialModelSpec`` object or a JSON string.
-    scenario_set : ScenarioSet | str
-        A typed scenario set or its JSON serialization.
+    model : FinancialModelSpec
+        A ``FinancialModelSpec``.
+    scenario_set : ScenarioSet
+        The scenario set.
     market : MarketContext
         Curves, fixings and FX the instruments are priced from.
     as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
@@ -251,14 +259,19 @@ def evaluate_scenario_set_with_market(
     """
 
 def scenario_diff(
-    scenario_set: Any, results: ScenarioResults, baseline: str, comparison: str, metrics: list[str], periods: list[str]
+    scenario_set: ScenarioSet,
+    results: ScenarioResults,
+    baseline: str,
+    comparison: str,
+    metrics: list[str],
+    periods: list[str],
 ) -> ScenarioDiff:
     """Compare two evaluated scenarios metric-by-metric.
 
     Parameters
     ----------
-    scenario_set : ScenarioSet | str
-        A typed scenario set or its JSON serialization.
+    scenario_set : ScenarioSet
+        The scenario set.
     results : ScenarioResults
         Output of ``evaluate_scenario_set`` for the same scenario set.
     baseline : str
@@ -285,15 +298,21 @@ def scenario_diff(
 
     Examples
     --------
-    >>> from finstack_quant.statements_analytics import scenario_diff
-    >>> scenario_diff("{}", "{}", "base", "up", ["ebitda"], ["2025Q1"])
-    Traceback (most recent call last):
-    TypeError: ...
+    >>> from finstack_quant.statements import ModelBuilder
+    >>> from finstack_quant.statements_analytics import ScenarioSet, evaluate_scenario_set, scenario_diff
+    >>> b = ModelBuilder("m")
+    >>> _ = b.periods("2025Q1..Q1", None)
+    >>> _ = b.value("revenue", [("2025Q1", 100.0)])
+    >>> _ = b.compute("profit", "revenue * 0.5")
+    >>> scenarios = ScenarioSet({"base": {}, "down": {"revenue": 90.0}})
+    >>> results = evaluate_scenario_set(b.build(), scenarios)
+    >>> scenario_diff(scenarios, results, "base", "down", ["profit"], ["2025Q1"]).variance.rows[0].abs_var
+    -5.0
     """
 
 def variance_bridge(
-    base: Any,
-    comparison: Any,
+    base: StatementResult,
+    comparison: StatementResult,
     target_metric: str,
     period: str,
     drivers: list[str],
@@ -308,10 +327,10 @@ def variance_bridge(
 
     Parameters
     ----------
-    base : StatementResult | str
-        Baseline evaluated statement result, or its JSON serialization.
-    comparison : StatementResult | str
-        Comparison evaluated statement result, or its JSON serialization.
+    base : StatementResult
+        Baseline evaluated statement result.
+    comparison : StatementResult
+        Comparison evaluated statement result.
     target_metric : str
         Node identifier whose variance is being explained.
     period : str
@@ -337,10 +356,17 @@ def variance_bridge(
 
     Examples
     --------
+    >>> from finstack_quant.statements import Evaluator, ModelBuilder
     >>> from finstack_quant.statements_analytics import variance_bridge
-    >>> variance_bridge("{}", "{}", "ebitda", "2025Q1", ["revenue"], "base", "actual")
-    Traceback (most recent call last):
-    ValueError: ...
+    >>> def results(revenue):
+    ...     b = ModelBuilder("m")
+    ...     _ = b.periods("2025Q1..Q1", None)
+    ...     _ = b.value("revenue", [("2025Q1", revenue)])
+    ...     _ = b.compute("profit", "revenue * 0.5")
+    ...     return Evaluator().evaluate(b.build())
+    >>> chart = variance_bridge(results(100.0), results(120.0), "profit", "2025Q1", ["revenue"], "base", "actual")
+    >>> [(step.driver, step.contribution) for step in chart.steps], chart.unexplained
+    ([('revenue', 20.0)], -10.0)
     """
 
 class ForecastMetrics:
@@ -871,7 +897,7 @@ class GoalSeekResult:
         ...
 
 def goal_seek(
-    model: FinancialModelSpec | str,
+    model: FinancialModelSpec,
     spec: GoalSeekSpec,
     market: MarketContext | None = None,
 ) -> GoalSeekResult:
@@ -879,7 +905,7 @@ def goal_seek(
 
     Parameters
     ----------
-    model : FinancialModelSpec or str
+    model : FinancialModelSpec
         Original model containing both the editable assumption and the target.
     spec : GoalSeekSpec
         Named driver and target, typed target amount, tolerances and explicit search bounds.

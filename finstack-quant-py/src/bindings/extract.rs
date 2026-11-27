@@ -17,8 +17,6 @@ use pyo3::prelude::*;
 
 use crate::bindings::portfolio::container::PyPortfolio;
 use crate::bindings::portfolio::valuation::PyPortfolioValuation;
-use crate::bindings::statements::evaluator::PyStatementResult;
-use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::bindings::valuations::composite::PyCompositeInstrument;
 use crate::bindings::valuations::convert::serialize_typed_instrument_json;
 use crate::bindings::valuations::instruments::{PyBond, PyTermLoan};
@@ -307,92 +305,6 @@ pub fn envelope_json_text(obj: &Bound<'_, PyAny>) -> PyResult<String> {
     Err(pyo3::exceptions::PyTypeError::new_err(
         "expected a canonical instrument envelope as a dict or JSON string",
     ))
-}
-
-// Zero-clone access types (available for callers that only need &T)
-
-/// Access to a [`FinancialModelSpec`] without cloning on the typed fast path.
-///
-/// When the caller passes a `FinancialModelSpec` Python object, the
-/// `Borrowed` variant holds a `PyRef` guard — no clone occurs.  When the
-/// caller passes a JSON string, the `Owned` variant holds the parsed value.
-///
-/// Use `Deref` (i.e. `&model`) for read-only access.  Call `.into_owned()`
-/// only when ownership is truly needed (e.g. `goal_seek` which mutates).
-pub enum ModelAccess<'py> {
-    Borrowed(PyRef<'py, PyFinancialModelSpec>),
-    Owned(Box<finstack_quant_statements::types::FinancialModelSpec>),
-}
-
-impl std::ops::Deref for ModelAccess<'_> {
-    type Target = finstack_quant_statements::types::FinancialModelSpec;
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Borrowed(r) => &r.inner,
-            Self::Owned(m) => m.as_ref(),
-        }
-    }
-}
-
-impl ModelAccess<'_> {
-    /// Consume this access and produce an owned value, cloning only if
-    /// the data was borrowed from a Python object.
-    pub fn into_owned(self) -> finstack_quant_statements::types::FinancialModelSpec {
-        match self {
-            Self::Borrowed(r) => r.inner.clone(),
-            Self::Owned(m) => *m,
-        }
-    }
-}
-
-/// Access to a [`StatementResult`] without cloning on the typed fast path.
-pub enum ResultAccess<'py> {
-    Borrowed(PyRef<'py, PyStatementResult>),
-    Owned(Box<finstack_quant_statements::evaluator::StatementResult>),
-}
-
-impl std::ops::Deref for ResultAccess<'_> {
-    type Target = finstack_quant_statements::evaluator::StatementResult;
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Borrowed(r) => &r.inner,
-            Self::Owned(r) => r.as_ref(),
-        }
-    }
-}
-
-impl ResultAccess<'_> {
-    pub fn into_owned(self) -> finstack_quant_statements::evaluator::StatementResult {
-        match self {
-            Self::Borrowed(r) => r.inner.clone(),
-            Self::Owned(r) => *r,
-        }
-    }
-}
-
-/// Extract a [`FinancialModelSpec`] without cloning when a typed Python
-/// object is passed.  Returns [`ModelAccess`] which dereferences to
-/// `&FinancialModelSpec`.
-pub fn extract_model_ref<'py>(obj: &Bound<'py, PyAny>) -> PyResult<ModelAccess<'py>> {
-    if let Ok(spec) = obj.cast::<PyFinancialModelSpec>() {
-        return Ok(ModelAccess::Borrowed(spec.borrow()));
-    }
-    let json: String = obj.extract()?;
-    let inner = finstack_quant_statements::types::FinancialModelSpec::from_json(&json)
-        .map_err(|error| crate::errors::contract_to_py(obj.py(), error))?;
-    Ok(ModelAccess::Owned(Box::new(inner)))
-}
-
-/// Extract a [`StatementResult`] without cloning when a typed Python
-/// object is passed.
-pub fn extract_results_ref<'py>(obj: &Bound<'py, PyAny>) -> PyResult<ResultAccess<'py>> {
-    if let Ok(result) = obj.cast::<PyStatementResult>() {
-        return Ok(ResultAccess::Borrowed(result.borrow()));
-    }
-    let json: String = obj.extract()?;
-    let inner: finstack_quant_statements::evaluator::StatementResult =
-        serde_json::from_str(&json).map_err(to_py)?;
-    Ok(ResultAccess::Owned(Box::new(inner)))
 }
 
 // Portfolio — borrow-preferring access

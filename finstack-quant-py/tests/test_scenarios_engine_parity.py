@@ -37,6 +37,7 @@ from finstack_quant.scenarios import (
     parallel_bp_many,
     validate_scenario_spec,
 )
+from finstack_quant.statements import FinancialModelSpec
 from finstack_quant.valuations.instruments import Bond, price_instrument
 from tests.tests_typed_helpers import projection_curve
 
@@ -594,15 +595,17 @@ def test_shocked_instrument_copies_survive_result_round_trips(with_model: bool) 
             scenario,
             _market(),
             AS_OF,
-            json.dumps({
-                "schema_version": 1,
-                "id": "m",
-                "periods": {
-                    "calendar": "gregorian",
-                    "periods": [{"id": "2025Q1", "start": "2025-01-01", "end": "2025-04-01", "is_actual": False}],
-                },
-                "nodes": {"x": {"node_id": "x", "node_type": "value", "value_type": {"type": "scalar"}}},
-            }),
+            FinancialModelSpec.from_json(
+                json.dumps({
+                    "schema_version": 1,
+                    "id": "m",
+                    "periods": {
+                        "calendar": "gregorian",
+                        "periods": [{"id": "2025Q1", "start": "2025-01-01", "end": "2025-04-01", "is_actual": False}],
+                    },
+                    "nodes": {"x": {"node_id": "x", "node_type": "value", "value_type": {"type": "scalar"}}},
+                })
+            ),
             instruments=[original],
         )
     else:

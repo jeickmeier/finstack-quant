@@ -2,10 +2,10 @@
 
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::py_to_date;
-use crate::bindings::extract::extract_results_ref;
 use crate::bindings::models::credit::PyScoringResult;
 use crate::bindings::module_utils::fields_from_py;
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::statements::evaluator::PyStatementResult;
 use crate::errors::{core_to_py, statements_to_py};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements_analytics::analysis::{
@@ -102,14 +102,14 @@ impl PyCreditScoringModel {
 #[pyfunction]
 #[doc = pydoc!("finstack_quant.statements_analytics._scoring", "score_statement")]
 fn score_statement(
-    results: &Bound<'_, PyAny>,
+    results: PyRef<'_, PyStatementResult>,
     period: &str,
     mapping: &PyStatementScoringMapping,
     model: &PyCreditScoringModel,
 ) -> PyResult<PyScoringResult> {
     let period: PeriodId = period.parse().map_err(core_to_py)?;
-    let results = extract_results_ref(results)?;
-    let score = analysis::score_statement(&results, &period, &mapping.inner, &model.inner)
+    let results = &results.inner;
+    let score = analysis::score_statement(results, &period, &mapping.inner, &model.inner)
         .map_err(statements_to_py)?;
     Ok(PyScoringResult::from_inner(score))
 }
@@ -117,17 +117,17 @@ fn score_statement(
 #[pyfunction]
 #[doc = pydoc!("finstack_quant.statements_analytics._scoring", "score_statement_series")]
 fn score_statement_series(
-    results: &Bound<'_, PyAny>,
+    results: PyRef<'_, PyStatementResult>,
     rows: Vec<(String, PyCreditScoringModel)>,
     mapping: &PyStatementScoringMapping,
 ) -> PyResult<Vec<PyScoringResult>> {
-    let results = extract_results_ref(results)?;
+    let results = &results.inner;
     let requested = rows
         .into_iter()
         .map(|(period, model)| Ok((period.parse().map_err(core_to_py)?, model.inner)))
         .collect::<PyResult<Vec<_>>>()?;
     Ok(
-        analysis::score_statement_series(&results, &requested, &mapping.inner)
+        analysis::score_statement_series(results, &requested, &mapping.inner)
             .map_err(statements_to_py)?
             .into_iter()
             .map(PyScoringResult::from_inner)

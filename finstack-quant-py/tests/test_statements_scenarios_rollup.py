@@ -121,9 +121,11 @@ def test_quarterly_results_roll_up_to_annual() -> None:
     assert annual.get("ebitda", "2025") == pytest.approx(138.0)
     assert annual.get("cash", "2025") == pytest.approx(40.0)
     assert annual.get("margin", "2025") == pytest.approx(0.3)
-    # JSON spec input and round trip.
-    assert quarterly.rollup(model, spec.to_json()).get("cash", "2025") == pytest.approx(40.0)
+    # A spec loaded from JSON gives the same rollup; JSON text is not a spec.
+    assert quarterly.rollup(model, RollupSpec.from_json(spec.to_json())).get("cash", "2025") == pytest.approx(40.0)
     assert RollupSpec.from_json(spec.to_json()).methods == methods
+    with pytest.raises(TypeError, match="RollupSpec"):
+        quarterly.rollup(model, spec.to_json())
     # Nothing is summed by default: a line with no method fails the rollup.
     with pytest.raises(ValueError, match=r"revenue, ebitda.*no rollup method"):
         quarterly.rollup(model, RollupSpec("annual", {"cash": "period_end", "margin": "formula"}))

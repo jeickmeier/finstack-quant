@@ -3,9 +3,10 @@
 use super::sensitivity::PyCorporateValuationResult;
 use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::extract::extract_model_ref;
 use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::macros::wire_methods;
+use crate::bindings::statements::evaluator::PyStatementResult;
+use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::errors::{serde_json_to_py, statements_to_py};
 use finstack_quant_statements_analytics::analysis::{
     CorporateDcfRequest, DcfProjection, StatementValuationCut, TerminalFcffBasis,
@@ -521,11 +522,11 @@ impl PyCorporateDcfRequest {
 #[pyo3(signature = (model, request, market=None))]
 pub(super) fn evaluate_corporate_dcf<'py>(
     py: Python<'py>,
-    model: &Bound<'py, PyAny>,
+    model: PyRef<'py, PyFinancialModelSpec>,
     request: &PyCorporateDcfRequest,
     market: Option<PyRef<'py, PyMarketContext>>,
 ) -> PyResult<PyCorporateValuationResult> {
-    let model = extract_model_ref(model)?.into_owned();
+    let model = model.inner.clone();
     let request = request.inner.clone();
     let market = market.map(|market| market.inner.clone());
     let inner = py
@@ -544,12 +545,12 @@ pub(super) fn evaluate_corporate_dcf<'py>(
 #[pyfunction]
 pub(super) fn evaluate_dcf_from_results<'py>(
     py: Python<'py>,
-    model: &Bound<'py, PyAny>,
-    results: &Bound<'py, PyAny>,
+    model: PyRef<'py, PyFinancialModelSpec>,
+    results: PyRef<'py, PyStatementResult>,
     request: &PyCorporateDcfRequest,
 ) -> PyResult<PyCorporateValuationResult> {
-    let model = extract_model_ref(model)?.into_owned();
-    let results = crate::bindings::extract::extract_results_ref(results)?.into_owned();
+    let model = model.inner.clone();
+    let results = results.inner.clone();
     let request = request.inner.clone();
     let inner = py
         .detach(move || {
