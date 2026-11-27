@@ -182,33 +182,33 @@ def _assert_releases_gil[T](call: Callable[[], T]) -> T:
     raise AssertionError(msg)
 
 
-def test_portfolio_from_spec_releases_gil_during_json_build() -> None:
+def test_portfolio_from_json_releases_gil_during_json_build() -> None:
     portfolio_json = _portfolio_spec_json(10_000)
-    portfolio = _assert_releases_gil(lambda: Portfolio.from_spec(portfolio_json))
+    portfolio = _assert_releases_gil(lambda: Portfolio.from_json(portfolio_json))
 
     assert len(portfolio) == 10_000
 
 
-def test_portfolio_from_spec_detached_parse_preserves_value_error_mapping() -> None:
+def test_portfolio_from_json_detached_parse_preserves_value_error_mapping() -> None:
     with pytest.raises(ValueError, match="EOF"):
-        Portfolio.from_spec('{"positions":')
+        Portfolio.from_json('{"positions":')
 
 
 def test_compatibility_build_spec_path_releases_gil() -> None:
     portfolio_json = _portfolio_spec_json(10_000)
-    round_tripped = _assert_releases_gil(lambda: Portfolio.from_spec(portfolio_json).to_json())
+    round_tripped = _assert_releases_gil(lambda: Portfolio.from_json(portfolio_json).to_json())
 
     assert len(json.loads(round_tripped)["positions"]) == 10_000
 
 
 def test_value_portfolio_loaded_from_json_releases_gil_and_preserves_result() -> None:
     portfolio_json = _portfolio_spec_json(3_000)
-    portfolio = Portfolio.from_spec(portfolio_json)
+    portfolio = Portfolio.from_json(portfolio_json)
     market = _market()
 
     valuation = _assert_releases_gil(lambda: value_portfolio(portfolio, market, metrics=[]))
     result = json.loads(valuation.to_json())
-    # Portfolio JSON text is not a portfolio: it goes through `Portfolio.from_spec`.
+    # Portfolio JSON text is not a portfolio: it goes through `Portfolio.from_json`.
     with pytest.raises(TypeError, match="'Portfolio'"):
         value_portfolio(portfolio_json, market, metrics=[])
 
@@ -217,7 +217,7 @@ def test_value_portfolio_loaded_from_json_releases_gil_and_preserves_result() ->
 
 
 def test_raw_valuation_metric_aggregation_releases_gil() -> None:
-    portfolio = Portfolio.from_spec(_portfolio_spec_json(3_000))
+    portfolio = Portfolio.from_json(_portfolio_spec_json(3_000))
     market = _market()
     valuation = value_portfolio(portfolio, market, metrics=[])
 
@@ -229,7 +229,7 @@ def test_raw_valuation_metric_aggregation_releases_gil() -> None:
 
 
 def test_attribution_nested_serialization_releases_gil() -> None:
-    portfolio = Portfolio.from_spec(_portfolio_spec_json(256))
+    portfolio = Portfolio.from_json(_portfolio_spec_json(256))
     next_date = AS_OF + timedelta(days=1)
     result = attribute_portfolio_pnl(
         portfolio,
@@ -246,7 +246,7 @@ def test_attribution_nested_serialization_releases_gil() -> None:
 
 
 def test_replay_parse_and_compute_release_gil() -> None:
-    portfolio = Portfolio.from_spec(_portfolio_spec_json(500))
+    portfolio = Portfolio.from_json(_portfolio_spec_json(500))
     snapshots = _replay_snapshots(20)
 
     typed = _assert_releases_gil(lambda: replay_portfolio(portfolio, snapshots, {"mode": "pv_only"}))
@@ -257,14 +257,14 @@ def test_replay_parse_and_compute_release_gil() -> None:
 
 
 def test_replay_detached_parse_preserves_value_error_mapping() -> None:
-    portfolio = Portfolio.from_spec(_portfolio_spec_json(1))
+    portfolio = Portfolio.from_json(_portfolio_spec_json(1))
 
     with pytest.raises(ValueError, match="invalid snapshots JSON"):
         replay_portfolio(portfolio, [{}], {"mode": "pv_only"})
 
 
 def test_factor_stress_releases_gil_and_returns_position_results() -> None:
-    portfolio = Portfolio.from_spec(_portfolio_spec_json(2_000))
+    portfolio = Portfolio.from_json(_portfolio_spec_json(2_000))
     market = _market()
     config = FactorModelConfig.from_json(_factor_model_config_json())
 
@@ -284,7 +284,7 @@ def test_factor_stress_releases_gil_and_returns_position_results() -> None:
 
 
 def test_factor_stress_rejects_invalid_config_after_detached_parse() -> None:
-    portfolio = Portfolio.from_spec(_portfolio_spec_json(1))
+    portfolio = Portfolio.from_json(_portfolio_spec_json(1))
 
     with pytest.raises(TypeError, match="FactorModelConfig"):
         FactorModel.from_config('{"factors":')
@@ -295,7 +295,7 @@ def test_factor_stress_rejects_invalid_config_after_detached_parse() -> None:
 
 
 def test_position_what_if_uses_combined_baseline_analysis() -> None:
-    portfolio = Portfolio.from_spec(_portfolio_spec_json(2))
+    portfolio = Portfolio.from_json(_portfolio_spec_json(2))
     result = FactorModel.from_config(FactorModelConfig.from_json(_factor_model_config_json())).position_what_if(
         portfolio, _market(), AS_OF.isoformat(), [{"kind": "remove", "position_id": "POS-1"}]
     )
@@ -305,7 +305,7 @@ def test_position_what_if_uses_combined_baseline_analysis() -> None:
 
 
 def test_position_what_if_rejects_unsupported_add() -> None:
-    portfolio = Portfolio.from_spec(_portfolio_spec_json(2))
+    portfolio = Portfolio.from_json(_portfolio_spec_json(2))
     with pytest.raises(ValueError, match=r"unknown variant.*add"):
         FactorModel.from_config(FactorModelConfig.from_json(_factor_model_config_json())).position_what_if(
             portfolio, _market(), AS_OF.isoformat(), [{"kind": "add", "position": {}}]
@@ -352,7 +352,7 @@ def test_large_carino_parse_compute_and_serialize_release_gil() -> None:
 
 def test_sensitivity_result_conversion_and_decomposition_release_gil() -> None:
     factor_config = json.loads(_factor_model_config_json())
-    portfolio = Portfolio.from_spec(_portfolio_spec_json(2_000))
+    portfolio = Portfolio.from_json(_portfolio_spec_json(2_000))
     factors = factor_config["factors"]
     covariance = factor_config["covariance"]
     market = _market()

@@ -101,7 +101,7 @@ def _market() -> MarketContext:
 
 
 def test_to_arrow_matches_positions_columns() -> None:
-    portfolio = Portfolio.from_spec(_portfolio_spec_json())
+    portfolio = Portfolio.from_json(_portfolio_spec_json())
     valuation = value_portfolio(portfolio, _market())
 
     at = valuation.to_arrow()

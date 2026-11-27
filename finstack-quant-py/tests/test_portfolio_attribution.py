@@ -78,7 +78,7 @@ def _ordered_two_position_portfolio_json() -> str:
 
 
 def test_attribute_portfolio_pnl_returns_typed_aggregate_money_and_nested_json() -> None:
-    portfolio = Portfolio.from_spec(_portfolio_json())
+    portfolio = Portfolio.from_json(_portfolio_json())
     market_t0 = _market("USD", AS_OF_T0)
     market_t1 = _market("USD", AS_OF_T1, shift=0.002)
 
@@ -115,7 +115,7 @@ def test_attribute_portfolio_pnl_returns_typed_aggregate_money_and_nested_json()
 
 def test_nested_attribution_json_preserves_portfolio_insertion_order() -> None:
     result = attribute_portfolio_pnl(
-        Portfolio.from_spec(_ordered_two_position_portfolio_json()),
+        Portfolio.from_json(_ordered_two_position_portfolio_json()),
         _market("USD", AS_OF_T0),
         _market("USD", AS_OF_T1, shift=0.002),
         AS_OF_T0,
@@ -130,7 +130,7 @@ def test_nested_attribution_json_preserves_portfolio_insertion_order() -> None:
 def test_attribute_portfolio_pnl_accepts_loaded_inputs_and_tracks_fx_translation() -> None:
     market_t0 = _market("EUR", AS_OF_T0, fx=1.10)
     market_t1 = _market("EUR", AS_OF_T1, fx=1.12)
-    portfolio = Portfolio.from_spec(_portfolio_json("EUR"))
+    portfolio = Portfolio.from_json(_portfolio_json("EUR"))
 
     typed = attribute_portfolio_pnl(
         portfolio,
@@ -141,7 +141,7 @@ def test_attribute_portfolio_pnl_accepts_loaded_inputs_and_tracks_fx_translation
         "parallel",
     )
     from_json = attribute_portfolio_pnl(
-        Portfolio.from_spec(_portfolio_json("EUR")),
+        Portfolio.from_json(_portfolio_json("EUR")),
         MarketContext.from_json(market_t0.to_json()),
         MarketContext.from_json(market_t1.to_json()),
         AS_OF_T0,
@@ -164,7 +164,7 @@ def test_attribute_portfolio_pnl_accepts_loaded_inputs_and_tracks_fx_translation
 
 def test_position_dataframe_is_position_id_plus_the_rust_wide_row() -> None:
     result = attribute_portfolio_pnl(
-        Portfolio.from_spec(_ordered_two_position_portfolio_json()),
+        Portfolio.from_json(_ordered_two_position_portfolio_json()),
         _market("USD", AS_OF_T0),
         _market("USD", AS_OF_T1, shift=0.002),
         AS_OF_T0,

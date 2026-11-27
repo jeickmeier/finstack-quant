@@ -469,7 +469,7 @@ class PortfolioOptimizationSpec:
     ... )
     >>> objective = Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.pv_base()))
     >>> spec_json = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> PortfolioOptimizationSpec.new(Portfolio.from_spec(spec_json), objective).objective.direction
+    >>> PortfolioOptimizationSpec.new(Portfolio.from_json(spec_json), objective).objective.direction
     'maximize'
     """
 
@@ -512,7 +512,7 @@ class PortfolioOptimizationSpec:
         ... )
         >>> objective = Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.pv_base()))
         >>> spec_json = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-        >>> PortfolioOptimizationSpec.new(Portfolio.from_spec(spec_json), objective).weighting.label
+        >>> PortfolioOptimizationSpec.new(Portfolio.from_json(spec_json), objective).weighting.label
         'value_weight'
         """
         ...
@@ -693,7 +693,7 @@ class PortfolioOptimizationSpec:
         ... )
         >>> objective = Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.pv_base()))
         >>> spec_json = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-        >>> original = PortfolioOptimizationSpec.new(Portfolio.from_spec(spec_json), objective)
+        >>> original = PortfolioOptimizationSpec.new(Portfolio.from_json(spec_json), objective)
         >>> PortfolioOptimizationSpec.from_json(original.to_json()).objective.direction
         'maximize'
         """

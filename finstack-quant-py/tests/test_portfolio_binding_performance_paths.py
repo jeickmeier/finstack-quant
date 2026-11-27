@@ -86,7 +86,7 @@ def _scenario_batch_json() -> str:
 
 
 def test_value_portfolio_returns_typed_roundtrippable_result() -> None:
-    portfolio = Portfolio.from_spec(_portfolio_json())
+    portfolio = Portfolio.from_json(_portfolio_json())
     market = _market()
 
     valuation = value_portfolio(portfolio, market)
@@ -100,7 +100,7 @@ def test_value_portfolio_returns_typed_roundtrippable_result() -> None:
 
 
 def test_value_portfolio_metrics_select_pv_only_or_explicit_risk() -> None:
-    portfolio = Portfolio.from_spec(_portfolio_json())
+    portfolio = Portfolio.from_json(_portfolio_json())
     market = _market()
 
     pv_only = json.loads(value_portfolio(portfolio, market, metrics=[]).to_json())
@@ -114,7 +114,7 @@ def test_value_portfolio_metrics_select_pv_only_or_explicit_risk() -> None:
 
 
 def test_scenario_pnl_batch_matches_standalone_and_accepts_loaded_inputs() -> None:
-    portfolio = Portfolio.from_spec(_portfolio_json())
+    portfolio = Portfolio.from_json(_portfolio_json())
     market = _market()
     scenarios = [ScenarioSpec.from_json(json.dumps(scenario)) for scenario in json.loads(_scenario_batch_json())]
 
@@ -127,7 +127,7 @@ def test_scenario_pnl_batch_matches_standalone_and_accepts_loaded_inputs() -> No
     assert [item["scenario_id"] for item in batch] == ["up_10bp", "down_15bp"]
     # A portfolio and a market loaded from JSON reach the same answer as the typed handles.
     from_json = scenario_pnl_batch(
-        Portfolio.from_spec(_portfolio_json()), scenarios, MarketContext.from_json(market.to_json())
+        Portfolio.from_json(_portfolio_json()), scenarios, MarketContext.from_json(market.to_json())
     )
     assert [json.loads(item.to_json()) for item in from_json] == batch
     # Portfolio JSON text is not a portfolio: it goes through `Portfolio.from_spec`.

@@ -528,7 +528,7 @@ def aggregate_full_cashflows(
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.portfolio import Portfolio, aggregate_full_cashflows
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> cashflows = aggregate_full_cashflows(Portfolio.from_spec(spec), MarketContext())
+    >>> cashflows = aggregate_full_cashflows(Portfolio.from_json(spec), MarketContext())
     >>> (len(cashflows.by_position), len(cashflows.issues))
     (0, 0)
     """

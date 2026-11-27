@@ -263,18 +263,18 @@ impl PyPortfolio {
         })
     }
 
-    /// Build a portfolio from a JSON ``PortfolioSpec``.
+    /// Build a portfolio from the JSON text of a ``PortfolioSpec``.
     ///
     /// This performs position materialization, rebuilds the position and
     /// dependency indices, and validates the result. Hold the returned
     /// object and pass it directly to pipeline functions to avoid repeating
-    /// this work.
+    /// this work. Parsing and building both run with the GIL released.
     #[staticmethod]
-    #[pyo3(text_signature = "(spec_json)")]
-    fn from_spec(py: Python<'_>, spec_json: &str) -> PyResult<Self> {
-        let spec_json = spec_json.to_owned();
+    #[pyo3(text_signature = "(json)")]
+    fn from_json(py: Python<'_>, json: &str) -> PyResult<Self> {
+        let json = json.to_owned();
         let spec: finstack_quant_portfolio::PortfolioSpec = py
-            .detach(move || serde_json::from_str(&spec_json))
+            .detach(move || serde_json::from_str(&json))
             .map_err(display_to_py)?;
         let inner = py
             .detach(move || finstack_quant_portfolio::Portfolio::from_spec(spec))
@@ -282,16 +282,23 @@ impl PyPortfolio {
         Ok(Self::from_inner(inner))
     }
 
+    /// Build a portfolio from a JSON ``PortfolioSpec``.
+    #[staticmethod]
+    #[pyo3(text_signature = "(spec_json)")]
+    fn from_spec(py: Python<'_>, spec_json: &str) -> PyResult<Self> {
+        Self::from_json(py, spec_json)
+    }
+
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
     ///
-    /// Reconstruction goes through ``to_json`` / ``from_spec`` — the same
+    /// Reconstruction goes through ``to_json`` / ``from_json`` — the same
     /// strict serde round-trip as the wire format — so an unpickled portfolio
     /// is rebuilt (positions materialized, indices rebuilt) exactly as if it
     /// had been loaded from its canonical ``PortfolioSpec``.
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let payload = self.to_json(py)?;
-        let from_spec = py.get_type::<Self>().getattr("from_spec")?;
-        crate::bindings::pickle_support::reduce_via_json(from_spec, payload)
+        let from_json = py.get_type::<Self>().getattr("from_json")?;
+        crate::bindings::pickle_support::reduce_via_json(from_json, payload)
     }
 
     /// Structural equality: two portfolios are equal when their canonical
@@ -382,7 +389,7 @@ impl PyPortfolio {
     }
 
     /// Serialize the canonical ``PortfolioSpec`` (Rust ``Portfolio::to_spec``)
-    /// to a JSON string accepted by ``from_spec``.
+    /// to a JSON string accepted by ``from_json``.
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self, py: Python<'_>) -> PyResult<String> {
         let portfolio = self.inner.as_ref();

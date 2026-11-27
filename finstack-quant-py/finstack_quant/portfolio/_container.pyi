@@ -548,6 +548,46 @@ class Portfolio:
         ...
 
     @staticmethod
+    def from_json(json: str) -> Portfolio:
+        """
+        Build a portfolio from the JSON text of a ``PortfolioSpec``.
+
+        Positions are materialized, the lookup indices rebuilt and the result
+        validated. Parsing and building run with the GIL released. Pickling
+        rebuilds a portfolio through this loader.
+
+        Parameters
+        ----------
+        json : str
+            ``PortfolioSpec`` JSON text, as :meth:`to_json` writes it: the
+            portfolio id, base currency, as-of date, entities and positions.
+
+        Returns
+        -------
+        Portfolio
+            Validated runtime portfolio built from ``json``.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is not JSON or does not match the ``PortfolioSpec`` schema.
+        PortfolioError
+            If the decoded positions or portfolio identifiers violate portfolio
+            construction invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.portfolio import Portfolio
+        >>> text = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
+        >>> portfolio = Portfolio.from_json(text)
+        >>> (portfolio.id, portfolio.base_currency, len(portfolio))
+        ('empty', 'USD', 0)
+        >>> Portfolio.from_json(portfolio.to_json()) == portfolio
+        True
+        """
+        ...
+
+    @staticmethod
     def from_spec(spec_json: str) -> Portfolio:
         """
         Parse a ``PortfolioSpec`` JSON string into a runtime portfolio.
@@ -859,7 +899,7 @@ class Portfolio:
         -------
         str
             Compact canonical JSON of :meth:`to_spec`, accepted by
-            :meth:`from_spec`.
+            :meth:`from_json`.
 
         Raises
         ------

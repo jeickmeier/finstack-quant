@@ -82,7 +82,7 @@ def _market() -> MarketContext:
 
 
 def test_value_portfolio_rejects_unknown_metric_name() -> None:
-    portfolio = Portfolio.from_spec(_portfolio_json())
+    portfolio = Portfolio.from_json(_portfolio_json())
     market = _market()
 
     with pytest.raises(ValueError, match="dv011"):
@@ -90,7 +90,7 @@ def test_value_portfolio_rejects_unknown_metric_name() -> None:
 
 
 def test_value_portfolio_still_accepts_standard_metric_names() -> None:
-    portfolio = Portfolio.from_spec(_portfolio_json())
+    portfolio = Portfolio.from_json(_portfolio_json())
     market = _market()
 
     valuation = json.loads(value_portfolio(portfolio, market, metrics=["dv01"]).to_json())
@@ -104,7 +104,7 @@ def test_value_portfolio_still_accepts_standard_metric_names() -> None:
 def test_value_portfolio_accepts_every_listed_standard_metric() -> None:
     from finstack_quant.valuations.instruments import list_standard_metrics
 
-    portfolio = Portfolio.from_spec(_portfolio_json())
+    portfolio = Portfolio.from_json(_portfolio_json())
     listed = list_standard_metrics()
     # A registry-only id (not a standard ``MetricId``) used to be rejected here
     # while ``price_instrument`` accepted it.
@@ -117,7 +117,7 @@ def test_value_portfolio_accepts_every_listed_standard_metric() -> None:
 
 
 def test_value_portfolio_strict_risk_defaults_to_rust_options() -> None:
-    portfolio = Portfolio.from_spec(_portfolio_json())
+    portfolio = Portfolio.from_json(_portfolio_json())
 
     def outcome(**kwargs: object) -> tuple[object, ...]:
         wire = json.loads(value_portfolio(portfolio, _market(), **kwargs).to_json())
@@ -135,7 +135,7 @@ def test_value_portfolio_strict_risk_defaults_to_rust_options() -> None:
 def test_replay_portfolio_requires_the_canonical_config() -> None:
     from finstack_quant.portfolio import replay_portfolio
 
-    portfolio = Portfolio.from_spec(_portfolio_json())
+    portfolio = Portfolio.from_json(_portfolio_json())
     with pytest.raises(TypeError):
         replay_portfolio(portfolio, [])  # type: ignore[call-arg]
     with pytest.raises(TypeError):

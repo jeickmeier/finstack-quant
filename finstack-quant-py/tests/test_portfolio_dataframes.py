@@ -473,7 +473,7 @@ def test_portfolio_attribution_leaves_untouched_factors_at_zero() -> None:
 def test_portfolio_attribution_of_an_empty_book_is_all_zero() -> None:
     """The degenerate case still has to work — it is just not a mapping guard."""
     result = attribute_portfolio_pnl(
-        Portfolio.from_spec(EMPTY_PORTFOLIO),
+        Portfolio.from_json(EMPTY_PORTFOLIO),
         MarketContext(),
         MarketContext(),
         "2025-01-01",
@@ -1003,7 +1003,7 @@ def _optimization_result() -> PortfolioOptimizationResult:
     objective = Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.pv_base()))
     spec = (
         PortfolioOptimizationSpec
-        .new(Portfolio.from_spec(_two_position_portfolio_json()), objective)
+        .new(Portfolio.from_json(_two_position_portfolio_json()), objective)
         .with_constraint(Constraint.weight_bounds(PositionFilter.all(), 0.0, 1.0, label="position_limits"))
         .with_weighting(WeightingScheme.value_weight())
         .with_missing_metric_policy(MissingMetricPolicy.zero())
@@ -1110,7 +1110,7 @@ def test_portfolio_optimization_trade_dataframe_keeps_schema_when_no_trades() ->
     objective = Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.pv_base()))
     spec = (
         PortfolioOptimizationSpec
-        .new(Portfolio.from_spec(_portfolio_json()), objective)
+        .new(Portfolio.from_json(_portfolio_json()), objective)
         .with_constraint(Constraint.weight_bounds(PositionFilter.all(), 0.0, 1.0, label="position_limits"))
         .with_weighting(WeightingScheme.value_weight())
         .with_missing_metric_policy(MissingMetricPolicy.zero())
@@ -1129,7 +1129,7 @@ def test_portfolio_optimization_trade_dataframe_keeps_schema_when_no_trades() ->
 
 def test_portfolio_valuation_to_dataframe_matches_arrow_columns() -> None:
     """The pandas exit reuses the same table envelope as the Arrow exit."""
-    valuation = value_portfolio(Portfolio.from_spec(_portfolio_json()), _market())
+    valuation = value_portfolio(Portfolio.from_json(_portfolio_json()), _market())
     df = valuation.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
@@ -1201,7 +1201,7 @@ def test_position_value_exports_the_fx_rate_applied() -> None:
 
 def test_portfolio_cashflows_to_dataframe() -> None:
     """One row per dated event, with Money flattened into amount + currency."""
-    cashflows = aggregate_full_cashflows(Portfolio.from_spec(_portfolio_json()), _market())
+    cashflows = aggregate_full_cashflows(Portfolio.from_json(_portfolio_json()), _market())
     df = cashflows.to_pandas()
 
     assert isinstance(df, pd.DataFrame)

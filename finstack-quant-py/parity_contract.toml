@@ -3127,6 +3127,7 @@ excluded = { attribute = "literal", attribute_indicator = "literal", constant = 
 
 [parity.members."finstack_quant.portfolio.Portfolio"]
 excluded = { positions_table = "arrow" }
+renames = { from_json = { js = "fromSpec", reason = "WASM Portfolio.fromSpec takes the PortfolioSpec object or its JSON text; Python takes the text through from_json" } }
 wasm_only = { numPositions = "Rust position count; twin of Python len(portfolio) (__len__)" }
 
 [parity.members."finstack_quant.portfolio.PortfolioAttribution"]

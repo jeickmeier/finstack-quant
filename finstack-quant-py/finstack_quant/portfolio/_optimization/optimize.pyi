@@ -56,7 +56,7 @@ def optimize_portfolio(
     ... )
     >>> objective = Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.pv_base()))
     >>> spec_json = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> spec = PortfolioOptimizationSpec.new(Portfolio.from_spec(spec_json), objective)
+    >>> spec = PortfolioOptimizationSpec.new(Portfolio.from_json(spec_json), objective)
     >>> try:
     ...     optimize_portfolio(spec, MarketContext())
     ... except PortfolioError as exc:
@@ -111,7 +111,7 @@ def rebalance_from_spec(
     ... )
     >>> objective = Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.pv_base()))
     >>> spec_json = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> spec = PortfolioOptimizationSpec.new(Portfolio.from_spec(spec_json), objective)
+    >>> spec = PortfolioOptimizationSpec.new(Portfolio.from_json(spec_json), objective)
     >>> foreign = PortfolioOptimizationResult.from_json(
     ...     '{"meta":{"numeric_mode":"f64","rounding":{"mode":"bankers","ingest_scale_by_currency":{},"output_scale_by_currency":{},"version":1}},"schema_version":1,"status":"optimal",'
     ...     '"objective_value":0.0,"turnover":0.0,"optimal_weights":{"X":1.0},"current_weights":{},'

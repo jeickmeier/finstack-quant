@@ -221,7 +221,7 @@ class TestRealFailuresRaiseTheMappedClass:
         so the class matches ``price_instrument`` on the same position (and the
         WASM error ``kind`` of ``not_found``).
         """
-        portfolio = Portfolio.from_spec(_portfolio_json(discount_curve_id="MISSING-CURVE"))
+        portfolio = Portfolio.from_json(_portfolio_json(discount_curve_id="MISSING-CURVE"))
         with pytest.raises(KeyError, match="MISSING-CURVE") as excinfo:
             value_portfolio(portfolio, MarketContext())
         assert not isinstance(excinfo.value, PortfolioError)
@@ -232,13 +232,13 @@ class TestRealFailuresRaiseTheMappedClass:
         Same portfolio and market as the control, only the base currency
         differs, so the trigger is the absent rate.
         """
-        portfolio = Portfolio.from_spec(_portfolio_json(base_currency="EUR"))
+        portfolio = Portfolio.from_json(_portfolio_json(base_currency="EUR"))
         with pytest.raises(KeyError, match=r"(?i)fx"):
             value_portfolio(portfolio, _usd_market())
 
     def test_the_same_market_prices_cleanly_in_the_native_base(self) -> None:
         """Control for the two portfolio triggers: neither fixture is simply broken."""
-        valuation = value_portfolio(Portfolio.from_spec(_portfolio_json()), _usd_market())
+        valuation = value_portfolio(Portfolio.from_json(_portfolio_json()), _usd_market())
         assert len(valuation) == 1
 
     def test_bad_contract_marker_raises_contract_validation_error(self) -> None:

@@ -2,6 +2,12 @@
 
 ## Itemized changes
 
+### Python: `Portfolio.from_json`
+
+`Portfolio.from_json(text)` loads a portfolio from `PortfolioSpec` JSON text,
+as every other class does. `to_json()` writes what it reads, and pickling
+rebuilds through it.
+
 ### Python: a scenario result's instruments are envelope dicts
 
 `ApplicationResult.instruments` returns a list of instrument-envelope dicts

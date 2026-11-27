@@ -5,7 +5,7 @@ Examples
 --------
 >>> from finstack_quant.portfolio import Portfolio
 >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
->>> (Portfolio.from_spec(spec).id, len(Portfolio.from_spec(spec)))
+>>> (Portfolio.from_json(spec).id, len(Portfolio.from_json(spec)))
 ('empty', 0)
 """
 

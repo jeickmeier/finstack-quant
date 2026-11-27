@@ -644,7 +644,7 @@ def replay_portfolio(
     >>> from finstack_quant.portfolio import Portfolio, replay_portfolio
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
     >>> try:
-    ...     replay_portfolio(Portfolio.from_spec(spec), [], {"mode": "pv_only"})
+    ...     replay_portfolio(Portfolio.from_json(spec), [], {"mode": "pv_only"})
     ... except ValueError as exc:
     ...     print("must be non-empty" in str(exc))
     True

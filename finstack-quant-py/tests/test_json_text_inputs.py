@@ -2,7 +2,7 @@
 
 A ``str`` argument is a value: a label, a code, a date, an id. It is not read
 as a JSON document. A holder of JSON text calls a named loader first
-(``T.from_json``, ``Portfolio.from_spec``, or ``json.loads`` where the
+(``T.from_json``, or ``json.loads`` where the
 parameter takes a ``dict``). Every case in ``CASES`` names one parameter that
 once read JSON text and pins two things: the function raises ``rejects_text``
 for the text, valid or malformed, and the loader route still works.
@@ -829,7 +829,7 @@ CASES = [
     Case(
         "portfolio",
         lambda portfolio: value_portfolio(portfolio, _market()),
-        Portfolio.from_spec,
+        Portfolio.from_json,
         lambda: _portfolio().to_json(),
         malformed={**MALFORMED, "unknown-entity": _portfolio_text_with_unknown_entity()},
         rejects_text=TypeError,
@@ -1199,11 +1199,11 @@ CASES = [
         rejects_text=TypeError,
     ),
     # The text arm of `PortfolioOptimizationSpec.new` keeps the parsed spec; it does
-    # not build the portfolio, which `Portfolio.from_spec` does.
+    # not build the portfolio, which `Portfolio.from_json` does.
     Case(
         "portfolio_in_optimization_spec",
         _optimization_spec,
-        Portfolio.from_spec,
+        Portfolio.from_json,
         lambda: _portfolio().to_json(),
         malformed={**MALFORMED, "unknown-entity": _portfolio_text_with_unknown_entity()},
         rejects_text=TypeError,

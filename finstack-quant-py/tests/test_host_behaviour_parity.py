@@ -120,5 +120,5 @@ def test_portfolio_to_spec_is_the_plain_form_of_to_json() -> None:
     spec = portfolio.to_spec()
     assert spec == json.loads(portfolio.to_json())
     assert spec["id"] == "book"
-    assert Portfolio.from_spec(portfolio.to_json()) == portfolio
+    assert Portfolio.from_json(portfolio.to_json()) == portfolio
     assert not hasattr(portfolio, "to_spec_json")

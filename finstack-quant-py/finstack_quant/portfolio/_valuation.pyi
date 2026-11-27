@@ -691,7 +691,7 @@ def value_portfolio(
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.portfolio import Portfolio, value_portfolio
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> value_portfolio(Portfolio.from_spec(spec), MarketContext()).total_value
+    >>> value_portfolio(Portfolio.from_json(spec), MarketContext()).total_value
     0.0
     """
     ...

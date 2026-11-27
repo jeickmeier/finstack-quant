@@ -1365,7 +1365,7 @@ class TestPortfolioBenchmarks:
     def test_parse_and_build_one_deposit(self, benchmark) -> None:
         def _parse_build():
             spec = parse_portfolio_spec_json(PORTFOLIO_SPEC_JSON)
-            return Portfolio.from_spec(spec).to_json()
+            return Portfolio.from_json(spec).to_json()
 
         assert len(json.loads(_parse_build())["positions"]) == 1
         result = benchmark.pedantic(_parse_build, rounds=10, warmup_rounds=1)
@@ -1381,7 +1381,7 @@ class TestPortfolioCompoundWorkflow:
     """Deposit-only compound workflows through the Python binding.
 
     These measure the realistic calling pattern (value + metrics + cashflows)
-    with inputs loaded from JSON on every call (``Portfolio.from_spec``,
+    with inputs loaded from JSON on every call (``Portfolio.from_json``,
     ``MarketContext.from_json``) and with a prebuilt :class:`Portfolio` /
     :class:`MarketContext`.
     """
@@ -1391,11 +1391,11 @@ class TestPortfolioCompoundWorkflow:
 
         def _run():
             val = value_portfolio(
-                Portfolio.from_spec(_BENCH_SPEC_JSON_500), MarketContext.from_json(_BENCH_MARKET_JSON), strict_risk=True
+                Portfolio.from_json(_BENCH_SPEC_JSON_500), MarketContext.from_json(_BENCH_MARKET_JSON), strict_risk=True
             )
             agg = aggregate_metrics(val, MarketContext.from_json(_BENCH_MARKET_JSON))
             cf = aggregate_full_cashflows(
-                Portfolio.from_spec(_BENCH_SPEC_JSON_500), MarketContext.from_json(_BENCH_MARKET_JSON)
+                Portfolio.from_json(_BENCH_SPEC_JSON_500), MarketContext.from_json(_BENCH_MARKET_JSON)
             )
             return val, agg, cf
 
@@ -1405,7 +1405,7 @@ class TestPortfolioCompoundWorkflow:
 
     def test_typed_pipeline_500_deposits_value_metrics_cashflows(self, benchmark) -> None:
         """Typed inputs, 500 deposits: Portfolio + MarketContext built once."""
-        portfolio = Portfolio.from_spec(_BENCH_SPEC_JSON_500)
+        portfolio = Portfolio.from_json(_BENCH_SPEC_JSON_500)
 
         def _run():
             val = value_portfolio(portfolio, _BENCH_MARKET, strict_risk=True)
@@ -1419,12 +1419,12 @@ class TestPortfolioCompoundWorkflow:
 
     def test_typed_deposit_portfolio_from_spec_500(self, benchmark) -> None:
         """Cost of building a typed Portfolio from a 500-deposit spec."""
-        result = benchmark(Portfolio.from_spec, _BENCH_SPEC_JSON_500)
+        result = benchmark(Portfolio.from_json, _BENCH_SPEC_JSON_500)
         assert len(result) == 500
 
     def test_value_500_deposits_prebuilt_inputs(self, benchmark) -> None:
         """Typed input and output path, avoiding valuation JSON serialization."""
-        portfolio = Portfolio.from_spec(_BENCH_SPEC_JSON_500)
+        portfolio = Portfolio.from_json(_BENCH_SPEC_JSON_500)
         _assert_deposit_valuation(value_portfolio(portfolio, _BENCH_MARKET, strict_risk=True), 500)
         result = benchmark(value_portfolio, portfolio, _BENCH_MARKET, strict_risk=True)
         _assert_deposit_valuation(result, 500)
@@ -1434,7 +1434,7 @@ class TestPortfolioCompoundWorkflow:
 
         def _run():
             return value_portfolio(
-                Portfolio.from_spec(_BENCH_SPEC_JSON_500), MarketContext.from_json(_BENCH_MARKET_JSON), strict_risk=True
+                Portfolio.from_json(_BENCH_SPEC_JSON_500), MarketContext.from_json(_BENCH_MARKET_JSON), strict_risk=True
             )
 
         _assert_deposit_valuation(_run(), 500)
@@ -1453,7 +1453,7 @@ class TestPortfolioReleaseControls:
     )
     def test_metrics_based_attribution(self, benchmark, n_positions: int) -> None:
         """Metrics attribution over typed books of 40 and 120 deposits."""
-        portfolio = Portfolio.from_spec(_build_portfolio_spec_json(n_positions))
+        portfolio = Portfolio.from_json(_build_portfolio_spec_json(n_positions))
 
         def _run():
             return attribute_portfolio_pnl(
@@ -1481,7 +1481,7 @@ class TestPortfolioReleaseControls:
     )
     def test_scenario_pnl_batch_500_deposits(self, benchmark, n_scenarios: int) -> None:
         """Batched scenarios over a typed 500-deposit portfolio."""
-        portfolio = Portfolio.from_spec(_BENCH_SPEC_JSON_500)
+        portfolio = Portfolio.from_json(_BENCH_SPEC_JSON_500)
         scenarios = [ScenarioSpec.from_json(text) for text in _build_curve_scenario_jsons(n_scenarios)]
         preflight = scenario_pnl_batch(portfolio, scenarios, _BENCH_MARKET)
         assert len(preflight) == n_scenarios
@@ -1504,7 +1504,7 @@ class TestPortfolioReleaseControls:
     )
     def test_scenario_pnl_repeated_500_deposits(self, benchmark, n_scenarios: int) -> None:
         """Repeated single-scenario control for the corresponding batch shape."""
-        portfolio = Portfolio.from_spec(_BENCH_SPEC_JSON_500)
+        portfolio = Portfolio.from_json(_BENCH_SPEC_JSON_500)
         scenarios = [ScenarioSpec.from_json(text) for text in _build_curve_scenario_jsons(n_scenarios)]
 
         def _run_repeated():
@@ -1521,7 +1521,7 @@ class TestPortfolioReleaseControls:
 
     def test_replay_500_deposits_pv_only_20_snapshots(self, benchmark) -> None:
         """PV-only 500-deposit replay through twenty prebuilt snapshots."""
-        portfolio = Portfolio.from_spec(_BENCH_SPEC_JSON_500)
+        portfolio = Portfolio.from_json(_BENCH_SPEC_JSON_500)
         snapshots = _build_replay_snapshots(20)
         config = ReplayConfig(
             "pv_only",
@@ -1543,7 +1543,7 @@ class TestPortfolioReleaseControls:
     @pytest.mark.slow
     def test_value_3000_deposits_standard_risk(self, benchmark) -> None:
         """Strict standard-risk valuation for a typed 3,000-deposit portfolio."""
-        portfolio = Portfolio.from_spec(_build_portfolio_spec_json(3_000))
+        portfolio = Portfolio.from_json(_build_portfolio_spec_json(3_000))
         _assert_deposit_valuation(value_portfolio(portfolio, _BENCH_MARKET, strict_risk=True), 3_000)
         result = benchmark.pedantic(
             value_portfolio,
@@ -1561,7 +1561,7 @@ class TestPortfolioReleaseControls:
     )
     def test_value_deposit_portfolio_pv_only(self, benchmark, n_positions: int) -> None:
         """Deposit-only PV control with typed inputs and typed output."""
-        portfolio = Portfolio.from_spec(_build_portfolio_spec_json(n_positions))
+        portfolio = Portfolio.from_json(_build_portfolio_spec_json(n_positions))
         preflight = value_portfolio(portfolio, _BENCH_MARKET, strict_risk=True, metrics=[])
         _assert_deposit_valuation(preflight, n_positions, standard_risk=False)
         result = benchmark.pedantic(

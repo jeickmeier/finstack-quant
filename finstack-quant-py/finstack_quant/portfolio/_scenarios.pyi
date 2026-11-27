@@ -649,7 +649,7 @@ def apply_scenario_and_revalue(
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
     >>> from finstack_quant.scenarios import ScenarioSpec
     >>> scenario = ScenarioSpec("s", [], name="S")
-    >>> result = apply_scenario_and_revalue(Portfolio.from_spec(spec), scenario, MarketContext())
+    >>> result = apply_scenario_and_revalue(Portfolio.from_json(spec), scenario, MarketContext())
     >>> (result.valuation.total_value, result.report.operations_applied)
     (0.0, 0)
     """
@@ -705,7 +705,7 @@ def scenario_pnl(
     >>> from finstack_quant.portfolio import Portfolio, scenario_pnl
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
     >>> from finstack_quant.scenarios import ScenarioSpec
-    >>> item = scenario_pnl(Portfolio.from_spec(spec), ScenarioSpec("s", [], name="S"), MarketContext())
+    >>> item = scenario_pnl(Portfolio.from_json(spec), ScenarioSpec("s", [], name="S"), MarketContext())
     >>> (item.scenario_id, item.pnl.total, item.pnl.currency, item.pnl.by_position)
     ('s', 0.0, 'USD', {})
     """
@@ -759,7 +759,7 @@ def scenario_pnl_batch(
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.portfolio import Portfolio, scenario_pnl_batch
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> scenario_pnl_batch(Portfolio.from_spec(spec), [], MarketContext())
+    >>> scenario_pnl_batch(Portfolio.from_json(spec), [], MarketContext())
     []
     """
     ...

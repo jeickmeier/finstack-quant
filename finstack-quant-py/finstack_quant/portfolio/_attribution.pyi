@@ -203,7 +203,7 @@ class PortfolioAttribution:
     >>> from finstack_quant.portfolio import Portfolio, attribute_portfolio_pnl
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
     >>> result = attribute_portfolio_pnl(
-    ...     Portfolio.from_spec(spec), MarketContext(), MarketContext(), "2025-01-01", "2025-01-02", "parallel"
+    ...     Portfolio.from_json(spec), MarketContext(), MarketContext(), "2025-01-01", "2025-01-02", "parallel"
     ... )
     >>> result.total_pnl.amount == 0
     True
@@ -729,7 +729,7 @@ def attribute_portfolio_pnl(
     >>> from finstack_quant.portfolio import Portfolio, attribute_portfolio_pnl
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
     >>> result = attribute_portfolio_pnl(
-    ...     Portfolio.from_spec(spec), MarketContext(), MarketContext(), "2025-01-01", "2025-01-02", "parallel"
+    ...     Portfolio.from_json(spec), MarketContext(), MarketContext(), "2025-01-01", "2025-01-02", "parallel"
     ... )
     >>> result.total_pnl.amount == 0
     True

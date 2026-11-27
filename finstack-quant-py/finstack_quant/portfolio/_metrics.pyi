@@ -445,7 +445,7 @@ def aggregate_metrics(
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.portfolio import Portfolio, aggregate_metrics, value_portfolio
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> valuation = value_portfolio(Portfolio.from_spec(spec), MarketContext())
+    >>> valuation = value_portfolio(Portfolio.from_json(spec), MarketContext())
     >>> aggregate_metrics(valuation, MarketContext()).aggregated
     {}
     """

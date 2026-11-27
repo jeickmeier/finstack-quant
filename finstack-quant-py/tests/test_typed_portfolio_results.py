@@ -435,7 +435,7 @@ def test_twrr_linked_returns_typed_result() -> None:
 
 
 def test_aggregate_metrics_returns_typed_portfolio_metrics() -> None:
-    portfolio = pf.Portfolio.from_spec(_portfolio_json())
+    portfolio = pf.Portfolio.from_json(_portfolio_json())
     market = _market()
     valuation = pf.value_portfolio(portfolio, market)
 
@@ -455,7 +455,7 @@ def test_aggregate_metrics_returns_typed_portfolio_metrics() -> None:
 
 
 def test_replay_portfolio_returns_typed_result() -> None:
-    portfolio = pf.Portfolio.from_spec(_portfolio_json())
+    portfolio = pf.Portfolio.from_json(_portfolio_json())
     snapshots = [
         {"date": "2025-01-15", "market": json.loads(_market("2025-01-15").to_json())},
         {"date": "2025-01-16", "market": json.loads(_market("2025-01-16", bump=0.001).to_json())},
@@ -477,7 +477,7 @@ def test_replay_portfolio_returns_typed_result() -> None:
 
 
 def test_replay_portfolio_typed_snapshot_tuples_match_the_json_wire() -> None:
-    portfolio = pf.Portfolio.from_spec(_portfolio_json())
+    portfolio = pf.Portfolio.from_json(_portfolio_json())
     m0, m1 = _market("2025-01-15"), _market("2025-01-16", bump=0.001)
     config = {"mode": "pv_only"}
     wire = [
@@ -527,7 +527,7 @@ def test_allocation_rejects_unsupported_target_volatility() -> None:
 
 
 def test_scenario_pnl_batch_returns_typed_items() -> None:
-    portfolio = pf.Portfolio.from_spec(_portfolio_json())
+    portfolio = pf.Portfolio.from_json(_portfolio_json())
     market = _market()
     from finstack_quant.scenarios import ScenarioSpec
 
