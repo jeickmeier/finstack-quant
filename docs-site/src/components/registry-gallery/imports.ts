@@ -285,11 +285,11 @@ export const importHarnesses = {
       name: "use-portfolio-spec-validator",
       modules: modules.length,
     })),
-  "use-scenario-pnl-batch": () =>
+  "use-scenario-pnl": () =>
     Promise.all([
-      import("@/hooks/portfolio/use-scenario-pnl-batch/use-scenario-pnl-batch"),
+      import("@/hooks/portfolio/use-scenario-pnl/use-scenario-pnl"),
     ]).then((modules) => ({
-      name: "use-scenario-pnl-batch",
+      name: "use-scenario-pnl",
       modules: modules.length,
     })),
   "use-apply-scenario-and-revalue": () =>

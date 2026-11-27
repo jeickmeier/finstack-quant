@@ -27,7 +27,7 @@ const request = {
 };
 // The worker's PortfolioApi over the raw package, one native call each:
 // valuePortfolio then aggregateMetrics, portfolioMetricsSeries, metricMetadata
-// of the returned measure ids, scenarioPnlBatch and portfolioMargin.
+// of the returned measure ids, scenarioPnl and portfolioMargin.
 const book = native.Portfolio.fromSpec(specJson);
 const context = native.MarketContext.fromJson(marketJson);
 let value;
@@ -44,7 +44,7 @@ try {
   );
   value = {
     description:
-      "Native portfolio workbench runs of the margined rates book (two interest rate swaps margined bilaterally and an unmargined deposit) over the pricing market: portfolio.valuePortfolio and aggregateMetrics with the host's metric menu, the bucketed_dv01 series, metricMetadata of the returned measure ids, portfolio.scenarioPnlBatch under the host-parity up_10bp and down_15bp USD-OIS scenarios, and portfolio.portfolioMargin on the margin fixture's date with no collateral held. The market is not stored.",
+      "Native portfolio workbench runs of the margined rates book (two interest rate swaps margined bilaterally and an unmargined deposit) over the pricing market: portfolio.valuePortfolio and aggregateMetrics with the host's metric menu, the bucketed_dv01 series, metricMetadata of the returned measure ids, portfolio.scenarioPnl under the host-parity up_10bp and down_15bp USD-OIS scenarios, and portfolio.portfolioMargin on the margin fixture's date with no collateral held. The market is not stored.",
     sources: [margin.source, market.source, parity.source],
     specJson,
     request,
@@ -61,7 +61,7 @@ try {
     metadata: native.metricMetadata([...new Set(keys)]),
     batch: {
       positionIds: book.positionIds,
-      items: native.scenarioPnlBatch(
+      items: native.scenarioPnl(
         book,
         `[${request.scenarioJsons.join(",")}]`,
         context,

@@ -19,7 +19,7 @@ import { MarketScenarioReport } from "@/components/finstack/scenarios/components
 export interface ScenarioPnlTableData {
   /** Position ids in spec order (Portfolio#positionIds); rows follow it. */
   positionIds: readonly string[];
-  /** portfolio.scenarioPnlBatch items, in scenario order; columns follow it. */
+  /** portfolio.scenarioPnl items, in scenario order; columns follow it. */
   items: readonly ScenarioPnlBatchItem[];
 }
 export interface ScenarioPnlTableProps {

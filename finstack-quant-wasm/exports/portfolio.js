@@ -91,7 +91,6 @@ export const portfolio = {
   // Raw export is prefixed: `primitiveExposures` is also the composite
   // namespace name (valuations.composite), so the raw names must differ.
   primitiveExposures: wasm.portfolioPrimitiveExposures,
-  scenarioPnlBatch: wasm.scenarioPnlBatch,
   attributePortfolioPnl: wasm.attributePortfolioPnl,
   // Rust methods on result types; WASM results are plain objects, so each
   // takes the object (or its JSON) as the first argument.

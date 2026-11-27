@@ -118,7 +118,7 @@ const cases = [
   },
 ];
 // Scenario P&L: the host-parity book at t0 under its two parity scenarios
-// (portfolio.scenarioPnlBatch, scenario texts joined into one JSON array as
+// (portfolio.scenarioPnl, scenario texts joined into one JSON array as
 // the worker does), and the first scenario through applyScenarioAndRevalue.
 function scenarioPnl(specJson, marketJson, scenarioJsons) {
   const book = native.Portfolio.fromSpec(specJson);
@@ -128,11 +128,7 @@ function scenarioPnl(specJson, marketJson, scenarioJsons) {
       request: { scenarioJsons },
       batch: {
         positionIds: book.positionIds,
-        items: native.scenarioPnlBatch(
-          book,
-          `[${scenarioJsons.join(",")}]`,
-          market,
-        ),
+        items: native.scenarioPnl(book, `[${scenarioJsons.join(",")}]`, market),
       },
       revalue: {
         scenarioJson: scenarioJsons[0],
@@ -155,7 +151,7 @@ cases.push({
       inputs.scenarios.map((scenario) => JSON.stringify(scenario)),
     ),
     // The batch pinned by the Py/WASM host-parity tests.
-    expected: { scenario_pnl_batch: expected.scenario_pnl_batch },
+    expected: { scenario_pnl: expected.scenario_pnl },
   },
 });
 for (const { file, value } of cases)

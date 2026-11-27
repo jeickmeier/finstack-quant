@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "One scenario's P&L with its provenance, from `scenario_pnl` or `scenario_pnl_batch`.",
+  "description": "One scenario's P&L with its provenance: one entry of `scenario_pnl`.",
   "examples": [
     {
       "pnl": {

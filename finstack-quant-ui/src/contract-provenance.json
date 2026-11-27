@@ -2119,10 +2119,10 @@
       "route": "returned-pnl",
       "convention": "Returned ScenarioPnlBatchItem per scenario in batch order: by_position money in Portfolio#positionIds (spec) order, the total row from pnl.total in the base currency, the totals charted as returned and each ApplicationReport; nothing summed or differenced. The batch fails whole on the earliest failing scenario.",
       "api": {
-        "name": "portfolio.scenarioPnlBatch",
+        "name": "portfolio.scenarioPnl",
         "source": "finstack-quant-wasm/pkg/finstack_quant_wasm.d.ts",
         "owner": "PortfolioNamespace",
-        "member": "scenarioPnlBatch",
+        "member": "scenarioPnl",
         "inputs": [
           {
             "name": "portfolio",
@@ -2141,16 +2141,16 @@
           }
         ],
         "returns": "ScenarioPnlBatchItem[]",
-        "declaration": "/**\n * Compute ordered portfolio P&L for a batch of scenarios.\n *\n * The Rust batch engine values the unstressed base leg once for the whole\n * request, then applies and revalues each scenario independently. Returns one\n * `ScenarioPnlBatchItem` (`scenario_id`, `pnl`, `report`) per input scenario,\n * in input order; an empty batch returns `[]` without a valuation.\n * @param portfolio - Built portfolio valued for the shared base and every scenario.\n * @param scenarios - Array of `ScenarioSpec` objects, or its JSON.\n * @param market - `core.MarketContext` handle holding the unshocked market snapshot.\n * @returns The ordered `ScenarioPnlBatchItem` array.\n *\n * # Errors\n *\n * Throws a `TypeError` (kind `invalid_type`) if `scenarios` is not a JSON\n * string or array, and a `FinstackError` if a scenario is malformed or\n * inconsistent (kind `validation`), or scenario application, valuation or\n * base-currency differencing fails; the error is the earliest failing\n * scenario's.\n */\nexport function scenarioPnlBatch(portfolio: Portfolio, scenarios: ScenarioSpec[] | string, market: MarketContext): ScenarioPnlBatchItem[];",
-        "sha256": "c5d83618fff289647b0412927a8f2d728dfba9e259846ab715b4e68271764e59"
+        "declaration": "/**\n * Compute the profit and loss attributable to each scenario for an\n * already-built `Portfolio` handle.\n *\n * The Rust engine values the unstressed base leg once for the whole request,\n * then applies and revalues each scenario independently. Returns one\n * `ScenarioPnlBatchItem` (`scenario_id`, a structured `pnl` with\n * base-currency `total` plus `by_position`, and `report`) per input scenario,\n * in input order. Positions added or removed by a scenario are zero-filled\n * against the missing side, so each drill-down sums to its total. An empty\n * array returns `[]` without a valuation.\n * @param portfolio - Built portfolio valued for the shared base and every scenario.\n * @param scenarios - Array of one or more `ScenarioSpec` objects, or its JSON. A single scenario goes in an array of one.\n * @param market - `core.MarketContext` handle holding the unshocked market snapshot.\n * @returns The ordered `ScenarioPnlBatchItem` array.\n *\n * # Errors\n *\n * Throws a `TypeError` (kind `invalid_type`) if `scenarios` is not a JSON\n * string or array, and a `FinstackError` if a scenario is malformed or\n * inconsistent (kind `validation`), or scenario application, valuation or\n * base-currency differencing fails; the error is the earliest failing\n * scenario's.\n */\nexport function scenarioPnl(portfolio: Portfolio, scenarios: ScenarioSpec[] | string, market: MarketContext): ScenarioPnlBatchItem[];",
+        "sha256": "cdeb77210fdacdab2b866e4fc01faf0f20ad14f1b43cdd6ee087cb2569cda5f5"
       },
       "schemas": [
         {
           "uri": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
           "pointer": "#",
           "source": "finstack-quant/portfolio/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
-          "sha256": "64670295dcc98feb9e4e09cf47e942ca155acd739a3edc6a49dae50c73c99cc6",
-          "description": "One scenario's P&L with its provenance, from `scenario_pnl` or `scenario_pnl_batch`."
+          "sha256": "2685c3d31773443df7583523bf9e79b1ebb7e4ed6eae931179e20adb52ff7a5b",
+          "description": "One scenario's P&L with its provenance: one entry of `scenario_pnl`."
         }
       ]
     },

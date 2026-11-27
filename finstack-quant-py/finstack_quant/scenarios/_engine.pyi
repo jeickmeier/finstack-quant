@@ -23,7 +23,7 @@ class ApplicationReport:
     returned by :func:`apply_scenario`,
     as the second element of the tuple returned by
     :func:`finstack_quant.portfolio.apply_scenario_and_revalue`, and as the
-    ``report`` of the ``ScenarioPnlBatchItem`` returned by
+    ``report`` of each ``ScenarioPnlBatchItem`` returned by
     :func:`finstack_quant.portfolio.scenario_pnl`.
 
     Examples

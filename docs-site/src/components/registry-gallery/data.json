@@ -72731,7 +72731,7 @@
       }
     },
     "expected": {
-      "scenario_pnl_batch": [
+      "scenario_pnl": [
         {
           "scenario_id": "up_10bp",
           "pnl": {
@@ -73294,7 +73294,7 @@
     ]
   },
   "portfolioWorkbench": {
-    "description": "Native portfolio workbench runs of the margined rates book (two interest rate swaps margined bilaterally and an unmargined deposit) over the pricing market: portfolio.valuePortfolio and aggregateMetrics with the host's metric menu, the bucketed_dv01 series, metricMetadata of the returned measure ids, portfolio.scenarioPnlBatch under the host-parity up_10bp and down_15bp USD-OIS scenarios, and portfolio.portfolioMargin on the margin fixture's date with no collateral held. The market is not stored.",
+    "description": "Native portfolio workbench runs of the margined rates book (two interest rate swaps margined bilaterally and an unmargined deposit) over the pricing market: portfolio.valuePortfolio and aggregateMetrics with the host's metric menu, the bucketed_dv01 series, metricMetadata of the returned measure ids, portfolio.scenarioPnl under the host-parity up_10bp and down_15bp USD-OIS scenarios, and portfolio.portfolioMargin on the margin fixture's date with no collateral held. The market is not stored.",
     "sources": [
       {
         "path": "finstack-quant-ui/tests/portfolio/margin/cases.json",
@@ -73306,7 +73306,7 @@
       },
       {
         "path": "finstack-quant/portfolio/tests/fixtures/host_parity.json",
-        "sha256": "b3f20749ec7b8357cffb422591bfd258fa953feda6b4fb260ad07c9bbc31f788"
+        "sha256": "9547f21dc7f18551cd1dfa8303c61e244a3395e996be9837144cf7e7e2d6aa68"
       }
     ],
     "specJson": "{\"id\":\"MARGIN-BOOK\",\"name\":\"Margined rates book\",\"base_currency\":\"USD\",\"as_of\":\"2023-12-28\",\"entities\":{\"RATES\":{\"id\":\"RATES\",\"name\":\"Rates\"}},\"positions\":[{\"position_id\":\"IRS-A\",\"entity_id\":\"RATES\",\"instrument_id\":\"IRS-A\",\"instrument_spec\":{\"spec\":{\"adjust_fixed_accrual_dates\":false,\"adjust_float_accrual_dates\":false,\"attributes\":{},\"fixed_leg\":{\"business_day_convention\":\"modified_following\",\"calendar_id\":\"usny\",\"day_count\":\"30_360\",\"discount_curve_id\":\"USD-OIS\",\"end\":\"2029-01-02\",\"end_of_month\":false,\"frequency\":{\"count\":6,\"unit\":\"months\"},\"payment_lag_days\":0,\"rate\":\"0.04\",\"start\":\"2024-01-02\",\"stub\":\"short_front\"},\"float_leg\":{\"business_day_convention\":\"modified_following\",\"calendar_id\":\"usny\",\"compounding\":\"simple\",\"day_count\":\"act_360\",\"discount_curve_id\":\"USD-OIS\",\"end\":\"2029-01-02\",\"end_of_month\":false,\"fixing_calendar_id\":\"usny\",\"forward_curve_id\":\"USD-SOFR-3M\",\"frequency\":{\"count\":3,\"unit\":\"months\"},\"index_id\":\"USD-SOFR-3M\",\"payment_lag_days\":0,\"reset_lag_days\":2,\"spread_bp\":\"0\",\"start\":\"2024-01-02\",\"stub\":\"short_front\"},\"id\":\"IRS-A\",\"notional\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"side\":\"pay\",\"margin_spec\":{\"clearing_status\":\"bilateral\",\"csa\":{\"id\":\"USD-REGULATORY-CSA\",\"base_currency\":\"USD\",\"calendar_id\":\"usny\",\"vm_params\":{\"threshold\":{\"amount\":\"0\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"500000\",\"currency\":\"USD\"},\"rounding\":{\"amount\":\"10000\",\"currency\":\"USD\"},\"independent_amount\":{\"amount\":\"0\",\"currency\":\"USD\"},\"frequency\":\"daily\",\"settlement_lag\":1},\"im_params\":{\"methodology\":\"simm\",\"mpor_days\":10,\"threshold\":{\"amount\":\"50000000\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"0\",\"currency\":\"USD\"},\"segregated\":true},\"eligible_collateral\":{\"eligible\":[{\"asset_class\":\"cash\",\"haircut\":0,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":null,\"max_remaining_years\":1},\"haircut\":0.005,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":1,\"max_remaining_years\":5},\"haircut\":0.02,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":5,\"max_remaining_years\":null},\"haircut\":0.04,\"fx_haircut_addon\":0.08}],\"rehypothecation_allowed\":false},\"call_timing\":{\"notification_deadline_hours\":13,\"response_deadline_hours\":2,\"dispute_resolution_days\":1,\"delivery_grace_days\":0},\"collateral_curve_id\":\"USD-OIS\"}}},\"type\":\"interest_rate_swap\"},\"quantity\":1,\"unit\":\"units\"},{\"position_id\":\"IRS-B\",\"entity_id\":\"RATES\",\"instrument_id\":\"IRS-B\",\"instrument_spec\":{\"spec\":{\"adjust_fixed_accrual_dates\":false,\"adjust_float_accrual_dates\":false,\"attributes\":{},\"fixed_leg\":{\"business_day_convention\":\"modified_following\",\"calendar_id\":\"usny\",\"day_count\":\"30_360\",\"discount_curve_id\":\"USD-OIS\",\"end\":\"2029-01-02\",\"end_of_month\":false,\"frequency\":{\"count\":6,\"unit\":\"months\"},\"payment_lag_days\":0,\"rate\":\"0.04\",\"start\":\"2024-01-02\",\"stub\":\"short_front\"},\"float_leg\":{\"business_day_convention\":\"modified_following\",\"calendar_id\":\"usny\",\"compounding\":\"simple\",\"day_count\":\"act_360\",\"discount_curve_id\":\"USD-OIS\",\"end\":\"2029-01-02\",\"end_of_month\":false,\"fixing_calendar_id\":\"usny\",\"forward_curve_id\":\"USD-SOFR-3M\",\"frequency\":{\"count\":3,\"unit\":\"months\"},\"index_id\":\"USD-SOFR-3M\",\"payment_lag_days\":0,\"reset_lag_days\":2,\"spread_bp\":\"0\",\"start\":\"2024-01-02\",\"stub\":\"short_front\"},\"id\":\"IRS-B\",\"notional\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"side\":\"pay\",\"margin_spec\":{\"clearing_status\":\"bilateral\",\"csa\":{\"id\":\"CSA-B\",\"base_currency\":\"USD\",\"calendar_id\":\"usny\",\"vm_params\":{\"threshold\":{\"amount\":\"0\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"500000\",\"currency\":\"USD\"},\"rounding\":{\"amount\":\"10000\",\"currency\":\"USD\"},\"independent_amount\":{\"amount\":\"0\",\"currency\":\"USD\"},\"frequency\":\"daily\",\"settlement_lag\":1},\"im_params\":{\"methodology\":\"simm\",\"mpor_days\":10,\"threshold\":{\"amount\":\"50000000\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"0\",\"currency\":\"USD\"},\"segregated\":true},\"eligible_collateral\":{\"eligible\":[{\"asset_class\":\"cash\",\"haircut\":0,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":null,\"max_remaining_years\":1},\"haircut\":0.005,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":1,\"max_remaining_years\":5},\"haircut\":0.02,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":5,\"max_remaining_years\":null},\"haircut\":0.04,\"fx_haircut_addon\":0.08}],\"rehypothecation_allowed\":false},\"call_timing\":{\"notification_deadline_hours\":13,\"response_deadline_hours\":2,\"dispute_resolution_days\":1,\"delivery_grace_days\":0},\"collateral_curve_id\":\"USD-OIS\"}}},\"type\":\"interest_rate_swap\"},\"quantity\":2,\"unit\":\"units\"},{\"position_id\":\"DEP-1\",\"entity_id\":\"RATES\",\"instrument_id\":\"DEP-USD-6M\",\"instrument_spec\":{\"spec\":{\"attributes\":{},\"business_day_convention\":\"modified_following\",\"calendar_id\":null,\"day_count\":\"act_360\",\"discount_curve_id\":\"USD-OIS\",\"fixed_rate\":\"0.045\",\"id\":\"DEP-USD-6M\",\"maturity\":\"2024-07-01\",\"notional\":{\"amount\":\"100000\",\"currency\":\"USD\"},\"start_date\":\"2024-01-03\"},\"type\":\"deposit\"},\"quantity\":1,\"unit\":\"units\"}]}",
@@ -74783,7 +74783,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
-        "sha256": "96ea4391a7e79de8b2b1aac243eec168c8cc333d7a26f6357015e9b37f1ded4e"
+        "sha256": "e34bf21f9889ec6b2f1c6ae65996361e35cebb098f72ac3b3a4306cc02238958"
       },
       {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
@@ -74791,7 +74791,7 @@
       },
       {
         "path": "finstack-quant/portfolio/tests/fixtures/host_parity.json",
-        "sha256": "b3f20749ec7b8357cffb422591bfd258fa953feda6b4fb260ad07c9bbc31f788"
+        "sha256": "9547f21dc7f18551cd1dfa8303c61e244a3395e996be9837144cf7e7e2d6aa68"
       }
     ],
     "asOf": "2023-12-28",
@@ -75052,7 +75052,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
-        "sha256": "96ea4391a7e79de8b2b1aac243eec168c8cc333d7a26f6357015e9b37f1ded4e"
+        "sha256": "e34bf21f9889ec6b2f1c6ae65996361e35cebb098f72ac3b3a4306cc02238958"
       },
       {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
@@ -87576,7 +87576,7 @@
     "description": "Native portfolio.brinsonLinked of host-supplied SectorPeriod rows over three periods (the portfolio host-parity golden): every period's Brinson-Fachler sector effects and totals, the Carino-linked effects by sector and by effect and the compounded portfolio and benchmark returns, with the native errors of no periods, weights not summing to one and a reordered period.",
     "source": {
       "path": "finstack-quant/portfolio/tests/fixtures/host_parity.json",
-      "sha256": "b3f20749ec7b8357cffb422591bfd258fa953feda6b4fb260ad07c9bbc31f788"
+      "sha256": "9547f21dc7f18551cd1dfa8303c61e244a3395e996be9837144cf7e7e2d6aa68"
     },
     "inputs": {
       "periods": [

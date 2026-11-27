@@ -1,6 +1,6 @@
 "use client";
 import { ScenarioPnlTable } from "@/components/finstack/portfolio/components/scenario-pnl-table/scenario-pnl-table";
-import { useScenarioPnlBatch } from "@/hooks/portfolio/use-scenario-pnl-batch/use-scenario-pnl-batch";
+import { useScenarioPnl } from "@/hooks/portfolio/use-scenario-pnl/use-scenario-pnl";
 
 interface ScenarioPanelProps {
   /** Canonical PortfolioSpec JSON the workbench values. */
@@ -12,7 +12,7 @@ interface ScenarioPanelProps {
   density: "compact" | "comfortable";
 }
 /**
- * The book under the host's scenarios: one native portfolio.scenarioPnlBatch,
+ * The book under the host's scenarios: one native portfolio.scenarioPnl,
  * mounted (and so called) when the Scenarios tab first opens.
  */
 export function ScenarioPanel({
@@ -21,7 +21,7 @@ export function ScenarioPanel({
   scenarioJsons,
   density,
 }: ScenarioPanelProps) {
-  const batch = useScenarioPnlBatch({ specJson, marketJson, scenarioJsons });
+  const batch = useScenarioPnl({ specJson, marketJson, scenarioJsons });
   return (
     <ScenarioPnlTable
       report={batch.data}

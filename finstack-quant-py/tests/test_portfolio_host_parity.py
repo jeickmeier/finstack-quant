@@ -37,7 +37,7 @@ from finstack_quant.portfolio import (
     attribute_portfolio_pnl,
     brinson_linked,
     build_credit_vol_report,
-    scenario_pnl_batch,
+    scenario_pnl,
     twrr_linked,
     value_portfolio,
 )
@@ -243,9 +243,9 @@ def _compute(inputs: dict[str, Any]) -> dict[str, Any]:
     position_metrics = metrics.get_position_metrics("POS-1")
     return {
         "allocate_weights": json.loads(allocate_weights(allocation).to_json()),
-        "scenario_pnl_batch": [
+        "scenario_pnl": [
             json.loads(item.to_json())
-            for item in scenario_pnl_batch(
+            for item in scenario_pnl(
                 portfolio, [ScenarioSpec.from_json(json.dumps(spec)) for spec in inputs["scenarios"]], market_t0
             )
         ],

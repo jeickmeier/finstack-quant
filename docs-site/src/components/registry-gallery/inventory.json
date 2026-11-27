@@ -435,7 +435,7 @@
     {
       "name": "scenario-pnl-table",
       "type": "registry:component",
-      "docs": "Display-only view of the batch returned by useScenarioPnlBatch (portfolio.scenarioPnlBatch): rows in Portfolio#positionIds (spec) order, never the by_position key order, plus any position a scenario added in returned key order; one column per scenario in batch order with the exact returned by_position money; a total row from each scenario's returned pnl.total (base currency); a bar chart of those totals; and each scenario's ApplicationReport through market-scenario-report in a disclosure. Nothing is summed or differenced. Accepts report ({positionIds, items}), loading, error and density props; no worker or query provider required.",
+      "docs": "Display-only view of the batch returned by useScenarioPnl (portfolio.scenarioPnl): rows in Portfolio#positionIds (spec) order, never the by_position key order, plus any position a scenario added in returned key order; one column per scenario in batch order with the exact returned by_position money; a total row from each scenario's returned pnl.total (base currency); a bar chart of those totals; and each scenario's ApplicationReport through market-scenario-report in a disclosure. Nothing is summed or differenced. Accepts report ({positionIds, items}), loading, error and density props; no worker or query provider required.",
       "worker": "none"
     },
     {
@@ -471,7 +471,7 @@
     {
       "name": "portfolio-workbench",
       "type": "registry:block",
-      "docs": "Tabs over the portfolio components, with no native call of its own. Positions: portfolio-summary and positions-table of useValuePortfolio (portfolio.valuePortfolio, then aggregateMetrics) with Rust metricMetadata of every returned measure id. Risk: portfolio-metrics of the same report, charting the usePortfolioMetricsSeries series of seriesBase when one is supplied, then exposure-report of usePrimitiveExposures (portfolio.primitiveExposures of the book over marketJson with exposures.metrics, omitted being quantity and value only) and, when exposures.factorsJson is supplied, useFactorSensitivities (portfolio.computeFactorSensitivities on asOf with any exposures.bumpConfigJson), then, when correlation is supplied, correlation-heatmap of useCorrelationMatrix (analytics.Performance correlationMatrix of the host's return panel, with Rust's repaired stamp). Scenarios (only when scenarioJsons are supplied): scenario-pnl-table of useScenarioPnlBatch (portfolio.scenarioPnlBatch). Attribution (only when attribution is supplied): portfolio-attribution-report of useAttributePortfolioPnl (portfolio.attributePortfolioPnl from marketJson on asOf to attribution.marketT1Json on attribution.asOfT1, with Rust's explain, reconciliation at attribution.reconciliationTolerance and buckets) under the method the user picks; every Rust method is offered, none preselected, waterfall in useDefaultWaterfallOrder's order, and a method that fails on the book shows its native error. Returns (only when returns is supplied): portfolio-returns of useTwrrLinked, useTwrrModifiedDietz and useMwrXirr (portfolio.twrrLinked, twrrModifiedDietz and mwrXirr) over the host's returns.linked (sub-period decimal returns and horizonYears in 365-day years), returns.dietz (one TwrrPeriod) and returns.xirr (dated investor flows), computed when the tab opens and again for each form the user resubmits. Brinson (only when brinson is supplied): brinson-report of useBrinsonLinked (portfolio.brinsonLinked) over the host's brinson.periods (chronological SectorPeriod rows, each side's weights summing to one) named by any brinson.periodLabels, computed when the tab opens. Margin: portfolio-margin-report of usePortfolioMargin (portfolio.portfolioMargin) on asOf with any currentImCollateral. Book: PortfolioSpec JSON that usePortfolioSpecValidator validates natively before every tab values it. The exposure, Scenarios, Attribution, Returns, Brinson and Margin calls run only when their tab first opens. Host-supplied props: defaultSpecJson (PortfolioSpec; remount for a different book), marketJson (MarketContextState), asOf (ISO margin date, never read from the spec), metrics (omitted is Rust's standard set), seriesBase, exposures (additive metric ids and factor definitions, none of them defaulted), correlation (a return or price panel, never derived from the book), scenarioJsons (never parsed), attribution (the closing MarketContextState marketT1Json, which needs any FIXING: series a seasoned floating leg fixes before its asOfT1, that ISO date and a base-currency reconciliationTolerance; Rust has no default for any of them), returns (performance data, none of it defaulted or derived from the book), brinson (sector weights and returns per period, none of them defaulted or derived from the book), currentImCollateral (omitted is none held) and density. Nothing is summed, netted or converted; native errors show as returned. Requires FinstackQueryProvider.",
+      "docs": "Tabs over the portfolio components, with no native call of its own. Positions: portfolio-summary and positions-table of useValuePortfolio (portfolio.valuePortfolio, then aggregateMetrics) with Rust metricMetadata of every returned measure id. Risk: portfolio-metrics of the same report, charting the usePortfolioMetricsSeries series of seriesBase when one is supplied, then exposure-report of usePrimitiveExposures (portfolio.primitiveExposures of the book over marketJson with exposures.metrics, omitted being quantity and value only) and, when exposures.factorsJson is supplied, useFactorSensitivities (portfolio.computeFactorSensitivities on asOf with any exposures.bumpConfigJson), then, when correlation is supplied, correlation-heatmap of useCorrelationMatrix (analytics.Performance correlationMatrix of the host's return panel, with Rust's repaired stamp). Scenarios (only when scenarioJsons are supplied): scenario-pnl-table of useScenarioPnl (portfolio.scenarioPnl). Attribution (only when attribution is supplied): portfolio-attribution-report of useAttributePortfolioPnl (portfolio.attributePortfolioPnl from marketJson on asOf to attribution.marketT1Json on attribution.asOfT1, with Rust's explain, reconciliation at attribution.reconciliationTolerance and buckets) under the method the user picks; every Rust method is offered, none preselected, waterfall in useDefaultWaterfallOrder's order, and a method that fails on the book shows its native error. Returns (only when returns is supplied): portfolio-returns of useTwrrLinked, useTwrrModifiedDietz and useMwrXirr (portfolio.twrrLinked, twrrModifiedDietz and mwrXirr) over the host's returns.linked (sub-period decimal returns and horizonYears in 365-day years), returns.dietz (one TwrrPeriod) and returns.xirr (dated investor flows), computed when the tab opens and again for each form the user resubmits. Brinson (only when brinson is supplied): brinson-report of useBrinsonLinked (portfolio.brinsonLinked) over the host's brinson.periods (chronological SectorPeriod rows, each side's weights summing to one) named by any brinson.periodLabels, computed when the tab opens. Margin: portfolio-margin-report of usePortfolioMargin (portfolio.portfolioMargin) on asOf with any currentImCollateral. Book: PortfolioSpec JSON that usePortfolioSpecValidator validates natively before every tab values it. The exposure, Scenarios, Attribution, Returns, Brinson and Margin calls run only when their tab first opens. Host-supplied props: defaultSpecJson (PortfolioSpec; remount for a different book), marketJson (MarketContextState), asOf (ISO margin date, never read from the spec), metrics (omitted is Rust's standard set), seriesBase, exposures (additive metric ids and factor definitions, none of them defaulted), correlation (a return or price panel, never derived from the book), scenarioJsons (never parsed), attribution (the closing MarketContextState marketT1Json, which needs any FIXING: series a seasoned floating leg fixes before its asOfT1, that ISO date and a base-currency reconciliationTolerance; Rust has no default for any of them), returns (performance data, none of it defaulted or derived from the book), brinson (sector weights and returns per period, none of them defaulted or derived from the book), currentImCollateral (omitted is none held) and density. Nothing is summed, netted or converted; native errors show as returned. Requires FinstackQueryProvider.",
       "worker": "host"
     },
     {
@@ -877,7 +877,7 @@
       "type": "registry:hook"
     },
     {
-      "name": "use-scenario-pnl-batch",
+      "name": "use-scenario-pnl",
       "type": "registry:hook"
     },
     {
@@ -1832,7 +1832,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/scenario-pnl.json",
-      "sha256": "a3f930c2080c10eed14d4a3b26cf33e5741bb805c21526bf1611c679c1c0b2dc"
+      "sha256": "759642bbb376fdf0978815b64183a2f6ba0160c0acda117c6717aeb855159f8b"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/margin/cases.json",
@@ -1840,15 +1840,15 @@
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
-      "sha256": "96ea4391a7e79de8b2b1aac243eec168c8cc333d7a26f6357015e9b37f1ded4e"
+      "sha256": "e34bf21f9889ec6b2f1c6ae65996361e35cebb098f72ac3b3a4306cc02238958"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/exposures/cases.json",
-      "sha256": "1d754f91d4953a5dd6b44234adef1037bd4cc68419b964e01daa402500070c69"
+      "sha256": "9283d7961e2e7d766a8e6a8a044ea1a9265d6415361335d9f282f65a4fd6400c"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/attribution/cases.json",
-      "sha256": "0bdf9eecba14beee8b97518dc654a80b65cc0a071cececafa5160dca9e9770df"
+      "sha256": "7893619ba27dd887704d8428148b1c94bc1237270ba745fddcec94bf9127dda1"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/returns/cases.json",
@@ -1856,7 +1856,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/brinson/cases.json",
-      "sha256": "17ff9e563e310275864c5d453ee25223277627075c9b81fc296e4eaad82344df"
+      "sha256": "e60df1114f2b9a691cb77e96e9e6874b66b1e0b2ca87649d917a4f83cf03113d"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",

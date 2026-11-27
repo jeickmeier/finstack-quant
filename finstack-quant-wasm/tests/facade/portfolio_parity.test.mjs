@@ -66,25 +66,33 @@ test('allocateWeights matches Python', () => {
   assert.throws(() => portfolio.allocateWeights(7), TypeError);
 });
 
-test('scenarioPnlBatch matches Python and keeps input order', () => {
-  const batch = portfolio.scenarioPnlBatch(book, inputs.scenarios, marketT0);
-  assertClose(wire(batch), expected.scenario_pnl_batch);
+test('scenarioPnl matches Python and keeps input order', () => {
+  const batch = portfolio.scenarioPnl(book, inputs.scenarios, marketT0);
+  assertClose(wire(batch), expected.scenario_pnl);
   assert.deepEqual(
     batch.map((item) => item.scenario_id),
     ['up_10bp', 'down_15bp']
   );
-  assert.deepEqual(portfolio.scenarioPnlBatch(book, [], marketT0), []);
+  assert.deepEqual(portfolio.scenarioPnl(book, [], marketT0), []);
+  // A single scenario goes in an array of one; a bare scenario object is refused.
   assert.throws(
-    () => portfolio.scenarioPnlBatch(book, [{ id: '', operations: [] }], marketT0),
+    () => portfolio.scenarioPnl(book, inputs.scenarios[0], marketT0),
+    (error) => ['validation', 'invalid_type'].includes(error.kind)
+  );
+  assertClose(wire(portfolio.scenarioPnl(book, [inputs.scenarios[0]], marketT0)), [
+    expected.scenario_pnl[0],
+  ]);
+  assert.throws(
+    () => portfolio.scenarioPnl(book, [{ id: '', operations: [] }], marketT0),
     (error) => error.kind === 'validation'
   );
 });
 
-test('scenarioPnlBatch preserves Rust base-valuation error precedence', () => {
+test('scenarioPnl preserves Rust base-valuation error precedence', () => {
   const emptyMarket = new core.MarketContext();
   try {
     assert.throws(
-      () => portfolio.scenarioPnlBatch(book, [{ id: '', operations: [] }], emptyMarket),
+      () => portfolio.scenarioPnl(book, [{ id: '', operations: [] }], emptyMarket),
       (error) => {
         assert.doesNotMatch(error.message, /Scenario ID cannot be empty/);
         assert.match(error.message, /curve|market|missing|not found/i);

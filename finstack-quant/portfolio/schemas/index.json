@@ -380,10 +380,10 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
-      "bytes": 82157,
+      "bytes": 82141,
       "kind": "output",
       "path": "schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
-      "summary": "One scenario's P&L with its provenance, from `scenario_pnl` or `scenario_pnl_batch`.",
+      "summary": "One scenario's P&L with its provenance: one entry of `scenario_pnl`.",
       "title": "ScenarioPnlBatchItem",
       "type_name": "ScenarioPnlBatchItem"
     },

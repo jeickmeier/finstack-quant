@@ -341,7 +341,7 @@
     }
   },
   "expected": {
-    "scenario_pnl_batch": [
+    "scenario_pnl": [
       {
         "scenario_id": "up_10bp",
         "pnl": {

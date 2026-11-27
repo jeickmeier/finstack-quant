@@ -14,7 +14,6 @@ from finstack_quant.portfolio import (
     Portfolio,
     PortfolioValuation,
     scenario_pnl,
-    scenario_pnl_batch,
     value_portfolio,
 )
 from finstack_quant.scenarios import ScenarioSpec
@@ -113,33 +112,33 @@ def test_value_portfolio_metrics_select_pv_only_or_explicit_risk() -> None:
     assert "theta" not in dv01_measures
 
 
-def test_scenario_pnl_batch_matches_standalone_and_accepts_loaded_inputs() -> None:
+def test_scenario_pnl_of_a_list_matches_one_at_a_time_and_accepts_loaded_inputs() -> None:
     portfolio = Portfolio.from_json(_portfolio_json())
     market = _market()
     scenarios = [ScenarioSpec.from_json(json.dumps(scenario)) for scenario in json.loads(_scenario_batch_json())]
 
-    # Batch items and the standalone results are compared through their
+    # The list's items and the one-at-a-time results are compared through their
     # canonical JSON.
-    batch = [json.loads(item.to_json()) for item in scenario_pnl_batch(portfolio, scenarios, market)]
-    expected = [json.loads(scenario_pnl(portfolio, scenario, market).to_json()) for scenario in scenarios]
+    batch = [json.loads(item.to_json()) for item in scenario_pnl(portfolio, scenarios, market)]
+    expected = [json.loads(scenario_pnl(portfolio, [scenario], market)[0].to_json()) for scenario in scenarios]
 
     assert batch == expected
     assert [item["scenario_id"] for item in batch] == ["up_10bp", "down_15bp"]
     # A portfolio and a market loaded from JSON reach the same answer as the typed handles.
-    from_json = scenario_pnl_batch(
+    from_json = scenario_pnl(
         Portfolio.from_json(_portfolio_json()), scenarios, MarketContext.from_json(market.to_json())
     )
     assert [json.loads(item.to_json()) for item in from_json] == batch
     # Portfolio JSON text is not a portfolio: it goes through `Portfolio.from_json`.
     with pytest.raises(TypeError, match="'Portfolio'"):
-        scenario_pnl_batch(_portfolio_json(), scenarios, market)
+        scenario_pnl(_portfolio_json(), scenarios, market)
     # Market JSON text is not a market: it goes through the loader.
     with pytest.raises(TypeError, match="MarketContext"):
-        scenario_pnl_batch(portfolio, scenarios, market.to_json())
-    assert scenario_pnl_batch(portfolio, [], market) == []
+        scenario_pnl(portfolio, scenarios, market.to_json())
+    assert scenario_pnl(portfolio, [], market) == []
     # Scenarios are a list of `ScenarioSpec`; JSON text is not one.
     with pytest.raises(TypeError):
-        scenario_pnl_batch(portfolio, _scenario_batch_json(), market)
+        scenario_pnl(portfolio, _scenario_batch_json(), market)
 
 
 def test_numpy_position_pnls_match_nested_lists() -> None:

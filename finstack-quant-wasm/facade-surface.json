@@ -3568,7 +3568,6 @@
       "rebalanceFromSpec",
       "replayPortfolio",
       "scenarioPnl",
-      "scenarioPnlBatch",
       "schema",
       "sensitivityMatrixDelta",
       "sensitivityMatrixFactorDeltas",
@@ -3754,9 +3753,6 @@
     "kind": "function"
   },
   "portfolio.primitiveExposures": {
-    "kind": "function"
-  },
-  "portfolio.scenarioPnlBatch": {
     "kind": "function"
   },
   "portfolio.attributePortfolioPnl": {

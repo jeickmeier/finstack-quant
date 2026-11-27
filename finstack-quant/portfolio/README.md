@@ -67,7 +67,7 @@ through its module path. See the rustdoc for detail
 | `sensitivity` | `DeltaBasedEngine`, `FullRepricingEngine` + `ScenarioGrid`, `FactorSensitivityEngine` |
 | `optimization` | `PortfolioOptimizationProblem`, `optimize`, `optimize_portfolio`, `PortfolioOptimizationResult` |
 | `margin` | `portfolio_margin`, `PortfolioMarginResult`, `NettingSetMargin` — see [`src/margin/README.md`](src/margin/README.md) |
-| `scenarios` | `apply_scenario_and_revalue`, `scenario_pnl`, `scenario_pnl_batch` |
+| `scenarios` | `apply_scenario_and_revalue`, `scenario_pnl` |
 | `replay` | `replay_portfolio` over a `ReplayTimeline` of dated market snapshots |
 
 ## Quick start

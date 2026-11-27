@@ -674,7 +674,7 @@ export type D_9F32C296492D66417E76 =
     };
 
 /**
- * One scenario's P&L with its provenance, from `scenario_pnl` or `scenario_pnl_batch`.
+ * One scenario's P&L with its provenance: one entry of `scenario_pnl`.
  */
 export interface ScenarioPnlBatchItemWire {
   pnl: D_781De20B337Be254Ae38;

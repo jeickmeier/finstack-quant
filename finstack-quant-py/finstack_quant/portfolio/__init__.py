@@ -108,7 +108,6 @@ ScenarioRevalueView = _portfolio.ScenarioRevalueView
 apply_scenario_and_revalue = _portfolio.apply_scenario_and_revalue
 attribute_scenario_pnl = _portfolio.attribute_scenario_pnl
 scenario_pnl = _portfolio.scenario_pnl
-scenario_pnl_batch = _portfolio.scenario_pnl_batch
 attribute_portfolio_pnl = _portfolio.attribute_portfolio_pnl
 allocate_weights = _portfolio.allocate_weights
 optimize_portfolio = _portfolio.optimize_portfolio
@@ -306,7 +305,6 @@ __all__ = [
     "rebalance_from_spec",
     "replay_portfolio",
     "scenario_pnl",
-    "scenario_pnl_batch",
     "schema",
     "twrr_linked",
     "twrr_modified_dietz",

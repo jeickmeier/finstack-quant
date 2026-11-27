@@ -84,7 +84,7 @@ it(
     expect(
       serializeHost(
         unwrap(
-          await proxy().scenarioPnlBatch({
+          await proxy().scenarioPnl({
             specJson,
             marketJson,
             scenarioJsons: request.scenarioJsons,
@@ -137,7 +137,7 @@ it(
       ),
     ).toEqual(fixture.report.positionIds);
     // The Scenarios and Margin calls wait for their tabs.
-    expect(harness.methods()).not.toContain("scenarioPnlBatch");
+    expect(harness.methods()).not.toContain("scenarioPnl");
     expect(harness.methods()).not.toContain("portfolioMargin");
     expect(screen.queryAllByRole("alert")).toEqual([]);
   },
@@ -179,9 +179,9 @@ it(
     expect(
       within(margin).getAllByTitle(fixture.margin.total_margin.amount).length,
     ).toBeGreaterThan(0);
-    expect(
-      harness.methods().filter((call) => call === "scenarioPnlBatch"),
-    ).toEqual(["scenarioPnlBatch"]);
+    expect(harness.methods().filter((call) => call === "scenarioPnl")).toEqual([
+      "scenarioPnl",
+    ]);
     expect(
       harness.methods().filter((call) => call === "portfolioMargin"),
     ).toEqual(["portfolioMargin"]);

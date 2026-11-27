@@ -7385,7 +7385,7 @@ export interface ScenarioRevalueView {
   [k: string]: unknown;
 }
 /**
- * One scenario's P&L with its provenance, from `scenario_pnl` or `scenario_pnl_batch`.
+ * One scenario's P&L with its provenance: one entry of `scenario_pnl`.
  */
 export interface ScenarioPnlBatchItem {
   /**

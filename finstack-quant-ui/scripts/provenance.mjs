@@ -394,7 +394,7 @@ const displays = [
     id: "scenario-pnl-table",
     schema: `${base}portfolio/1/scenario_pnl_batch_item.schema.json`,
     pointer: "#",
-    api: "portfolio.scenarioPnlBatch",
+    api: "portfolio.scenarioPnl",
     route: "returned-pnl",
     convention:
       "Returned ScenarioPnlBatchItem per scenario in batch order: by_position money in Portfolio#positionIds (spec) order, the total row from pnl.total in the base currency, the totals charted as returned and each ApplicationReport; nothing summed or differenced. The batch fails whole on the earliest failing scenario.",

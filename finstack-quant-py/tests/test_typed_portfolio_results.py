@@ -526,14 +526,14 @@ def test_allocation_rejects_unsupported_target_volatility() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_scenario_pnl_batch_returns_typed_items() -> None:
+def test_scenario_pnl_returns_typed_items() -> None:
     portfolio = pf.Portfolio.from_json(_portfolio_json())
     market = _market()
     from finstack_quant.scenarios import ScenarioSpec
 
     scenarios = [ScenarioSpec.from_json(json.dumps(scenario)) for scenario in json.loads(_scenario_batch_json())]
 
-    batch = pf.scenario_pnl_batch(portfolio, scenarios, market)
+    batch = pf.scenario_pnl(portfolio, scenarios, market)
     expected = [json.loads(item.to_json()) for item in batch]
 
     assert isinstance(batch, list)
@@ -545,7 +545,7 @@ def test_scenario_pnl_batch_returns_typed_items() -> None:
         assert item.report.operations_applied == expected_item["report"]["operations_applied"]
         assert item.to_arrow().column_names() == ["scenario_id", "position_id", "pnl"]
         assert list(item.to_pandas().columns) == ["scenario_id", "position_id", "pnl"]
-    assert pf.scenario_pnl_batch(portfolio, [], market) == []
+    assert pf.scenario_pnl(portfolio, [], market) == []
 
 
 def test_json_twins_return_wire_strings() -> None:

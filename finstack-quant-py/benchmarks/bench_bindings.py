@@ -78,7 +78,6 @@ from finstack_quant.portfolio import (
     parse_portfolio_spec_json,
     replay_portfolio,
     scenario_pnl,
-    scenario_pnl_batch,
     value_portfolio,
 )
 from finstack_quant.scenarios import (
@@ -1479,16 +1478,15 @@ class TestPortfolioReleaseControls:
         [10, pytest.param(100, marks=pytest.mark.slow)],
         ids=["10-scenarios", "100-scenarios"],
     )
-    def test_scenario_pnl_batch_500_deposits(self, benchmark, n_scenarios: int) -> None:
+    def test_scenario_pnl_500_deposits(self, benchmark, n_scenarios: int) -> None:
         """Batched scenarios over a typed 500-deposit portfolio."""
         portfolio = Portfolio.from_json(_BENCH_SPEC_JSON_500)
         scenarios = [ScenarioSpec.from_json(text) for text in _build_curve_scenario_jsons(n_scenarios)]
-        preflight = scenario_pnl_batch(portfolio, scenarios, _BENCH_MARKET)
+        preflight = scenario_pnl(portfolio, scenarios, _BENCH_MARKET)
         assert len(preflight) == n_scenarios
         for item in preflight:
             _assert_deposit_scenario_pnl(item.pnl, 500)
         result = benchmark.pedantic(
-            scenario_pnl_batch,
             args=(portfolio, scenarios, _BENCH_MARKET),
             rounds=5,
             warmup_rounds=1,
@@ -1508,7 +1506,7 @@ class TestPortfolioReleaseControls:
         scenarios = [ScenarioSpec.from_json(text) for text in _build_curve_scenario_jsons(n_scenarios)]
 
         def _run_repeated():
-            return tuple(scenario_pnl(portfolio, scenario, _BENCH_MARKET) for scenario in scenarios)
+            return tuple(scenario_pnl(portfolio, [scenario], _BENCH_MARKET)[0] for scenario in scenarios)
 
         preflight = _run_repeated()
         assert len(preflight) == n_scenarios

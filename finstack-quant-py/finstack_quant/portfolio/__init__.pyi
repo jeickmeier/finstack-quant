@@ -74,7 +74,6 @@ from finstack_quant.portfolio._scenarios import (
     apply_scenario_and_revalue as apply_scenario_and_revalue,
     attribute_scenario_pnl as attribute_scenario_pnl,
     scenario_pnl as scenario_pnl,
-    scenario_pnl_batch as scenario_pnl_batch,
 )
 from finstack_quant.portfolio._allocation import (
     StrategyAllocationInput as StrategyAllocationInput,
@@ -308,7 +307,6 @@ __all__ = [
     "rebalance_from_spec",
     "replay_portfolio",
     "scenario_pnl",
-    "scenario_pnl_batch",
     "schema",
     "twrr_linked",
     "twrr_modified_dietz",

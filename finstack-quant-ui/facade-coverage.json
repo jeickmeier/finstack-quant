@@ -68,7 +68,7 @@
     "portfolio.portfolioMargin",
     "portfolio.portfolioMetricsSeries",
     "portfolio.primitiveExposures",
-    "portfolio.scenarioPnlBatch",
+    "portfolio.scenarioPnl",
     "portfolio.twrrLinked",
     "portfolio.twrrModifiedDietz",
     "portfolio.valuePortfolio",

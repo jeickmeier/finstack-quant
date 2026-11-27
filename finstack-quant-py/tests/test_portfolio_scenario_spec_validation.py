@@ -37,11 +37,10 @@ def test_portfolio_scenario_entry_points_refuse_json_text() -> None:
     with pytest.raises(TypeError, match="ScenarioSpec"):
         portfolio.apply_scenario_and_revalue(book, VALID, MarketContext())
     with pytest.raises(TypeError, match="ScenarioSpec"):
-        portfolio.scenario_pnl(book, VALID, MarketContext())
-    with pytest.raises(TypeError, match="ScenarioSpec"):
-        portfolio.scenario_pnl_batch(book, [VALID], MarketContext())
-    with pytest.raises(TypeError):
-        portfolio.scenario_pnl_batch(book, f"[{VALID}]", MarketContext())
+        portfolio.scenario_pnl(book, [VALID], MarketContext())
+    for text in (VALID, f"[{VALID}]"):
+        with pytest.raises(TypeError):
+            portfolio.scenario_pnl(book, text, MarketContext())
     loaded = ScenarioSpec.from_json(VALID)
     assert portfolio.apply_scenario_and_revalue(book, loaded, MarketContext()).report.operations_applied == 0
-    assert [item.scenario_id for item in portfolio.scenario_pnl_batch(book, [loaded], MarketContext())] == ["ok"]
+    assert [item.scenario_id for item in portfolio.scenario_pnl(book, [loaded], MarketContext())] == ["ok"]

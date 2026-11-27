@@ -102,53 +102,18 @@ pub fn attribute_scenario_pnl(
     to_js_value_with_bigints(&result)
 }
 
-/// Compute the profit and loss attributable to a scenario for an already-built
-/// `Portfolio` handle.
+/// Compute the profit and loss attributable to each scenario for an
+/// already-built `Portfolio` handle.
 ///
-/// Values the portfolio against the unshocked market and against the
-/// scenario-shocked market, and returns the `ScenarioPnlBatchItem`
-/// (`scenario_id`, a structured `pnl` with base-currency `total` plus
-/// `by_position`, and `report`), the same item `scenarioPnlBatch` returns per
-/// scenario. Positions added or removed by the scenario are zero-filled
-/// against the missing side, so the drill-down always sums to the total.
-/// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
-/// @param scenarioJson - Canonical JSON payload representing the scenario whose profit-and-loss impact is measured.
-/// @param market - Constructed `core.MarketContext` handle supplying the unshocked curves, quotes, and FX data used for the base leg.
-/// @returns The scenario's `ScenarioPnlBatchItem`.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if the scenario JSON is malformed or invalid,
-/// scenario application or either valuation fails, valuation currencies are
-/// inconsistent, or the structured result cannot be converted to JavaScript.
-#[wasm_bindgen(js_name = scenarioPnl, unchecked_return_type = "ScenarioPnlBatchItem")]
-pub fn scenario_pnl(
-    portfolio: &JsPortfolio,
-    #[wasm_bindgen(js_name = "scenarioJson", unchecked_param_type = "JsonInput")]
-    scenario_json: JsValue,
-    market: &JsMarketContext,
-) -> Result<JsValue, JsValue> {
-    let scenario_json: &str = &json_text(&scenario_json, "scenarioJson")?;
-    let scenario =
-        finstack_quant_scenarios::ScenarioSpec::from_json(scenario_json).map_err(to_js_err)?;
-    let config = finstack_quant_core::config::FinstackConfig::default();
-    let out = finstack_quant_portfolio::scenarios::scenario_pnl(
-        &portfolio.inner,
-        &scenario,
-        market.inner(),
-        &config,
-    )
-    .map_err(to_js_err)?;
-    to_js_value(&out)
-}
-/// Compute ordered portfolio P&L for a batch of scenarios.
-///
-/// The Rust batch engine values the unstressed base leg once for the whole
-/// request, then applies and revalues each scenario independently. Returns one
-/// `ScenarioPnlBatchItem` (`scenario_id`, `pnl`, `report`) per input scenario,
-/// in input order; an empty batch returns `[]` without a valuation.
+/// The Rust engine values the unstressed base leg once for the whole request,
+/// then applies and revalues each scenario independently. Returns one
+/// `ScenarioPnlBatchItem` (`scenario_id`, a structured `pnl` with
+/// base-currency `total` plus `by_position`, and `report`) per input scenario,
+/// in input order. Positions added or removed by a scenario are zero-filled
+/// against the missing side, so each drill-down sums to its total. An empty
+/// array returns `[]` without a valuation.
 /// @param portfolio - Built portfolio valued for the shared base and every scenario.
-/// @param scenarios - Array of `ScenarioSpec` objects, or its JSON.
+/// @param scenarios - Array of one or more `ScenarioSpec` objects, or its JSON. A single scenario goes in an array of one.
 /// @param market - `core.MarketContext` handle holding the unshocked market snapshot.
 /// @returns The ordered `ScenarioPnlBatchItem` array.
 ///
@@ -159,8 +124,8 @@ pub fn scenario_pnl(
 /// inconsistent (kind `validation`), or scenario application, valuation or
 /// base-currency differencing fails; the error is the earliest failing
 /// scenario's.
-#[wasm_bindgen(js_name = scenarioPnlBatch, unchecked_return_type = "ScenarioPnlBatchItem[]")]
-pub fn scenario_pnl_batch(
+#[wasm_bindgen(js_name = scenarioPnl, unchecked_return_type = "ScenarioPnlBatchItem[]")]
+pub fn scenario_pnl(
     portfolio: &JsPortfolio,
     #[wasm_bindgen(unchecked_param_type = "ScenarioSpec[] | string")] scenarios: JsValue,
     market: &JsMarketContext,
@@ -168,7 +133,7 @@ pub fn scenario_pnl_batch(
     let scenarios: Vec<finstack_quant_scenarios::ScenarioSpec> =
         from_js_json(&scenarios, "scenarios")?;
     let config = finstack_quant_core::config::FinstackConfig::default();
-    let items = finstack_quant_portfolio::scenarios::scenario_pnl_batch(
+    let items = finstack_quant_portfolio::scenarios::scenario_pnl(
         &portfolio.inner,
         &scenarios,
         market.inner(),

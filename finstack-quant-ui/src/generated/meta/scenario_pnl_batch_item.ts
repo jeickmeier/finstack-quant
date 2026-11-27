@@ -3,7 +3,7 @@ export default [
   {
     "path": "#",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json#",
-    "description": "One scenario's P&L with its provenance, from `scenario_pnl` or `scenario_pnl_batch`.",
+    "description": "One scenario's P&L with its provenance: one entry of `scenario_pnl`.",
     "examples": [
       {
         "pnl": {

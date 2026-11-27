@@ -14,10 +14,10 @@ import {
 import type { ScenarioPnlBatchItem } from "finstack-quant-wasm";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
 import {
-  scenarioPnlBatchOptions,
-  useScenarioPnlBatch,
-  type ScenarioPnlBatchRequest,
-} from "@/hooks/portfolio/use-scenario-pnl-batch/use-scenario-pnl-batch";
+  scenarioPnlOptions,
+  useScenarioPnl,
+  type ScenarioPnlRequest,
+} from "@/hooks/portfolio/use-scenario-pnl/use-scenario-pnl";
 import { applyScenarioAndRevalueOptions } from "@/hooks/portfolio/use-apply-scenario-and-revalue/use-apply-scenario-and-revalue";
 import {
   ScenarioPnlTable,
@@ -58,7 +58,7 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
-const batchRequest: ScenarioPnlBatchRequest = {
+const batchRequest: ScenarioPnlRequest = {
   specJson: JSON.stringify(inputs.portfolio_spec),
   marketJson: JSON.stringify(inputs.market_t0),
   scenarioJsons: fixture.request.scenarioJsons,
@@ -71,14 +71,14 @@ const rowsOf = (table: HTMLElement) =>
 it(
   "values the parity scenarios through the real worker as the generator did and as the parity tests pin",
   async () => {
-    const result = unwrap(await proxy().scenarioPnlBatch(batchRequest));
+    const result = unwrap(await proxy().scenarioPnl(batchRequest));
     expect(serializeHost(result)).toBe(serializeHost(fixture.batch));
     expect(result.items.map((item) => item.scenario_id)).toEqual([
       "up_10bp",
       "down_15bp",
     ]);
     expect(result.items.map((item) => item.pnl)).toEqual(
-      expected.scenario_pnl_batch.map((item: ScenarioPnlBatchItem) => item.pnl),
+      expected.scenario_pnl.map((item: ScenarioPnlBatchItem) => item.pnl),
     );
     const revalue = unwrap(
       await proxy().applyScenarioAndRevalue({
@@ -99,11 +99,10 @@ it(
 );
 it("returns an empty batch without valuing and the earliest failing scenario's native error", async () => {
   expect(
-    unwrap(
-      await proxy().scenarioPnlBatch({ ...batchRequest, scenarioJsons: [] }),
-    ).items,
+    unwrap(await proxy().scenarioPnl({ ...batchRequest, scenarioJsons: [] }))
+      .items,
   ).toEqual([]);
-  const failed = await proxy().scenarioPnlBatch({
+  const failed = await proxy().scenarioPnl({
     ...batchRequest,
     scenarioJsons: [
       batchRequest.scenarioJsons[0]!,
@@ -130,15 +129,15 @@ it("returns an empty batch without valuing and the earliest failing scenario's n
   expect(missing.ok).toBe(false);
 });
 it("keys both queries on the worker session and the complete snapshotted request", () => {
-  const options = scenarioPnlBatchOptions(null, 2, batchRequest);
+  const options = scenarioPnlOptions(null, 2, batchRequest);
   expect(options.queryKey).toEqual([
     "finstack",
     2,
-    "scenarioPnlBatch",
+    "scenarioPnl",
     batchRequest,
   ]);
   expect(options.queryKey[3]).not.toBe(batchRequest);
-  expect(scenarioPnlBatchOptions(null, 2, null).enabled).toBe(false);
+  expect(scenarioPnlOptions(null, 2, null).enabled).toBe(false);
   const revalue = {
     specJson: batchRequest.specJson,
     marketJson: batchRequest.marketJson,
@@ -230,8 +229,8 @@ it("shows the empty, loading and native-error states", () => {
   rerender(<ScenarioPnlTable report={batch} error="native failure" />);
   expect(screen.getByRole("alert").textContent).toBe("native failure");
 });
-function Connected({ request }: { request: ScenarioPnlBatchRequest }) {
-  const result = useScenarioPnlBatch(request);
+function Connected({ request }: { request: ScenarioPnlRequest }) {
+  const result = useScenarioPnl(request);
   return (
     <ScenarioPnlTable
       report={result.data}

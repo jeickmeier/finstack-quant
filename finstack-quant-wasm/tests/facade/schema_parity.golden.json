@@ -2213,7 +2213,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
             "type_name": "ScenarioPnlBatchItem",
             "kind": "output",
-            "bytes": 82157
+            "bytes": 82141
           },
           {
             "path": "schemas/portfolio/1/scenario_revalue_view.schema.json",
@@ -5315,7 +5315,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
             "type_name": "ScenarioPnlBatchItem",
             "kind": "output",
-            "bytes": 82157
+            "bytes": 82141
           },
           {
             "domain": "portfolio",

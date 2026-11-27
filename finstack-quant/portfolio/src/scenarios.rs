@@ -332,8 +332,8 @@ pub struct ScenarioPnl {
     pub by_position: IndexMap<PositionId, Money>,
 }
 
-/// One scenario's P&L with its provenance: the result of [`scenario_pnl`] and
-/// each ordered entry of [`scenario_pnl_batch`].
+/// One scenario's P&L with its provenance: each ordered entry of
+/// [`scenario_pnl`].
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ScenarioPnlBatchItem {
@@ -502,14 +502,16 @@ pub fn attribute_scenario_pnl(
     })
 }
 
-/// Compute the profit and loss attributable to a scenario.
+/// Compute the profit and loss attributable to each scenario, sharing one base valuation.
 ///
-/// Registers an unstressed state and the scenario-applied state with the
-/// request-scoped portfolio evaluation engine, requests PV only for both, and
-/// reports the difference per position and in total. Both legs require the
-/// canonical PV pricing path; a pricing failure aborts rather than switching
-/// either leg independently to `Instrument::value`. Unlike
-/// [`apply_scenario_and_revalue`], this function does not compute the standard risk set.
+/// The base portfolio is valued once with a PV-only profile. Each scenario is
+/// applied to its own copy of the market, and the stressed states are valued
+/// in bounded waves, so retained memory is proportional to the active wave plus
+/// the returned P&L ladders rather than the full positions-by-scenarios
+/// valuation cube. Both legs require the canonical PV pricing path; a pricing
+/// failure aborts rather than switching either leg independently to
+/// `Instrument::value`. Unlike [`apply_scenario_and_revalue`], this function
+/// does not compute the standard risk set.
 ///
 /// The arithmetic stays in [`Money`] end to end (Decimal-backed): position
 /// deltas are currency-checked subtractions of the base-currency position
@@ -531,27 +533,30 @@ pub fn attribute_scenario_pnl(
 ///
 /// # Arguments
 ///
-/// * `portfolio` - Portfolio to value on both the unstressed and stressed legs.
-/// * `scenario` - Scenario specification describing the shocks to apply.
-/// * `market` - Unstressed market snapshot; used as the base leg and as the
-///   source the scenario operations are applied to.
-/// * `config` - Active configuration used by scenario-report provenance and
-///   both registered PV-only jobs, so the base and stressed legs share one
-///   rounding and convention policy while retaining separate immutable market
-///   states and calibration caches.
+/// * `portfolio` - Portfolio to value for the shared base and every scenario.
+/// * `scenarios` - Ordered scenario specifications, one or many. Pass a slice
+///   of one (`std::slice::from_ref(&scenario)`) for a single scenario. An
+///   empty slice returns an empty vector without performing valuation.
+/// * `market` - Unstressed market snapshot used for the shared base and as the
+///   source for each independently applied scenario.
+/// * `config` - Active configuration used for every scenario report and
+///   executor state, so the base and stressed legs share one rounding and
+///   convention policy while retaining separate immutable market states and
+///   calibration caches.
 ///
 /// # Returns
 ///
-/// [`ScenarioPnlBatchItem`] holding the scenario `id`, the [`ScenarioPnl`]
-/// ladder and the scenario [`ApplicationReport`], so the P&L is never
-/// separated from its provenance.
+/// One [`ScenarioPnlBatchItem`] per scenario, in input order, each holding the
+/// scenario `id`, the [`ScenarioPnl`] ladder and the scenario
+/// [`ApplicationReport`], so the P&L is never separated from its provenance.
 ///
 /// # Errors
 ///
-/// Returns [`Error::ScenarioError`] when the scenario engine fails, any
-/// canonical valuation error raised by the shared evaluation executor on
-/// either leg, and [`Error::Core`] when a position's stressed and base values
-/// carry different currencies. No best-effort PV fallback is used.
+/// Returns the first error in input order: [`Error::ScenarioError`] when the
+/// scenario engine fails, any canonical valuation error raised by the shared
+/// evaluation executor on either leg, and [`Error::Core`] when a position's
+/// stressed and base values carry different currencies. No best-effort PV
+/// fallback is used.
 ///
 /// # Examples
 ///
@@ -564,50 +569,14 @@ pub fn attribute_scenario_pnl(
 /// # fn main() -> finstack_quant_portfolio::Result<()> {
 /// # let portfolio: finstack_quant_portfolio::Portfolio = unimplemented!("Provide a portfolio");
 /// # let market: MarketContext = unimplemented!("Provide market data");
-/// # let scenario: ScenarioSpec = unimplemented!("Provide a scenario");
-/// let finstack_quant_portfolio::scenarios::ScenarioPnlBatchItem { pnl, report, .. } = scenario_pnl(&portfolio, &scenario, &market, &FinstackConfig::default())?;
-/// println!("Scenario P&L: {} over {} operations", pnl.total, report.operations_applied);
+/// # let scenarios: Vec<ScenarioSpec> = unimplemented!("Provide one or more scenarios");
+/// for item in scenario_pnl(&portfolio, &scenarios, &market, &FinstackConfig::default())? {
+///     println!("{}: {} over {} operations", item.scenario_id, item.pnl.total, item.report.operations_applied);
+/// }
 /// # Ok(())
 /// # }
 /// ```
 pub fn scenario_pnl(
-    portfolio: &Portfolio,
-    scenario: &ScenarioSpec,
-    market: &MarketContext,
-    config: &finstack_quant_core::config::FinstackConfig,
-) -> Result<ScenarioPnlBatchItem> {
-    scenario_pnl_batch(portfolio, std::slice::from_ref(scenario), market, config)?
-        .pop()
-        .ok_or_else(|| Error::scenario(ErrorKind::Validation, "scenario batch returned no result"))
-}
-
-/// Compute ordered P&L results for multiple scenarios while sharing one base valuation.
-///
-/// The base portfolio is valued once with a PV-only profile. Stressed states
-/// are evaluated in bounded waves, so retained memory is proportional to the
-/// active wave plus the returned P&L ladders rather than the full
-/// positions-by-scenarios valuation cube.
-///
-/// # Arguments
-///
-/// * `portfolio` - Portfolio to value for the shared base and every scenario.
-/// * `scenarios` - Ordered scenario specifications. An empty slice returns an
-///   empty vector without performing valuation.
-/// * `market` - Unstressed market snapshot used for the shared base and as the
-///   source for each independently applied scenario.
-/// * `config` - Active configuration used for every scenario report and
-///   executor state.
-///
-/// # Returns
-///
-/// Ordered results matching `scenarios`, including each scenario identifier,
-/// P&L ladder, and application report.
-///
-/// # Errors
-///
-/// Returns the first scenario-application or valuation error in input order,
-/// or a currency error while differencing base and stressed values.
-pub fn scenario_pnl_batch(
     portfolio: &Portfolio,
     scenarios: &[ScenarioSpec],
     market: &MarketContext,
@@ -707,6 +676,16 @@ pub fn scenario_pnl_batch(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The one result of `scenario_pnl` for a single scenario.
+    fn one_scenario_pnl(
+        portfolio: &Portfolio,
+        scenario: &ScenarioSpec,
+        market: &MarketContext,
+        config: &FinstackConfig,
+    ) -> Result<ScenarioPnlBatchItem> {
+        Ok(scenario_pnl(portfolio, std::slice::from_ref(scenario), market, config)?.remove(0))
+    }
 
     use crate::position::{Position, PositionUnit};
     use crate::test_utils::build_test_market;
@@ -1073,7 +1052,7 @@ mod tests {
             pnl,
             report: _report,
             ..
-        } = scenario_pnl(&portfolio, &scenario_with(Vec::new()), &market, &config)
+        } = one_scenario_pnl(&portfolio, &scenario_with(Vec::new()), &market, &config)
             .expect("test should succeed");
 
         assert_eq!(pnl.total.amount(), 0.0);
@@ -1119,7 +1098,7 @@ mod tests {
             })
             .collect();
 
-        let results = scenario_pnl_batch(
+        let results = scenario_pnl(
             &portfolio,
             &scenarios,
             &build_test_market(),
@@ -1150,7 +1129,7 @@ mod tests {
         }]);
 
         let crate::scenarios::ScenarioPnlBatchItem { pnl, report, .. } =
-            scenario_pnl(&portfolio, &scenario, &market, &config).expect("test should succeed");
+            one_scenario_pnl(&portfolio, &scenario, &market, &config).expect("test should succeed");
 
         assert!(report.operations_applied > 0);
 
@@ -1175,7 +1154,7 @@ mod tests {
         let portfolio = single_position_portfolio();
         let market = build_test_market();
 
-        let view = scenario_pnl(
+        let view = one_scenario_pnl(
             &portfolio,
             &scenario_with(vec![OperationSpec::CurveParallelBp {
                 curve_kind: CurveKind::Discount,

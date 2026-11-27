@@ -141,7 +141,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "apply_scenario_and_revalue",
         "attribute_scenario_pnl",
         "scenario_pnl",
-        "scenario_pnl_batch",
         "attribute_portfolio_pnl",
         "allocate_weights",
         "optimize_portfolio",

@@ -446,7 +446,7 @@
         "leverage": 1.0000000000000002
       }
     },
-    "scenario_pnl_batch": [
+    "scenario_pnl": [
       {
         "scenario_id": "up_10bp",
         "pnl": {

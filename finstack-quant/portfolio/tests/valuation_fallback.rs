@@ -437,7 +437,7 @@ fn scenario_pnl_rejects_noncanonical_pv_fallback() {
 
     let error = finstack_quant_portfolio::scenarios::scenario_pnl(
         &portfolio,
-        &scenario,
+        std::slice::from_ref(&scenario),
         &market_with_usd(),
         &FinstackConfig::default(),
     )

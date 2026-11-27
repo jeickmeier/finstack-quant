@@ -704,6 +704,6 @@ def test_scenario_attribution_keeps_contract_effects_separate_from_market_moves(
     assert market_only.contract_pnl.total == 0.0
     assert both.contract_pnl.total > 0.0
     assert both.market_attribution.total_pnl == market_only.market_attribution.total_pnl
-    assert both.mark_pnl.total == pytest.approx(scenario_pnl(book, mixed, market).pnl.total)
+    assert both.mark_pnl.total == pytest.approx(scenario_pnl(book, [mixed], market)[0].pnl.total)
     assert both.total_pnl.amount == pytest.approx(both.market_attribution.total_pnl.amount + both.contract_pnl.total)
     assert market.to_json() == original_market

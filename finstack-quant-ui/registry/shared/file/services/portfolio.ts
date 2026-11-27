@@ -9,7 +9,7 @@ export type PortfolioNative = {
     | "aggregateMetrics"
     | "portfolioMetricsSeries"
     | "parsePortfolioSpecJson"
-    | "scenarioPnlBatch"
+    | "scenarioPnl"
     | "applyScenarioAndRevalue"
     | "portfolioMargin"
     | "computeFactorSensitivities"
@@ -69,12 +69,12 @@ export function createPortfolioService(
         return context.portfolio(canonical).json;
       });
     },
-    scenarioPnlBatch(request) {
+    scenarioPnl(request) {
       return context.result(() => {
         const book = context.portfolio(request.specJson).handle;
         const market = context.market(request.marketJson).handle;
         // The scenario texts are joined into one JSON array; none is parsed here.
-        const items = native.portfolio.scenarioPnlBatch(
+        const items = native.portfolio.scenarioPnl(
           book,
           `[${request.scenarioJsons.join(",")}]`,
           market,

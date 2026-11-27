@@ -85,7 +85,7 @@ ENTRY_SHAPES: list[tuple[str, str, str]] = [
     ("finstack_quant.portfolio", "aggregate_metrics", "wrapper"),
     ("finstack_quant.portfolio", "replay_portfolio", "wrapper"),
     ("finstack_quant.portfolio", "allocate_weights", "wrapper"),
-    ("finstack_quant.portfolio", "scenario_pnl_batch", "wrapper"),
+    ("finstack_quant.portfolio", "scenario_pnl", "wrapper"),
 ]
 
 # Result classes that must carry the full accessor contract:

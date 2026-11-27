@@ -162,62 +162,17 @@ fn attribute_scenario_pnl(
     .map_err(portfolio_to_py)
 }
 
-/// Compute the profit and loss attributable to a scenario.
+/// Compute the P&L of each scenario, valuing the unstressed portfolio once.
 ///
 /// Parameters
 /// ----------
 /// portfolio : Portfolio
-///     Built portfolio.
-/// scenario : ScenarioSpec
-///     :class:`~finstack_quant.scenarios.ScenarioSpec` to apply. Load JSON text
-///     with ``ScenarioSpec.from_json``.
-/// market : MarketContext
-///     Unshocked base market.
-///
-/// Returns
-/// -------
-/// ScenarioPnlBatchItem
-///     The scenario's ``scenario_id``, its P&L ladder ``pnl``
-///     (:class:`ScenarioPnl`, base-currency ``total`` plus ``by_position``)
-///     and the scenario application ``report``; the same item type
-///     :func:`scenario_pnl_batch` returns per scenario.
-#[pyfunction]
-#[pyo3(text_signature = "(portfolio, scenario, market)")]
-fn scenario_pnl(
-    py: Python<'_>,
-    portfolio: PyRef<'_, PyPortfolio>,
-    scenario: PyRef<'_, PyScenarioSpec>,
-    market: PyRef<'_, PyMarketContext>,
-) -> PyResult<PyScenarioPnlBatchItem> {
-    let portfolio = &portfolio.inner;
-    let scenario = scenario.inner.clone();
-    let market = &market.inner;
-    let config = finstack_quant_core::config::FinstackConfig::default();
-    let portfolio_ref: &finstack_quant_portfolio::Portfolio = portfolio;
-    let market_ref: &finstack_quant_core::market_data::context::MarketContext = market;
-    py.detach(|| {
-        finstack_quant_portfolio::scenarios::scenario_pnl(
-            portfolio_ref,
-            &scenario,
-            market_ref,
-            &config,
-        )
-    })
-    .map(|inner| PyScenarioPnlBatchItem { inner })
-    .map_err(portfolio_to_py)
-}
-
-/// Compute ordered portfolio P&L for a batch of scenarios.
-///
-/// Parameters
-/// ----------
-/// portfolio : Portfolio
-///     A built :class:`Portfolio`. The Rust batch engine values its
-///     unstressed base leg once for the complete request.
+///     A built :class:`Portfolio`. The Rust engine values its unstressed base
+///     leg once for the complete request.
 /// scenarios : list[ScenarioSpec]
-///     Ordered ``ScenarioSpec`` objects. Output order matches input order. An
-///     empty batch returns ``[]`` without a valuation. Load JSON text with
-///     ``ScenarioSpec.from_json``.
+///     One or more ``ScenarioSpec`` objects, in a list. Output order matches
+///     input order. An empty list returns ``[]`` without a valuation. Load
+///     JSON text with ``ScenarioSpec.from_json``.
 /// market : MarketContext
 ///     The unshocked market snapshot.
 ///
@@ -225,20 +180,22 @@ fn scenario_pnl(
 /// -------
 /// list[ScenarioPnlBatchItem]
 ///     One ordered item per input scenario, each carrying ``scenario_id``,
-///     a typed ``pnl`` (:class:`ScenarioPnl`) and ``report``
+///     a typed ``pnl`` (:class:`ScenarioPnl`, base-currency ``total`` plus
+///     ``by_position``) and ``report``
 ///     (:class:`~finstack_quant.scenarios.ApplicationReport`); each item's
 ///     ``to_json()`` gives its wire form.
 ///
 /// Raises
 /// ------
 /// TypeError
-///     If ``scenarios`` is not a list of ``ScenarioSpec`` objects.
+///     If ``scenarios`` is not a list of ``ScenarioSpec`` objects. A single
+///     ``ScenarioSpec`` goes in a list of one.
 /// PortfolioError
 ///     If scenario application, valuation, or base-currency P&L differencing
 ///     fails. The error identifies the earliest failing input scenario.
 #[pyfunction]
 #[pyo3(text_signature = "(portfolio, scenarios, market)")]
-fn scenario_pnl_batch(
+fn scenario_pnl(
     py: Python<'_>,
     portfolio: PyRef<'_, PyPortfolio>,
     scenarios: Vec<PyRef<'_, PyScenarioSpec>>,
@@ -258,7 +215,7 @@ fn scenario_pnl_batch(
     let market_ref: &finstack_quant_core::market_data::context::MarketContext = market;
     let results = py
         .detach(|| {
-            finstack_quant_portfolio::scenarios::scenario_pnl_batch(
+            finstack_quant_portfolio::scenarios::scenario_pnl(
                 portfolio_ref,
                 &scenarios,
                 market_ref,
@@ -398,7 +355,7 @@ struct BatchPnlRow<'a> {
     pnl: f64,
 }
 
-/// One ordered result from :func:`scenario_pnl_batch`.
+/// One ordered result from :func:`scenario_pnl`.
 ///
 /// Carries the scenario identifier, its typed :class:`ScenarioPnl` ladder,
 /// and the scenario :class:`~finstack_quant.scenarios.ApplicationReport`.
@@ -484,6 +441,5 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyScenarioPnlBatchItem>()?;
     m.add_function(pyo3::wrap_pyfunction!(apply_scenario_and_revalue, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(scenario_pnl, m)?)?;
-    m.add_function(pyo3::wrap_pyfunction!(scenario_pnl_batch, m)?)?;
     Ok(())
 }

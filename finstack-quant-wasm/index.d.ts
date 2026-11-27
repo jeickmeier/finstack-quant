@@ -11834,25 +11834,28 @@ export interface PortfolioNamespace {
    */
   readonly attributeScenarioPnl: typeof wasm.attributeScenarioPnl;
   /**
-   * Compute the profit and loss attributable to a scenario for an already-built
-   * `Portfolio` handle.
+   * Compute the profit and loss attributable to each scenario for an
+   * already-built `Portfolio` handle.
    *
-   * Values the portfolio against the unshocked market and against the
-   * scenario-shocked market, and returns the `ScenarioPnlBatchItem`
-   * (`scenario_id`, a structured `pnl` with base-currency `total` plus
-   * `by_position`, and `report`), the same item `scenarioPnlBatch` returns per
-   * scenario. Positions added or removed by the scenario are zero-filled
-   * against the missing side, so the drill-down always sums to the total.
-   * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
-   * @param scenarioJson - Canonical JSON payload representing the scenario whose profit-and-loss impact is measured.
-   * @param market - Constructed `core.MarketContext` handle supplying the unshocked curves, quotes, and FX data used for the base leg.
-   * @returns The scenario's `ScenarioPnlBatchItem`.
+   * The Rust engine values the unstressed base leg once for the whole request,
+   * then applies and revalues each scenario independently. Returns one
+   * `ScenarioPnlBatchItem` (`scenario_id`, a structured `pnl` with
+   * base-currency `total` plus `by_position`, and `report`) per input scenario,
+   * in input order. Positions added or removed by a scenario are zero-filled
+   * against the missing side, so each drill-down sums to its total. An empty
+   * array returns `[]` without a valuation.
+   * @param portfolio - Built portfolio valued for the shared base and every scenario.
+   * @param scenarios - Array of one or more `ScenarioSpec` objects, or its JSON. A single scenario goes in an array of one.
+   * @param market - `core.MarketContext` handle holding the unshocked market snapshot.
+   * @returns The ordered `ScenarioPnlBatchItem` array.
    *
    * # Errors
    *
-   * Throws a JavaScript exception if the scenario JSON is malformed or invalid,
-   * scenario application or either valuation fails, valuation currencies are
-   * inconsistent, or the structured result cannot be converted to JavaScript.
+   * Throws a `TypeError` (kind `invalid_type`) if `scenarios` is not a JSON
+   * string or array, and a `FinstackError` if a scenario is malformed or
+   * inconsistent (kind `validation`), or scenario application, valuation or
+   * base-currency differencing fails; the error is the earliest failing
+   * scenario's.
    */
   readonly scenarioPnl: typeof wasm.scenarioPnl;
   /**
@@ -12029,27 +12032,6 @@ export interface PortfolioNamespace {
    * is invalid, or market data or FX is missing.
    */
   readonly primitiveExposures: typeof wasm.portfolioPrimitiveExposures;
-  /**
-   * Compute ordered portfolio P&L for a batch of scenarios.
-   *
-   * The Rust batch engine values the unstressed base leg once for the whole
-   * request, then applies and revalues each scenario independently. Returns one
-   * `ScenarioPnlBatchItem` (`scenario_id`, `pnl`, `report`) per input scenario,
-   * in input order; an empty batch returns `[]` without a valuation.
-   * @param portfolio - Built portfolio valued for the shared base and every scenario.
-   * @param scenarios - Array of `ScenarioSpec` objects, or its JSON.
-   * @param market - `core.MarketContext` handle holding the unshocked market snapshot.
-   * @returns The ordered `ScenarioPnlBatchItem` array.
-   *
-   * # Errors
-   *
-   * Throws a `TypeError` (kind `invalid_type`) if `scenarios` is not a JSON
-   * string or array, and a `FinstackError` if a scenario is malformed or
-   * inconsistent (kind `validation`), or scenario application, valuation or
-   * base-currency differencing fails; the error is the earliest failing
-   * scenario's.
-   */
-  readonly scenarioPnlBatch: typeof wasm.scenarioPnlBatch;
   /**
    * Attribute portfolio P&L between two market snapshots.
    *

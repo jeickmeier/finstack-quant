@@ -85,7 +85,6 @@ const EXPORTED_KEYS = [
   'rebalanceFromSpec',
   'replayPortfolio',
   'scenarioPnl',
-  'scenarioPnlBatch',
   'schema',
   'sensitivityMatrixDelta',
   'sensitivityMatrixFactorDeltas',

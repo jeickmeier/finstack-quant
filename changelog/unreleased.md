@@ -2,6 +2,23 @@
 
 ## Itemized changes
 
+### Portfolio: one `scenario_pnl`, taking a list of scenarios
+
+`scenario_pnl` now takes a list of one or more scenarios and returns one
+`ScenarioPnlBatchItem` per scenario, in order, valuing the unstressed
+portfolio once. The single-scenario function is removed and the name
+`scenario_pnl_batch` (WASM `scenarioPnlBatch`) is gone, in Rust, Python and
+WASM. The item type and its schema are unchanged, and so are the numbers. An
+empty list still returns an empty list. Old → new:
+
+- Rust `scenario_pnl(&portfolio, &scenario, &market, &config)?` → `scenario_pnl(&portfolio, std::slice::from_ref(&scenario), &market, &config)?.remove(0)`
+- Rust `scenario_pnl_batch(&portfolio, &scenarios, &market, &config)` → `scenario_pnl(&portfolio, &scenarios, &market, &config)`
+- Python `scenario_pnl(portfolio, scenario, market)` → `scenario_pnl(portfolio, [scenario], market)[0]`; a bare `ScenarioSpec` raises `TypeError`
+- Python `scenario_pnl_batch(portfolio, scenarios, market)` → `scenario_pnl(portfolio, scenarios, market)`
+- WASM `portfolio.scenarioPnl(portfolio, scenario, market)` → `portfolio.scenarioPnl(portfolio, [scenario], market)[0]`; a bare scenario throws a validation error
+- WASM `portfolio.scenarioPnlBatch(portfolio, scenarios, market)` → `portfolio.scenarioPnl(portfolio, scenarios, market)`
+- UI: the hook `useScenarioPnlBatch` is `useScenarioPnl`, and its registry id is `use-scenario-pnl`
+
 ### Margin: the SA-CCR and FRTB free functions are removed
 
 `saccr_ead` and `frtb_sba_charge` (WASM `saccrEad`, `frtbSbaCharge`) are
@@ -77,8 +94,8 @@ typed class takes its dict. JSON text enters through a named loader:
 `tests/test_json_text_inputs.py` enforce it. WASM is unchanged. Results are
 unchanged. Old → new:
 
-- Scenarios: `apply_scenario(scenario_json, ...)`, `compute_horizon_return(..., scenario_json)` and the portfolio functions `apply_scenario_and_revalue`, `attribute_scenario_pnl` and `scenario_pnl` → pass `ScenarioSpec.from_json(scenario_json)`
-- `scenario_pnl_batch(portfolio, "[...]", market)` or a list holding JSON strings → a list of `ScenarioSpec` objects
+- Scenarios: `apply_scenario(scenario_json, ...)`, `compute_horizon_return(..., scenario_json)` and the portfolio functions `apply_scenario_and_revalue` and `attribute_scenario_pnl` → pass `ScenarioSpec.from_json(scenario_json)`
+- `scenario_pnl(portfolio, "[...]", market)` or a list holding JSON strings → a list of `ScenarioSpec` objects
 - `config=config_json` on `apply_scenario` and `compute_horizon_return` → `config=FinstackConfig.from_json(config_json)`; a wrong type there is now `TypeError`, not `ValueError`
 - `OperationSpec.hierarchy_*(target_json, ...)` → `HierarchyTarget.from_json(target_json)`
 - Markets: every `market` argument (pricing, cashflows, attribution, portfolio valuation, risk, margin, scenarios, calibration, statement analytics; 68 parameters) → pass a `MarketContext`; for JSON text, `MarketContext.from_json(market_json)`. Passing `market.to_json()` back in no longer works: pass `market`

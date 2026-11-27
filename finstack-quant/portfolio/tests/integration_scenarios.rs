@@ -21,6 +21,22 @@ use std::any::Any;
 use std::sync::Arc;
 use time::Duration;
 
+/// The one result of `scenario_pnl` for a single scenario.
+fn one_scenario_pnl(
+    portfolio: &finstack_quant_portfolio::Portfolio,
+    scenario: &finstack_quant_scenarios::ScenarioSpec,
+    market: &MarketContext,
+    config: &FinstackConfig,
+) -> finstack_quant_portfolio::Result<finstack_quant_portfolio::scenarios::ScenarioPnlBatchItem> {
+    Ok(finstack_quant_portfolio::scenarios::scenario_pnl(
+        portfolio,
+        std::slice::from_ref(scenario),
+        market,
+        config,
+    )?
+    .remove(0))
+}
+
 #[test]
 fn apply_scenario_and_revalue_succeeds() {
     let as_of = base_date();
@@ -167,8 +183,7 @@ fn scenario_pnl_reconciles_end_to_end() {
     };
 
     let finstack_quant_portfolio::scenarios::ScenarioPnlBatchItem { pnl, report, .. } =
-        finstack_quant_portfolio::scenarios::scenario_pnl(&portfolio, &scenario, &market, &config)
-            .unwrap();
+        one_scenario_pnl(&portfolio, &scenario, &market, &config).unwrap();
 
     assert!(report.operations_applied > 0);
     assert_eq!(pnl.by_position.len(), 2);
@@ -249,7 +264,7 @@ fn scenario_pnl_no_op_scenario_is_flat() {
         pnl,
         report: _report,
         ..
-    } = finstack_quant_portfolio::scenarios::scenario_pnl(
+    } = one_scenario_pnl(
         &portfolio,
         &scenario,
         &market_with_usd(),
@@ -277,7 +292,7 @@ fn scenario_pnl_no_op_scenario_is_flat() {
     };
     let market = market_with_usd();
     let config = FinstackConfig::default();
-    let batch = finstack_quant_portfolio::scenarios::scenario_pnl_batch(
+    let batch = finstack_quant_portfolio::scenarios::scenario_pnl(
         &portfolio,
         &[scenario, shock.clone()],
         &market,
@@ -286,8 +301,7 @@ fn scenario_pnl_no_op_scenario_is_flat() {
     .expect("scenario batch");
     let finstack_quant_portfolio::scenarios::ScenarioPnlBatchItem {
         pnl: standalone, ..
-    } = finstack_quant_portfolio::scenarios::scenario_pnl(&portfolio, &shock, &market, &config)
-        .expect("standalone scenario");
+    } = one_scenario_pnl(&portfolio, &shock, &market, &config).expect("standalone scenario");
 
     assert_eq!(
         batch
@@ -451,7 +465,7 @@ fn scenario_batch_reports_earliest_error_across_application_and_valuation_phases
     ];
 
     for _ in 0..8 {
-        let error = finstack_quant_portfolio::scenarios::scenario_pnl_batch(
+        let error = finstack_quant_portfolio::scenarios::scenario_pnl(
             &portfolio,
             &scenarios,
             &market,

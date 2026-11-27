@@ -17,7 +17,7 @@ expand benchmark runtime unless a matching `[[bench]]` entry is added.
 | `portfolio_cashflows.rs` | yes | `aggregate_full_cashflows` ladder (63 / 64 / 250; 3,000 with `FINSTACK_PORTFOLIO_BENCH_XL`) plus `collapse_to_base_by_date_kind` |
 | `portfolio_metrics.rs` | yes | `aggregate_metrics` scaling (63 / 64 / 250 / 3,000), combined valuation, and table export |
 | `portfolio_attribution.rs` | yes | Parallel, metrics-based, and method-owned attribution controls |
-| `portfolio_workflows.rs` | yes | `scenario_pnl` / `scenario_pnl_batch` reuse and `replay_portfolio` |
+| `portfolio_workflows.rs` | yes | `scenario_pnl` base-valuation reuse and `replay_portfolio` |
 | `portfolio_analytics.rs` | yes | Book rollup, primitive exposure, Brinson / Campisi / grid / factor-Brinson / excess-return |
 | `portfolio_margin.rs` | yes | `margin::portfolio_margin` over 256 / 1,024 mocked-marginable positions |
 | `portfolio_optimization.rs` | yes | `optimization::optimize` on 32 / 64-bond books |

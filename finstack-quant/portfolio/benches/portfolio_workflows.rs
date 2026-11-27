@@ -16,7 +16,7 @@ use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_portfolio::replay::{
     ReplayConfig, ReplayErrorPolicy, ReplayMode, ReplayTimeline, replay_portfolio,
 };
-use finstack_quant_portfolio::scenarios::{scenario_pnl, scenario_pnl_batch};
+use finstack_quant_portfolio::scenarios::scenario_pnl;
 use finstack_quant_portfolio::valuation::{PortfolioValuationOptions, RequestedMetrics};
 use finstack_quant_scenarios::{CurveKind, OperationSpec, ScenarioSpec};
 use std::hint::black_box;
@@ -55,7 +55,7 @@ fn bench_scenario_pnl_workflows(criterion: &mut Criterion) {
         bencher.iter(|| {
             scenario_pnl(
                 black_box(&portfolio),
-                black_box(&single[0]),
+                black_box(&single),
                 black_box(&market),
                 black_box(&config),
             )
@@ -76,7 +76,7 @@ fn bench_scenario_pnl_workflows(criterion: &mut Criterion) {
                         .map(|scenario| {
                             scenario_pnl(
                                 black_box(&portfolio),
-                                black_box(scenario),
+                                black_box(std::slice::from_ref(scenario)),
                                 black_box(&market),
                                 black_box(&config),
                             )
@@ -92,7 +92,7 @@ fn bench_scenario_pnl_workflows(criterion: &mut Criterion) {
             &scenario_count,
             |bencher, _| {
                 bencher.iter(|| {
-                    scenario_pnl_batch(
+                    scenario_pnl(
                         black_box(&portfolio),
                         black_box(&scenarios),
                         black_box(&market),
@@ -129,7 +129,7 @@ fn bench_scenario_pnl_scale(criterion: &mut Criterion) {
                 bencher.iter(|| {
                     scenario_pnl(
                         black_box(&portfolio),
-                        black_box(&scenario),
+                        black_box(std::slice::from_ref(&scenario)),
                         black_box(&market),
                         black_box(&config),
                     )

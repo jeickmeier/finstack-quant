@@ -821,7 +821,7 @@ export interface PortfolioMetricsSeriesRequest {
   readonly base: string;
 }
 /** A host-supplied book and market under an ordered batch of canonical scenarios. */
-export interface ScenarioPnlBatchRequest {
+export interface ScenarioPnlRequest {
   /** PortfolioSpec JSON; canonicalized (Portfolio#toJson) through the shared portfolio handle cache. */
   readonly specJson: string;
   /** Canonical MarketContext JSON of the unshocked market. */
@@ -833,7 +833,7 @@ export interface ScenarioPnlBatchRequest {
 export interface ScenarioPnlBatch {
   /** Position ids in spec order (Portfolio#positionIds); `pnl.by_position` keys do not keep it. */
   readonly positionIds: string[];
-  /** portfolio.scenarioPnlBatch: one item per scenario, in input order. */
+  /** portfolio.scenarioPnl: one item per scenario, in input order. */
   readonly items: ScenarioPnlBatchItem[];
 }
 /** A host-supplied book and market under one canonical scenario. */
@@ -1331,10 +1331,8 @@ export interface PortfolioApi {
   ): Promise<Envelope<PortfolioMetricSeriesEntry[]>>;
   /** portfolio.parsePortfolioSpecJson, then Portfolio.fromSpec through the handle cache: canonical PortfolioSpec JSON of a book that builds. */
   validatePortfolio(specJson: string): Promise<Envelope<string>>;
-  /** portfolio.scenarioPnlBatch over the cached Portfolio and MarketContext handles; the whole batch fails on the earliest failing scenario. */
-  scenarioPnlBatch(
-    request: ScenarioPnlBatchRequest,
-  ): Promise<Envelope<ScenarioPnlBatch>>;
+  /** portfolio.scenarioPnl over the cached Portfolio and MarketContext handles; the whole batch fails on the earliest failing scenario. */
+  scenarioPnl(request: ScenarioPnlRequest): Promise<Envelope<ScenarioPnlBatch>>;
   /** portfolio.applyScenarioAndRevalue over the cached Portfolio and MarketContext handles. */
   applyScenarioAndRevalue(
     request: ScenarioRevalueRequest,

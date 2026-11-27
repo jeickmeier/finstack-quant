@@ -41,7 +41,6 @@ from finstack_quant.portfolio import (
     mwr_xirr,
     net_in_currency_by_date,
     scenario_pnl,
-    scenario_pnl_batch,
     twrr_modified_dietz,
     value_portfolio,
 )
@@ -168,12 +167,12 @@ class TestScenarioInputs:
         pf, mkt = _portfolio(), _market()
         report = apply_scenario_and_revalue(pf, spec, mkt).report
         assert report.operations_applied == 0
-        item = scenario_pnl(pf, spec, mkt)
+        [item] = scenario_pnl(pf, [spec], mkt)
         assert item.scenario_id == "s"
         assert item.pnl.total == pytest.approx(0.0)
-        batch = scenario_pnl_batch(pf, [spec, spec], mkt)
+        batch = scenario_pnl(pf, [spec, spec], mkt)
         assert [item.scenario_id for item in batch] == ["s", "s"]
-        assert scenario_pnl_batch(pf, [], mkt) == []
+        assert scenario_pnl(pf, [], mkt) == []
 
     def test_pv_only_revaluation_uses_options_and_keeps_market_unchanged(self) -> None:
         shock = OperationSpec.curve_parallel_bp(CurveKind.discount(), "USD-OIS", 37.0)
@@ -192,6 +191,15 @@ class TestScenarioInputs:
     def test_scenario_rejects_non_spec(self) -> None:
         with pytest.raises(TypeError):
             scenario_pnl(_portfolio(), 42, _market())
+        with pytest.raises(TypeError, match="ScenarioSpec"):
+            scenario_pnl(_portfolio(), [42], _market())
+
+    def test_a_single_scenario_goes_in_a_list(self) -> None:
+        """The name is kept and the shape is new: a bare spec must fail loudly, not run."""
+        spec = ScenarioSpec.from_json('{"id":"s","name":"S","operations":[]}')
+        with pytest.raises(TypeError):
+            scenario_pnl(_portfolio(), spec, _market())
+        assert [item.scenario_id for item in scenario_pnl(_portfolio(), [spec], _market())] == ["s"]
 
 
 class TestCashflows:

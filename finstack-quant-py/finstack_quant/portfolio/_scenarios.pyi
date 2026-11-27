@@ -151,7 +151,7 @@ class ScenarioPnl:
     Scenario-attributable profit and loss, in the portfolio base currency.
 
     Held as ``pnl`` by the :class:`ScenarioPnlBatchItem` that
-    :func:`scenario_pnl` and :func:`scenario_pnl_batch` return, beside the
+    :func:`scenario_pnl` returns per scenario, beside the
     scenario :class:`~finstack_quant.scenarios.ApplicationReport`. Positions added or
     removed by the scenario are zero-filled against the missing side, so
     :attr:`by_position` always sums to :attr:`total`.
@@ -330,7 +330,7 @@ class ScenarioPnl:
         ----------
         json : str
             Canonical payload produced by :meth:`to_json`, or the ``pnl``
-            member of a :func:`scenario_pnl_batch` entry.
+            member of a :func:`scenario_pnl` entry.
 
         Returns
         -------
@@ -355,7 +355,7 @@ class ScenarioPnl:
 
 class ScenarioPnlBatchItem:
     """
-    One ordered result from :func:`scenario_pnl_batch`.
+    One ordered result from :func:`scenario_pnl`.
 
     Carries the scenario identifier, its typed :class:`ScenarioPnl` ladder,
     and the scenario :class:`~finstack_quant.scenarios.ApplicationReport`.
@@ -657,109 +657,63 @@ def apply_scenario_and_revalue(
 
 def scenario_pnl(
     portfolio: Portfolio,
-    scenario: ScenarioSpec,
-    market: MarketContext,
-) -> ScenarioPnlBatchItem:
-    """
-    Compute the profit and loss attributable to a scenario.
-
-    Values the portfolio against the unshocked market and against the
-    scenario-shocked market, then reports the base-currency difference per
-    position and in total. Positions added or removed by the scenario are
-    zero-filled against the missing side, so ``by_position`` always sums to
-    ``total``.
-
-    Parameters
-    ----------
-    portfolio : Portfolio
-        Built portfolio valued on both the unshocked and shocked legs.
-    scenario : ScenarioSpec
-        :class:`~finstack_quant.scenarios.ScenarioSpec` describing the
-        market-data shocks whose profit-and-loss impact is measured. Load JSON
-        text with ``ScenarioSpec.from_json``.
-    market : MarketContext
-        Unshocked market context used as the base leg and as the
-        source the scenario operations are applied to.
-
-    Returns
-    -------
-    ScenarioPnlBatchItem
-        The scenario's ``scenario_id``, its P&L ladder ``pnl``
-        (:class:`ScenarioPnl`, base-currency ``total`` and ``by_position``
-        amounts) and the scenario application ``report`` carrying which
-        operations were applied; the same item type
-        :func:`scenario_pnl_batch` returns per scenario. ``to_json()`` gives
-        its wire form.
-
-    Raises
-    ------
-    TypeError
-        If ``portfolio``, ``scenario`` or ``market`` is not its typed class.
-    PortfolioError
-        If scenario application or either valuation fails, including for
-        missing market data or mismatched base and shocked currencies.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.market_data import MarketContext
-    >>> from finstack_quant.portfolio import Portfolio, scenario_pnl
-    >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> from finstack_quant.scenarios import ScenarioSpec
-    >>> item = scenario_pnl(Portfolio.from_json(spec), ScenarioSpec("s", [], name="S"), MarketContext())
-    >>> (item.scenario_id, item.pnl.total, item.pnl.currency, item.pnl.by_position)
-    ('s', 0.0, 'USD', {})
-    """
-    ...
-
-def scenario_pnl_batch(
-    portfolio: Portfolio,
     scenarios: list[ScenarioSpec],
     market: MarketContext,
 ) -> list[ScenarioPnlBatchItem]:
     """
-    Compute ordered scenario P&L results while reusing one base valuation.
+    Compute the profit and loss attributable to each scenario.
 
     The Rust portfolio engine values the unshocked portfolio once, applies
-    each scenario independently, and returns results in the same order as the
-    input list. It is the batch counterpart to :func:`scenario_pnl`;
-    use it when more than one scenario is evaluated against one portfolio and
-    market snapshot.
+    each scenario to its own copy of the market, and reports the base-currency
+    difference per position and in total, in the order of the input list.
+    Positions added or removed by a scenario are zero-filled against the
+    missing side, so each ``by_position`` sums to its ``total``.
 
     Parameters
     ----------
     portfolio : Portfolio
-        Built portfolio.
+        Built portfolio valued on the shared unshocked leg and on every
+        shocked leg.
     scenarios : list[ScenarioSpec]
-        Ordered ``ScenarioSpec`` objects. Order is preserved exactly; an empty
-        batch returns an empty list without valuation. Load JSON text with
+        One or more ``ScenarioSpec`` objects, in a list; a single scenario
+        goes in a list of one. Order is preserved exactly, and an empty list
+        returns an empty list without valuation. Load JSON text with
         ``ScenarioSpec.from_json``.
     market : MarketContext
-        Unshocked market context used for the shared
-        base valuation and each scenario application.
+        Unshocked market context used for the shared base valuation and as
+        the source each scenario's operations are applied to.
 
     Returns
     -------
     list[ScenarioPnlBatchItem]
         One ordered item per input scenario, each carrying ``scenario_id``,
-        a typed ``pnl`` (:class:`ScenarioPnl`) and ``report``
-        (:class:`~finstack_quant.scenarios.ApplicationReport`); use
-        serialize with ``to_json()`` for the wire string.
+        a typed ``pnl`` (:class:`ScenarioPnl`, base-currency ``total`` and
+        ``by_position`` amounts) and the application ``report``
+        (:class:`~finstack_quant.scenarios.ApplicationReport`) saying which
+        operations were applied. ``to_json()`` gives an item's wire form.
 
     Raises
     ------
     TypeError
-        If ``scenarios`` is not a list of ``ScenarioSpec`` objects.
+        If ``portfolio`` or ``market`` is not its typed class, or
+        ``scenarios`` is not a list of ``ScenarioSpec`` objects (a bare
+        ``ScenarioSpec`` or JSON text included).
     PortfolioError
-        If scenario application, valuation, or base-currency P&L differencing
-        fails. The reported error is for the earliest failing input scenario.
+        If scenario application or a valuation fails, including for missing
+        market data or mismatched base and shocked currencies. The reported
+        error is for the earliest failing input scenario.
 
     Examples
     --------
-    >>> import json
     >>> from finstack_quant.core.market_data import MarketContext
-    >>> from finstack_quant.portfolio import Portfolio, scenario_pnl_batch
+    >>> from finstack_quant.portfolio import Portfolio, scenario_pnl
+    >>> from finstack_quant.scenarios import ScenarioSpec
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> scenario_pnl_batch(Portfolio.from_json(spec), [], MarketContext())
+    >>> portfolio = Portfolio.from_json(spec)
+    >>> [item] = scenario_pnl(portfolio, [ScenarioSpec("s", [], name="S")], MarketContext())
+    >>> (item.scenario_id, item.pnl.total, item.pnl.currency, item.pnl.by_position)
+    ('s', 0.0, 'USD', {})
+    >>> scenario_pnl(portfolio, [], MarketContext())
     []
     """
     ...

@@ -536,7 +536,7 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "portfolio",
         "scenario_pnl_batch_item",
         Output,
-        "One scenario's P&L with its provenance, from `scenario_pnl` or `scenario_pnl_batch`."
+        "One scenario's P&L with its provenance: one entry of `scenario_pnl`."
     )
     .with_packager(package_materialization_schema)
     .with_examples(super::examples::scenario_pnl_batch_item),

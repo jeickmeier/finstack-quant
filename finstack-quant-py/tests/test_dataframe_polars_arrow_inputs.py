@@ -121,7 +121,7 @@ def test_scenario_pnl_empty_dataframe_has_float64_schema() -> None:
         "entities": {},
         "positions": [],
     })
-    frame = scenario_pnl(empty_book, ScenarioSpec("flat", []), MarketContext()).pnl.to_pandas()
+    frame = scenario_pnl(empty_book, [ScenarioSpec("flat", [])], MarketContext())[0].pnl.to_pandas()
     assert frame.empty
     assert list(frame.columns) == ["position_id", "pnl"]
     assert str(frame["pnl"].dtype) == "float64"
