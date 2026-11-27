@@ -30,6 +30,7 @@ from dataclasses import dataclass, field
 import datetime as dt
 import importlib
 import json
+import math
 import pkgutil
 import re
 import types
@@ -55,12 +56,26 @@ from finstack_quant.calibration import (
     dry_run,
     validate_calibration,
 )
+from finstack_quant.cashflows import (
+    build_cashflow_schedule,
+    build_cashflow_schedule_json,
+    dated_flows,
+    dated_flows_json,
+)
+from finstack_quant.cashflows.builder import CashFlowSchedule
 from finstack_quant.core.config import FinstackConfig
+from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, Tenor
-from finstack_quant.core.market_data import DiscountCurve, MarketContext
+from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext
 from finstack_quant.core.money import Money
-from finstack_quant.covenants import CovenantTemplate, covenant_template, evaluate_engine, validate_covenant_engine_json
-from finstack_quant.features import PanelTransformSpec, transform_panel
+from finstack_quant.covenants import (
+    CovenantEngine,
+    CovenantTemplate,
+    covenant_template,
+    evaluate_engine,
+    validate_covenant_engine_json,
+)
+from finstack_quant.features import PanelTransformSpec, transform_panel, transform_panel_json
 from finstack_quant.margin import CsaSpec, OtcMarginSpec
 from finstack_quant.models import HestonParams, bs_price, heston_price
 from finstack_quant.models.factor import FactorCovarianceMatrix, FactorModelConfig
@@ -79,6 +94,7 @@ from finstack_quant.portfolio import (
     aggregate_full_cashflows,
     aggregate_metrics,
     allocate_weights,
+    attribute_portfolio_pnl,
     brinson_fachler,
     cell_returns_from_reference,
     excess_returns,
@@ -106,9 +122,12 @@ from finstack_quant.statements import (
 )
 from finstack_quant.statements_analytics import (
     CompanyMetrics,
+    CorkscrewReport,
     CreditMapping,
     PeerSet,
     ScenarioSet,
+    ScorecardMetric,
+    ScorecardReport,
     ScoringDimension,
     SensitivityConfig,
     SensitivityResult,
@@ -128,6 +147,13 @@ from finstack_quant.statements_analytics import (
     run_three_statement_checks,
     run_variance,
     score_relative_value,
+)
+from finstack_quant.valuations.composite import (
+    CompositeLegSpec,
+    CompositeSpec,
+    RebalanceRule,
+    WeightingMethod,
+    history_from_spec,
 )
 from finstack_quant.valuations.instruments import (
     AssetPool,
@@ -1580,3 +1606,362 @@ def test_the_builder_probe_is_not_vacuous() -> None:
     # 82 builders and 1,467 one-argument setters when written; a large drop means the probe lost its reach.
     assert len(_BUILDER_CLASSES) >= 70
     assert probed >= 1000
+
+
+# ---------------------------------------------------------------------------
+# Results leave typed: each JSON-text twin against its typed form
+# ---------------------------------------------------------------------------
+#
+# A function or member that returns JSON text beside a typed form of the same
+# computation is a second way to do one thing. Each `Twin` runs both forms on
+# valid input and on bad input. `via_text` and `via_typed` return values that
+# compare equal when the two forms carry the same data; `same_text` also
+# compares the raw strings where the typed result has its own `to_json()`.
+
+
+@dataclass(frozen=True)
+class Twin:
+    """One JSON-text form and the typed form of the same computation."""
+
+    id: str
+    via_text: Callable[[], Any]
+    via_typed: Callable[[], Any]
+    # Bad inputs: label -> (text form, typed form). Both must raise the same type.
+    bad: Mapping[str, tuple[Callable[[], Any], Callable[[], Any]]] = field(default_factory=dict)
+
+
+def _fixed_schedule_spec() -> dict[str, Any]:
+    return {
+        "notional": {"initial": {"amount": "1000000", "currency": "USD"}, "amort": "none"},
+        "issue_date": "2024-08-31",
+        "maturity": "2025-08-31",
+        "coupon_program": [
+            {
+                "kind": "fixed",
+                "spec": {
+                    "coupon_type": "cash",
+                    "rate": "0.06",
+                    "frequency": {"count": 12, "unit": "months"},
+                    "day_count": "30_360",
+                    "business_day_convention": "following",
+                    "calendar_id": "weekends_only",
+                    "stub": "none",
+                    "end_of_month": False,
+                    "payment_lag_days": 0,
+                },
+            }
+        ],
+    }
+
+
+def _floating_schedule_spec() -> dict[str, Any]:
+    spec = _fixed_schedule_spec()
+    spec["issue_date"], spec["maturity"] = "2025-01-15", "2026-01-15"
+    schedule = {key: value for key, value in spec["coupon_program"][0]["spec"].items() if key != "rate"}
+    schedule["frequency"], schedule["day_count"] = {"count": 3, "unit": "months"}, "act_360"
+    rate_spec = {
+        "index_id": "USD-SOFR-3M",
+        "forward_curve_id": "USD-SOFR-3M",
+        "spread_bp": "150.0",
+        "gearing": "1.0",
+        "gearing_includes_spread": True,
+        "index_floor_bp": None,
+        "all_in_floor_bp": None,
+        "all_in_cap_bp": None,
+        "index_cap_bp": None,
+        "reset_frequency": {"count": 3, "unit": "months"},
+        "reset_lag_days": 0,
+        "fixing_calendar_id": None,
+        "compounding": None,
+        "overnight_basis": None,
+    }
+    spec["coupon_program"] = [{"kind": "floating", "spec": {"rate_spec": rate_spec, **schedule}}]
+    return spec
+
+
+def _schedule_market(with_forward_curve: bool) -> MarketContext:
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", dt.date(2024, 1, 1), 0.04, "act_365f"))
+    if with_forward_curve:
+        market = market.insert(
+            ForwardCurve({
+                "id": "USD-SOFR-3M",
+                "base_date": dt.date(2025, 1, 15),
+                "knots": [(0.0, 1.0), (1.0, math.exp(-0.035)), (5.0, math.exp(-0.215))],
+                "interp": "log_linear",
+                "extrapolation": "extend",
+                "day_count": "act_360",
+                "index_tenor": "3M",
+            })
+        )
+    return market
+
+
+def _schedule_twin(spec: dict[str, Any], market: MarketContext | None = None) -> tuple[Callable[[], Any], ...]:
+    market_text = None if market is None else market.to_json()
+    return (
+        lambda: build_cashflow_schedule_json(json.dumps(spec), market_text),
+        lambda: build_cashflow_schedule(spec, market).to_json(),
+    )
+
+
+def _overlapping_windows_spec() -> dict[str, Any]:
+    spec = _fixed_schedule_spec()
+    spec["issue_date"], spec["maturity"] = "2025-01-01", "2027-01-01"
+    spec["payment_program"] = [
+        {"kind": "window", "start": "2025-01-01", "end": "2026-06-01", "split": "pik"},
+        {"kind": "window", "start": "2026-01-01", "end": "2027-01-01", "split": "cash"},
+    ]
+    return spec
+
+
+def _fixed_schedule_text() -> str:
+    return build_cashflow_schedule(_fixed_schedule_spec()).to_json()
+
+
+def _flows_as_wire(flows: list[tuple[dt.date, Money]]) -> list[dict[str, Any]]:
+    return [{"date": date.isoformat(), "amount": json.loads(amount.to_json())} for date, amount in flows]
+
+
+def _covenant_engine_text(**extra: Any) -> str:
+    template = CovenantTemplate.lbo_standard(6.0, 2.0, 1.1, 50_000_000.0)
+    return json.dumps({"specs": [json.loads(covenant_template(template)[0].to_json())], **extra})
+
+
+def _reports_as_wire(reports: Mapping[str, Any]) -> list[tuple[str, str]]:
+    return [(key, report.to_json()) for key, report in reports.items()]
+
+
+def _engine_twin(engine_text: str, metrics: Any) -> tuple[Callable[[], Any], ...]:
+    return (
+        lambda: _reports_as_wire(evaluate_engine(engine_text, metrics, "2026-03-31")),
+        lambda: _reports_as_wire(CovenantEngine.from_json(engine_text).evaluate(metrics, "2026-03-31")),
+    )
+
+
+def _calibration_result() -> Any:
+    return calibrate(CalibrationEnvelope.from_json(_calibration_envelope()))
+
+
+def _calibration_market_text() -> str:
+    return _calibration_result().market.to_json()
+
+
+def _portfolio_cashflows() -> PortfolioCashflows:
+    return aggregate_full_cashflows(_portfolio(), _market())
+
+
+def _portfolio_attribution() -> Any:
+    later = AS_OF + dt.timedelta(days=30)
+    market_t1 = MarketContext().insert(DiscountCurve.flat("USD-OIS", later, 0.042, "act_365f"))
+    return attribute_portfolio_pnl(_portfolio(), _market(), market_t1, AS_OF, later, "parallel")
+
+
+def _corkscrew_report() -> CorkscrewReport:
+    row = {"account": "debt", "type": "balance", "periods_validated": 4, "max_error": 0.5, "is_valid": True}
+    return CorkscrewReport.from_json(
+        json.dumps({"status": "success", "message": "ok", "data": {"validations": [row]}, "warnings": [], "errors": []})
+    )
+
+
+def _scorecard_report() -> ScorecardReport:
+    return ScorecardReport.from_json(
+        json.dumps({"status": "success", "message": "ok", "data": {"metric_scores": [], "overall": 1.5}})
+    )
+
+
+def _scorecard_metric() -> ScorecardMetric:
+    return ScorecardMetric("leverage", "total_debt / ebitda", weight=0.5, thresholds={"A": (0.0, 2.0), "B": (2.0, 4.0)})
+
+
+def _composite_history() -> Any:
+    def equity(instrument_id: str, price: float) -> dict[str, Any]:
+        spec = {
+            "id": instrument_id,
+            "ticker": instrument_id,
+            "currency": "USD",
+            "quantity": 1.0,
+            "quoted_spot": price,
+            "spot_id": None,
+            "div_yield_id": None,
+            "discrete_dividends": [],
+            "discount_curve_id": "USD",
+            "attributes": {"tags": [], "meta": {}},
+        }
+        return {"schema": "finstack_quant.instrument/1", "instrument": {"type": "equity", "spec": spec}}
+
+    spec = CompositeSpec(
+        "A-B",
+        Currency("USD"),
+        Money(100.0, Currency("USD")),
+        [CompositeLegSpec("A", equity("A", 100.0), 1.0), CompositeLegSpec("B", equity("B", 90.0), -1.0)],
+        WeightingMethod.fixed_quantity(),
+        RebalanceRule.manual(),
+    )
+    state = json.loads(MarketContext().to_json())
+    return history_from_spec(spec, [{"date": "2025-01-01", "state": state}, {"date": "2025-01-02", "state": state}])
+
+
+TWINS = [
+    Twin(
+        "build_cashflow_schedule_json",
+        *_schedule_twin(_fixed_schedule_spec()),
+        bad={
+            "overlapping-windows": _schedule_twin(_overlapping_windows_spec()),
+            "missing-forward-curve": _schedule_twin(_floating_schedule_spec(), _schedule_market(False)),
+            "unknown-field": _schedule_twin({**_fixed_schedule_spec(), "zzz": 1}),
+            "invalid-date": _schedule_twin({**_fixed_schedule_spec(), "maturity": "2025-02-30"}),
+            "spec-not-json": (
+                lambda: build_cashflow_schedule_json("{not json"),
+                lambda: build_cashflow_schedule(json.loads("{not json")),
+            ),
+            "market-not-json": (
+                lambda: build_cashflow_schedule_json(json.dumps(_floating_schedule_spec()), "{not json"),
+                lambda: build_cashflow_schedule(_floating_schedule_spec(), MarketContext.from_json("{not json")),
+            ),
+        },
+    ),
+    Twin(
+        "build_cashflow_schedule_json_floating",
+        *_schedule_twin(_floating_schedule_spec(), _schedule_market(True)),
+    ),
+    Twin(
+        "dated_flows_json",
+        lambda: json.loads(dated_flows_json(_fixed_schedule_text())),
+        lambda: _flows_as_wire(dated_flows(CashFlowSchedule.from_json(_fixed_schedule_text()))),
+        bad={
+            "not-json": (
+                lambda: dated_flows_json("{not json"),
+                lambda: dated_flows(CashFlowSchedule.from_json("{not json")),
+            ),
+            "not-a-schedule": (
+                lambda: dated_flows_json('{"zzz": 1}'),
+                lambda: dated_flows(CashFlowSchedule.from_json('{"zzz": 1}')),
+            ),
+        },
+    ),
+    Twin(
+        "transform_panel_json",
+        lambda: transform_panel_json(json.dumps(PANEL_TRANSFORM)),
+        lambda: transform_panel(PanelTransformSpec.from_json(json.dumps(PANEL_TRANSFORM))).to_json(),
+        bad={
+            "not-json": (
+                lambda: transform_panel_json("{not json"),
+                lambda: transform_panel(PanelTransformSpec.from_json("{not json")),
+            ),
+            "unknown-operation": (
+                lambda: transform_panel_json(
+                    json.dumps({
+                        **PANEL_TRANSFORM,
+                        "operations": [{"name": "x", "family": "cross_sectional", "op": "zzz"}],
+                    })
+                ),
+                lambda: transform_panel(
+                    PanelTransformSpec.from_json(
+                        json.dumps({
+                            **PANEL_TRANSFORM,
+                            "operations": [{"name": "x", "family": "cross_sectional", "op": "zzz"}],
+                        })
+                    )
+                ),
+            ),
+            "ragged-columns": (
+                lambda: transform_panel_json(json.dumps({**PANEL_TRANSFORM, "time_key": ["1"]})),
+                lambda: transform_panel(
+                    PanelTransformSpec.from_json(json.dumps({**PANEL_TRANSFORM, "time_key": ["1"]}))
+                ),
+            ),
+        },
+    ),
+    Twin(
+        "evaluate_engine",
+        *_engine_twin(_covenant_engine_text(breach_history=[], windows=[], waivers=[]), {"debt_to_ebitda": 4.0}),
+        bad={
+            "missing-metric": _engine_twin(_covenant_engine_text(), {}),
+            "not-json": _engine_twin("{", {"debt_to_ebitda": 4.0}),
+            "unknown-field": _engine_twin(_covenant_engine_text(zzz=1), {"debt_to_ebitda": 4.0}),
+            "metrics-as-text": _engine_twin(_covenant_engine_text(), '{"debt_to_ebitda": 4.0}'),
+        },
+    ),
+    # A hand-written document may carry only `specs`.
+    Twin("evaluate_engine_specs_only", *_engine_twin(_covenant_engine_text(), {"debt_to_ebitda": 4.0})),
+    Twin(
+        "CalibrationResultEnvelope.market_json",
+        lambda: _calibration_result().market_json,
+        _calibration_market_text,
+    ),
+    Twin(
+        "PortfolioAttribution.by_position_json",
+        lambda: json.loads(_portfolio_attribution().by_position_json()),
+        lambda: {key: json.loads(value.to_json()) for key, value in _portfolio_attribution().by_position.items()},
+    ),
+    Twin(
+        "PortfolioCashflows.events_json",
+        lambda: json.loads(_portfolio_cashflows().events_json()),
+        lambda: _portfolio_cashflows().events,
+    ),
+    Twin(
+        "PortfolioCashflows.by_date_json",
+        lambda: json.loads(_portfolio_cashflows().by_date_json()),
+        lambda: _portfolio_cashflows().by_date,
+    ),
+    Twin(
+        "PortfolioCashflows.issues_json",
+        lambda: json.loads(_portfolio_cashflows().issues_json()),
+        lambda: _portfolio_cashflows().issues,
+    ),
+    Twin(
+        "CorkscrewReport.data_json",
+        lambda: json.loads(_corkscrew_report().data_json()),
+        lambda: _corkscrew_report().data,
+    ),
+    Twin(
+        "ScorecardReport.data_json",
+        lambda: json.loads(_scorecard_report().data_json()),
+        lambda: _scorecard_report().data,
+    ),
+    Twin(
+        "ScorecardMetric.thresholds_json",
+        lambda: json.loads(_scorecard_metric().thresholds_json()),
+        lambda: {key: list(band) for key, band in _scorecard_metric().thresholds.items()},
+    ),
+    Twin(
+        "CompositeHistoryResult.row_json",
+        lambda: [json.loads(_composite_history().row_json(index)) for index in range(2)],
+        lambda: [_composite_history().row(index) for index in range(2)],
+        bad={
+            "row-out-of-range": (lambda: _composite_history().row_json(9), lambda: _composite_history().row(9)),
+        },
+    ),
+]
+
+
+@pytest.mark.parametrize("twin", TWINS, ids=lambda twin: twin.id)
+def test_text_form_equals_typed_form(twin: Twin) -> None:
+    via_text, via_typed = twin.via_text(), twin.via_typed()
+    assert via_text == via_typed
+    # Not vacuous: the pair carries some data, except for the list of issues of a clean book.
+    assert via_text or twin.id == "PortfolioCashflows.issues_json"
+
+
+@pytest.mark.parametrize(
+    ("twin", "label"),
+    [pytest.param(twin, label, id=f"{twin.id}-{label}") for twin in TWINS for label in twin.bad],
+)
+def test_text_form_and_typed_form_fail_alike(twin: Twin, label: str) -> None:
+    via_text, via_typed = (_outcome(form) for form in twin.bad[label])
+    assert via_text[0] == "raises", f"the text form accepts {label}"
+    assert via_typed[0] == "raises", f"the typed form accepts {label}; the text form raises {via_text[1]}"
+    # `json.loads` reports text that is not JSON as `JSONDecodeError`, a `ValueError`.
+    assert via_typed[1] is via_text[1] or issubclass(via_typed[1], via_text[1])
+
+
+def test_collapse_ladder_text_has_no_typed_equal() -> None:
+    """`collapse_to_base_by_date_kind_json` stays: its typed form is a float table, the text is exact."""
+    cashflows = _portfolio_cashflows()
+    ladder = json.loads(cashflows.collapse_to_base_by_date_kind_json(_market(), "USD", AS_OF))
+    table = cashflows.collapse_to_base_by_date_kind(_market(), "USD", AS_OF).to_pandas()
+    first_date = next(iter(ladder))
+    amount = next(iter(ladder[first_date].values()))["amount"]
+    assert isinstance(amount, str)
+    assert str(table["amount"].dtype) == "float64"
+    assert set(ladder) == set(table["date"])
