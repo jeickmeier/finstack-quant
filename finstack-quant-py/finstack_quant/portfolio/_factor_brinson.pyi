@@ -19,7 +19,6 @@ class FactorBrinsonResult:
 
     Examples
     --------
-    >>> import json
     >>> from finstack_quant.portfolio import factor_brinson_attribution
     >>> inputs = {
     ...     "asset_ids": ["A"],
@@ -29,7 +28,7 @@ class FactorBrinsonResult:
     ...     "portfolio_weights": [1.0],
     ...     "benchmark_weights": [1.0],
     ... }
-    >>> factor_brinson_attribution(json.dumps(inputs), [0.02]).active_return
+    >>> factor_brinson_attribution(inputs, [0.02]).active_return
     0.0
     """
 
@@ -285,7 +284,7 @@ class FactorBrinsonResult:
         ...
 
 def factor_brinson_attribution(
-    input: str | dict[str, Any] | list[Any] | pd.DataFrame | pl.DataFrame | Any,
+    input: dict[str, Any] | list[Any] | pd.DataFrame | pl.DataFrame | Any,
     factor_returns: Sequence[float] | npt.NDArray[np.float64] | pd.Series | pl.Series | Any,
 ) -> FactorBrinsonResult:
     """
@@ -299,7 +298,7 @@ def factor_brinson_attribution(
 
     Parameters
     ----------
-    input : str | dict | list | pandas.DataFrame | polars.DataFrame | Any
+    input : dict | list | pandas.DataFrame | polars.DataFrame | Any
         ``FactorBrinsonInput`` with ``asset_ids``, ``asset_returns``,
         ``exposures`` (row-major ``n_assets x n_factors``), ``factor_names``,
         ``portfolio_weights`` and ``benchmark_weights``. Each weight vector
@@ -338,7 +337,6 @@ def factor_brinson_attribution(
 
     Examples
     --------
-    >>> import json
     >>> from finstack_quant.portfolio import factor_brinson_attribution
     >>> inputs = {
     ...     "asset_ids": ["A"],
@@ -348,7 +346,7 @@ def factor_brinson_attribution(
     ...     "portfolio_weights": [1.0],
     ...     "benchmark_weights": [1.0],
     ... }
-    >>> factor_brinson_attribution(json.dumps(inputs), [0.02]).active_return
+    >>> factor_brinson_attribution(inputs, [0.02]).active_return
     0.0
     """
     ...

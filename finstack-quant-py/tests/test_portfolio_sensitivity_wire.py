@@ -70,7 +70,7 @@ def test_malformed_wire_raises_value_error(wire: dict[str, object], message: str
 
 def test_engine_output_uses_the_wire_form() -> None:
     book = Portfolio.builder("book", "EUR", "2025-01-15").build()
-    matrix = compute_factor_sensitivities(book, "[]", MarketContext(), "2025-01-15")
+    matrix = compute_factor_sensitivities(book, [], MarketContext(), "2025-01-15")
     assert json.loads(matrix.to_json()) == {
         "base_currency": "EUR",
         "position_ids": [],

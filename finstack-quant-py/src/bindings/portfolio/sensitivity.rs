@@ -274,7 +274,7 @@ impl PyFactorPnlProfile {
 
 tabular_methods!(PyFactorPnlProfile, index = "shift");
 
-/// Deserialize factor definitions from a JSON string, list of dicts or
+/// Deserialize factor definitions from a list of dicts or
 /// ``pandas.DataFrame``.
 fn extract_factors(
     py: Python<'_>,
@@ -287,7 +287,7 @@ fn extract_factors(
     serde_json::from_str(&json).map_err(|e| serde_json_to_py(e, "invalid factors JSON"))
 }
 
-/// Deserialize an optional ``BumpSizeConfig`` from a JSON string or dict.
+/// Deserialize an optional ``BumpSizeConfig`` from a dict.
 fn extract_bump_config(
     py: Python<'_>,
     bump_config: Option<&Bound<'_, PyAny>>,
@@ -300,31 +300,7 @@ fn extract_bump_config(
         .transpose()
 }
 
-/// Compute the position-by-factor sensitivity matrix of a portfolio.
-///
-/// Each cell is the central difference of the position's base-currency PV
-/// under an up and a down bump of the factor, weighted by the position's
-/// scale factor. Rows follow portfolio position order, columns follow
-/// ``factors``, and every value is in ``portfolio.base_currency``.
-///
-/// Parameters
-/// ----------
-/// portfolio : Portfolio
-///     Built ``Portfolio``.
-/// factors : str | list | pandas.DataFrame
-///     ``FactorDefinition`` array (JSON or records). Every factor must map to
-///     market data; credit hierarchy factors need ``FactorModel``.
-/// market : MarketContext
-///     Market to bump, including FX for cross-currency positions.
-/// as_of : datetime.date | str
-///     Valuation date for pricing and spot FX.
-/// bump_config : str | dict, optional
-///     ``BumpSizeConfig``; defaults to 1 bp / 1 % per factor type.
-///
-/// Returns
-/// -------
-/// SensitivityMatrix
-///     Positions × factors delta matrix.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._sensitivity", "compute_factor_sensitivities")]
 #[pyfunction]
 #[pyo3(signature = (portfolio, factors, market, as_of, bump_config=None))]
 fn compute_factor_sensitivities(
@@ -355,29 +331,7 @@ fn compute_factor_sensitivities(
     .map_err(core_to_py)
 }
 
-/// Compute full-repricing scenario P&L profiles of a portfolio, one per factor.
-///
-/// Parameters
-/// ----------
-/// portfolio : Portfolio
-///     Built ``Portfolio``; its positions are the
-///     profile columns and its ``base_currency`` the reporting currency.
-/// factors : str | list | pandas.DataFrame
-///     ``FactorDefinition`` array (JSON or records).
-/// market : MarketContext
-///     Market reused by every scenario.
-/// as_of : datetime.date | str
-///     Valuation date for pricing and spot FX.
-/// bump_config : str | dict, optional
-///     ``BumpSizeConfig``; defaults to 1 bp / 1 % per factor type.
-/// n_points : int, optional
-///     Odd number of grid points in ``3..=1001``; defaults to 5
-///     (shifts ``[-2, -1, 0, 1, 2]``).
-///
-/// Returns
-/// -------
-/// list[FactorPnlProfile]
-///     One profile per factor, each containing scenario P&L for every position.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._sensitivity", "compute_pnl_profiles")]
 #[pyfunction]
 #[pyo3(signature = (portfolio, factors, market, as_of, bump_config=None, n_points=None))]
 fn compute_pnl_profiles(

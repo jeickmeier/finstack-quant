@@ -129,68 +129,7 @@ impl PyFactorBrinsonResult {
 
 tabular_methods!(PyFactorBrinsonResult);
 
-/// Compute Jeet-Partani (2023) factor-Brinson unified attribution.
-///
-/// Binds Rust `finstack_quant_portfolio::factor_brinson::factor_brinson_attribution`:
-/// generalizes classical Brinson-Fachler allocation/selection to continuous
-/// factor exposures by replacing the sector partition with a factor-exposure
-/// matrix and a caller-supplied benchmark factor-return vector.
-///
-/// Parameters
-/// ----------
-/// input : str | dict | list | pandas.DataFrame
-///     JSON ``FactorBrinsonInput`` with ``asset_ids``, ``asset_returns``,
-///     ``exposures`` (row-major ``n_assets x n_factors``), ``factor_names``,
-///     ``portfolio_weights`` and ``benchmark_weights``. Each weight vector
-///     must sum to ``1.0`` within ``1e-6``; weights may be negative (short
-///     positions).
-/// factor_returns : list[float]
-///     Caller-supplied benchmark factor returns ``f_b``, length
-///     ``input.factor_names``. Typically fit with
-///     :func:`finstack_quant.analytics.constrained_least_squares` (using
-///     benchmark weights) so the completeness condition below holds.
-///
-/// Returns
-/// -------
-/// FactorBrinsonResult
-///     Typed result with ``allocation``, ``selection``, and their
-///     per-factor / per-asset breakdowns. Use
-///     :meth:`to_json` for the raw wire string.
-///
-/// Raises
-/// ------
-/// PortfolioError
-///     If any array has the wrong length relative to ``n_assets`` /
-///     ``n_factors``, either ``n_assets`` or ``n_factors`` is zero, any
-///     input value is non-finite, portfolio or benchmark weights don't sum
-///     to ``1.0`` within tolerance, or the Jeet-Partani completeness
-///     residual ``|h_b'eps_b|`` exceeds tolerance — meaning the supplied
-///     ``factor_returns`` do not fully explain the benchmark return, so
-///     ``allocation``/``selection`` would not be valid Brinson effects. The
-///     error directs callers to
-///     :func:`finstack_quant.analytics.constrained_least_squares`.
-/// ValueError
-///     If ``input`` is malformed or carries unknown fields.
-///
-/// Sources
-/// -------
-/// See ``docs/REFERENCES.md#jeet-partani-2023``.
-///
-/// Examples
-/// --------
-/// >>> import json
-/// >>> from finstack_quant.portfolio import factor_brinson_attribution
-/// >>> inputs = {
-/// ...     "asset_ids": ["A"],
-/// ...     "asset_returns": [0.02],
-/// ...     "exposures": [1.0],
-/// ...     "factor_names": ["Market"],
-/// ...     "portfolio_weights": [1.0],
-/// ...     "benchmark_weights": [1.0],
-/// ... }
-/// >>> result = factor_brinson_attribution(json.dumps(inputs), [0.02])
-/// >>> result.active_return
-/// 0.0
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._factor_brinson", "factor_brinson_attribution")]
 #[pyfunction]
 #[pyo3(text_signature = "(input, factor_returns)")]
 fn factor_brinson_attribution(

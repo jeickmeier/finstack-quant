@@ -33,7 +33,7 @@ class SensitivityMatrix:
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.portfolio import Portfolio, compute_factor_sensitivities
     >>> book = Portfolio.builder("book", "USD", "2025-01-15").build()
-    >>> matrix = compute_factor_sensitivities(book, "[]", MarketContext(), "2025-01-15")
+    >>> matrix = compute_factor_sensitivities(book, [], MarketContext(), "2025-01-15")
     >>> (matrix.n_positions, matrix.n_factors)
     (0, 0)
     """
@@ -549,10 +549,10 @@ class FactorPnlProfile:
 
 def compute_factor_sensitivities(
     portfolio: Portfolio,
-    factors: list[FactorDefinition] | str | list[dict[str, Any]] | pd.DataFrame,
+    factors: list[FactorDefinition] | list[dict[str, Any]] | pd.DataFrame,
     market: MarketContext,
     as_of: datetime.date | str,
-    bump_config: str | dict[str, Any] | None = None,
+    bump_config: dict[str, Any] | None = None,
 ) -> SensitivityMatrix:
     """
     Compute the position-by-factor sensitivity matrix of a portfolio.
@@ -569,17 +569,17 @@ def compute_factor_sensitivities(
     portfolio : Portfolio
         Built ``Portfolio``. Its positions are the rows and its
         ``base_currency`` is the reporting currency.
-    factors : str | list | pandas.DataFrame
-        ``FactorDefinition`` array as JSON text, a list of dicts or a records
-        ``DataFrame``. Every factor must map to market data; credit hierarchy
-        factors (``Credit`` with an empty ``curve_ids`` list) are rejected, use
-        :meth:`FactorModel.compute_sensitivities` for them.
+    factors : list | pandas.DataFrame
+        ``FactorDefinition`` array as a list of typed definitions or dicts, or
+        a records ``DataFrame``. Every factor must map to market data; credit
+        hierarchy factors (``Credit`` with an empty ``curve_ids`` list) are
+        rejected, use :meth:`FactorModel.compute_sensitivities` for them.
     market : MarketContext
         Market to bump, including the FX needed for cross-currency positions.
     as_of : datetime.date | str
         Valuation date for pricing and spot FX.
-    bump_config : str | dict, optional
-        ``BumpSizeConfig`` as JSON text or a dict. Defaults to 1 bp / 1 % per
+    bump_config : dict, optional
+        ``BumpSizeConfig`` as a dict. Defaults to 1 bp / 1 % per
         factor type.
 
     Returns
@@ -603,7 +603,7 @@ def compute_factor_sensitivities(
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.portfolio import Portfolio, compute_factor_sensitivities
     >>> book = Portfolio.builder("book", "USD", "2025-01-15").build()
-    >>> matrix = compute_factor_sensitivities(book, "[]", MarketContext(), "2025-01-15")
+    >>> matrix = compute_factor_sensitivities(book, [], MarketContext(), "2025-01-15")
     >>> matrix.to_pandas().shape
     (0, 0)
     """
@@ -611,10 +611,10 @@ def compute_factor_sensitivities(
 
 def compute_pnl_profiles(
     portfolio: Portfolio,
-    factors: list[FactorDefinition] | str | list[dict[str, Any]] | pd.DataFrame,
+    factors: list[FactorDefinition] | list[dict[str, Any]] | pd.DataFrame,
     market: MarketContext,
     as_of: datetime.date | str,
-    bump_config: str | dict[str, Any] | None = None,
+    bump_config: dict[str, Any] | None = None,
     n_points: int | None = None,
 ) -> list[FactorPnlProfile]:
     """
@@ -629,7 +629,7 @@ def compute_pnl_profiles(
     portfolio : Portfolio
         Built ``Portfolio``. Its positions are the profile columns and its
         ``base_currency`` is the reporting currency.
-    factors : str | list | pandas.DataFrame
+    factors : list | pandas.DataFrame
         ``FactorDefinition`` array, in returned profile order (same accepted
         forms and credit-hierarchy restriction as
         :func:`compute_factor_sensitivities`).
@@ -637,8 +637,8 @@ def compute_pnl_profiles(
         Market reused by every scenario.
     as_of : datetime.date | str
         Valuation date for pricing and spot FX.
-    bump_config : str | dict, optional
-        ``BumpSizeConfig`` as JSON text or a dict.
+    bump_config : dict, optional
+        ``BumpSizeConfig`` as a dict.
     n_points : int, optional
         Odd number of scenario grid points in ``3..=1001``; ``None`` selects 5
         (shifts ``[-2, -1, 0, 1, 2]``).
@@ -664,7 +664,7 @@ def compute_pnl_profiles(
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.portfolio import Portfolio, compute_pnl_profiles
     >>> book = Portfolio.builder("book", "USD", "2025-01-15").build()
-    >>> compute_pnl_profiles(book, "[]", MarketContext(), "2025-01-15")
+    >>> compute_pnl_profiles(book, [], MarketContext(), "2025-01-15")
     []
     """
     ...

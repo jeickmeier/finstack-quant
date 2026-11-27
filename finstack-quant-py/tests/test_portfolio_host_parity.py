@@ -225,7 +225,7 @@ def _compute(inputs: dict[str, Any]) -> dict[str, Any]:
     market_t0 = MarketContext.from_json(json.dumps(inputs["market_t0"]))
     market_t1 = MarketContext.from_json(json.dumps(inputs["market_t1"]))
     config = json.dumps(inputs["factor_model_config"])
-    allocation = json.dumps(inputs["allocation_spec"])
+    allocation = inputs["allocation_spec"]
 
     attribution = attribute_portfolio_pnl(
         portfolio, market_t0, market_t1, inputs["as_of_t0"], inputs["as_of_t1"], inputs["attribution_method"]
@@ -265,8 +265,7 @@ def _compute(inputs: dict[str, Any]) -> dict[str, Any]:
         "builder_spec": json.loads(_built_portfolio(inputs).to_json()),
         "brinson_linked": json.loads(brinson_linked(inputs["brinson_periods"]).to_json()),
         "twrr_linked": [
-            json.loads(twrr_linked(json.dumps(inputs["twrr_returns"]), horizon).to_json())
-            for horizon in inputs["twrr_horizons"]
+            json.loads(twrr_linked(inputs["twrr_returns"], horizon).to_json()) for horizon in inputs["twrr_horizons"]
         ],
     }
 

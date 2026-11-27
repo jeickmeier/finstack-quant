@@ -18,7 +18,6 @@ class BrinsonPeriodResult:
 
     Examples
     --------
-    >>> import json
     >>> from finstack_quant.portfolio import brinson_fachler
     >>> sectors = [
     ...     {
@@ -29,7 +28,7 @@ class BrinsonPeriodResult:
     ...         "benchmark_return": 0.01,
     ...     }
     ... ]
-    >>> brinson_fachler(json.dumps(sectors)).total_excess_return
+    >>> brinson_fachler(sectors).total_excess_return
     0.01
     """
 
@@ -272,7 +271,6 @@ class CarinoLinkedAttribution:
 
     Examples
     --------
-    >>> import json
     >>> from finstack_quant.portfolio import brinson_fachler, carino_link
     >>> period = [
     ...     {
@@ -283,7 +281,7 @@ class CarinoLinkedAttribution:
     ...         "benchmark_return": 0.01,
     ...     }
     ... ]
-    >>> result = carino_link([brinson_fachler(json.dumps(p)) for p in [period, period]])
+    >>> result = carino_link([brinson_fachler(p) for p in [period, period]])
     >>> round(result.linked_selection, 4)
     0.0203
     """
@@ -519,15 +517,15 @@ class CarinoLinkedAttribution:
         ...
 
 def brinson_fachler(
-    sectors: str | dict[str, Any] | list[Any] | pd.DataFrame | pl.DataFrame | Any,
+    sectors: dict[str, Any] | list[Any] | pd.DataFrame | pl.DataFrame | Any,
 ) -> BrinsonPeriodResult:
     """
     Compute single-period Brinson-Fachler attribution from sector inputs.
 
     Parameters
     ----------
-    sectors : str | dict | list | pandas.DataFrame | polars.DataFrame | Any
-        Sequence/JSON array of ``SectorPeriod`` records or a pandas/Polars
+    sectors : dict | list | pandas.DataFrame | polars.DataFrame | Any
+        Sequence of ``SectorPeriod`` records or a pandas/Polars
         DataFrame or Arrow table with ``sector``, ``portfolio_weight``,
         ``benchmark_weight``, ``portfolio_return``, and ``benchmark_return``
         columns. Returns are simple decimal returns for the period (e.g.
@@ -554,7 +552,6 @@ def brinson_fachler(
 
     Examples
     --------
-    >>> import json
     >>> from finstack_quant.portfolio import brinson_fachler
     >>> sectors = [
     ...     {
@@ -565,13 +562,13 @@ def brinson_fachler(
     ...         "benchmark_return": 0.01,
     ...     }
     ... ]
-    >>> brinson_fachler(json.dumps(sectors)).total_excess_return
+    >>> brinson_fachler(sectors).total_excess_return
     0.01
     """
     ...
 
 def carino_link(
-    periods: str | dict[str, Any] | Sequence[BrinsonPeriodResult | dict[str, Any]] | pd.DataFrame | pl.DataFrame | Any,
+    periods: dict[str, Any] | Sequence[BrinsonPeriodResult | dict[str, Any]] | pd.DataFrame | pl.DataFrame | Any,
 ) -> CarinoLinkedAttribution:
     """
     Carino-link already-computed single-period Brinson-Fachler results.
@@ -583,9 +580,9 @@ def carino_link(
 
     Parameters
     ----------
-    periods : str | dict | sequence | pandas.DataFrame | polars.DataFrame | Any
+    periods : dict | sequence | pandas.DataFrame | polars.DataFrame | Any
         Chronological sequence of typed ``BrinsonPeriodResult`` objects (as
-        returned by :func:`brinson_fachler`) or their JSON form (for example
+        returned by :func:`brinson_fachler`) or their dict form (for example
         ``json.loads(brinson_fachler(...).to_json())`` per period) with identical
         sector ordering in every period.
 
@@ -620,16 +617,15 @@ def carino_link(
     ...         "benchmark_return": 0.01,
     ...     }
     ... ]
-    >>> result = json.loads(brinson_fachler(json.dumps(period)).to_json())
-    >>> linked = carino_link(json.dumps([result, result]))
+    >>> result = json.loads(brinson_fachler(period).to_json())
+    >>> linked = carino_link([result, result])
     >>> round(linked.linked_selection, 4)
     0.0203
     """
     ...
 
 def brinson_linked(
-    periods: str
-    | list[list[dict[str, Any]]]
+    periods: list[list[dict[str, Any]]]
     | Sequence[pd.DataFrame | pl.DataFrame | Any]
     | pd.DataFrame
     | pl.DataFrame
@@ -644,12 +640,12 @@ def brinson_linked(
 
     Parameters
     ----------
-    periods : str | list[list[dict]] | sequence[DataFrame] | pd.DataFrame | pl.DataFrame | Any
+    periods : list[list[dict]] | sequence[DataFrame] | pd.DataFrame | pl.DataFrame | Any
         Chronological periods given as a list of per-period ``SectorPeriod``
         record lists, a sequence of per-period pandas/Polars DataFrames or Arrow
-        tables, a single tidy pandas/Polars DataFrame or Arrow table with a
-        ``period`` column grouping periods in first-appearance order, or a JSON
-        string. Each row holds ``sector``, ``portfolio_weight``,
+        tables, or a single tidy pandas/Polars DataFrame or Arrow table with a
+        ``period`` column grouping periods in first-appearance order. Each row
+        holds ``sector``, ``portfolio_weight``,
         ``benchmark_weight``, ``portfolio_return``, and ``benchmark_return``.
         Weights are decimal fractions summing to one on each side; returns are
         decimal period returns (``0.015`` is +1.5 %). Every period lists the
@@ -673,7 +669,7 @@ def brinson_linked(
         the zero-based period), the sector ordering changes between periods,
         or a period return is at most ``-1``.
     ValueError
-        If ``periods`` is malformed JSON or a row has an unknown field.
+        If ``periods`` is malformed or a row has an unknown field.
 
     Sources
     -------

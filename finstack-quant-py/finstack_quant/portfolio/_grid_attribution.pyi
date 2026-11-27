@@ -18,11 +18,10 @@ class GridAttributionResult:
 
     Examples
     --------
-    >>> import json
     >>> from finstack_quant.portfolio import grid_attribution
     >>> portfolio = [{"cell": "0-3", "sector": "GOVT", "weight": 1.0, "total_return": 0.02}]
     >>> benchmark = [{"cell": "0-3", "sector": "GOVT", "weight": 1.0, "total_return": 0.01}]
-    >>> result = grid_attribution(json.dumps(portfolio), json.dumps(benchmark))
+    >>> result = grid_attribution(portfolio, benchmark)
     >>> round(result.total_selection, 4)
     0.01
     """
@@ -308,8 +307,8 @@ class GridCarinoLinkedResult:
     >>> from finstack_quant.portfolio import grid_attribution, grid_carino_link
     >>> portfolio = [{"cell": "0-3", "sector": "GOVT", "weight": 1.0, "total_return": 0.02}]
     >>> benchmark = [{"cell": "0-3", "sector": "GOVT", "weight": 1.0, "total_return": 0.01}]
-    >>> period = json.loads(grid_attribution(json.dumps(portfolio), json.dumps(benchmark)).to_json())
-    >>> result = grid_carino_link(json.dumps([period, period]))
+    >>> period = json.loads(grid_attribution(portfolio, benchmark).to_json())
+    >>> result = grid_carino_link([period, period])
     >>> round(result.linked_selection, 4)
     0.0203
     """
@@ -529,8 +528,8 @@ class GridCarinoLinkedResult:
         ...
 
 def grid_attribution(
-    portfolio: str | dict[str, Any] | list[Any] | pd.DataFrame | pl.DataFrame | Any,
-    benchmark: str | dict[str, Any] | list[Any] | pd.DataFrame | pl.DataFrame | Any,
+    portfolio: dict[str, Any] | list[Any] | pd.DataFrame | pl.DataFrame | Any,
+    benchmark: dict[str, Any] | list[Any] | pd.DataFrame | pl.DataFrame | Any,
 ) -> GridAttributionResult:
     """
     Compute a single-period hierarchical duration-cell x sector grid attribution.
@@ -542,13 +541,13 @@ def grid_attribution(
 
     Parameters
     ----------
-    portfolio : str | dict | list | pandas.DataFrame | polars.DataFrame | Any
-        Sequence/JSON array of ``GridPosition`` records or a pandas/Polars
+    portfolio : dict | list | pandas.DataFrame | polars.DataFrame | Any
+        Sequence of ``GridPosition`` records or a pandas/Polars
         DataFrame or Arrow table with ``cell``, ``sector``, ``weight``, and
         ``total_return`` columns for the portfolio side; weights must sum to
         ``1.0`` within ``1e-6``.
-    benchmark : str | dict | list | pandas.DataFrame | polars.DataFrame | Any
-        Sequence/JSON array of ``GridPosition`` records or a pandas/Polars
+    benchmark : dict | list | pandas.DataFrame | polars.DataFrame | Any
+        Sequence of ``GridPosition`` records or a pandas/Polars
         DataFrame or Arrow table for the benchmark side; same weight-sum
         requirement.
 
@@ -573,7 +572,7 @@ def grid_attribution(
         weight), which is undefined-or-explosive to attribute (the error
         names the bucket and the side).
     ValueError
-        If either JSON argument is malformed or carries unknown fields.
+        If either argument is malformed or carries unknown fields.
 
     Sources
     -------
@@ -581,23 +580,17 @@ def grid_attribution(
 
     Examples
     --------
-    >>> import json
     >>> from finstack_quant.portfolio import grid_attribution
     >>> portfolio = [{"cell": "0-3", "sector": "GOVT", "weight": 1.0, "total_return": 0.02}]
     >>> benchmark = [{"cell": "0-3", "sector": "GOVT", "weight": 1.0, "total_return": 0.01}]
-    >>> result = grid_attribution(json.dumps(portfolio), json.dumps(benchmark))
+    >>> result = grid_attribution(portfolio, benchmark)
     >>> round(result.total_selection, 4)
     0.01
     """
     ...
 
 def grid_carino_link(
-    periods: str
-    | dict[str, Any]
-    | Sequence[GridAttributionResult | dict[str, Any]]
-    | pd.DataFrame
-    | pl.DataFrame
-    | Any,
+    periods: dict[str, Any] | Sequence[GridAttributionResult | dict[str, Any]] | pd.DataFrame | pl.DataFrame | Any,
 ) -> GridCarinoLinkedResult:
     """
     Carino-link multi-period hierarchical grid attribution results.
@@ -612,11 +605,10 @@ def grid_carino_link(
 
     Parameters
     ----------
-    periods : str | dict | sequence | pandas.DataFrame | polars.DataFrame | Any
+    periods : dict | sequence | pandas.DataFrame | polars.DataFrame | Any
         Chronological sequence of typed ``GridAttributionResult`` objects (as
-        returned by :func:`grid_attribution`) or their JSON form, each the
-        wire output of :func:`grid_attribution` (or
-        ``GridAttributionResult.to_json()``).
+        returned by :func:`grid_attribution`) or their dict form (for example
+        ``json.loads(result.to_json())`` per period).
 
     Returns
     -------
@@ -649,8 +641,8 @@ def grid_carino_link(
     >>> from finstack_quant.portfolio import grid_attribution, grid_carino_link
     >>> portfolio = [{"cell": "0-3", "sector": "GOVT", "weight": 1.0, "total_return": 0.02}]
     >>> benchmark = [{"cell": "0-3", "sector": "GOVT", "weight": 1.0, "total_return": 0.01}]
-    >>> period = json.loads(grid_attribution(json.dumps(portfolio), json.dumps(benchmark)).to_json())
-    >>> result = grid_carino_link(json.dumps([period, period]))
+    >>> period = json.loads(grid_attribution(portfolio, benchmark).to_json())
+    >>> result = grid_carino_link([period, period])
     >>> round(result.linked_selection, 4)
     0.0203
     """

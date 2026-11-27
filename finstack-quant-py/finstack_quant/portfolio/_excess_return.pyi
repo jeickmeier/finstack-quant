@@ -18,10 +18,9 @@ class DurationCellTable:
 
     Examples
     --------
-    >>> import json
     >>> from finstack_quant.portfolio import cell_returns_from_reference
     >>> reference = [{"duration": 1.0, "total_return": 0.02}]
-    >>> table = cell_returns_from_reference(json.dumps(reference), "UST", '{"width":2.0}')
+    >>> table = cell_returns_from_reference(reference, "UST", {"width": 2.0})
     >>> table.cells[0]["base_return"]
     0.02
     """
@@ -184,12 +183,11 @@ class ExcessReturnResult:
 
     Examples
     --------
-    >>> import json
     >>> from finstack_quant.portfolio import cell_returns_from_reference, excess_returns
     >>> reference = [{"duration": 1.0, "total_return": 0.02}]
-    >>> table = cell_returns_from_reference(json.dumps(reference), "UST", '{"width":2.0}')
+    >>> table = cell_returns_from_reference(reference, "UST", {"width": 2.0})
     >>> positions = [{"id": "B1", "weight": 1.0, "duration": 1.0, "total_return": 0.03}]
-    >>> result = excess_returns(json.dumps(positions), table.to_json())
+    >>> result = excess_returns(positions, table)
     >>> round(result.portfolio_excess_return, 4)
     0.01
     """
@@ -393,9 +391,9 @@ class ExcessReturnResult:
         ...
 
 def cell_returns_from_reference(
-    reference: str | dict[str, Any] | list[Any] | pd.DataFrame,
+    reference: dict[str, Any] | list[Any] | pd.DataFrame,
     base_label: str,
-    config: str | dict[str, Any] | list[Any] | pd.DataFrame,
+    config: dict[str, Any] | list[Any] | pd.DataFrame,
 ) -> DurationCellTable:
     """
     Build a duration-cell base-return table from a reference universe.
@@ -408,15 +406,15 @@ def cell_returns_from_reference(
 
     Parameters
     ----------
-    reference : str | dict | list | pandas.DataFrame
-        JSON array of ``ReferenceReturn`` objects (``duration``,
+    reference : dict | list | pandas.DataFrame
+        List of ``ReferenceReturn`` objects (``duration``,
         ``total_return``, both decimals with duration in years); must be
         non-empty. Unknown fields are rejected.
     base_label : str
         Label identifying the resulting curve (e.g. ``"UST"``), carried
         through to the output's ``base_label`` for policy visibility.
-    config : str | dict | list | pandas.DataFrame
-        JSON ``CellConfig``; ``width`` is its only field (cell width in
+    config : dict | list | pandas.DataFrame
+        ``CellConfig`` dict; ``width`` is its only field (cell width in
         years, finite and positive) and is required — there is no default.
 
     Returns
@@ -438,7 +436,7 @@ def cell_returns_from_reference(
         units mistake, e.g. days instead of years, rather than a legitimate
         duration grid).
     ValueError
-        If any JSON argument is malformed or carries unknown fields.
+        If ``reference`` or ``config`` is malformed or carries unknown fields.
 
     Sources
     -------
@@ -446,10 +444,9 @@ def cell_returns_from_reference(
 
     Examples
     --------
-    >>> import json
     >>> from finstack_quant.portfolio import cell_returns_from_reference
     >>> reference = [{"duration": 1.0, "total_return": 0.02}]
-    >>> table = cell_returns_from_reference(json.dumps(reference), "UST", '{"width":2.0}')
+    >>> table = cell_returns_from_reference(reference, "UST", {"width": 2.0})
     >>> table.cells[0]["base_return"]
     0.02
     """
@@ -461,7 +458,7 @@ def cell_returns_from_curves(
     horizon_years: float,
     max_duration: float,
     base_label: str,
-    config: str | dict[str, Any] | list[Any] | pd.DataFrame,
+    config: dict[str, Any] | list[Any] | pd.DataFrame,
 ) -> DurationCellTable:
     """
     Build a duration-cell base-return table from start/end discount curves.
@@ -488,8 +485,8 @@ def cell_returns_from_curves(
     base_label : str
         Label identifying the base curve (e.g. ``"UST"``, ``"USD-SOFR"``),
         stamped into the result purely for policy visibility.
-    config : str | dict | list | pandas.DataFrame
-        JSON ``CellConfig``; ``width`` is its only field and is required.
+    config : dict | list | pandas.DataFrame
+        ``CellConfig`` dict; ``width`` is its only field and is required.
 
     Returns
     -------
@@ -521,20 +518,19 @@ def cell_returns_from_curves(
     Examples
     --------
     >>> from datetime import date
-    >>> import json
     >>> from finstack_quant.core.market_data import DiscountCurve
     >>> from finstack_quant.portfolio import cell_returns_from_curves
     >>> start = DiscountCurve.flat("start", date(2025, 1, 1), 0.02, "act_365f")
     >>> end = DiscountCurve.flat("end", date(2025, 4, 1), 0.03, "act_365f")
-    >>> table = cell_returns_from_curves(start, end, 0.25, 2.0, "UST", '{"width":1.0}')
+    >>> table = cell_returns_from_curves(start, end, 0.25, 2.0, "UST", {"width": 1.0})
     >>> len(table.cells)
     2
     """
     ...
 
 def excess_returns(
-    positions: str | dict[str, Any] | list[Any] | pd.DataFrame | pl.DataFrame | Any,
-    table: DurationCellTable | str | dict[str, Any] | list[Any] | pd.DataFrame | pl.DataFrame | Any,
+    positions: dict[str, Any] | list[Any] | pd.DataFrame | pl.DataFrame | Any,
+    table: DurationCellTable | dict[str, Any] | list[Any] | pd.DataFrame | pl.DataFrame | Any,
 ) -> ExcessReturnResult:
     """
     Compute duration-matched credit excess returns against a base-return table.
@@ -547,14 +543,15 @@ def excess_returns(
 
     Parameters
     ----------
-    positions : str | dict | list | pandas.DataFrame | polars.DataFrame | Any
-        JSON array, record list, pandas/Polars DataFrame, or Arrow table of
+    positions : dict | list | pandas.DataFrame | polars.DataFrame | Any
+        Record list, pandas/Polars DataFrame, or Arrow table of
         ``ExcessReturnPosition`` objects (``id``, ``weight``, ``duration``,
         ``total_return``); weights must sum to ``1.0`` within ``1e-6``.
-    table : DurationCellTable | str | dict | list | pandas.DataFrame | polars.DataFrame | Any
-        Typed ``DurationCellTable``, its JSON form, or a tabular record input as
-        returned by :func:`cell_returns_from_reference`,
-        :func:`cell_returns_from_curves`, or ``DurationCellTable.to_json()``.
+    table : DurationCellTable | dict | list | pandas.DataFrame | polars.DataFrame | Any
+        Typed ``DurationCellTable`` as returned by
+        :func:`cell_returns_from_reference` or
+        :func:`cell_returns_from_curves`, its dict form (for example
+        ``json.loads(table.to_json())``), or a tabular record input.
 
     Returns
     -------
@@ -574,7 +571,7 @@ def excess_returns(
         every cell, including a valid gap (the error names the position); or
         the position weights do not sum to ``1.0`` within tolerance.
     ValueError
-        If any JSON argument is malformed.
+        If ``positions`` or ``table`` is malformed.
 
     Sources
     -------
@@ -582,12 +579,11 @@ def excess_returns(
 
     Examples
     --------
-    >>> import json
     >>> from finstack_quant.portfolio import cell_returns_from_reference, excess_returns
     >>> reference = [{"duration": 1.0, "total_return": 0.02}]
-    >>> table = cell_returns_from_reference(json.dumps(reference), "UST", '{"width":2.0}')
+    >>> table = cell_returns_from_reference(reference, "UST", {"width": 2.0})
     >>> positions = [{"id": "B1", "weight": 1.0, "duration": 1.0, "total_return": 0.03}]
-    >>> result = excess_returns(json.dumps(positions), table.to_json())
+    >>> result = excess_returns(positions, table)
     >>> round(result.portfolio_excess_return, 4)
     0.01
     """

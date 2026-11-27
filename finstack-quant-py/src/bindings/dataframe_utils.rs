@@ -350,7 +350,11 @@ pub(crate) fn extract_f64_vec(obj: &Bound<'_, PyAny>, label: &str) -> PyResult<V
     if obj.hasattr("to_numpy")? && obj.hasattr("dtype")? {
         return extract_float64_column(obj, label);
     }
-    if obj.is_instance_of::<PyString>() || obj.is_instance_of::<PyBytes>() {
+    // A mapping iterates its keys; it is never a float vector.
+    if obj.is_instance_of::<PyString>()
+        || obj.is_instance_of::<PyBytes>()
+        || obj.is_instance_of::<pyo3::types::PyDict>()
+    {
         return Err(PyTypeError::new_err(format!(
             "{label} must be a sequence of floats, a NumPy array, a pandas Series, or a Polars Series"
         )));

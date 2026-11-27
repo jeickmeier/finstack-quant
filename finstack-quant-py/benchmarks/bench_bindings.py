@@ -427,17 +427,16 @@ def _build_curve_scenario_jsons(n_scenarios: int) -> tuple[str, ...]:
     )
 
 
-def _build_replay_snapshots_json(n_snapshots: int) -> str:
+def _build_replay_snapshots(n_snapshots: int) -> list[tuple[date, MarketContext]]:
     """Build a dated, gently rising-rate replay path before benchmark timing."""
     start = date(2025, 1, 15)
-    snapshots = [
+    return [
         (
-            f'{{"date":"{(start + timedelta(days=index)).isoformat()}",'
-            f'"market":{_build_bench_market(0.05 + index * 0.00005, start + timedelta(days=index)).to_json()}}}'
+            start + timedelta(days=index),
+            _build_bench_market(0.05 + index * 0.00005, start + timedelta(days=index)),
         )
         for index in range(n_snapshots)
     ]
-    return f"[{','.join(snapshots)}]"
 
 
 _RISK_MATRIX_SIZE = 256
@@ -1522,14 +1521,14 @@ class TestPortfolioReleaseControls:
     def test_replay_500_deposits_pv_only_20_snapshots(self, benchmark) -> None:
         """PV-only 500-deposit replay through twenty prebuilt snapshots."""
         portfolio = Portfolio.from_spec(_BENCH_SPEC_JSON_500)
-        snapshots_json = _build_replay_snapshots_json(20)
+        snapshots = _build_replay_snapshots(20)
         config = ReplayConfig(
             "pv_only",
             valuation_options={"strict_risk": True, "metrics": {"mode": "only", "metrics": []}},
         )
 
         def _run():
-            return replay_portfolio(portfolio, snapshots_json, config)
+            return replay_portfolio(portfolio, snapshots, config)
 
         def _check(result):
             assert not result.skipped_dates

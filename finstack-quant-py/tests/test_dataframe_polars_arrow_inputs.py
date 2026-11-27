@@ -130,7 +130,7 @@ def test_scenario_pnl_empty_dataframe_has_float64_schema() -> None:
 
 
 def test_twrr_linked_accepts_series_dataframe_polars_and_arrow() -> None:
-    expected = twrr_linked("[0.05, 0.03]", horizon_years=1.0).cumulative
+    expected = twrr_linked([0.05, 0.03], horizon_years=1.0).cumulative
     pa_tbl = pa.table({"r": [0.05, 0.03]})
     pl_df = pl.DataFrame({"r": [0.05, 0.03]})
     pd_df = pd.DataFrame({"r": [0.05, 0.03]})

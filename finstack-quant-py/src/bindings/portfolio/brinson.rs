@@ -186,21 +186,7 @@ impl PyCarinoLinkedAttribution {
 
 tabular_methods!(PyCarinoLinkedAttribution);
 
-/// Compute a single-period Brinson-Fachler attribution from sector JSON.
-///
-/// Parameters
-/// ----------
-/// sectors : str | dict | list | pandas.DataFrame
-///     JSON array of ``SectorPeriod`` objects with ``sector``,
-///     ``portfolio_weight``, ``benchmark_weight``, ``portfolio_return``, and
-///     ``benchmark_return`` fields.
-///
-/// Returns
-/// -------
-/// BrinsonPeriodResult
-///     Typed result with per-sector effects, effect totals, and
-///     ``to_pandas()`` / ``to_polars()`` / ``to_arrow()`` / ``to_json()`` exits. Use
-///     :meth:`to_json` for the raw wire string.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._brinson", "brinson_fachler")]
 #[pyfunction]
 #[pyo3(text_signature = "(sectors)")]
 fn brinson_fachler(py: Python<'_>, sectors: &Bound<'_, PyAny>) -> PyResult<PyBrinsonPeriodResult> {
@@ -214,32 +200,7 @@ fn brinson_fachler(py: Python<'_>, sectors: &Bound<'_, PyAny>) -> PyResult<PyBri
         })?,
     })
 }
-/// Carino-link already-computed single-period Brinson-Fachler results.
-///
-/// Binds Rust ``carino_link``, like :func:`campisi_carino_link` and
-/// :func:`grid_carino_link`. To link raw sector inputs, attribute each period
-/// first: ``carino_link([brinson_fachler(p) for p in periods])``.
-///
-/// Parameters
-/// ----------
-/// periods : list[BrinsonPeriodResult] | str | list[dict]
-///     Chronological ``BrinsonPeriodResult`` values (typed results from
-///     :func:`brinson_fachler`, or their JSON) with identical sector ordering
-///     in every period.
-///
-/// Returns
-/// -------
-/// CarinoLinkedAttribution
-///     Typed result with linked sector effects and compounded returns. Use
-///     :meth:`to_json` for the raw wire string.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If the JSON is malformed.
-/// PortfolioError
-///     If the sequence is empty or changes sector ordering, or a period
-///     return is non-finite or at most ``-1``.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._brinson", "carino_link")]
 #[pyfunction]
 #[pyo3(text_signature = "(periods)")]
 fn carino_link(py: Python<'_>, periods: &Bound<'_, PyAny>) -> PyResult<PyCarinoLinkedAttribution> {
@@ -261,34 +222,7 @@ fn carino_link(py: Python<'_>, periods: &Bound<'_, PyAny>) -> PyResult<PyCarinoL
         })?,
     })
 }
-/// Attribute each period with Brinson-Fachler and Carino-link the results.
-///
-/// Binds Rust ``brinson_linked``: the multi-period Brinson-Fachler report in
-/// one call, identical to ``carino_link([brinson_fachler(p) for p in periods])``.
-///
-/// Parameters
-/// ----------
-/// periods : str | list[list[dict]] | list[pandas.DataFrame] | pandas.DataFrame | polars.DataFrame
-///     Chronological periods, either as nested ``SectorPeriod`` sequences
-///     (list of per-period sector lists or DataFrames) or as a tidy DataFrame
-///     with a ``period`` column grouping chronological rows (each group
-///     holding ``sector``, ``portfolio_weight``, ``benchmark_weight``,
-///     ``portfolio_return``, ``benchmark_return``).
-///
-/// Returns
-/// -------
-/// CarinoLinkedAttribution
-///     Per-period sector effects, linked effects by sector and by effect,
-///     and the compounded portfolio and benchmark returns.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If the JSON is malformed or a tidy DataFrame lacks a ``period`` column.
-/// PortfolioError
-///     If there are no periods, a period fails Brinson-Fachler (the message
-///     names the zero-based period), the sector ordering changes between
-///     periods, or a period return is at most ``-1``.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._brinson", "brinson_linked")]
 #[pyfunction]
 #[pyo3(text_signature = "(periods)")]
 fn brinson_linked(

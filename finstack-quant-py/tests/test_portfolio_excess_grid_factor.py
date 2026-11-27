@@ -6,10 +6,10 @@ factor_brinson_attribution}`` and ``finstack_quant.analytics.constrained_least_s
 
 Every function gets: one golden re-pin against a value independently verified
 in the Rust test suite, one keyword-argument call using the exact
-``text_signature`` names, one malformed-JSON -> ``ValueError`` case (where the
-function takes JSON), one domain error -> ``PortfolioError``/``AnalyticsError``
+``text_signature`` names, one JSON-text -> ``TypeError`` case (where the
+function takes records), one domain error -> ``PortfolioError``/``AnalyticsError``
 with the message content asserted, and one ``deny_unknown_fields`` rejection
-(where the function takes JSON).
+(where the function takes records).
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ import pytest
 from finstack_quant.analytics import AnalyticsError, constrained_least_squares, multi_factor_greeks
 from finstack_quant.core.market_data import DiscountCurve
 from finstack_quant.portfolio import (
+    DurationCellTable,
     PortfolioError,
     cell_returns_from_curves,
     cell_returns_from_reference,
@@ -71,12 +72,12 @@ def _lehman_b1_cells() -> list[dict[str, float]]:
     return [_ref(d, r) for d, r in cells]
 
 
-def _lehman_b1_table_json() -> str:
+def _lehman_b1_table() -> DurationCellTable:
     return cell_returns_from_reference(
-        json.dumps(_lehman_b1_cells()),
+        _lehman_b1_cells(),
         "UST",
-        json.dumps({"width": 0.5}),
-    ).to_json()
+        {"width": 0.5},
+    )
 
 
 def _gpos(cell: str, sector: str, weight: float, total_return: float) -> dict[str, float | str]:
@@ -120,7 +121,7 @@ def _factor_brinson_binary_input() -> dict[str, object]:
 def test_cell_returns_from_reference_matches_rust_interpolation_golden() -> None:
     """Re-pins the Rust `cell_table_interpolates_interior_and_extrapolates_ends` golden."""
     reference = [_ref(0.25, 0.01), _ref(2.25, 0.05)]
-    table = json.loads(cell_returns_from_reference(json.dumps(reference), "UST", json.dumps({"width": 0.5})).to_json())
+    table = json.loads(cell_returns_from_reference(reference, "UST", {"width": 0.5}).to_json())
 
     assert table["base_label"] == "UST"
     assert len(table["cells"]) == 5
@@ -137,27 +138,27 @@ def test_cell_returns_from_reference_accepts_keyword_arguments() -> None:
     reference = [_ref(0.25, 0.01), _ref(2.25, 0.05)]
     table = json.loads(
         cell_returns_from_reference(
-            reference=json.dumps(reference),
+            reference=reference,
             base_label="UST",
-            config=json.dumps({"width": 0.5}),
+            config={"width": 0.5},
         ).to_json()
     )
     assert table["base_label"] == "UST"
 
 
 def test_cell_returns_from_reference_rejects_malformed_json() -> None:
-    """Malformed JSON in either JSON argument raises ``ValueError``."""
-    with pytest.raises(ValueError, match="reference JSON"):
-        cell_returns_from_reference("not json", "UST", json.dumps({"width": 0.5})).to_json()
-    with pytest.raises(ValueError, match="config JSON"):
-        cell_returns_from_reference(json.dumps([_ref(1.0, 0.01)]), "UST", "not json").to_json()
+    """Text in either records argument is refused with ``TypeError``; it is never parsed."""
+    with pytest.raises(TypeError, match="reference must be a list, a dict or a DataFrame, not a string"):
+        cell_returns_from_reference("not json", "UST", {"width": 0.5}).to_json()
+    with pytest.raises(TypeError, match="config must be a list, a dict or a DataFrame, not a string"):
+        cell_returns_from_reference([_ref(1.0, 0.01)], "UST", "not json").to_json()
 
 
 def test_cell_returns_from_reference_rejects_colliding_width_labels() -> None:
     """A width like 0.03 collides on the one-decimal label; the error names both."""
     reference = [_ref(0.1, 0.01)]
     with pytest.raises(PortfolioError) as exc_info:
-        cell_returns_from_reference(json.dumps(reference), "UST", json.dumps({"width": 0.03})).to_json()
+        cell_returns_from_reference(reference, "UST", {"width": 0.03}).to_json()
     message = str(exc_info.value)
     assert "0.03" in message
     assert "0.1-0.1" in message
@@ -174,14 +175,14 @@ def test_cell_returns_from_reference_rejects_astronomically_large_duration() -> 
     """
     reference = [_ref(1e30, 0.01)]
     with pytest.raises(PortfolioError, match="sanity bound"):
-        cell_returns_from_reference(json.dumps(reference), "UST", json.dumps({"width": 1.0})).to_json()
+        cell_returns_from_reference(reference, "UST", {"width": 1.0}).to_json()
 
 
 def test_cell_returns_from_reference_denies_unknown_fields() -> None:
     """An unknown field on a ``ReferenceReturn`` entry fails closed."""
     bad_reference = [{"duration": 1.0, "total_return": 0.01, "surprise": 1.0}]
     with pytest.raises(ValueError, match="reference JSON"):
-        cell_returns_from_reference(json.dumps(bad_reference), "UST", json.dumps({"width": 0.5})).to_json()
+        cell_returns_from_reference(bad_reference, "UST", {"width": 0.5}).to_json()
 
 
 # cell_returns_from_curves tests
@@ -204,7 +205,7 @@ def _flat_ust_curve() -> DiscountCurve:
 def test_cell_returns_from_curves_matches_rust_flat_curve_golden() -> None:
     """Re-pins the Rust `flat_curve_cell_returns_equal_pure_carry` golden."""
     curve = _flat_ust_curve()
-    table = json.loads(cell_returns_from_curves(curve, curve, 0.25, 2.0, "UST", json.dumps({"width": 1.0})).to_json())
+    table = json.loads(cell_returns_from_curves(curve, curve, 0.25, 2.0, "UST", {"width": 1.0}).to_json())
 
     assert table["base_label"] == "UST"
     assert len(table["cells"]) == 2
@@ -236,7 +237,7 @@ def test_cell_returns_from_curves_distinguishes_start_and_end_curves() -> None:
         extrapolation="extend",
         day_count="act_365f",
     )
-    table = json.loads(cell_returns_from_curves(start, end, 0.25, 2.0, "UST", json.dumps({"width": 1.0})).to_json())
+    table = json.loads(cell_returns_from_curves(start, end, 0.25, 2.0, "UST", {"width": 1.0}).to_json())
 
     assert table["cells"][0]["base_return"] == pytest.approx(0.0075281983, abs=1e-8)
     assert table["cells"][1]["base_return"] == pytest.approx(-0.00249688, abs=1e-8)
@@ -252,16 +253,16 @@ def test_cell_returns_from_curves_accepts_keyword_arguments() -> None:
             horizon_years=0.25,
             max_duration=2.0,
             base_label="UST",
-            config=json.dumps({"width": 1.0}),
+            config={"width": 1.0},
         ).to_json()
     )
     assert len(table["cells"]) == 2
 
 
 def test_cell_returns_from_curves_rejects_malformed_config_json() -> None:
-    """Malformed ``config_json`` raises ``ValueError``."""
+    """Text for ``config`` is refused with ``TypeError``; it is never parsed."""
     curve = _flat_ust_curve()
-    with pytest.raises(ValueError, match="config JSON"):
+    with pytest.raises(TypeError, match="config must be a list, a dict or a DataFrame, not a string"):
         cell_returns_from_curves(curve, curve, 0.25, 2.0, "UST", "not json").to_json()
 
 
@@ -272,14 +273,14 @@ def test_cell_returns_from_curves_rejects_cell_maturing_inside_period() -> None:
         "UST", _BASE_DATE, knots, interp="monotone_convex", extrapolation="extend", day_count="act_365f"
     )
     with pytest.raises(PortfolioError, match="mature"):
-        cell_returns_from_curves(curve, curve, 0.25, 0.5, "UST", json.dumps({"width": 0.25})).to_json()
+        cell_returns_from_curves(curve, curve, 0.25, 0.5, "UST", {"width": 0.25}).to_json()
 
 
 def test_cell_returns_from_curves_denies_unknown_config_fields() -> None:
     """An unknown field on ``CellConfig`` fails closed."""
     curve = _flat_ust_curve()
     with pytest.raises(ValueError, match="config JSON"):
-        cell_returns_from_curves(curve, curve, 0.25, 2.0, "UST", json.dumps({"width": 1.0, "surprise": 1.0})).to_json()
+        cell_returns_from_curves(curve, curve, 0.25, 2.0, "UST", {"width": 1.0, "surprise": 1.0}).to_json()
 
 
 # excess_returns tests
@@ -287,7 +288,7 @@ def test_cell_returns_from_curves_denies_unknown_config_fields() -> None:
 
 def test_excess_returns_matches_lehman_figure_b2_golden() -> None:
     """Reproduces Dynkin, Hyman & Vankudre (1998), Figure B-2 exactly."""
-    table_json = _lehman_b1_table_json()
+    table = _lehman_b1_table()
     positions = [
         {"id": "Colombia", "weight": 0.2, "duration": 5.16, "total_return": 0.0225},
         {"id": "RiteAid", "weight": 0.2, "duration": 6.71, "total_return": 0.0172},
@@ -295,7 +296,7 @@ def test_excess_returns_matches_lehman_figure_b2_golden() -> None:
         {"id": "Delta", "weight": 0.2, "duration": 9.81, "total_return": 0.0102},
         {"id": "Quebec", "weight": 0.2, "duration": 11.08, "total_return": 0.0185},
     ]
-    result = json.loads(excess_returns(json.dumps(positions), table_json).to_json())
+    result = json.loads(excess_returns(positions, table).to_json())
 
     expected = [0.0128, 0.0067, 0.0071, -0.0009, 0.0067]
     for got, want in zip(result["positions"], expected, strict=True):
@@ -308,28 +309,28 @@ def test_excess_returns_matches_lehman_figure_b2_golden() -> None:
 
 def test_excess_returns_accepts_keyword_arguments() -> None:
     """The advertised ``text_signature`` names are the real keyword names."""
-    table_json = _lehman_b1_table_json()
+    table = _lehman_b1_table()
     positions = [{"id": "Colombia", "weight": 1.0, "duration": 5.16, "total_return": 0.0225}]
-    result = json.loads(excess_returns(positions=json.dumps(positions), table=table_json).to_json())
+    result = json.loads(excess_returns(positions=positions, table=table).to_json())
     assert result["positions"][0]["id"] == "Colombia"
 
 
 def test_excess_returns_rejects_malformed_json() -> None:
-    """Malformed JSON in either argument raises ``ValueError``."""
-    table_json = _lehman_b1_table_json()
-    with pytest.raises(ValueError, match="positions JSON"):
-        excess_returns("not json", table_json).to_json()
+    """Text in either argument is refused with ``TypeError``; it is never parsed."""
+    table = _lehman_b1_table()
+    with pytest.raises(TypeError, match="positions must be a list, a dict or a DataFrame, not a string"):
+        excess_returns("not json", table).to_json()
     positions = [{"id": "A", "weight": 1.0, "duration": 1.0, "total_return": 0.01}]
-    with pytest.raises(ValueError, match="table JSON"):
-        excess_returns(json.dumps(positions), "not json").to_json()
+    with pytest.raises(TypeError, match="table must be a list, a dict or a DataFrame, not a string"):
+        excess_returns(positions, "not json").to_json()
 
 
 def test_excess_returns_rejects_duration_outside_table_range() -> None:
     """A position duration outside the table's covered range names the position."""
-    table_json = _lehman_b1_table_json()
+    table = _lehman_b1_table()
     positions = [{"id": "X", "weight": 1.0, "duration": 99.0, "total_return": 0.01}]
     with pytest.raises(PortfolioError, match="X"):
-        excess_returns(json.dumps(positions), table_json).to_json()
+        excess_returns(positions, table).to_json()
 
 
 def test_excess_returns_validates_inbound_cell_table_structure() -> None:
@@ -343,7 +344,7 @@ def test_excess_returns_validates_inbound_cell_table_structure() -> None:
         ],
     }
     with pytest.raises(PortfolioError, match=r"cell\[1\].*overlaps"):
-        excess_returns(json.dumps(positions), json.dumps(overlapping)).to_json()
+        excess_returns(positions, overlapping).to_json()
 
 
 @pytest.mark.parametrize(
@@ -365,15 +366,15 @@ def test_excess_returns_rejects_invalid_inbound_cell_labels(labels: list[str], e
     }
 
     with pytest.raises(PortfolioError, match=expected):
-        excess_returns(json.dumps(positions), json.dumps(table)).to_json()
+        excess_returns(positions, table).to_json()
 
 
 def test_excess_returns_denies_unknown_position_fields() -> None:
     """An unknown field on an ``ExcessReturnPosition`` entry fails closed."""
-    table_json = _lehman_b1_table_json()
+    table = _lehman_b1_table()
     bad_positions = [{"id": "A", "weight": 1.0, "duration": 1.0, "total_return": 0.01, "surprise": 1.0}]
     with pytest.raises(ValueError, match="positions JSON"):
-        excess_returns(json.dumps(bad_positions), table_json).to_json()
+        excess_returns(bad_positions, table).to_json()
 
 
 # grid_attribution tests
@@ -381,9 +382,7 @@ def test_excess_returns_denies_unknown_position_fields() -> None:
 
 def test_grid_attribution_matches_hand_derived_golden() -> None:
     """Re-pins the Rust `grid_attribution_matches_hand_derived_golden` fixture."""
-    result = json.loads(
-        grid_attribution(json.dumps(_grid_golden_portfolio()), json.dumps(_grid_golden_benchmark())).to_json()
-    )
+    result = json.loads(grid_attribution(_grid_golden_portfolio(), _grid_golden_benchmark()).to_json())
 
     assert result["portfolio_return"] == pytest.approx(0.0293, abs=1e-12)
     assert result["benchmark_return"] == pytest.approx(0.0245, abs=1e-12)
@@ -399,19 +398,19 @@ def test_grid_attribution_accepts_keyword_arguments() -> None:
     """The advertised ``text_signature`` names are the real keyword names."""
     result = json.loads(
         grid_attribution(
-            portfolio=json.dumps(_grid_golden_portfolio()),
-            benchmark=json.dumps(_grid_golden_benchmark()),
+            portfolio=_grid_golden_portfolio(),
+            benchmark=_grid_golden_benchmark(),
         ).to_json()
     )
     assert result["active_return"] == pytest.approx(0.0048, abs=1e-12)
 
 
 def test_grid_attribution_rejects_malformed_json() -> None:
-    """Malformed JSON in either argument raises ``ValueError``."""
-    with pytest.raises(ValueError, match="grid portfolio JSON"):
-        grid_attribution("not json", json.dumps(_grid_golden_benchmark())).to_json()
-    with pytest.raises(ValueError, match="grid benchmark JSON"):
-        grid_attribution(json.dumps(_grid_golden_portfolio()), "not json").to_json()
+    """Text in either argument is refused with ``TypeError``; it is never parsed."""
+    with pytest.raises(TypeError, match="portfolio must be a list, a dict or a DataFrame, not a string"):
+        grid_attribution("not json", _grid_golden_benchmark()).to_json()
+    with pytest.raises(TypeError, match="benchmark must be a list, a dict or a DataFrame, not a string"):
+        grid_attribution(_grid_golden_portfolio(), "not json").to_json()
 
 
 def test_grid_attribution_rejects_zero_net_weight_bucket() -> None:
@@ -424,7 +423,7 @@ def test_grid_attribution_rejects_zero_net_weight_bucket() -> None:
     benchmark = [_gpos("0.0-3.0", "CORP", 1.0, 0.025)]
 
     with pytest.raises(PortfolioError) as exc_info:
-        grid_attribution(json.dumps(portfolio), json.dumps(benchmark)).to_json()
+        grid_attribution(portfolio, benchmark).to_json()
     message = str(exc_info.value)
     assert "0.0-3.0" in message
     assert "GOVT" in message
@@ -451,7 +450,7 @@ def test_grid_attribution_rejects_near_zero_net_weight_bucket() -> None:
     ]
 
     with pytest.raises(PortfolioError) as exc_info:
-        grid_attribution(json.dumps(portfolio), json.dumps(benchmark)).to_json()
+        grid_attribution(portfolio, benchmark).to_json()
     message = str(exc_info.value)
     assert "bucket 'X'" in message
     assert "Benchmark" in message
@@ -461,20 +460,20 @@ def test_grid_attribution_denies_unknown_position_fields() -> None:
     """An unknown field on a ``GridPosition`` entry fails closed."""
     bad_portfolio = [{**_grid_golden_portfolio()[0], "surprise": 1.0}]
     with pytest.raises(ValueError, match="grid portfolio JSON"):
-        grid_attribution(json.dumps(bad_portfolio), json.dumps(_grid_golden_benchmark())).to_json()
+        grid_attribution(bad_portfolio, _grid_golden_benchmark()).to_json()
 
 
 # grid_carino_link tests
 
 
 def _grid_golden_period_json() -> str:
-    return grid_attribution(json.dumps(_grid_golden_portfolio()), json.dumps(_grid_golden_benchmark())).to_json()
+    return grid_attribution(_grid_golden_portfolio(), _grid_golden_benchmark()).to_json()
 
 
 def test_grid_carino_link_reconstructs_compounded_active_return() -> None:
     """Re-pins the Rust `linked_effects_reconstruct_compounded_active_return` fixture."""
     period = json.loads(_grid_golden_period_json())
-    linked = json.loads(grid_carino_link(json.dumps([period, period])).to_json())
+    linked = json.loads(grid_carino_link([period, period]).to_json())
 
     assert linked["portfolio_return_compounded"] == pytest.approx(0.05945849, abs=1e-8)
     assert linked["benchmark_return_compounded"] == pytest.approx(0.04960025, abs=1e-8)
@@ -503,20 +502,20 @@ def test_grid_carino_link_reconstructs_compounded_active_return() -> None:
 def test_grid_carino_link_accepts_keyword_arguments() -> None:
     """The advertised ``text_signature`` name is the real keyword name."""
     period = json.loads(_grid_golden_period_json())
-    linked = json.loads(grid_carino_link(periods=json.dumps([period, period])).to_json())
+    linked = json.loads(grid_carino_link(periods=[period, period]).to_json())
     assert len(linked["periods"]) == 2
 
 
 def test_grid_carino_link_rejects_malformed_json() -> None:
-    """Malformed JSON raises ``ValueError``."""
-    with pytest.raises(ValueError, match="grid periods JSON"):
+    """Text is refused with ``TypeError``; it is never parsed."""
+    with pytest.raises(TypeError, match="periods must be a list, a dict or a DataFrame, not a string"):
         grid_carino_link("not json").to_json()
 
 
 def test_grid_carino_link_rejects_empty_periods() -> None:
     """An empty periods array fails closed, naming the requirement."""
     with pytest.raises(PortfolioError, match="at least one period"):
-        grid_carino_link(json.dumps([])).to_json()
+        grid_carino_link([]).to_json()
 
 
 def test_grid_carino_link_rejects_inconsistent_period_contract() -> None:
@@ -525,11 +524,11 @@ def test_grid_carino_link_rejects_inconsistent_period_contract() -> None:
 
     bad_active = {**period, "active_return": period["active_return"] + 0.001}
     with pytest.raises(PortfolioError, match="active_return"):
-        grid_carino_link(json.dumps([bad_active])).to_json()
+        grid_carino_link([bad_active]).to_json()
 
     bad_total = {**period, "total_selection": period["total_selection"] + 0.001}
     with pytest.raises(PortfolioError, match="effect totals"):
-        grid_carino_link(json.dumps([bad_total])).to_json()
+        grid_carino_link([bad_total]).to_json()
 
 
 def test_grid_carino_link_denies_unknown_period_fields() -> None:
@@ -537,7 +536,7 @@ def test_grid_carino_link_denies_unknown_period_fields() -> None:
     period = json.loads(_grid_golden_period_json())
     bad_period = {**period, "surprise": 1.0}
     with pytest.raises(ValueError, match="grid periods JSON"):
-        grid_carino_link(json.dumps([bad_period])).to_json()
+        grid_carino_link([bad_period]).to_json()
 
 
 # factor_brinson_attribution tests
@@ -545,9 +544,9 @@ def test_grid_carino_link_denies_unknown_period_fields() -> None:
 
 def test_factor_brinson_attribution_matches_binary_golden() -> None:
     """Re-pins the Rust `binary_factors_reproduce_brinson_fachler_exactly` golden."""
-    input_json = json.dumps(_factor_brinson_binary_input())
+    input_data = _factor_brinson_binary_input()
     f_b = [0.02, 0.31 / 7.0]
-    result = json.loads(factor_brinson_attribution(input_json, f_b).to_json())
+    result = json.loads(factor_brinson_attribution(input_data, f_b).to_json())
 
     assert result["active_return"] == pytest.approx(0.02, abs=1e-12)
     assert result["allocation"] == pytest.approx(0.0145714285714286, abs=1e-12)
@@ -557,14 +556,14 @@ def test_factor_brinson_attribution_matches_binary_golden() -> None:
 
 def test_factor_brinson_attribution_accepts_keyword_arguments() -> None:
     """The advertised ``text_signature`` names are the real keyword names."""
-    input_json = json.dumps(_factor_brinson_binary_input())
-    result = json.loads(factor_brinson_attribution(input=input_json, factor_returns=[0.02, 0.31 / 7.0]).to_json())
+    input_data = _factor_brinson_binary_input()
+    result = json.loads(factor_brinson_attribution(input=input_data, factor_returns=[0.02, 0.31 / 7.0]).to_json())
     assert result["allocation"] == pytest.approx(0.0145714285714286, abs=1e-12)
 
 
 def test_factor_brinson_attribution_rejects_malformed_json() -> None:
-    """Malformed ``input_json`` raises ``ValueError``."""
-    with pytest.raises(ValueError, match="factor-Brinson input JSON"):
+    """Text for ``input`` is refused with ``TypeError``; it is never parsed."""
+    with pytest.raises(TypeError, match="input must be a list, a dict or a DataFrame, not a string"):
         factor_brinson_attribution("not json", [0.02, 0.01]).to_json()
 
 
@@ -579,14 +578,14 @@ def test_factor_brinson_attribution_rejects_incomplete_factor_returns() -> None:
         "benchmark_weights": [0.60, 0.30, 0.10],
     }
     with pytest.raises(PortfolioError, match="constrained_least_squares"):
-        factor_brinson_attribution(json.dumps(input_data), [0.05, 0.01]).to_json()
+        factor_brinson_attribution(input_data, [0.05, 0.01]).to_json()
 
 
 def test_factor_brinson_attribution_denies_unknown_input_fields() -> None:
     """An unknown field on ``FactorBrinsonInput`` fails closed."""
     bad_input = {**_factor_brinson_binary_input(), "surprise": 1.0}
     with pytest.raises(ValueError, match="factor-Brinson input JSON"):
-        factor_brinson_attribution(json.dumps(bad_input), [0.02, 0.31 / 7.0]).to_json()
+        factor_brinson_attribution(bad_input, [0.02, 0.31 / 7.0]).to_json()
 
 
 # analytics constrained_least_squares tests
@@ -717,6 +716,6 @@ def test_constrained_factor_returns_satisfy_factor_brinson_completeness() -> Non
         "portfolio_weights": [1.25, -0.30, 0.05],
         "benchmark_weights": benchmark_weights,
     }
-    result = json.loads(factor_brinson_attribution(json.dumps(input_data), f_b).to_json())
+    result = json.loads(factor_brinson_attribution(input_data, f_b).to_json())
 
     assert result["allocation"] + result["selection"] == pytest.approx(result["active_return"], abs=1e-12)

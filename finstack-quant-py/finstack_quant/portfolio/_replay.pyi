@@ -602,8 +602,8 @@ class ReplayResult:
 
 def replay_portfolio(
     portfolio: Portfolio,
-    snapshots: list[tuple[datetime.date | str, MarketContext]] | list[dict[str, Any]] | str,
-    config: ReplayConfig | dict[str, Any] | str,
+    snapshots: list[tuple[datetime.date | str, MarketContext]] | list[dict[str, Any]],
+    config: ReplayConfig | dict[str, Any],
 ) -> ReplayResult:
     """
     Replay a portfolio through dated market snapshots.
@@ -612,13 +612,12 @@ def replay_portfolio(
     ----------
     portfolio : Portfolio
         Built :class:`Portfolio` to replay.
-    snapshots : list[tuple[date, MarketContext]] | list[dict] | str
+    snapshots : list[tuple[date, MarketContext]] | list[dict]
         Dated market snapshots in ascending order: ``(date, market)`` pairs
-        (dates as ``datetime.date`` or ISO strings), JSON-shaped
-        ``{"date": "YYYY-MM-DD", "market": {...}}`` dicts, or the canonical
-        JSON array string.
-    config : ReplayConfig | dict | str
-        ``ReplayConfig`` as a dict or JSON string: required ``mode``
+        (dates as ``datetime.date`` or ISO strings) or JSON-shaped
+        ``{"date": "YYYY-MM-DD", "market": {...}}`` dicts.
+    config : ReplayConfig | dict
+        Typed ``ReplayConfig`` or its dict: required ``mode``
         (``"pv_only"``, ``"pv_and_pnl"`` or ``"full_attribution"``) and
         optional ``attribution_method``, ``valuation_options`` and
         ``on_error``; unknown keys are rejected. The same input the WASM

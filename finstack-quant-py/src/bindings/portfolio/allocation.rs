@@ -174,32 +174,7 @@ impl PyWeightAllocationResult {
 
 tabular_methods!(PyWeightAllocationResult);
 
-/// Allocate strategy weights from a typed specification.
-///
-/// ``total_capital`` is finite and signed; nonnegative strategy weights allocate
-/// amounts with the same sign. Capital sums to the total rounded at
-/// ``money_decimal_places`` (default 10, maximum 12). Minor units are assigned
-/// by largest fractional remainder, with ties awarded in strategy input order.
-/// Zero-weight strategies receive zero capital.
-///
-/// Parameters
-/// ----------
-/// spec : WeightAllocationSpec | str | dict
-///     Typed request or its wire representation with a scheme, finite signed
-///     total capital, strategy rows, and any required covariance data.
-///
-/// Returns
-/// -------
-/// WeightAllocationResult
-///     Typed result with ``scheme``, ``allocations`` and ``diagnostics``
-///     getters plus ``to_pandas()`` / ``to_polars()`` / ``to_arrow()``; ``to_json()`` gives the wire form.
-///     A spec that allocates without error is valid.
-///
-/// Raises
-/// ------
-/// PortfolioError
-///     If the specification is malformed, violates scheme invariants, or its
-///     capital is not representable at the requested rounding precision.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._allocation", "allocate_weights")]
 #[pyfunction]
 #[pyo3(text_signature = "(spec)")]
 fn allocate_weights(py: Python<'_>, spec: &Bound<'_, PyAny>) -> PyResult<PyWeightAllocationResult> {

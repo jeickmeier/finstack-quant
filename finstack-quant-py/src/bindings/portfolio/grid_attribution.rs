@@ -221,60 +221,7 @@ impl PyGridCarinoLinkedResult {
 
 tabular_methods!(PyGridCarinoLinkedResult);
 
-/// Compute a single-period hierarchical duration-cell x sector grid attribution.
-///
-/// Binds Rust `finstack_quant_portfolio::grid_attribution::grid_attribution` (Dynkin, Hyman &
-/// Vankudre 1998, Appendix A): decomposes active return into a per-cell
-/// curve (positioning) effect, a within-cell sector allocation effect, and a
-/// security-selection residual per (cell, sector).
-///
-/// Parameters
-/// ----------
-/// portfolio : str | dict | list | pandas.DataFrame
-///     JSON array of ``GridPosition`` objects (``cell``, ``sector``,
-///     ``weight``, ``total_return``) for the portfolio side; weights must
-///     sum to ``1.0`` within ``1e-6``.
-/// benchmark : str | dict | list | pandas.DataFrame
-///     JSON array of ``GridPosition`` objects for the benchmark side; same
-///     weight-sum requirement.
-///
-/// Returns
-/// -------
-/// GridAttributionResult
-///     Typed result whose ``total_curve``, ``total_sector`` and
-///     ``total_selection`` sum to ``active_return`` to floating-point
-///     precision for well-conditioned inputs; among *accepted* inputs (those
-///     that clear the near-zero-net-weight check below), the reconciliation
-///     residual grows the closer any bucket's net weight sits to that
-///     check's own rejection boundary — see the Rust module docs' measured
-///     residuals for magnitudes. Use :meth:`to_json` for the
-///     raw wire string.
-///
-/// Raises
-/// ------
-/// PortfolioError
-///     If any weight or return is non-finite, either side's weights don't
-///     sum to ``1.0`` within tolerance, or a (cell) or (cell, sector)
-///     bucket has positions on a side but nets to a weight that is zero, or
-///     numerically near zero (within ``1e-6`` relative to its own gross
-///     weight), which is undefined-or-explosive to attribute (the error
-///     names the bucket and the side).
-/// ValueError
-///     If either JSON argument is malformed or carries unknown fields.
-///
-/// Sources
-/// -------
-/// See ``docs/REFERENCES.md#dynkin-hyman-vankudre-1998``.
-///
-/// Examples
-/// --------
-/// >>> import json
-/// >>> from finstack_quant.portfolio import grid_attribution
-/// >>> portfolio = [{"cell": "0-3", "sector": "GOVT", "weight": 1.0, "total_return": 0.02}]
-/// >>> benchmark = [{"cell": "0-3", "sector": "GOVT", "weight": 1.0, "total_return": 0.01}]
-/// >>> result = grid_attribution(json.dumps(portfolio), json.dumps(benchmark))
-/// >>> result.total_selection
-/// 0.01
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._grid_attribution", "grid_attribution")]
 #[pyfunction]
 #[pyo3(text_signature = "(portfolio, benchmark)")]
 fn grid_attribution(
@@ -297,58 +244,7 @@ fn grid_attribution(
         })?,
     })
 }
-/// Carino-link multi-period hierarchical grid attribution results.
-///
-/// Binds Rust `finstack_quant_portfolio::grid_attribution::grid_carino_link` (Carino 1999):
-/// applies Carino smoothing to a chronological sequence of single-period
-/// `grid_attribution` results so the three top-level effects
-/// (``linked_curve``, ``linked_sector``, ``linked_selection``) sum exactly
-/// to the geometrically compounded active return. Only the three top-level
-/// effects are linked; per-cell / per-(cell, sector) multi-period linking is
-/// out of scope.
-///
-/// Parameters
-/// ----------
-/// periods : str | dict | list | pandas.DataFrame
-///     JSON array of ``GridAttributionResult`` objects, in chronological
-///     order, each the wire output of :meth:`to_json` (or
-///     ``GridAttributionResult.to_json()``).
-///
-/// Returns
-/// -------
-/// GridCarinoLinkedResult
-///     Typed result with the three linked effects and compounded returns.
-///     Use :meth:`to_json` serialize with ``to_json()`` for the wire string.
-///
-/// Raises
-/// ------
-/// PortfolioError
-///     If ``periods`` is empty; any consumed return or top-level effect
-///     is non-finite; ``active_return`` disagrees with the portfolio-minus-
-///     benchmark return; the three effect totals do not reconcile to
-///     ``active_return`` within an overflow-safe scaled-L1 tolerance; a
-///     return-identity or reconciliation residual is non-finite; or any
-///     per-period or compounded return is at or below -100% (outside the
-///     Carino domain).
-/// ValueError
-///     If ``periods`` is malformed or does not match the
-///     ``GridAttributionResult`` schema.
-///
-/// Sources
-/// -------
-/// See ``docs/REFERENCES.md#carino-1999`` and
-/// ``docs/REFERENCES.md#dynkin-hyman-vankudre-1998``.
-///
-/// Examples
-/// --------
-/// >>> import json
-/// >>> from finstack_quant.portfolio import grid_attribution, grid_carino_link
-/// >>> portfolio = [{"cell": "0-3", "sector": "GOVT", "weight": 1.0, "total_return": 0.02}]
-/// >>> benchmark = [{"cell": "0-3", "sector": "GOVT", "weight": 1.0, "total_return": 0.01}]
-/// >>> period = json.loads(grid_attribution(json.dumps(portfolio), json.dumps(benchmark)).to_json())
-/// >>> result = grid_carino_link(json.dumps([period, period]))
-/// >>> round(result.linked_selection, 4)
-/// 0.0203
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._grid_attribution", "grid_carino_link")]
 #[pyfunction]
 #[pyo3(text_signature = "(periods)")]
 fn grid_carino_link(

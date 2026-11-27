@@ -126,29 +126,27 @@ for when in timeline:
         period = history[len(returns) - 1]
         start, end = date.fromisoformat(period["start"]), date.fromisoformat(period["end"])
         dietz_returns.append(
-            twrr_modified_dietz(
-                json.dumps({
-                    "beginning_market_value": period_begin,
-                    "ending_market_value": nav,
-                    "cashflows": [
-                        {
-                            "amount": flow["amount"],
-                            "fraction_of_period_remaining": (end - date.fromisoformat(flow["date"])).days
-                            / (end - start).days,
-                        }
-                        for flow in period_flows
-                    ],
-                })
-            )
+            twrr_modified_dietz({
+                "beginning_market_value": period_begin,
+                "ending_market_value": nav,
+                "cashflows": [
+                    {
+                        "amount": flow["amount"],
+                        "fraction_of_period_remaining": (end - date.fromisoformat(flow["date"])).days
+                        / (end - start).days,
+                    }
+                    for flow in period_flows
+                ],
+            })
         )
         period_begin, segment_start, factor, period_flows = nav, nav, 1.0, []
 investor_flows.append({"date": end_date.isoformat(), "amount": nav})
 years = (date.fromisoformat(history[-1]["end"]) - date.fromisoformat(history[0]["start"])).days / 365.0
-linked = json.loads(twrr_linked(json.dumps(returns), years).to_json())
+linked = json.loads(twrr_linked(returns, years).to_json())
 # Keep the actual deposits and withdrawals: their sign pattern is nonconventional.
 xirr_error = None
 try:
-    mwr_xirr(json.dumps(investor_flows))
+    mwr_xirr(investor_flows)
 except ValueError as error:
     xirr_error = str(error)
 print("Expected XIRR validation error:", xirr_error)
@@ -228,9 +226,9 @@ The reflected standardized returns preserve the mean and sample variance exactly
 ```python exec id=exercise-flow-before-rally role=exercise
 # Two half-years: +0%, then +20%. A 900 USD contribution precedes the rally.
 flow_case = [{"date":"2024-01-01","amount":-100.0},{"date":"2024-07-01","amount":-900.0},{"date":"2025-01-01","amount":1200.0}]
-flow_mwrr = mwr_xirr(json.dumps(flow_case))
+flow_mwrr = mwr_xirr(flow_case)
 flow_twrr = (1+0.0)*(1+0.20)-1
-flow_dietz = twrr_modified_dietz(json.dumps({"beginning_market_value":100.0,"ending_market_value":1200.0,"cashflows":[{"amount":900.0,"fraction_of_period_remaining":184/366}]}))
+flow_dietz = twrr_modified_dietz({"beginning_market_value":100.0,"ending_market_value":1200.0,"cashflows":[{"amount":900.0,"fraction_of_period_remaining":184/366}]})
 print({"one_year_TWRR":flow_twrr,"annualized_XIRR":flow_mwrr,"modified_Dietz":flow_dietz})
 print("The investor put most capital to work for the rally. TWRR removes that sizing decision; MWRR retains it.")
 ```

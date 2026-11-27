@@ -312,7 +312,7 @@ impl PyReplayResult {
 
 tabular_methods!(PyReplayResult);
 
-/// Parse the replay configuration from ``config`` (JSON string or dict).
+/// Parse the replay configuration from ``config`` (a dict).
 fn extract_replay_config(
     py: Python<'_>,
     config: &Bound<'_, PyAny>,
@@ -325,12 +325,11 @@ fn extract_replay_config(
         .map_err(display_to_py)
 }
 
-/// Resolve the snapshot timeline from a JSON array string, a list of
-/// ``{"date", "market"}`` dicts, or a list of ``(date, MarketContext)``
-/// tuples.
+/// Resolve the snapshot timeline from a list of ``{"date", "market"}``
+/// dicts or a list of ``(date, MarketContext)`` tuples.
 ///
 /// Tuples are converted to typed `(Date, MarketContext)` pairs and passed to
-/// `ReplayTimeline::new`; JSON text and dicts go through the Rust
+/// `ReplayTimeline::new`; dicts go through the Rust
 /// `ReplayTimeline::from_json_snapshots` wire parser.
 fn extract_replay_timeline(
     py: Python<'_>,
@@ -338,10 +337,13 @@ fn extract_replay_timeline(
 ) -> PyResult<finstack_quant_portfolio::replay::ReplayTimeline> {
     use finstack_quant_portfolio::replay::ReplayTimeline;
 
-    if let Ok(json) = snapshots.extract::<String>() {
-        return py
-            .detach(move || ReplayTimeline::from_json_snapshots(&json))
-            .map_err(portfolio_to_py);
+    // A string is a value, not a document; a mapping would iterate its keys.
+    if snapshots.is_instance_of::<pyo3::types::PyString>()
+        || snapshots.is_instance_of::<pyo3::types::PyDict>()
+    {
+        return Err(pyo3::exceptions::PyTypeError::new_err(
+            "replay snapshots must be a list of (date, market) tuples or a list of dicts",
+        ));
     }
     let items: Vec<Bound<'_, PyAny>> = snapshots.try_iter()?.collect::<PyResult<_>>()?;
     let is_tuple = |item: &Bound<'_, PyAny>| {
@@ -377,37 +379,7 @@ fn extract_replay_timeline(
         .map_err(portfolio_to_py)
 }
 
-/// Replay a portfolio through dated market snapshots.
-///
-/// Parameters
-/// ----------
-/// portfolio : Portfolio
-///     A built :class:`Portfolio`.
-/// snapshots : list[tuple[date, MarketContext]] | list[dict] | str
-///     Dated market snapshots in ascending date order: ``(date, market)``
-///     pairs (dates as ``datetime.date`` or ISO strings), JSON-shaped
-///     ``{"date": "YYYY-MM-DD", "market": {...}}`` dicts, or the canonical
-///     JSON array string.
-/// config : dict | str
-///     ``ReplayConfig`` as a dict or JSON string: required ``mode``
-///     (``"pv_only"``, ``"pv_and_pnl"`` or ``"full_attribution"``) and
-///     optional ``attribution_method``, ``valuation_options`` and
-///     ``on_error``; unknown keys are rejected. The same input the WASM
-///     ``replayPortfolio`` takes.
-///
-/// Returns
-/// -------
-/// ReplayResult
-///     Typed result with ``steps``, ``summary`` and ``skipped_dates``
-///     getters plus ``to_pandas()`` / ``to_polars()`` / ``to_arrow()``; ``to_json()`` gives the wire form.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If a snapshot or config payload is malformed (including a missing
-///     ``mode``).
-/// PortfolioError
-///     If a snapshot fails to revalue under a strict error policy.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._replay", "replay_portfolio")]
 #[pyfunction]
 #[pyo3(text_signature = "(portfolio, snapshots, config)")]
 fn replay_portfolio(

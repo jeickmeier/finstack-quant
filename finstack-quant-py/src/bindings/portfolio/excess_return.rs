@@ -158,58 +158,7 @@ impl PyExcessReturnResult {
 
 tabular_methods!(PyExcessReturnResult);
 
-/// Build a duration-cell base-return table from a reference universe.
-///
-/// Binds Rust `finstack_quant_portfolio::excess_return::cell_returns_from_reference`
-/// (Dynkin, Hyman & Vankudre 1998, Appendix B): buckets `reference` into
-/// fixed-width duration cells and averages each cell's member total returns,
-/// interpolating interior gaps and flat-extrapolating leading/trailing gaps.
-///
-/// Parameters
-/// ----------
-/// reference : str | dict | list | pandas.DataFrame
-///     JSON array of ``ReferenceReturn`` objects (``duration``,
-///     ``total_return``, both decimals with duration in years); must be
-///     non-empty. Unknown fields are rejected.
-/// base_label : str
-///     Label identifying the resulting curve (e.g. ``"UST"``), carried
-///     through to the output's ``base_label`` for policy visibility.
-/// config : str | dict | list | pandas.DataFrame
-///     JSON ``CellConfig``; ``width`` is its only field (cell width in
-///     years, finite and positive) and is required — there is no default.
-///
-/// Returns
-/// -------
-/// DurationCellTable
-///     Typed cell table with ``to_pandas()`` / ``to_polars()`` / ``to_arrow()`` / ``to_json()`` exits. Use
-///     :meth:`to_json` for the raw wire string.
-///
-/// Raises
-/// ------
-/// PortfolioError
-///     If ``reference`` is empty, ``config.width`` is not finite and
-///     positive, any reference entry has a non-finite ``total_return`` or a
-///     non-finite/negative ``duration``, the width produces two numerically
-///     distinct cells that collide on their one-decimal label, or the
-///     largest reference ``duration`` divided by ``config.width`` would
-///     require more than an internal sanity bound of cells (100,000; a units
-///     mistake, e.g. days instead of years, rather than a legitimate
-///     duration grid).
-/// ValueError
-///     If any JSON argument is malformed or carries unknown fields.
-///
-/// Sources
-/// -------
-/// See ``docs/REFERENCES.md#dynkin-hyman-vankudre-1998``.
-///
-/// Examples
-/// --------
-/// >>> import json
-/// >>> from finstack_quant.portfolio import cell_returns_from_reference
-/// >>> reference = [{"duration": 1.0, "total_return": 0.02}]
-/// >>> table = cell_returns_from_reference(json.dumps(reference), "UST", '{"width": 2.0}')
-/// >>> table.cells[0]["base_return"]
-/// 0.02
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._excess_return", "cell_returns_from_reference")]
 #[pyfunction]
 #[pyo3(text_signature = "(reference, base_label, config)")]
 fn cell_returns_from_reference(
@@ -235,69 +184,7 @@ fn cell_returns_from_reference(
         })?,
     })
 }
-/// Build a duration-cell base-return table from start/end discount curves.
-///
-/// Binds Rust `finstack_quant_portfolio::excess_return::cell_returns_from_curves`: each
-/// cell's base return is the holding-period return of a hypothetical
-/// zero-coupon position bought at the cell midpoint off ``start`` and
-/// revalued off ``end`` after ``horizon_years`` have elapsed. Every
-/// resulting cell is observed (a curve has a discount factor at every
-/// queried point), unlike the reference-universe path in
-/// :func:`cell_returns_from_reference`.
-///
-/// Parameters
-/// ----------
-/// start : DiscountCurve
-///     Discount curve observed at the start of the holding period.
-/// end : DiscountCurve
-///     Discount curve observed ``horizon_years`` later, at period end.
-/// horizon_years : float
-///     Length of the holding period, in years; must be finite and positive.
-/// max_duration : float
-///     Upper bound of the duration grid, in years; must be finite and
-///     strictly greater than ``horizon_years``.
-/// base_label : str
-///     Label identifying the base curve (e.g. ``"UST"``, ``"USD-SOFR"``),
-///     stamped into the result purely for policy visibility.
-/// config : str | dict | list | pandas.DataFrame
-///     JSON ``CellConfig``; ``width`` is its only field and is required.
-///
-/// Returns
-/// -------
-/// DurationCellTable
-///     Typed cell table with ``to_pandas()`` / ``to_polars()`` / ``to_arrow()`` / ``to_json()`` exits. Use
-///     :meth:`to_json` for the raw wire string.
-///
-/// Raises
-/// ------
-/// PortfolioError
-///     If ``config.width`` or ``horizon_years`` is not finite and positive,
-///     ``max_duration`` does not strictly exceed ``horizon_years``,
-///     ``max_duration`` divided by ``config.width`` would require more than
-///     an internal sanity bound of cells (100,000; a units mistake rather
-///     than a legitimate duration grid), a cell's midpoint does not exceed
-///     ``horizon_years`` (this is unavoidable whenever ``config.width`` is
-///     not strictly greater than ``2 * horizon_years``, since the first
-///     cell's midpoint is ``config.width / 2``), either curve produces a
-///     non-positive/non-finite discount factor at a queried time, or the
-///     width produces colliding one-decimal cell labels.
-/// ValueError
-///     If ``config`` is malformed.
-///
-/// Sources
-/// -------
-/// See ``docs/REFERENCES.md#dynkin-hyman-vankudre-1998``.
-///
-/// Examples
-/// --------
-/// >>> from datetime import date
-/// >>> from finstack_quant.core.market_data import DiscountCurve
-/// >>> from finstack_quant.portfolio import cell_returns_from_curves
-/// >>> start = DiscountCurve.flat("start", date(2025, 1, 1), 0.02, "act_365f")
-/// >>> end = DiscountCurve.flat("end", date(2025, 4, 1), 0.03, "act_365f")
-/// >>> table = cell_returns_from_curves(start, end, 0.25, 2.0, "UST", '{"width": 1.0}')
-/// >>> len(table.cells)
-/// 2
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._excess_return", "cell_returns_from_curves")]
 #[pyfunction]
 #[pyo3(text_signature = "(start, end, horizon_years, max_duration, base_label, config)")]
 fn cell_returns_from_curves(
@@ -329,59 +216,7 @@ fn cell_returns_from_curves(
         })?,
     })
 }
-/// Compute duration-matched credit excess returns against a base-return table.
-///
-/// Binds Rust `finstack_quant_portfolio::excess_return::excess_returns` (Dynkin, Hyman &
-/// Vankudre 1998, Appendix B): each position's ``duration`` is matched to its
-/// duration cell in ``table`` and the position's excess return is
-/// ``total_return - cell.base_return``, the credit-specific component of
-/// performance isolated from the general level/shape move of the base curve.
-///
-/// Parameters
-/// ----------
-/// positions : str | dict | list | pandas.DataFrame
-///     JSON array of ``ExcessReturnPosition`` objects (``id``, ``weight``,
-///     ``duration``, ``total_return``); weights must sum to ``1.0`` within
-///     ``1e-6``.
-/// table : str | dict | list | pandas.DataFrame
-///     JSON ``DurationCellTable``, as returned by
-///     :meth:`to_json`,
-///     :meth:`to_json`, or
-///     ``DurationCellTable.to_json()``.
-///
-/// Returns
-/// -------
-/// ExcessReturnResult
-///     Typed result with per-position and portfolio-level total/base/excess
-///     returns. Use :meth:`to_json` for the raw wire string.
-///
-/// Raises
-/// ------
-/// PortfolioError
-///     If ``table`` has no cells; a cell has an empty or duplicate
-///     label, non-finite bounds or base return, a negative lower bound, a
-///     non-positive width, non-ascending lower bounds, or overlaps its
-///     predecessor; a position has a non-finite
-///     weight/duration/total_return; a position's duration falls outside
-///     every cell, including a valid gap (the error names the position); or
-///     the position weights do not sum to ``1.0`` within tolerance.
-/// ValueError
-///     If any JSON argument is malformed.
-///
-/// Sources
-/// -------
-/// See ``docs/REFERENCES.md#dynkin-hyman-vankudre-1998``.
-///
-/// Examples
-/// --------
-/// >>> import json
-/// >>> from finstack_quant.portfolio import cell_returns_from_reference, excess_returns
-/// >>> reference = [{"duration": 1.0, "total_return": 0.02}]
-/// >>> table = cell_returns_from_reference(json.dumps(reference), "UST", '{"width": 2.0}')
-/// >>> positions = [{"id": "B1", "weight": 1.0, "duration": 1.0, "total_return": 0.03}]
-/// >>> result = excess_returns(json.dumps(positions), table.to_json())
-/// >>> round(result.portfolio_excess_return, 4)
-/// 0.01
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._excess_return", "excess_returns")]
 #[pyfunction]
 #[pyo3(text_signature = "(positions, table)")]
 fn excess_returns(

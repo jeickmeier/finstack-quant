@@ -22,7 +22,7 @@ class LinkedReturn:
     Examples
     --------
     >>> from finstack_quant.portfolio import twrr_linked
-    >>> result = twrr_linked("[0.05,0.03]", horizon_years=1.0)
+    >>> result = twrr_linked([0.05, 0.03], horizon_years=1.0)
     >>> (round(result.cumulative, 4), result.num_periods)
     (0.0815, 2)
     """
@@ -211,14 +211,14 @@ class LinkedReturn:
         """
         ...
 
-def twrr_modified_dietz(period: dict[str, Any] | str) -> float:
+def twrr_modified_dietz(period: dict[str, Any]) -> float:
     """
     Compute a Modified-Dietz TWRR sub-period return.
 
     Parameters
     ----------
-    period : dict | str
-        ``TwrrPeriod`` as a dict or JSON string: ``beginning_market_value``,
+    period : dict
+        ``TwrrPeriod`` as a dict: ``beginning_market_value``,
         ``ending_market_value`` and optional ``cashflows: [{amount,
         fraction_of_period_remaining}]`` (omitted means no flows). A positive
         ``amount`` is a contribution into the portfolio; the fraction, in
@@ -252,14 +252,7 @@ def twrr_modified_dietz(period: dict[str, Any] | str) -> float:
     ...
 
 def twrr_linked(
-    returns: str
-    | Sequence[float]
-    | npt.NDArray[np.float64]
-    | pd.Series
-    | pl.Series
-    | pd.DataFrame
-    | pl.DataFrame
-    | Any,
+    returns: Sequence[float] | npt.NDArray[np.float64] | pd.Series | pl.Series | pd.DataFrame | pl.DataFrame | Any,
     horizon_years: float,
 ) -> LinkedReturn:
     """
@@ -267,10 +260,10 @@ def twrr_linked(
 
     Parameters
     ----------
-    returns : str | Sequence[float] | numpy.ndarray | pandas.Series | polars.Series | pandas.DataFrame | polars.DataFrame | Any
+    returns : Sequence[float] | numpy.ndarray | pandas.Series | polars.Series | pandas.DataFrame | polars.DataFrame | Any
         Sub-period decimal returns supplied as a sequence, 1-D NumPy array,
-        ``pandas.Series``, ``polars.Series``, single-column DataFrame / Arrow
-        table, or JSON array string (e.g. from Modified Dietz).
+        ``pandas.Series``, ``polars.Series``, or single-column DataFrame /
+        Arrow table (e.g. from Modified Dietz).
     horizon_years : float
         Full elapsed horizon in 365-day calendar years; must be finite.
         Horizons of at least one year are annualized; shorter ones, including
@@ -291,9 +284,8 @@ def twrr_linked(
 
     Examples
     --------
-    >>> import json
     >>> from finstack_quant.portfolio import twrr_linked
-    >>> result = twrr_linked("[0.05,0.03]", horizon_years=1.0)
+    >>> result = twrr_linked([0.05, 0.03], horizon_years=1.0)
     >>> round(result.cumulative, 4)
     0.0815
     """
@@ -305,7 +297,6 @@ def mwr_xirr(
     | pd.Series
     | pd.DataFrame
     | pl.DataFrame
-    | str
     | Any,
 ) -> float:
     """
@@ -315,16 +306,15 @@ def mwr_xirr(
 
     Parameters
     ----------
-    cashflows : sequence[tuple[date, float]] | sequence[dict] | pandas.Series | pandas.DataFrame | polars.DataFrame | str | Any
+    cashflows : sequence[tuple[date, float]] | sequence[dict] | pandas.Series | pandas.DataFrame | polars.DataFrame | Any
         Dated flows from the investor's cash account: contributions negative,
         terminal value / distributions positive. Accepts ``(date, amount)``
         pairs (dates as ``datetime.date``, timestamps, ``numpy.datetime64``, or
         ISO strings), dicts with ``date`` and ``amount`` keys, a date-indexed
-        ``pandas.Series``, a DataFrame or Arrow table with ``date`` and
+        ``pandas.Series``, or a DataFrame or Arrow table with ``date`` and
         ``amount`` columns (or a date-indexed pandas DataFrame with an
-        ``amount`` column), or the canonical JSON array string. Dates are
-        sorted and equal-date flows netted; remaining nonzero flows must change
-        sign exactly once.
+        ``amount`` column). Dates are sorted and equal-date flows netted;
+        remaining nonzero flows must change sign exactly once.
 
     Returns
     -------
@@ -348,7 +338,7 @@ def mwr_xirr(
     >>> from finstack_quant.portfolio import mwr_xirr
     >>> round(mwr_xirr([(dt.date(2025, 1, 1), -100.0), (dt.date(2026, 1, 1), 110.0)]), 6)
     0.1
-    >>> round(mwr_xirr('[{"date":"2025-01-01","amount":-100.0},{"date":"2026-01-01","amount":110.0}]'), 6)
+    >>> round(mwr_xirr([{"date": "2025-01-01", "amount": -100.0}, {"date": "2026-01-01", "amount": 110.0}]), 6)
     0.1
     """
     ...

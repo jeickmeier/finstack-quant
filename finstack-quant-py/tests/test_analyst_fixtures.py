@@ -183,25 +183,23 @@ def test_dated_flow_history_drives_native_performance(fixtures: SimpleNamespace)
             period = history[len(returns) - 1]
             start, end = date.fromisoformat(period["start"]), date.fromisoformat(period["end"])
             dietz_returns.append(
-                twrr_modified_dietz(
-                    json.dumps({
-                        "beginning_market_value": period_begin,
-                        "ending_market_value": nav,
-                        "cashflows": [
-                            {
-                                "amount": flow["amount"],
-                                "fraction_of_period_remaining": (end - date.fromisoformat(flow["date"])).days
-                                / (end - start).days,
-                            }
-                            for flow in period_flows
-                        ],
-                    })
-                )
+                twrr_modified_dietz({
+                    "beginning_market_value": period_begin,
+                    "ending_market_value": nav,
+                    "cashflows": [
+                        {
+                            "amount": flow["amount"],
+                            "fraction_of_period_remaining": (end - date.fromisoformat(flow["date"])).days
+                            / (end - start).days,
+                        }
+                        for flow in period_flows
+                    ],
+                })
             )
             period_begin, segment_start, factor, period_flows = nav, nav, 1.0, []
     investor_flows.append({"date": end_date.isoformat(), "amount": nav})
     years = (date.fromisoformat(history[-1]["end"]) - date.fromisoformat(history[0]["start"])).days / 365.0
-    linked = json.loads(twrr_linked(json.dumps(returns), years).to_json())
+    linked = json.loads(twrr_linked(returns, years).to_json())
     assert len(returns) == len(dietz_returns) == 3
     assert linked["cumulative"] == pytest.approx(math.prod(1 + value for value in returns) - 1)
     assert all(math.isfinite(value) for value in returns + dietz_returns)
@@ -212,7 +210,7 @@ def test_dated_flow_history_drives_native_performance(fixtures: SimpleNamespace)
     # changes. XIRR deliberately rejects this nonconventional flow history;
     # the flow-adjusted TWRR calculations above remain well-defined.
     with pytest.raises(ValueError, match="exactly one sign change"):
-        mwr_xirr(json.dumps(investor_flows))
+        mwr_xirr(investor_flows)
 
 
 def test_risk_panel_alignment_and_reproducibility(fixtures: SimpleNamespace) -> None:

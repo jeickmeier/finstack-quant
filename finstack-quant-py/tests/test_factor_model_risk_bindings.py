@@ -107,7 +107,7 @@ def test_decompose_factors_zero_factors_returns_zero_risk() -> None:
     # Build a zero-factor sensitivity matrix via the public API.
     zero_factor_matrix = compute_factor_sensitivities(
         portfolio,
-        "[]",  # empty factor list → n_factors == 0
+        [],  # empty factor list → n_factors == 0
         market,
         "2025-01-15",
     )
@@ -127,12 +127,12 @@ def test_decompose_factors_zero_factors_returns_zero_risk() -> None:
 def test_sensitivity_reporting_currency_is_the_portfolio_base_currency() -> None:
     market = MarketContext()
     book = Portfolio.builder("book", "EUR", "2025-01-15").build()
-    matrix = compute_factor_sensitivities(book, "[]", market, "2025-01-15")
+    matrix = compute_factor_sensitivities(book, [], market, "2025-01-15")
     assert matrix.base_currency == "EUR"
     assert json.loads(matrix.to_json())["base_currency"] == "EUR"
     assert SensitivityMatrix.from_json(matrix.to_json()).base_currency == "EUR"
     assert pickle.loads(pickle.dumps(matrix)).base_currency == "EUR"  # noqa: S301 - trusted local roundtrip
-    assert compute_pnl_profiles(book, "[]", market, "2025-01-15") == []
+    assert compute_pnl_profiles(book, [], market, "2025-01-15") == []
 
 
 def test_free_sensitivities_match_factor_model_and_reject_credit_hierarchy_factors() -> None:

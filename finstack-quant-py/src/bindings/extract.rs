@@ -413,26 +413,31 @@ pub(crate) fn label<T: serde::Serialize>(value: &T) -> PyResult<String> {
     finstack_quant_core::wire::serde_label(value).map_err(crate::errors::core_to_py)
 }
 
-// Records — JSON string | dict | list | pandas.DataFrame → JSON string
+// Records — dict | list | pandas.DataFrame → JSON string
 
 /// Turn a JSON-shaped Python input into its compact JSON string.
 ///
-/// Accepts a pre-serialized JSON `str` (passed through unchanged), any
-/// `json.dumps`-able object (`dict`, `list`, tuples of scalars), typed
+/// Accepts any `json.dumps`-able object (`dict`, `list`, tuples of scalars), typed
 /// result/spec wrappers standalone or nested in lists and dicts (encoded
 /// through their `to_dict` / `to_json`), or a `pandas.DataFrame`, which is
 /// converted through `to_dict("records")` so each row becomes one JSON object.
 ///
+/// A `str` is refused: it is a value, not a document, and no records input
+/// is a bare string. JSON text loads with `json.loads`.
+///
 /// # Errors
 ///
-/// Returns `ValueError` when the object cannot be JSON-encoded.
+/// Returns `TypeError` for a `str` and `ValueError` when the object cannot be
+/// JSON-encoded.
 pub fn extract_records_json(
     py: Python<'_>,
     obj: &Bound<'_, PyAny>,
     label: &str,
 ) -> PyResult<String> {
-    if let Ok(json) = obj.extract::<String>() {
-        return Ok(json);
+    if obj.is_instance_of::<pyo3::types::PyString>() {
+        return Err(pyo3::exceptions::PyTypeError::new_err(format!(
+            "{label} must be a list, a dict or a DataFrame, not a string; load JSON text with json.loads"
+        )));
     }
     if let Some(records) = crate::bindings::dataframe_utils::table_to_py_records(py, obj)? {
         return crate::bindings::module_utils::py_to_json_string(py, &records, label);

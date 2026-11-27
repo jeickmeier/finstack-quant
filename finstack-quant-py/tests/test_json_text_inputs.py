@@ -966,12 +966,14 @@ CASES = [
             "unknown-field": ("TypeError", "ValueError"),
         },
         ruling=f"{RULING_D} {RULING_C}",
+        rejects_text=TypeError,
     ),
     Case(
         "dict_records_sectors",
         brinson_fachler,
         json.loads,
         lambda: json.dumps(BRINSON_SECTORS),
+        rejects_text=TypeError,
     ),
     Case(
         "dict_params_object",
@@ -1131,6 +1133,7 @@ CASES = [
         lambda table: excess_returns(EXCESS_RETURN_POSITIONS, table),
         DurationCellTable.from_json,
         _cell_table_text,
+        rejects_text=TypeError,
     ),
     Case(
         "factor_model_config",
@@ -1237,12 +1240,14 @@ CASES = [
         lambda: json.dumps(WEIGHT_ALLOCATION),
         differs={"not-json": ("JSONDecodeError", "PortfolioError")},
         ruling=RULING_G,
+        rejects_text=TypeError,
     ),
     Case(
         "dict_replay_config",
         lambda config: replay_portfolio(_portfolio(), json.loads(_snapshots_text()), config),
         json.loads,
         lambda: json.dumps({"mode": "pv_and_pnl"}),
+        rejects_text=TypeError,
     ),
     Case(
         "dict_replay_snapshots",
@@ -1251,6 +1256,7 @@ CASES = [
         _snapshots_text,
         differs={"not-json": ("JSONDecodeError", "PortfolioError"), "number": ("TypeError", "PortfolioError")},
         ruling=f"{RULING_G} {RULING_C}",
+        rejects_text=TypeError,
     ),
     Case(
         "dict_price_extras",

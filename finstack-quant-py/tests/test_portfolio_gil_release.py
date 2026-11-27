@@ -78,7 +78,7 @@ def _market(as_of: date = AS_OF, rate: float = 0.04) -> MarketContext:
     )
 
 
-def _replay_snapshots_json(snapshot_count: int) -> str:
+def _replay_snapshots(snapshot_count: int) -> list[dict[str, object]]:
     snapshots = []
     for index in range(snapshot_count):
         snapshot_date = AS_OF + timedelta(days=index)
@@ -86,7 +86,7 @@ def _replay_snapshots_json(snapshot_count: int) -> str:
             "date": snapshot_date.isoformat(),
             "market": json.loads(_market(snapshot_date, 0.04 + index * 0.0001).to_json()),
         })
-    return json.dumps(snapshots)
+    return snapshots
 
 
 def _factor_model_config_json() -> str:
@@ -246,9 +246,9 @@ def test_attribution_nested_serialization_releases_gil() -> None:
 
 def test_replay_parse_and_compute_release_gil() -> None:
     portfolio = Portfolio.from_spec(_portfolio_spec_json(500))
-    snapshots_json = _replay_snapshots_json(20)
+    snapshots = _replay_snapshots(20)
 
-    typed = _assert_releases_gil(lambda: replay_portfolio(portfolio, snapshots_json, '{"mode":"pv_only"}'))
+    typed = _assert_releases_gil(lambda: replay_portfolio(portfolio, snapshots, {"mode": "pv_only"}))
     result = json.loads(typed.to_json())
 
     assert len(result["steps"]) == 20
@@ -259,7 +259,7 @@ def test_replay_detached_parse_preserves_value_error_mapping() -> None:
     portfolio = Portfolio.from_spec(_portfolio_spec_json(1))
 
     with pytest.raises(ValueError, match="invalid snapshots JSON"):
-        replay_portfolio(portfolio, "{}", '{"mode":"pv_only"}')
+        replay_portfolio(portfolio, [{}], {"mode": "pv_only"})
 
 
 def test_factor_stress_releases_gil_and_returns_position_results() -> None:
@@ -310,9 +310,9 @@ def test_position_what_if_rejects_unsupported_add() -> None:
 
 
 def test_large_twrr_parse_link_and_serialize_release_gil() -> None:
-    returns_json = json.dumps([0.000001] * 200_000)
+    returns = [0.000001] * 200_000
 
-    result_json = _assert_releases_gil(lambda: twrr_linked(returns_json, 2.0).to_json())
+    result_json = _assert_releases_gil(lambda: twrr_linked(returns, 2.0).to_json())
     assert result_json is not None
     result = json.loads(result_json)
 
@@ -337,10 +337,10 @@ def test_large_carino_parse_compute_and_serialize_release_gil() -> None:
             "benchmark_return": 0.0,
         },
     ]
-    period_result = json.loads(brinson_fachler(json.dumps(period)).to_json())
-    periods_json = json.dumps([period_result] * 10_000)
+    period_result = json.loads(brinson_fachler(period).to_json())
+    periods = [period_result] * 10_000
 
-    result_json = _assert_releases_gil(lambda: carino_link(periods_json).to_json())
+    result_json = _assert_releases_gil(lambda: carino_link(periods).to_json())
     result = json.loads(result_json)
 
     assert len(result["periods"]) == 10_000
@@ -350,13 +350,13 @@ def test_large_carino_parse_compute_and_serialize_release_gil() -> None:
 def test_sensitivity_result_conversion_and_decomposition_release_gil() -> None:
     factor_config = json.loads(_factor_model_config_json())
     portfolio = Portfolio.from_spec(_portfolio_spec_json(2_000))
-    factors_json = json.dumps(factor_config["factors"])
+    factors = factor_config["factors"]
     covariance_json = json.dumps(factor_config["covariance"])
     market = _market()
     matrix = _assert_releases_gil(
         lambda: compute_factor_sensitivities(
             portfolio,
-            factors_json,
+            factors,
             market,
             AS_OF.isoformat(),
         )

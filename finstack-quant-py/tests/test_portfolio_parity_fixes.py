@@ -460,19 +460,22 @@ class TestOptimizationAndResultsAudit:
         )
 
         ref = [{"duration": d, "total_return": r} for d, r in ((0.5, 0.01), (1.5, 0.02), (2.5, 0.03))]
-        table = pf.cell_returns_from_reference(json.dumps(ref), "UST", json.dumps({"width": 1.0}))
-        positions = json.dumps([{"id": "X", "duration": 1.0, "total_return": 0.025, "weight": 1.0}])
-        assert pf.excess_returns(positions, table).to_json() == pf.excess_returns(positions, table.to_json()).to_json()
+        table = pf.cell_returns_from_reference(ref, "UST", {"width": 1.0})
+        positions = [{"id": "X", "duration": 1.0, "total_return": 0.025, "weight": 1.0}]
+        table_wire = json.loads(table.to_json())
+        assert pf.excess_returns(positions, table).to_json() == pf.excess_returns(positions, table_wire).to_json()
+        with pytest.raises(TypeError, match="table must be a list, a dict or a DataFrame, not a string"):
+            pf.excess_returns(positions, table.to_json())
 
         grid = pf.grid_attribution(
-            json.dumps([
+            [
                 {"cell": "0-3", "sector": "GOVT", "weight": 0.5, "total_return": 0.02},
                 {"cell": "3-7", "sector": "CORP", "weight": 0.5, "total_return": 0.03},
-            ]),
-            json.dumps([
+            ],
+            [
                 {"cell": "0-3", "sector": "GOVT", "weight": 0.6, "total_return": 0.01},
                 {"cell": "3-7", "sector": "CORP", "weight": 0.4, "total_return": 0.02},
-            ]),
+            ],
         )
         assert (
             pf.grid_carino_link([grid, grid]).to_json()

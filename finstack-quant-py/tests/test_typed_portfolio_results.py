@@ -25,8 +25,8 @@ AS_OF = "2025-01-15"
 # ---------------------------------------------------------------------------
 
 
-def _brinson_sectors() -> str:
-    return json.dumps([
+def _brinson_sectors() -> list[dict[str, Any]]:
+    return [
         {
             "sector": "TECH",
             "portfolio_weight": 0.60,
@@ -41,7 +41,7 @@ def _brinson_sectors() -> str:
             "portfolio_return": 0.01,
             "benchmark_return": 0.03,
         },
-    ])
+    ]
 
 
 def _campisi_period(start: str = "2025-01-01", end: str = "2025-03-15") -> pf.FiAttributionResult:
@@ -60,32 +60,32 @@ def _campisi_period(start: str = "2025-01-01", end: str = "2025-03-15") -> pf.Fi
     return pf.campisi_attribution(portfolio, benchmark, config)
 
 
-def _reference_table_json() -> str:
+def _reference_table() -> pf.DurationCellTable:
     reference = [
         {"duration": 0.5, "total_return": 0.01},
         {"duration": 1.5, "total_return": 0.02},
         {"duration": 2.5, "total_return": 0.03},
     ]
-    return pf.cell_returns_from_reference(json.dumps(reference), "UST", json.dumps({"width": 1.0})).to_json()
+    return pf.cell_returns_from_reference(reference, "UST", {"width": 1.0})
 
 
-_GRID_PORTFOLIO = json.dumps([
+_GRID_PORTFOLIO = [
     {"cell": "0-3", "sector": "GOVT", "weight": 0.5, "total_return": 0.02},
     {"cell": "3-7", "sector": "CORP", "weight": 0.5, "total_return": 0.03},
-])
-_GRID_BENCHMARK = json.dumps([
+]
+_GRID_BENCHMARK = [
     {"cell": "0-3", "sector": "GOVT", "weight": 0.6, "total_return": 0.01},
     {"cell": "3-7", "sector": "CORP", "weight": 0.4, "total_return": 0.02},
-])
+]
 
-_FACTOR_BRINSON_INPUT = json.dumps({
+_FACTOR_BRINSON_INPUT = {
     "asset_ids": ["A"],
     "asset_returns": [0.02],
     "exposures": [1.0],
     "factor_names": ["Market"],
     "portfolio_weights": [1.0],
     "benchmark_weights": [1.0],
-})
+}
 
 
 def _portfolio_json() -> str:
@@ -153,7 +153,7 @@ def _scenario_batch_json() -> str:
     return json.dumps(scenarios)
 
 
-_ALLOCATION_SPEC = json.dumps({
+_ALLOCATION_SPEC = {
     "scheme": "inverse_volatility",
     "total_capital": 1_000_000.0,
     "strategies": [
@@ -161,7 +161,7 @@ _ALLOCATION_SPEC = json.dumps({
         {"id": "S2", "fixed_weight": None, "returns": [0.002, -0.001, 0.003, 0.001], "risk_budget": None},
     ],
     "covariance": None,
-})
+}
 
 
 def _approx_equal(a: Any, b: Any) -> bool:
@@ -215,8 +215,10 @@ def test_carino_link_returns_typed_result() -> None:
     result = pf.carino_link([period, period])
     expected = json.loads(result.to_json())
     # Typed per-period results and their JSON link to the same answer.
-    precomputed = json.dumps([json.loads(period.to_json()), json.loads(period.to_json())])
+    precomputed = [json.loads(period.to_json()), json.loads(period.to_json())]
     assert json.loads(pf.carino_link(precomputed).to_json()) == expected
+    with pytest.raises(TypeError, match="periods must be a list, a dict or a DataFrame, not a string"):
+        pf.carino_link(json.dumps(precomputed))
 
     _assert_contract(result, pf.CarinoLinkedAttribution)
     assert result.portfolio_return_compounded == pytest.approx(expected["portfolio_return_compounded"])
@@ -303,8 +305,8 @@ def test_fi_attribution_reconciliation_check_returns_typed_report() -> None:
 
 
 def test_cell_returns_from_reference_returns_typed_table() -> None:
-    reference = json.dumps([{"duration": 1.0, "total_return": 0.02}])
-    table = pf.cell_returns_from_reference(reference, "UST", json.dumps({"width": 2.0}))
+    reference = [{"duration": 1.0, "total_return": 0.02}]
+    table = pf.cell_returns_from_reference(reference, "UST", {"width": 2.0})
     expected = json.loads(table.to_json())
 
     _assert_contract(table, pf.DurationCellTable)
@@ -316,7 +318,7 @@ def test_cell_returns_from_reference_returns_typed_table() -> None:
 def test_cell_returns_from_curves_returns_typed_table() -> None:
     start = DiscountCurve.flat("start", date(2025, 1, 1), 0.02, "act_365f")
     end = DiscountCurve.flat("end", date(2025, 4, 1), 0.03, "act_365f")
-    config = json.dumps({"width": 1.0})
+    config = {"width": 1.0}
 
     table = pf.cell_returns_from_curves(start, end, 0.25, 2.0, "UST", config)
     expected = json.loads(table.to_json())
@@ -326,13 +328,13 @@ def test_cell_returns_from_curves_returns_typed_table() -> None:
 
 
 def test_excess_returns_returns_typed_result() -> None:
-    table_json = _reference_table_json()
-    positions = json.dumps([
+    table = _reference_table()
+    positions = [
         {"id": "B1", "weight": 0.5, "duration": 0.5, "total_return": 0.03},
         {"id": "B2", "weight": 0.5, "duration": 1.5, "total_return": 0.025},
-    ])
+    ]
 
-    result = pf.excess_returns(positions, table_json)
+    result = pf.excess_returns(positions, table)
     expected = json.loads(result.to_json())
 
     _assert_contract(result, pf.ExcessReturnResult)
@@ -370,7 +372,7 @@ def test_grid_attribution_returns_typed_result() -> None:
 
 def test_grid_carino_link_returns_typed_result() -> None:
     period = pf.grid_attribution(_GRID_PORTFOLIO, _GRID_BENCHMARK).to_json()
-    periods = json.dumps([json.loads(period), json.loads(period)])
+    periods = [json.loads(period), json.loads(period)]
 
     result = pf.grid_carino_link(periods)
     expected = json.loads(result.to_json())
@@ -414,7 +416,7 @@ def test_factor_brinson_attribution_returns_typed_result() -> None:
 
 
 def test_twrr_linked_returns_typed_result() -> None:
-    returns = json.dumps([0.05, 0.03])
+    returns = [0.05, 0.03]
     result = pf.twrr_linked(returns, 1.0)
     expected = json.loads(result.to_json())
 
@@ -454,11 +456,11 @@ def test_aggregate_metrics_returns_typed_portfolio_metrics() -> None:
 
 def test_replay_portfolio_returns_typed_result() -> None:
     portfolio = pf.Portfolio.from_spec(_portfolio_json())
-    snapshots = json.dumps([
+    snapshots = [
         {"date": "2025-01-15", "market": json.loads(_market("2025-01-15").to_json())},
         {"date": "2025-01-16", "market": json.loads(_market("2025-01-16", bump=0.001).to_json())},
-    ])
-    config = json.dumps({"mode": "pv_only"})
+    ]
+    config = {"mode": "pv_only"}
 
     result = pf.replay_portfolio(portfolio, snapshots, config)
     expected = json.loads(result.to_json())
@@ -485,9 +487,14 @@ def test_replay_portfolio_typed_snapshot_tuples_match_the_json_wire() -> None:
 
     typed = pf.replay_portfolio(portfolio, [(date(2025, 1, 15), m0), ("2025-01-16", m1)], pf.ReplayConfig("pv_only"))
     from_dicts = pf.replay_portfolio(portfolio, wire, config)
-    from_json = pf.replay_portfolio(portfolio, json.dumps(wire), config)
 
-    assert json.loads(typed.to_json()) == json.loads(from_dicts.to_json()) == json.loads(from_json.to_json())
+    assert json.loads(typed.to_json()) == json.loads(from_dicts.to_json())
+    refused = r"replay snapshots must be a list of \(date, market\) tuples or a list of dicts"
+    with pytest.raises(TypeError, match=refused):
+        pf.replay_portfolio(portfolio, json.dumps(wire), config)
+    # A mapping would iterate its keys; it is not a snapshot list.
+    with pytest.raises(TypeError, match=refused):
+        pf.replay_portfolio(portfolio, wire[0], config)
     with pytest.raises(ValueError, match=r"all \(date, market\) tuples"):
         pf.replay_portfolio(portfolio, [(date(2025, 1, 15), m0), wire[1]], config)
 
@@ -509,10 +516,9 @@ def test_allocate_weights_returns_typed_result() -> None:
 
 
 def test_allocation_rejects_unsupported_target_volatility() -> None:
-    spec = json.loads(_ALLOCATION_SPEC)
-    spec["target_volatility"] = None
+    spec = {**_ALLOCATION_SPEC, "target_volatility": None}
     with pytest.raises(ValueError, match="target_volatility"):
-        pf.allocate_weights(json.dumps(spec))
+        pf.allocate_weights(spec)
 
 
 # ---------------------------------------------------------------------------
@@ -545,5 +551,5 @@ def test_scenario_pnl_batch_returns_typed_items() -> None:
 def test_json_twins_return_wire_strings() -> None:
     """Every ``_json`` twin returns a parseable JSON string."""
     assert isinstance(json.loads(pf.brinson_fachler(_brinson_sectors()).to_json()), dict)
-    assert isinstance(json.loads(pf.twrr_linked(json.dumps([0.01]), 0.0).to_json()), dict)
+    assert isinstance(json.loads(pf.twrr_linked([0.01], 0.0).to_json()), dict)
     assert isinstance(json.loads(pf.allocate_weights(_ALLOCATION_SPEC).to_json()), dict)

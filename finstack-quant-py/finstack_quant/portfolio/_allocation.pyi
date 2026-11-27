@@ -111,7 +111,7 @@ class WeightAllocationResult:
     Examples
     --------
     >>> from finstack_quant.portfolio import allocate_weights
-    >>> spec = '{"scheme":"equal","total_capital":1000.0,"strategies":[{"id":"a"},{"id":"b"}]}'
+    >>> spec = {"scheme": "equal", "total_capital": 1000.0, "strategies": [{"id": "a"}, {"id": "b"}]}
     >>> [row["weight"] for row in allocate_weights(spec).allocations]
     [0.5, 0.5]
     """
@@ -277,14 +277,14 @@ class WeightAllocationResult:
         Examples
         --------
         >>> from finstack_quant.portfolio import WeightAllocationResult, allocate_weights
-        >>> spec = '{"scheme":"equal","total_capital":1000.0,"strategies":[{"id":"a"},{"id":"b"}]}'
+        >>> spec = {"scheme": "equal", "total_capital": 1000.0, "strategies": [{"id": "a"}, {"id": "b"}]}
         >>> result = allocate_weights(spec)
         >>> WeightAllocationResult.from_json(result.to_json()).to_json() == result.to_json()
         True
         """
         ...
 
-def allocate_weights(spec: WeightAllocationSpec | str | dict[str, Any]) -> WeightAllocationResult:
+def allocate_weights(spec: WeightAllocationSpec | dict[str, Any]) -> WeightAllocationResult:
     """
     Allocate strategy weights from a typed specification.
 
@@ -302,8 +302,8 @@ def allocate_weights(spec: WeightAllocationSpec | str | dict[str, Any]) -> Weigh
 
     Parameters
     ----------
-    spec : WeightAllocationSpec | str | dict
-        JSON-serialized ``WeightAllocationSpec`` with a scheme, finite signed
+    spec : WeightAllocationSpec | dict
+        Typed request or its wire dict with a scheme, finite signed
         total capital, strategy rows, and any required covariance data.
 
     Returns
@@ -317,7 +317,7 @@ def allocate_weights(spec: WeightAllocationSpec | str | dict[str, Any]) -> Weigh
     Raises
     ------
     ValueError
-        If the JSON is malformed, required fields are missing, the
+        If the specification is malformed, required fields are missing, the
         scheme is unsupported, or the selected scheme cannot be evaluated.
     PortfolioError
         If scheme invariants fail or capital cannot be represented at the
@@ -325,9 +325,8 @@ def allocate_weights(spec: WeightAllocationSpec | str | dict[str, Any]) -> Weigh
 
     Examples
     --------
-    >>> import json
     >>> from finstack_quant.portfolio import allocate_weights
-    >>> spec = '{"scheme":"equal","total_capital":1000.0,"strategies":[{"id":"a"},{"id":"b"}]}'
+    >>> spec = {"scheme": "equal", "total_capital": 1000.0, "strategies": [{"id": "a"}, {"id": "b"}]}
     >>> [entry["weight"] for entry in allocate_weights(spec).allocations]
     [0.5, 0.5]
     """

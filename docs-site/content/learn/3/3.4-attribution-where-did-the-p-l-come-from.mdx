@@ -86,7 +86,7 @@ for start, end in zip(history_dates[:-1], history_dates[1:], strict=True):
     # Selection is consequently zero; active return measures allocation alone.
     period = [{'sector': iid, 'portfolio_weight': weights[iid], 'benchmark_weight': 0.5,
                'portfolio_return': returns_by_id[iid], 'benchmark_return': returns_by_id[iid]} for iid in ids]
-    bf = brinson_fachler(json.dumps(period))
+    bf = brinson_fachler(period)
     pnl = sum(ending.values()) + sum(receipts.values()) - total_begin
     brinson_periods.append(json.loads(bf.to_json()))
     p_snap, b_snap = [], []
@@ -108,7 +108,7 @@ for start, end in zip(history_dates[:-1], history_dates[1:], strict=True):
                      'receipts_usd':receipts[iid],'total_return':returns_by_id[iid]})
     cp = campisi_attribution(json.dumps(p_snap), json.dumps(b_snap), json.dumps({'period_years':(end-start).days/365}))
     campisi_periods.append(json.loads(cp.to_json()))
-linked = carino_link(json.dumps(brinson_periods))
+linked = carino_link(brinson_periods)
 active = linked.portfolio_return_compounded-linked.benchmark_return_compounded
 campisi_linked = campisi_carino_link(json.dumps(campisi_periods))
 print(pd.DataFrame(rows).to_string(index=False))
@@ -195,7 +195,7 @@ The SVG is generated from the reconciled USD factors. The explicitly displayed r
 {/* notebook-block notebook="03_analytics/portfolio_returns_and_attribution.ipynb" cell="exercise-allocation-selection" role="exercise" */}
 ```python exec id=exercise-allocation-selection role=exercise
 case=[{"sector":"Equity","portfolio_weight":.7,"benchmark_weight":.5,"portfolio_return":.07,"benchmark_return":.10},{"sector":"Bonds","portfolio_weight":.3,"benchmark_weight":.5,"portfolio_return":.01,"benchmark_return":.02}]
-r=brinson_fachler(json.dumps(case))
+r=brinson_fachler(case)
 print(r.to_json())
 print("Overweight the stronger benchmark sector, yet underperform within both sectors; allocation is positive while selection is negative.")
 ```

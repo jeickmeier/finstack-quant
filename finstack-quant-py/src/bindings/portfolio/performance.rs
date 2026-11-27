@@ -86,30 +86,7 @@ impl PyLinkedReturn {
 
 tabular_methods!(PyLinkedReturn);
 
-/// Compute a Modified-Dietz TWRR sub-period return.
-///
-/// Parameters
-/// ----------
-/// period : str | dict
-///     ``TwrrPeriod`` as JSON or a dict: ``beginning_market_value``,
-///     ``ending_market_value`` and optional ``cashflows: [{amount,
-///     fraction_of_period_remaining}]`` (omitted means no flows). A positive
-///     ``amount`` is a contribution into the portfolio; the fraction, in
-///     ``[0, 1]``, is the share of the period remaining after the flow.
-///     Unknown keys are rejected. The same input the WASM
-///     ``twrrModifiedDietz`` takes.
-///
-/// Returns
-/// -------
-/// float
-///     Sub-period return as a decimal fraction.
-///
-/// Raises
-/// ------
-/// ValueError
-///     When the return is undefined (non-positive adjusted denominator, a
-///     cashflow weight outside ``[0, 1]``) or the period is malformed or has
-///     unknown keys.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._performance", "twrr_modified_dietz")]
 #[pyfunction]
 #[pyo3(text_signature = "(period)")]
 fn twrr_modified_dietz(py: Python<'_>, period: &Bound<'_, PyAny>) -> PyResult<f64> {
@@ -121,30 +98,7 @@ fn twrr_modified_dietz(py: Python<'_>, period: &Bound<'_, PyAny>) -> PyResult<f6
     })
 }
 
-/// Geometrically link TWRR sub-period returns.
-///
-/// Parameters
-/// ----------
-/// returns : str | dict | list | pandas.DataFrame
-///     JSON array of sub-period returns as decimal fractions.
-/// horizon_years : float
-///     Full elapsed horizon in 365-day calendar years; must be finite. Values
-///     below one, including zero and negative values, skip annualization
-///     (``annualised`` then mirrors ``cumulative``).
-///
-/// Returns
-/// -------
-/// LinkedReturn
-///     Typed result with ``cumulative``, ``annualised``, ``is_annualised``
-///     and ``num_periods``.
-///     Use :meth:`to_json` for the raw wire string.
-///
-/// Raises
-/// ------
-/// ValueError
-///     When ``horizon_years`` is NaN or infinite, any sub-period return is
-///     non-finite or at most -1, or the compounded growth factor is
-///     non-positive.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._performance", "twrr_linked")]
 #[pyfunction]
 #[pyo3(text_signature = "(returns, horizon_years)")]
 fn twrr_linked(
@@ -152,10 +106,7 @@ fn twrr_linked(
     returns: &Bound<'_, PyAny>,
     horizon_years: f64,
 ) -> PyResult<PyLinkedReturn> {
-    let returns: Vec<f64> = if let Ok(json) = returns.extract::<String>() {
-        serde_json::from_str(&json)
-            .map_err(|err| serde_json_to_py(err, "invalid TWRR returns JSON"))?
-    } else if crate::bindings::dataframe_utils::is_dataframe_like(returns)? {
+    let returns: Vec<f64> = if crate::bindings::dataframe_utils::is_dataframe_like(returns)? {
         let Some((flat, _nrows, ncols)) =
             crate::bindings::dataframe_utils::extract_2d_f64(returns, "returns")?
         else {
@@ -179,35 +130,7 @@ fn twrr_linked(
         })?,
     })
 }
-/// Compute the money-weighted return (XIRR, Act/365F) from dated cashflows.
-///
-/// Binds Rust ``mwr_xirr``.
-///
-/// Parameters
-/// ----------
-/// cashflows : str | list[tuple[date, float]] | list[dict] | pandas.DataFrame
-///     Dated flows from the investor's cash account: contributions negative,
-///     terminal value / distributions positive. Accepts ``(date, amount)``
-///     pairs (dates as ``datetime.date`` or ISO strings), JSON-shaped dicts
-///     with ``date`` and ``amount`` keys, a DataFrame with those columns, or
-///     the canonical JSON array string. Dates are sorted and equal-date
-///     flows netted; the remaining nonzero flows must change sign exactly once.
-///
-/// Returns
-/// -------
-/// float
-///     Unique annualised internal rate of return as a finite decimal greater
-///     than -1, using Act/365F year fractions.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If the flows are malformed, have fewer than two nonzero net dates,
-///     do not have exactly one net sign change, or no sufficiently accurate
-///     finite return greater than -1 can be found. Nonconventional cashflows
-///     are rejected even when a numerical solver could find one of their roots.
-/// RuntimeError
-///     If the numerical solver fails to converge within the valid return bracket.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._performance", "mwr_xirr")]
 #[pyfunction]
 #[pyo3(text_signature = "(cashflows)")]
 fn mwr_xirr(py: Python<'_>, cashflows: &Bound<'_, PyAny>) -> PyResult<f64> {
@@ -268,7 +191,7 @@ fn mwr_xirr(py: Python<'_>, cashflows: &Bound<'_, PyAny>) -> PyResult<f64> {
 }
 
 /// Interpret a sequence of ``(date, amount)`` 2-tuples; ``None`` when the
-/// input is not in that shape (so the caller can fall back to JSON records).
+/// input is not in that shape (so the caller can fall back to records).
 fn extract_dated_pairs(
     obj: &Bound<'_, PyAny>,
 ) -> PyResult<Option<Vec<(finstack_quant_core::dates::Date, f64)>>> {

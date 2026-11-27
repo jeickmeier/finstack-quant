@@ -37,7 +37,7 @@ def test_brinson_fachler_binding_reconstructs_active_return() -> None:
     """The Python binding exposes Brinson-Fachler attribution as JSON."""
     from finstack_quant.portfolio import brinson_fachler
 
-    result = json.loads(brinson_fachler(json.dumps(_period(0.60, 0.40, 0.08, 0.06, 0.01, 0.03))).to_json())
+    result = json.loads(brinson_fachler(_period(0.60, 0.40, 0.08, 0.06, 0.01, 0.03)).to_json())
 
     reconstructed = result["total_allocation"] + result["total_selection"] + result["total_interaction"]
     assert reconstructed == pytest.approx(result["total_excess_return"], abs=1e-12)
@@ -52,7 +52,7 @@ def test_carino_link_binding_reconstructs_compounded_active_return() -> None:
         _period(0.70, 0.50, 0.10, 0.06, 0.04, 0.05),
         _period(0.60, 0.50, 0.02, 0.03, -0.01, 0.00),
     ]
-    result = json.loads(carino_link([brinson_fachler(json.dumps(p)) for p in periods]).to_json())
+    result = json.loads(carino_link([brinson_fachler(p) for p in periods]).to_json())
 
     geometric_active = result["portfolio_return_compounded"] - result["benchmark_return_compounded"]
     reconstructed = result["linked_allocation"] + result["linked_selection"] + result["linked_interaction"]
@@ -68,12 +68,14 @@ def test_carino_link_links_precomputed_results_not_raw_sectors() -> None:
         _period(0.70, 0.50, 0.10, 0.06, 0.04, 0.05),
         _period(0.60, 0.50, 0.02, 0.03, -0.01, 0.00),
     ]
-    results = [json.loads(brinson_fachler(json.dumps(sectors)).to_json()) for sectors in periods]
-    linked = carino_link(json.dumps(results))
-    typed = carino_link([brinson_fachler(json.dumps(sectors)) for sectors in periods])
+    results = [json.loads(brinson_fachler(sectors).to_json()) for sectors in periods]
+    linked = carino_link(results)
+    typed = carino_link([brinson_fachler(sectors) for sectors in periods])
     assert linked.to_json() == typed.to_json()
+    with pytest.raises(TypeError, match="periods must be a list, a dict or a DataFrame, not a string"):
+        carino_link(json.dumps(results))
     with pytest.raises(ValueError, match="Brinson period results"):
-        carino_link(json.dumps(periods))
+        carino_link(periods)
 
 
 def test_brinson_linked_reconstructs_compounded_active_return() -> None:
@@ -105,9 +107,11 @@ def test_brinson_linked_reconstructs_compounded_active_return() -> None:
     assert sum(s["total"] for s in report.linked_sectors) == pytest.approx(active, abs=1e-12)
     assert len(report.periods) == 3
 
-    reference = carino_link([brinson_fachler(json.dumps(p)) for p in periods])
+    reference = carino_link([brinson_fachler(p) for p in periods])
     assert report.to_json() == reference.to_json()
-    assert brinson_linked(json.dumps(periods)).to_json() == report.to_json()
+    assert brinson_linked(json.loads(json.dumps(periods))).to_json() == report.to_json()
+    with pytest.raises(TypeError, match="periods must be a list, a dict or a DataFrame, not a string"):
+        brinson_linked(json.dumps(periods))
 
     bad = _period(0.60, 0.50, 0.02, 0.03, -0.01, 0.00)
     bad[0]["portfolio_weight"] = 0.9

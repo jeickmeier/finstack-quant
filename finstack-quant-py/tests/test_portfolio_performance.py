@@ -8,7 +8,7 @@ import pytest
 
 
 def test_twrr_modified_dietz_binding_matches_gips_example() -> None:
-    """The Python binding exposes Modified-Dietz TWRR as JSON input."""
+    """The Python binding exposes Modified-Dietz TWRR from a ``TwrrPeriod`` dict."""
     from finstack_quant.portfolio import twrr_modified_dietz
 
     period = {
@@ -22,7 +22,7 @@ def test_twrr_modified_dietz_binding_matches_gips_example() -> None:
         ],
     }
 
-    assert twrr_modified_dietz(json.dumps(period)) == pytest.approx(
+    assert twrr_modified_dietz(period) == pytest.approx(
         -500_000.0 / 10_600_000.0,
         abs=1e-12,
     )
@@ -32,7 +32,7 @@ def test_twrr_linked_binding_geometrically_links_returns() -> None:
     """The Python binding exposes geometric TWRR linking."""
     from finstack_quant.portfolio import twrr_linked
 
-    result = json.loads(twrr_linked(json.dumps([0.05, 0.03]), 1.0).to_json())
+    result = json.loads(twrr_linked([0.05, 0.03], 1.0).to_json())
 
     assert result["cumulative"] == pytest.approx(0.0815, abs=1e-12)
     assert result["annualised"] == pytest.approx(0.0815, abs=1e-12)
@@ -46,7 +46,7 @@ def test_twrr_linked_rejects_non_finite_horizon(horizon: float) -> None:
     from finstack_quant.portfolio import twrr_linked
 
     with pytest.raises(ValueError, match="horizon_years"):
-        twrr_linked(json.dumps([0.05, 0.03]), horizon)
+        twrr_linked([0.05, 0.03], horizon)
 
 
 def test_mwr_xirr_binding_solves_money_weighted_return() -> None:
@@ -58,4 +58,4 @@ def test_mwr_xirr_binding_solves_money_weighted_return() -> None:
         {"date": "2026-01-01", "amount": 110.0},
     ]
 
-    assert mwr_xirr(json.dumps(cashflows)) == pytest.approx(0.10, abs=1e-6)
+    assert mwr_xirr(cashflows) == pytest.approx(0.10, abs=1e-6)
