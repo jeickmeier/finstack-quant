@@ -18,7 +18,7 @@ def test_funded_bond_carry_matches_gross_endpoint_pnl() -> None:
         ).read_text()
     )
     result = attribute_pnl(
-        json.dumps(fixture["instrument"]),
+        fixture["instrument"],
         {
             "market_t0": fixture["market"],
             "market_t1": fixture["market"],
@@ -46,7 +46,7 @@ def test_convertible_credit_move_is_not_counted_as_rates(method: str | dict) -> 
         ).read_text()
     )
     result = attribute_pnl(
-        json.dumps(fixture["instrument"]),
+        fixture["instrument"],
         {
             "market_t0": fixture["market_t0"],
             "market_t1": fixture["market_t1"],

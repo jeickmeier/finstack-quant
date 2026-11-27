@@ -203,7 +203,7 @@ for mode in ('linear','log_linear'):
     grid=[0.3+i*0.05 for i in range(190)]
     ax.plot(grid,[100*curve.forward(t,t+0.02) for t in grid],label=mode)
 ax.set(xlabel='Years',ylabel='Short-interval forward (%)');ax.legend();fig.tight_layout()
-market=build_market('foundations');bond=json.dumps(instruments('foundations')['USD-CORP'])
+market=build_market('foundations');bond=instruments('foundations')['USD-CORP']
 calibrated_pv=price_instrument(bond,market,AS_OF).price
 hand_rate=market.get_discount('USD-OIS').zero_rate(1,'continuous')
 market.insert(DiscountCurve.flat('USD-OIS',AS_OF,hand_rate,'act_365f'))

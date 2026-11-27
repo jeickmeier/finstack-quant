@@ -116,12 +116,12 @@ for terminal in (50.0, 70.0, 90.0, 100.0, 125.0, 160.0):
         note_spec["final_payoff_type"] = payoff
         envelope = {"schema": "finstack_quant.instrument/1",
                     "instrument": {"type": "autocallable", "spec": note_spec}}
-        value = price_instrument(json.dumps(envelope), note_market, "2026-01-01").price
+        value = price_instrument(envelope, note_market, "2026-01-01").price
         values.append(value)
     print(f"{terminal:8.0f} | {values[0]:17.2f} | {values[1]:10.2f} | {values[2]:18.2f}")
 note_spec["past_fixings"] = [["2025-12-30", 50.0], ["2025-12-31", 100.0]]
 envelope["instrument"]["spec"] = note_spec
-recovered = price_instrument(json.dumps(envelope), note_market, "2026-01-01").price
+recovered = price_instrument(envelope, note_market, "2026-01-01").price
 print(f"Prior knock-in with full recovery: {recovered:.2f}")
 ```
 {/* /notebook-block */}
@@ -213,7 +213,7 @@ receipts["EQUITY"] = cash_available - sum(receipts.values())
 flow_df = lesson28_market.get_discount("USD-OIS").df((date(2025, 4, 15) - AS_OF).days / 365)
 waterfall_rows = []
 for tranche, receipt in receipts.items():
-    native = tranche_metrics(json.dumps(lesson28_deal), tranche, lesson28_market, AS_OF)
+    native = tranche_metrics(lesson28_deal, tranche, lesson28_market, AS_OF)
     waterfall_rows.append({"tranche": tranche, "receipt_usd": receipt, "native_pv_usd": native.pv})
 print(pd.DataFrame(waterfall_rows).to_string(index=False))
 ```
@@ -295,7 +295,7 @@ base_correlation_rows = []
 for rho in (0.15, 0.25, 0.40):
     tranche_market = tracks.build_structured_market(AS_OF)
     tranche_market.insert(BaseCorrelationCurve("CDX-BASE-CORR", [(3.0, rho), (7.0, rho), (15.0, rho), (100.0, rho)]))
-    tranche_value = price_instrument(json.dumps(synthetic), tranche_market, AS_OF, model="hazard_rate")
+    tranche_value = price_instrument(synthetic, tranche_market, AS_OF, model="hazard_rate")
     base_correlation_rows.append({"base_correlation": rho, "protection_pv_usd": tranche_value.value.amount})
 print(pd.DataFrame(base_correlation_rows).to_string(index=False))
 ```
@@ -341,17 +341,16 @@ from finstack_quant.valuations.instruments import (
 AS_OF = date(2025, 1, 15)
 
 long_deal = tracks.clo_deal()
-long_wire = json.dumps(long_deal)
-mezzanine = tranche_metrics(long_wire, "BBB", lesson28_market, AS_OF)
-breakeven = tranche_breakeven_cdr(long_wire, "BBB", lesson28_market, AS_OF)
+mezzanine = tranche_metrics(long_deal, "BBB", lesson28_market, AS_OF)
+breakeven = tranche_breakeven_cdr(long_deal, "BBB", lesson28_market, AS_OF)
 grid = {"cprs": [0.0], "cdrs": [0.0, 0.01, 0.02, 0.05], "severities": [0.6], "recovery_lag": 6}
-scenario_table = tranche_scenario_table(long_wire, "BBB", lesson28_market, AS_OF, grid)
+scenario_table = tranche_scenario_table(long_deal, "BBB", lesson28_market, AS_OF, grid)
 scenario_rows = json.loads(scenario_table.to_json())["cells"]
-oas = tranche_oas(long_wire, "BBB", lesson28_market, AS_OF, mezzanine.clean_price_pct)
+oas = tranche_oas(long_deal, "BBB", lesson28_market, AS_OF, mezzanine.clean_price_pct)
 # This BBB contract pays a fixed coupon. A floating-tranche margin is inapplicable.
 discount_margin_error = None
 try:
-    tranche_discount_margin(long_wire, "BBB", lesson28_market, AS_OF, mezzanine.clean_price_pct)
+    tranche_discount_margin(long_deal, "BBB", lesson28_market, AS_OF, mezzanine.clean_price_pct)
 except ValueError as error:
     discount_margin_error = str(error)
 print("Fixed-coupon discount-margin rejection:", discount_margin_error)

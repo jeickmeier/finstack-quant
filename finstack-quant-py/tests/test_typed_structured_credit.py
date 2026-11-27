@@ -169,7 +169,9 @@ class TestStructuredCreditTypedAnalytics:
         tranche_id = _metrics_tranche_id(deal_json)
         market = _market()
 
-        via_json = tranche_metrics(deal_json, tranche_id, market, "2024-01-01")
+        via_json = tranche_metrics(json.loads(deal_json), tranche_id, market, "2024-01-01")
+        with pytest.raises(TypeError, match="typed instrument instance or a canonical instrument envelope dict"):
+            tranche_metrics(deal_json, tranche_id, market, "2024-01-01")
         typed_deal = StructuredCredit.from_json(deal_json)
         via_typed = tranche_metrics(typed_deal, tranche_id, market, "2024-01-01")
         # Both sides serialize the same Rust value directly (no parse cycle),

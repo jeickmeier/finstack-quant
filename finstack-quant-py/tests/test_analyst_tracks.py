@@ -105,7 +105,7 @@ def test_structured_helpers_are_fresh_and_use_the_base_stage(
     second = tracks.structured_index_inputs()
     first["CDX-0-3"]["instrument"]["spec"]["detach_pct"] = 7.0
     market = tracks.build_structured_market()
-    tranche = price_instrument(json.dumps(second["CDX-0-3"]), market, tracks.AS_OF, model="hazard_rate")
+    tranche = price_instrument(second["CDX-0-3"], market, tracks.AS_OF, model="hazard_rate")
 
     assert sorted(second) == ["ANALYST-CDX", "CDX-0-3"]
     assert "CDX-PAYER" not in second
@@ -128,7 +128,7 @@ def test_real_clo_one_payment_cash_conservation_and_separate_bbb(tracks: ModuleT
     receipts["EQUITY"] = principal + interest - sum(receipts.values())
     market = tracks.build_market("credit")
     df = market.get_discount("USD-OIS").df((date(2025, 4, 15) - tracks.AS_OF).days / 365.0)
-    native = {iid: tranche_metrics(json.dumps(deal), iid, market, tracks.AS_OF).pv for iid in receipts}
+    native = {iid: tranche_metrics(deal, iid, market, tracks.AS_OF).pv for iid in receipts}
     assert sum(native.values()) / df == pytest.approx(principal + interest, abs=0.01)
     assert all(native[iid] == pytest.approx(receipts[iid] * df, abs=0.01) for iid in receipts)
     holding = tracks.clo_bbb_holding()
@@ -141,7 +141,7 @@ def test_oc_breach_changes_priority_and_does_not_invent_a_bbb_instrument(tracks:
     base, breach = tracks.clo_deal(), tracks.clo_deal(oc_trigger=1.30)
     assert 100e6 / 80e6 < 1.30
     metrics = [
-        {iid: tranche_metrics(json.dumps(payload), iid, market, tracks.AS_OF) for iid in ("AAA", "BBB", "EQUITY")}
+        {iid: tranche_metrics(payload, iid, market, tracks.AS_OF) for iid in ("AAA", "BBB", "EQUITY")}
         for payload in (base, breach)
     ]
     assert metrics[1]["AAA"].wal < metrics[0]["AAA"].wal
@@ -154,11 +154,11 @@ def test_index_payer_front_end_protection_and_convertible_limit(tracks: ModuleTy
     payer = tracks.credit_index_inputs()["CDX-PAYER"]
     knockout = deepcopy(payer)
     knockout["instrument"]["spec"]["knockout"] = True
-    nonko = price_instrument(json.dumps(payer), market, tracks.AS_OF, model="bloomberg_cdso").value.amount
-    ko = price_instrument(json.dumps(knockout), market, tracks.AS_OF, model="bloomberg_cdso").value.amount
+    nonko = price_instrument(payer, market, tracks.AS_OF, model="bloomberg_cdso").value.amount
+    ko = price_instrument(knockout, market, tracks.AS_OF, model="bloomberg_cdso").value.amount
     assert nonko > ko > 0
     payload = tracks.convertible_limit()
-    tree = price_instrument(json.dumps(payload), market, tracks.AS_OF, model="tree").value.amount
+    tree = price_instrument(payload, market, tracks.AS_OF, model="tree").value.amount
     analytical = 1000 * math.exp(-0.04) + 10 * bs_price({
         "spot": 100,
         "strike": 100,
@@ -181,8 +181,8 @@ def test_wrong_way_risk_keeps_marginal_utilization_fixed(tracks: ModuleType) -> 
     assert conditional[1] > conditional[0]
     payload = tracks.stochastic_revolver(num_paths=256)
     market = tracks.build_market("credit")
-    first = price_instrument(json.dumps(payload), market, tracks.AS_OF, model="monte_carlo_three_factor").value.amount
-    second = price_instrument(json.dumps(payload), market, tracks.AS_OF, model="monte_carlo_three_factor").value.amount
+    first = price_instrument(payload, market, tracks.AS_OF, model="monte_carlo_three_factor").value.amount
+    second = price_instrument(payload, market, tracks.AS_OF, model="monte_carlo_three_factor").value.amount
     assert first == second
     assert first > 0
 
@@ -207,7 +207,7 @@ def test_future_delivery_choice_switches_and_american_value_is_not_lower(tracks:
             future = deepcopy(inputs["UST-FUTURE"])
             future["instrument"]["spec"].update({"ctd_bond_id": iid, "ctd_bond": inputs[iid]["instrument"]["spec"]})
             result = price_instrument(
-                json.dumps(future),
+                future,
                 market,
                 tracks.AS_OF,
                 model="bond_future_clean_price_proxy",
@@ -218,16 +218,16 @@ def test_future_delivery_choice_switches_and_american_value_is_not_lower(tracks:
     assert cheapest == ["UST-DELIVERABLE-A", "UST-DELIVERABLE-B"]
     option = inputs["SPX-FUTURE-CALL"]
     market = tracks.build_market("vol")
-    european = price_instrument(json.dumps(option), market, tracks.AS_OF).value.amount
+    european = price_instrument(option, market, tracks.AS_OF).value.amount
     option["instrument"]["spec"]["terms"]["exercise_style"] = "american"
-    american = price_instrument(json.dumps(option), market, tracks.AS_OF).value.amount
+    american = price_instrument(option, market, tracks.AS_OF).value.amount
     assert american >= european > 0
 
 
 def test_variance_units_ohlc_and_kirk_independent_mc(tracks: ModuleType) -> None:
     market = tracks.build_market("vol")
     variance = price_instrument(
-        json.dumps(tracks.variance_inputs()["SPX-VARIANCE"]),
+        tracks.variance_inputs()["SPX-VARIANCE"],
         market,
         tracks.AS_OF,
         metrics=["variance_expected", "variance_realized"],
@@ -241,7 +241,7 @@ def test_variance_units_ohlc_and_kirk_independent_mc(tracks: ModuleType) -> None
         [day for day, _ in rows] == [day for day, _ in observations["SPX-CLOSE"]] for rows in observations.values()
     )
     spread = tracks.commodity_inputs()["WTI-BRENT-SPREAD"]
-    kirk = price_instrument(json.dumps(spread), market, tracks.AS_OF, model="black76").value.amount
+    kirk = price_instrument(spread, market, tracks.AS_OF, model="black76").value.amount
     time = (date(2025, 9, 15) - tracks.AS_OF).days / 365.0
     forwards = np.array([market.get_price_curve(f"{name}-FORWARD").price(time) for name in ("WTI", "BRENT")])
     sigma = np.array([0.30, 0.28])

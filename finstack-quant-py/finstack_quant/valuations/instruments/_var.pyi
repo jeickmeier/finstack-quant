@@ -31,7 +31,7 @@ def calculate_var(
 
     Parameters
     ----------
-    instruments : list[Bond | InterestRateSwap | ... | str]
+    instruments : list[Bond | InterestRateSwap | ... | dict]
         Typed instruments or ``finstack_quant.instrument/1`` envelopes. An
         empty list returns zero VaR and ES.
     market : MarketContext
@@ -60,7 +60,7 @@ def calculate_var(
     Raises
     ------
     TypeError
-        If an ``instruments`` entry is not a typed instrument, an envelope dict or a JSON string.
+        If an ``instruments`` entry is not a typed instrument or an envelope dict.
     ValueError
         If an instrument, ``config``, ``history`` or ``model`` is invalid, the
         confidence level is outside ``(0, 1)``, a non-empty portfolio has no

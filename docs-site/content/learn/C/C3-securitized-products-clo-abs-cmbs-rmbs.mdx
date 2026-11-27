@@ -113,7 +113,7 @@ receipts["EQUITY"]=principal+interest-sum(receipts.values())
 df=market.get_discount("USD-OIS").df((date(2025,4,15)-AS_OF).days/365)
 rows=[]
 for tranche,receipt in receipts.items():
-    native=tranche_metrics(json.dumps(short_deal),tranche,market,AS_OF)
+    native=tranche_metrics(short_deal,tranche,market,AS_OF)
     rows.append({"tranche":tranche,"hand_receipt_usd":receipt,"hand_pv_usd":receipt*df,"native_pv_usd":native.pv})
 print(pd.DataFrame(rows))
 ```
@@ -133,7 +133,7 @@ rated=deepcopy(deal)
 for asset,rating,spread in zip(rated["instrument"]["spec"]["pool"]["assets"],
                               ["BB","BB-","B+","B","B-"],[325.,350.,400.,450.,500.]):
     asset.update(rating=rating,spread_bp=spread,forward_curve_id="USD-SOFR-3M",reset_lag_days=2)
-pool_metrics=price_instrument(json.dumps(rated),market,AS_OF,metrics=["clo_warf","clo_was","wal"])
+pool_metrics=price_instrument(rated,market,AS_OF,metrics=["clo_warf","clo_was","wal"])
 print(pd.Series(pool_metrics.metrics))
 preset_rows=[];presets={}
 for kind in ["clo","abs","cmbs","rmbs"]:
@@ -173,7 +173,7 @@ for payload in [fee_deal,reinvest]:
 fee_rows=[]
 for name,payload in [("fees_no_reinvestment",fee_deal),("fees_reinvest_2y",reinvest)]:
     for tranche in ["AAA","BBB","EQUITY"]:
-        out=tranche_metrics(json.dumps(payload),tranche,market,AS_OF)
+        out=tranche_metrics(payload,tranche,market,AS_OF)
         fee_rows.append({"case":name,"tranche":tranche,"PV":out.pv,"WAL":out.wal})
 print(pd.DataFrame(fee_rows))
 print("Fees are explicit synthetic inputs matching the library CLO standard: $50k trustee, 40bp senior and 20bp subordinate management. Constructor defaults alone do not populate these fees.")
@@ -192,7 +192,7 @@ breach=tracks.clo_deal(oc_trigger=1.30)
 oc_rows=[]
 for scenario,payload in [("base",deal),("OC_130",breach)]:
     for tranche in ["AAA","BBB","EQUITY"]:
-        result=tranche_metrics(json.dumps(payload),tranche,market,AS_OF)
+        result=tranche_metrics(payload,tranche,market,AS_OF)
         oc_rows.append({"scenario":scenario,"tranche":tranche,"pv_usd":result.pv,"wal_years":result.wal})
 oc=pd.DataFrame(oc_rows).set_index(["scenario","tranche"])
 print(oc)
@@ -208,7 +208,7 @@ for cdr in [0.,.08]:
         payload=tracks.clo_deal(oc_trigger=trigger);s=payload["instrument"]["spec"]
         s["default_spec"]={"curve":"constant","cdr":cdr}
         for tranche in ["AAA","BBB"]:
-            out=tranche_metrics(json.dumps(payload),tranche,market,AS_OF)
+            out=tranche_metrics(payload,tranche,market,AS_OF)
             loss_oc_rows.append({"CDR":cdr,"OC_trigger":trigger,"tranche":tranche,"PV":out.pv,"WAL":out.wal})
 stress_without=next(r for r in loss_oc_rows if math.isclose(r["CDR"], .08) and r["OC_trigger"] is None and r["tranche"]=="AAA")
 stress_with=next(r for r in loss_oc_rows if math.isclose(r["CDR"], .08) and r["OC_trigger"] is not None and math.isclose(r["OC_trigger"], 1.249) and r["tranche"]=="AAA")
@@ -229,13 +229,13 @@ abs_deal=deepcopy(presets["abs"]);a=abs_deal["instrument"]["spec"]
 a["prepayment_spec"]=json.loads(PrepaymentModelSpec.psa(1.5).to_json())
 a["waterfall_rules"]={"step_down":{"step_down_date":"2027-01-15","triggers":[{"max_cumulative_loss":.04}]},
     "excess_spread":{"target_balance":{"amount":"1000000","currency":"USD"}}}
-abs_price=price_instrument(json.dumps(abs_deal),market,AS_OF,metrics=["prepayment01"])
+abs_price=price_instrument(abs_deal,market,AS_OF,metrics=["prepayment01"])
 print({"ABS_PV":abs_price.value.amount,**abs_price.metrics})
 cmbs=deepcopy(presets["cmbs"]);c=cmbs["instrument"]["spec"]
 c["prepayment_spec"]=json.loads(PrepaymentModelSpec.cmbs_with_lockout(60,.10).to_json())
 c["fees"]={"trustee_fee":{"amount":"75000","currency":"USD"},"senior_mgmt_fee_bp":0.,
     "subordinated_mgmt_fee_bp":0.,"servicing_fee_bp":0.,"master_servicer_fee_bp":25.,"special_servicer_fee_bp":25.}
-cmbs_price=price_instrument(json.dumps(cmbs),market,AS_OF,metrics=["prepayment01"])
+cmbs_price=price_instrument(cmbs,market,AS_OF,metrics=["prepayment01"])
 print({"CMBS_PV":cmbs_price.value.amount,**cmbs_price.metrics})
 print("All collateral is bullet at legal maturity and locked out until then. Zero local CPR sensitivity does not remove balloon/refinancing or default/recovery risk; special servicing fees enter on their native default-related base.")
 ```
@@ -248,8 +248,8 @@ print("All collateral is bullet at legal maturity and locked out until then. Zer
 {/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="c3-quote-breakeven" role="build" */}
 ```python exec id=c3-quote-breakeven role=build
 from finstack_quant.valuations.instruments import tranche_breakeven_cdr
-quoted=tranche_metrics(json.dumps(deal),"BBB",market,AS_OF,market_price_pct=96.5)
-first_loss_cdr=tranche_breakeven_cdr(json.dumps(deal),"BBB",market,AS_OF)
+quoted=tranche_metrics(deal,"BBB",market,AS_OF,market_price_pct=96.5)
+first_loss_cdr=tranche_breakeven_cdr(deal,"BBB",market,AS_OF)
 print(json.loads(quoted.to_json()))
 print({"first_principal_writedown_annual_CDR":first_loss_cdr})
 print("Break-even CDR locates first principal writedown. It is not the default rate at which NPV equals the 96.5 purchase price; the quote-conditioned z-spread is a separate calculation.")
@@ -260,7 +260,7 @@ print("Break-even CDR locates first principal writedown. It is not the default r
 {/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="c3-workflow-5" role="build" */}
 ```python exec id=c3-workflow-5 role=build
 grid={"cprs":[0.0,0.15],"cdrs":[0.0,0.05],"severities":[0.4,0.6],"recovery_lag":6}
-table=tranche_scenario_table(json.dumps(deal),"BBB",market,AS_OF,grid)
+table=tranche_scenario_table(deal,"BBB",market,AS_OF,grid)
 scenario_rows=json.loads(table.to_json())["cells"]
 print(pd.DataFrame(scenario_rows))
 ```
@@ -269,7 +269,7 @@ print(pd.DataFrame(scenario_rows))
 <ExecutedOutput lesson="C3" block="c3-workflow-5" />
 {/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="c3-workflow-7" role="build" */}
 ```python exec id=c3-workflow-7 role=build
-severe=tranche_scenario_table(json.dumps(deal),"BBB",market,AS_OF,
+severe=tranche_scenario_table(deal,"BBB",market,AS_OF,
     {"cprs":[0.0],"cdrs":[0.10],"severities":[0.80],"recovery_lag":6})
 print(pd.DataFrame(json.loads(severe.to_json())["cells"]))
 ```
@@ -282,7 +282,7 @@ from finstack_quant.portfolio import value_portfolio
 holding=tracks.clo_bbb_holding()
 book=tracks.build_book("credit")
 native=value_portfolio(book,market,metrics=[])
-bbb=tranche_metrics(json.dumps(holding["deal"]),holding["tranche_id"],market,AS_OF)
+bbb=tranche_metrics(holding["deal"],holding["tranche_id"],market,AS_OF)
 report=pd.DataFrame([{ "component":"native credit book", "pv_usd":native.total_value},
                      {"component":"CLO BBB analytical sleeve", "pv_usd":holding["quantity"]*bbb.pv}])
 report.loc[len(report)]={"component":"combined report total","pv_usd":report["pv_usd"].sum()}
@@ -305,7 +305,7 @@ The public tranche table provides price, WAL and writedown, not a dated per-tran
 ```python exec id=c3-exercise-equity role=exercise
 # With one payment date, discounted native equity PV identifies the exact terminal cash.
 # This controlled IRR exercise is explicitly a 90-day deal; the earlier five-year grid remains the risk reference.
-equity_grid=tranche_scenario_table(json.dumps(short_deal),"EQUITY",market,AS_OF,
+equity_grid=tranche_scenario_table(short_deal,"EQUITY",market,AS_OF,
     {"cprs":[0.,.15],"cdrs":[0.,.25,.50,.90],"severities":[.80],"recovery_lag":0})
 equity_rows=json.loads(equity_grid.to_json())["cells"]
 for row in equity_rows:
@@ -339,7 +339,7 @@ enhancement_rows=[]
 for name,payload in [("original_5m_equity",deal),("10m_equity_funded",subordinated),("5m_spread_account_target",spread_enhanced)]:
     for cdr in [0.,.05]:
         x=deepcopy(payload);z=x["instrument"]["spec"];z["default_spec"]={"curve":"constant","cdr":cdr}
-        out=tranche_metrics(json.dumps(x),"BBB",market,AS_OF)
+        out=tranche_metrics(x,"BBB",market,AS_OF)
         enhancement_rows.append({"enhancement":name,"CDR":cdr,"BBB_PV":out.pv,"BBB_WAL":out.wal})
 print(pd.DataFrame(enhancement_rows))
 print("Extra equity is funded at closing; excess spread must first be earned and retained. A target is not an upfront reserve balance. Their timing and protection are different even when both headline amounts are $5m.")
@@ -364,7 +364,7 @@ shifted["instrument"]["spec"]["waterfall_rules"]={"shifting_interest":{"senior_i
     {"months_from_closing":36,"senior_decimal":.65}]}}
 rmbs_rows=[]
 for name,payload in [("sequential",rmbs),("shifting_interest",shifted)]:
-    out=tranche_metrics(json.dumps(payload),"AAA",market,AS_OF)
+    out=tranche_metrics(payload,"AAA",market,AS_OF)
     rmbs_rows.append({"allocation":name,"senior_WAL":out.wal,"senior_PV":out.pv})
 print(pd.DataFrame(rmbs_rows))
 print("The native rule allocates all principal by scheduled weights. It is a first-order non-agency treatment, not an agency scheduled-principal/prepayment split.")

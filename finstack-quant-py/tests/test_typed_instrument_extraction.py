@@ -2,10 +2,12 @@
 
 Pricing entry points clone a typed instance's inner Rust instrument instead of
 serializing it to an envelope and parsing it back. The envelope path is
-unchanged, so each typed call must match the same call on ``to_json()``
-exactly: results, cashflows, VaR, structured-credit metrics, composite legs,
-statement debt, scenario and horizon runs, portfolio positions, optimization
-candidates, attribution, and error messages.
+unchanged, so each typed call must match the same call on the envelope dict
+(``json.loads(to_json())``) exactly: results, cashflows, VaR, structured-credit
+metrics, composite legs, statement debt, scenario and horizon runs, portfolio
+positions, optimization candidates, attribution, and error messages. Envelope
+text is not an instrument argument: every entry point refuses it with
+``TypeError``.
 """
 
 from __future__ import annotations
@@ -139,10 +141,21 @@ def _assert_same(typed: Callable[[], object], via_json: Callable[[], object]) ->
     return typed_outcome
 
 
+def _envelope(instrument: object) -> dict:
+    """The instrument's canonical envelope dict: the input form that is not the typed object."""
+    return json.loads(instrument.to_json())  # type: ignore[attr-defined]
+
+
+def _assert_text_refused(call: Callable[[], object]) -> None:
+    """A ``str`` is a value, never a JSON document: envelope text is refused."""
+    with pytest.raises(TypeError, match="expected a typed instrument instance or a canonical instrument envelope dict"):
+        call()
+
+
 @pytest.mark.parametrize("cls", EXAMPLE_TYPES, ids=lambda cls: cls.__name__)
 def test_price_and_cashflows_typed_equal_envelope(cls: type) -> None:
     instrument = cls.example()
-    envelope = instrument.to_json()
+    envelope = _envelope(instrument)
     market = _market()
     _assert_same(
         lambda: price_instrument(instrument, market, AS_OF),
@@ -152,6 +165,8 @@ def test_price_and_cashflows_typed_equal_envelope(cls: type) -> None:
         lambda: instrument_cashflows(instrument, market, AS_OF, "discounting"),
         lambda: instrument_cashflows(envelope, market, AS_OF, "discounting"),
     )
+    _assert_text_refused(lambda: price_instrument(instrument.to_json(), market, AS_OF))
+    _assert_text_refused(lambda: instrument_cashflows(instrument.to_json(), market, AS_OF, "discounting"))
 
 
 @pytest.mark.parametrize(
@@ -166,18 +181,20 @@ def test_bond_metrics_typed_equal_envelope(make: Callable[[], Bond], metrics: li
     bond = make()
     kind, _ = _assert_same(
         lambda: price_instrument(bond, _market(), AS_OF, metrics=metrics),
-        lambda: price_instrument(bond.to_json(), _market(), AS_OF, metrics=metrics),
+        lambda: price_instrument(_envelope(bond), _market(), AS_OF, metrics=metrics),
     )
     assert kind == "ok"
+    _assert_text_refused(lambda: price_instrument(bond.to_json(), _market(), AS_OF, metrics=metrics))
 
 
 def test_bond_cashflows_typed_equal_envelope() -> None:
     bond = _fixed_bond()
     kind, _ = _assert_same(
         lambda: instrument_cashflows(bond, _market(), AS_OF, "discounting"),
-        lambda: instrument_cashflows(bond.to_json(), _market(), AS_OF, "discounting"),
+        lambda: instrument_cashflows(_envelope(bond), _market(), AS_OF, "discounting"),
     )
     assert kind == "ok"
+    _assert_text_refused(lambda: instrument_cashflows(bond.to_json(), _market(), AS_OF, "discounting"))
 
 
 def test_metric_pricing_overrides_merge_identically() -> None:
@@ -188,15 +205,18 @@ def test_metric_pricing_overrides_merge_identically() -> None:
             bond, _market(), AS_OF, metrics=["dv01", "theta"], extras={"metric_pricing_overrides": overrides}
         ),
         lambda: price_instrument(
-            bond.to_json(), _market(), AS_OF, metrics=["dv01", "theta"], extras={"metric_pricing_overrides": overrides}
+            _envelope(bond), _market(), AS_OF, metrics=["dv01", "theta"], extras={"metric_pricing_overrides": overrides}
         ),
     )
     assert kind == "ok"
     kind, _ = _assert_same(
         lambda: price_instrument(bond, _market(), AS_OF, extras='{"metric_pricing_overrides": {"bogus": 1}}'),
-        lambda: price_instrument(bond.to_json(), _market(), AS_OF, extras={"metric_pricing_overrides": {"bogus": 1}}),
+        lambda: price_instrument(_envelope(bond), _market(), AS_OF, extras={"metric_pricing_overrides": {"bogus": 1}}),
     )
     assert kind == "ValueError"
+    _assert_text_refused(
+        lambda: price_instrument(bond.to_json(), _market(), AS_OF, extras={"metric_pricing_overrides": overrides})
+    )
 
 
 def test_calculate_var_typed_equal_envelope() -> None:
@@ -223,15 +243,16 @@ def test_calculate_var_typed_equal_envelope() -> None:
     instruments = [_fixed_bond(), _frn()]
     kind, _ = _assert_same(
         lambda: calculate_var(instruments, _market(), history, AS_OF),
-        lambda: calculate_var([i.to_json() for i in instruments], _market(), history, AS_OF),
+        lambda: calculate_var([_envelope(i) for i in instruments], _market(), history, AS_OF),
     )
     assert kind == "ok"
+    _assert_text_refused(lambda: calculate_var([i.to_json() for i in instruments], _market(), history, AS_OF))
 
 
 def test_structured_credit_metrics_typed_equal_envelope() -> None:
     deal = StructuredCredit.example()
-    envelope = deal.to_json()
-    tranche_ids = [t["id"] for t in json.loads(envelope)["instrument"]["spec"]["tranches"]["tranches"]]
+    envelope = _envelope(deal)
+    tranche_ids = [t["id"] for t in envelope["instrument"]["spec"]["tranches"]["tranches"]]
     assert tranche_ids
     for tranche_id in tranche_ids:
         kind, _ = _assert_same(
@@ -239,15 +260,17 @@ def test_structured_credit_metrics_typed_equal_envelope() -> None:
             lambda tid=tranche_id: tranche_metrics(envelope, tid, _market(), AS_OF),
         )
         assert kind == "ok"
+    _assert_text_refused(lambda: tranche_metrics(deal.to_json(), tranche_ids[0], _market(), AS_OF))
 
 
 def test_composite_leg_typed_equal_envelope() -> None:
     bond = _fixed_bond()
     kind, _ = _assert_same(
         lambda: composite.CompositeLegSpec("B1", bond, 1.0),
-        lambda: composite.CompositeLegSpec("B1", bond.to_json(), 1.0),
+        lambda: composite.CompositeLegSpec("B1", _envelope(bond), 1.0),
     )
     assert kind == "ok"
+    _assert_text_refused(lambda: composite.CompositeLegSpec("B1", bond.to_json(), 1.0))
 
 
 @pytest.mark.parametrize("cls", [Bond, TermLoan, EquityOption], ids=lambda cls: cls.__name__)
@@ -260,15 +283,16 @@ def test_statement_add_debt_typed_equal_envelope(cls: type) -> None:
         return builder.build()
 
     instrument = cls.example()
-    kind, _ = _assert_same(lambda: build(instrument), lambda: build(instrument.to_json()))
+    kind, _ = _assert_same(lambda: build(instrument), lambda: build(_envelope(instrument)))
     # Equity options are not capital-structure debt; the rejection must match too.
     assert kind == ("ValueError" if cls is EquityOption else "ok")
+    _assert_text_refused(lambda: build(instrument.to_json()))
 
 
 @pytest.mark.parametrize("cls", EXAMPLE_TYPES, ids=lambda cls: cls.__name__)
 def test_scenario_and_horizon_typed_equal_envelope(cls: type) -> None:
     instrument = cls.example()
-    envelope = instrument.to_json()
+    envelope = _envelope(instrument)
     roll = ScenarioSpec("roll", [OperationSpec.time_roll_forward("1M", roll_mode="calendar_days")])
     shock = ScenarioSpec("up25", [OperationSpec.curve_parallel_bp("discount", "USD-OIS", 25.0)])
     _assert_same(
@@ -279,12 +303,14 @@ def test_scenario_and_horizon_typed_equal_envelope(cls: type) -> None:
         lambda: compute_horizon_return(instrument, _market(), AS_OF, shock),
         lambda: compute_horizon_return(envelope, _market(), AS_OF, shock),
     )
+    _assert_text_refused(lambda: apply_scenario(roll, _market(), AS_OF, instruments=[instrument.to_json()]))
+    _assert_text_refused(lambda: compute_horizon_return(instrument.to_json(), _market(), AS_OF, shock))
 
 
 @pytest.mark.parametrize("cls", EXAMPLE_TYPES, ids=lambda cls: cls.__name__)
 def test_portfolio_position_and_candidate_typed_equal_envelope(cls: type) -> None:
     instrument = cls.example()
-    envelope = instrument.to_json()
+    envelope = _envelope(instrument)
     kind, _ = _assert_same(
         lambda: Portfolio.builder("book", "USD", AS_OF).position("P1", instrument, 2.0).build(),
         lambda: Portfolio.builder("book", "USD", AS_OF).position("P1", envelope, 2.0).build(),
@@ -295,12 +321,16 @@ def test_portfolio_position_and_candidate_typed_equal_envelope(cls: type) -> Non
         lambda: CandidatePosition("C1", "ACME", envelope, max_weight=0.5),
     )
     assert kind == "ok"
+    _assert_text_refused(
+        lambda: Portfolio.builder("book", "USD", AS_OF).position("P1", instrument.to_json(), 2.0).build()
+    )
+    _assert_text_refused(lambda: CandidatePosition("C1", "ACME", instrument.to_json(), max_weight=0.5))
 
 
 @pytest.mark.parametrize("cls", EXAMPLE_TYPES, ids=lambda cls: cls.__name__)
 def test_attribution_typed_equal_envelope(cls: type) -> None:
     instrument = cls.example()
-    envelope = instrument.to_json()
+    envelope = _envelope(instrument)
     t1 = datetime.date(2024, 1, 22)
     market_t1 = _market(t1, df_5y=0.81)
     _assert_same(
@@ -324,6 +354,18 @@ def test_attribution_typed_equal_envelope(cls: type) -> None:
                 "method": "parallel",
             },
         ),
+    )
+    _assert_text_refused(
+        lambda: attribute_pnl(
+            instrument.to_json(),
+            {
+                "market_t0": _market(),
+                "market_t1": market_t1,
+                "as_of_t0": AS_OF,
+                "as_of_t1": t1,
+                "method": "parallel",
+            },
+        )
     )
 
 
@@ -349,17 +391,29 @@ def test_attribution_many_typed_equal_envelope() -> None:
             "as_of_t1": t1,
             "method": "parallel",
         },
-        [i.to_json() for i in instruments],
+        [_envelope(i) for i in instruments],
     )
     assert typed.to_records() == via_json.to_records()
     assert typed.to_pandas().equals(via_json.to_pandas())
+    _assert_text_refused(
+        lambda: attribute_pnl_many(
+            {
+                "market_t0": _market(),
+                "market_t1": market_t1,
+                "as_of_t0": AS_OF,
+                "as_of_t1": t1,
+                "method": "parallel",
+            },
+            [i.to_json() for i in instruments],
+        )
+    )
 
 
 @pytest.mark.parametrize("make", [_fixed_bond, _frn], ids=["fixed", "frn"])
 def test_priced_scenario_horizon_attribution_typed_equal_envelope(make: Callable[[], Bond]) -> None:
     """Most examples need curves `_market` lacks; these bonds price on it, so results are compared."""
     bond = make()
-    envelope = bond.to_json()
+    envelope = _envelope(bond)
     roll = ScenarioSpec("roll", [OperationSpec.time_roll_forward("1M", roll_mode="calendar_days")])
     shock = ScenarioSpec("up25", [OperationSpec.curve_parallel_bp("discount", "USD-OIS", 25.0)])
     t1 = datetime.date(2024, 1, 22)
@@ -398,3 +452,5 @@ def test_priced_scenario_horizon_attribution_typed_equal_envelope(make: Callable
     ]:
         kind, _ = _assert_same(typed, via_json)
         assert kind == "ok"
+    _assert_text_refused(lambda: apply_scenario(roll, _market(), AS_OF, instruments=[bond.to_json()]))
+    _assert_text_refused(lambda: compute_horizon_return(bond.to_json(), _market(), AS_OF, shock))

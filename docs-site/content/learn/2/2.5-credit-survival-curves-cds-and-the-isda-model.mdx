@@ -140,7 +140,7 @@ previous, protection_rows = 0.0, []
 for end in boundaries:
     truncated = copy.deepcopy(cds)
     truncated['instrument']['spec']['premium_leg']['end'] = end.isoformat()
-    cumulative = price_instrument(json.dumps(truncated), market, AS_OF, metrics=['protection_leg_pv']).get_metric('protection_leg_pv')
+    cumulative = price_instrument(truncated, market, AS_OF, metrics=['protection_leg_pv']).get_metric('protection_leg_pv')
     protection_rows.append((end.isoformat(), cumulative - previous))
     previous = cumulative
 print({'par_spread_bp': par_spread_bp, 'upfront_pv_fraction': upfront_pv_fraction, 'cs01_per_bp': priced.get_metric('cs01::ACME-HZD')})
@@ -164,7 +164,7 @@ from finstack_quant.valuations.instruments import price_instrument
 from _shared.analyst_book import build_market, instruments
 AS_OF = date(2025, 1, 15)
 market=build_market('base');contract=instruments('base')['ACME-CDS']
-result=price_instrument(json.dumps(contract),market,AS_OF,metrics=['par_spread','risky_annuity'])
+result=price_instrument(contract,market,AS_OF,metrics=['par_spread','risky_annuity'])
 settlement=add_business_days(AS_OF,3,'usny');t=DayCount.ACT_365F.year_fraction(AS_OF,settlement)
 upfront_cash=result.price/market.get_discount('USD-OIS').df(t)
 print({'illustrative_trade_upfront_settlement':settlement,'contract_premium_start':contract['instrument']['spec']['premium_leg']['start'],'standard_coupon_bp':100.,'par_spread_bp':result.get_metric('par_spread'),'buyer_upfront_USD':upfront_cash,'buyer_upfront_percent':100*upfront_cash/1_000_000})
@@ -188,7 +188,7 @@ from _shared.analyst_book import build_market, instruments
 AS_OF = date(2025, 1, 15)
 market=build_market('base').insert(HazardCurve.flat('ACME-HZD',AS_OF,.02,.4,'act_365f')).insert(DiscountCurve.flat('USD-OIS',AS_OF,.04,'act_365f'))
 contract=instruments('base')['ACME-CDS']
-result=price_instrument(json.dumps(contract),market,AS_OF,metrics=['par_spread'])
+result=price_instrument(contract,market,AS_OF,metrics=['par_spread'])
 continuous_approx_bp=.02*(1-.4)*1e4
 print({'continuous_approx_bp':continuous_approx_bp,'native_ISDA_par_bp':result.get_metric('par_spread'),'residual_bp':result.get_metric('par_spread')-continuous_approx_bp})
 ```
@@ -275,7 +275,7 @@ from _shared.analyst_book import build_market, instruments
 AS_OF = date(2025, 1, 15)
 market=build_market('base').insert(HazardCurve.flat('ACME-HZD',AS_OF,.02,.4,'act_365f')).insert(DiscountCurve.flat('USD-OIS',AS_OF,.04,'act_365f'))
 contract=instruments('base')['ACME-CDS']
-result=price_instrument(json.dumps(contract),market,AS_OF,metrics=['par_spread'])
+result=price_instrument(contract,market,AS_OF,metrics=['par_spread'])
 continuous_approx_bp=.02*(1-.4)*1e4
 print({'continuous_approx_bp':continuous_approx_bp,'native_ISDA_par_bp':result.get_metric('par_spread'),'residual_bp':result.get_metric('par_spread')-continuous_approx_bp})
 ```

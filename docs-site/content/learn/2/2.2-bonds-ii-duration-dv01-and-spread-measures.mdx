@@ -96,15 +96,14 @@ curve = market.get_discount('USD-OIS')
 analysis_bond = instruments('foundations')['USD-CORP']
 # ASW constructs a new settlement-to-maturity leg, which has a short front stub.
 analysis_bond['instrument']['spec']['cashflow_spec']['fixed']['stub'] = 'short_front'
-bond = json.dumps(analysis_bond)
-result = price_instrument(bond, market, AS_OF, metrics=['dv01', 'bucketed_dv01', 'duration_mod', 'convexity', 'cs01', 'z_spread', 'i_spread', 'asw_par'])
+result = price_instrument(analysis_bond, market, AS_OF, metrics=['dv01', 'bucketed_dv01', 'duration_mod', 'convexity', 'cs01', 'z_spread', 'i_spread', 'asw_par'])
 values = {}
 for bp in (-1.0, 0.0, 1.0, 25.0):
     bumped = MarketContext.from_json(market.to_json())
     bumped.insert(DiscountCurve('USD-OIS', AS_OF,
         [(t, df * math.exp(-bp * 1e-4 * t)) for t, df in zip(curve.knots, curve.dfs)],
         interp='log_linear', extrapolation=curve.extrapolation, day_count=curve.day_count))
-    values[bp] = price_instrument(bond, bumped, AS_OF).price
+    values[bp] = price_instrument(analysis_bond, bumped, AS_OF).price
 dv01 = (values[1.0] - values[-1.0]) / 2  # native signed change for +1 bp
 actual = values[25.0] - values[0.0]
 linear = 25 * dv01
@@ -128,7 +127,7 @@ from finstack_quant.valuations.instruments import price_instrument
 from _shared.analyst_book import build_market, instruments
 AS_OF = date(2025, 1, 15)
 contract=instruments('foundations')['USD-CORP'];market=build_market('foundations')
-risk=price_instrument(json.dumps(contract),market,AS_OF,metrics=['ytm','duration_mac','duration_mod','convexity'])
+risk=price_instrument(contract,market,AS_OF,metrics=['ytm','duration_mac','duration_mod','convexity'])
 y=risk.get_metric('ytm');dmac=risk.get_metric('duration_mac');dmod=risk.get_metric('duration_mod')
 print({'Macaulay_years':dmac,'modified_years':dmod,'native_convexity':risk.get_metric('convexity'),'decimal_yield_convexity':100*risk.get_metric('convexity')})
 ```
@@ -159,12 +158,12 @@ market.insert_series(ScalarTimeSeries('FIXING:USD-SOFR-3M', term_sofr_fixings, '
 corporate=instruments('foundations')['USD-CORP']
 corporate['instrument']['spec']['cashflow_spec']['fixed']['stub']='short_front'
 corporate['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'quoted_clean_price_pct':99.0}}
-r=price_instrument(json.dumps(corporate),market,AS_OF,metrics=['ytm','i_spread','z_spread','asw_par'])
+r=price_instrument(corporate,market,AS_OF,metrics=['ytm','i_spread','z_spread','asw_par'])
 # A same-currency synthetic government yield is an explicit benchmark, not a native g_spread metric.
 government_yield=0.04
 g_spread_bp=(r.get_metric('ytm')-government_yield)*1e4
 _,frn=floating_bond(0)
-frn_result=price_instrument(json.dumps(instrument_envelope(frn)),market,AS_OF,metrics=['discount_margin'])
+frn_result=price_instrument(instrument_envelope(frn),market,AS_OF,metrics=['discount_margin'])
 print({'government_yield_decimal':government_yield,'G_spread_bp':g_spread_bp,'I_spread_bp':1e4*r.get_metric('i_spread'),'Z_spread_bp':1e4*r.get_metric('z_spread'),'ASW_par_bp':1e4*r.get_metric('asw_par'),'FRN_discount_margin_decimal':frn_result.get_metric('discount_margin')})
 ```
 {/* /notebook-block */}
@@ -192,7 +191,7 @@ from _shared.analyst_book import build_market, instruments
 AS_OF = date(2025, 1, 15)
 market=build_market('foundations').insert(DiscountCurve('USD-OIS',AS_OF,[(0,1)]+[(t,math.exp(-.04*t)) for t in (2,5,10,30)],interp='log_linear',extrapolation='extend',day_count='act_365f'))
 contract=instruments('foundations')['USD-CORP'];contract['instrument']['spec']['maturity']='2032-01-15'
-r=price_instrument(json.dumps(contract),market,AS_OF,metrics=['dv01','bucketed_dv01'])
+r=price_instrument(contract,market,AS_OF,metrics=['dv01','bucketed_dv01'])
 buckets={key:r.get_metric(key) for key in r.metrics if key.startswith('bucketed_dv01::USD-OIS::')}
 print({'curve_pillars_years':[2,5,10,30],'parallel_DV01_USD_per_bp':r.get_metric('dv01'),'native_key_rate_buckets':buckets})
 ```
@@ -214,13 +213,13 @@ from finstack_quant.valuations.instruments import price_instrument
 from _shared.analyst_book import build_market, instruments
 AS_OF = date(2025, 1, 15)
 market=build_market('foundations');contract=instruments('foundations')['USD-CORP']
-r=price_instrument(json.dumps(contract),market,AS_OF,metrics=['cs01','z_spread'])
+r=price_instrument(contract,market,AS_OF,metrics=['cs01','z_spread'])
 z=r.get_metric('z_spread')
 values={}
 for bp in (-1,0,1):
  bumped=copy.deepcopy(contract)
  bumped['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'quoted_z_spread':z+bp*1e-4}}
- values[bp]=price_instrument(json.dumps(bumped),market,AS_OF,metrics=['dirty_price']).get_metric('dirty_price')
+ values[bp]=price_instrument(bumped,market,AS_OF,metrics=['dirty_price']).get_metric('dirty_price')
 native=r.get_metric('cs01::USD-CORP');forward=values[1]-values[0];central=(values[1]-values[-1])/2
 print({'bond_zspread_CS01_USD_per_bp':native,'native_forward_difference':forward,'symmetric_difference':central,'convexity_difference':forward-central})
 ```
@@ -252,7 +251,7 @@ schedule = (CashFlowSchedule.builder().principal(Money(2_000_000.0, 'USD'), date
     .build())
 amortizer = Bond.from_cashflows('LESSON-AMORTIZER', schedule, 'semi_annual', 'USD-OIS')
 amortized = price_instrument(amortizer, market, AS_OF, metrics=['duration_mod', 'ytm'])
-bullet = price_instrument(json.dumps(instruments('foundations')['USD-CORP']), market, AS_OF, metrics=['duration_mod'])
+bullet = price_instrument(instruments('foundations')['USD-CORP'], market, AS_OF, metrics=['duration_mod'])
 print({'amortizer_duration': amortized.get_metric('duration_mod'), 'bullet_duration': bullet.get_metric('duration_mod')})
 ```
 {/* /notebook-block */}

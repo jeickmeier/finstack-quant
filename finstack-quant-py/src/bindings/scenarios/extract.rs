@@ -1,6 +1,6 @@
 //! Input extraction shared by the scenario entry points.
 //!
-//! Instruments arrive as typed instrument wrappers or envelope JSON. The Rust
+//! Instruments arrive as typed instrument wrappers or envelope dicts. The Rust
 //! scenario engine attaches its own recalibration provider, so the bindings
 //! only thread the configuration.
 
@@ -11,7 +11,7 @@ use crate::bindings::extract::extract_instrument;
 use crate::errors::core_to_py;
 
 /// Extract an optional instrument collection from typed instrument wrappers
-/// or canonical envelope JSON strings.
+/// or canonical envelope dicts.
 pub(crate) fn extract_instruments(
     objs: Option<Vec<Bound<'_, PyAny>>>,
 ) -> PyResult<Option<Vec<Box<dyn Instrument>>>> {

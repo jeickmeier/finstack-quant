@@ -154,13 +154,13 @@ def test_structured_note_redemption_profiles_through_supported_json_route() -> N
         )
         for payoff_type, expected_redemption in contracts:
             spec["final_payoff_type"] = payoff_type
-            result = price_instrument(json.dumps(envelope), market, as_of)
+            result = price_instrument(envelope, market, as_of)
             assert result.price == pytest.approx(1000.0 * expected_redemption, abs=1e-10)
 
     # A prior knock-in with full spot recovery returns principal, not put intrinsic.
     spec["final_payoff_type"] = {"knock_in_put": {"strike_ratio": 1.0}}
     spec["past_fixings"] = [["2025-12-30", 50.0], ["2025-12-31", 100.0]]
-    assert price_instrument(json.dumps(envelope), market, as_of).price == pytest.approx(1000.0)
+    assert price_instrument(envelope, market, as_of).price == pytest.approx(1000.0)
 
 
 def test_nested_barrier_monitoring_on_identical_paths_has_pathwise_order() -> None:

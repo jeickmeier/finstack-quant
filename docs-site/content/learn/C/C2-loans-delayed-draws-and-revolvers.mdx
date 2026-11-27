@@ -74,7 +74,7 @@ from finstack_quant.valuations.instruments import price_instrument
 AS_OF = date(2025, 1, 15)
 revolver_payload=tracks.credit_extension()["ANALYST-REVOLVER"]
 credit_market=tracks.build_market("credit")
-revolver_value=price_instrument(json.dumps(revolver_payload),credit_market,AS_OF,
+revolver_value=price_instrument(revolver_payload,credit_market,AS_OF,
     metrics=["available_capacity","utilization_rate","weighted_average_cost"])
 print(pd.Series(revolver_value.metrics))
 ```
@@ -107,8 +107,8 @@ print(pd.DataFrame(wwr_rows))
 mc_rows=[]
 for rho in [0.0,.30]:
     payload=tracks.stochastic_revolver(correlation=rho,num_paths=512)
-    first=price_instrument(json.dumps(payload),credit_market,AS_OF,model="monte_carlo_three_factor").value.amount
-    repeated=price_instrument(json.dumps(payload),credit_market,AS_OF,model="monte_carlo_three_factor").value.amount
+    first=price_instrument(payload,credit_market,AS_OF,model="monte_carlo_three_factor").value.amount
+    repeated=price_instrument(payload,credit_market,AS_OF,model="monte_carlo_three_factor").value.amount
     mc_rows.append({"correlation":rho,"seeded_native_pv_usd":first})
 print(pd.DataFrame(mc_rows))
 ```
@@ -133,7 +133,7 @@ l["rate"]["floating"].update({"spread_bp":"325","index_floor_bp":"100"})
 validate_instrument_json(json.dumps(loan))
 loan_quote=deepcopy(loan)
 loan_quote["instrument"]["spec"]["instrument_pricing_overrides"]={"market_quotes":{"quoted_clean_price_pct":98.5,"implied_volatility":.01}}
-loan_measures=price_instrument(json.dumps(loan_quote),credit_market,AS_OF,
+loan_measures=price_instrument(loan_quote,credit_market,AS_OF,
     metrics=["ytc","ytw","all_in_rate","discount_margin","oid_eir_rate"])
 print(pd.Series({k:loan_measures.metrics[k] for k in ["ytc","ytw","all_in_rate","discount_margin","oid_eir_rate"]}))
 ```
@@ -155,7 +155,7 @@ penalty["instrument"]["spec"]["covenants"]={"margin_steps":[{"date":"2025-07-15"
     "cash_sweeps":[],"draw_stop_dates":[]}
 event_rows=[]
 for name,payload in [("contract",contract),("penalty_and_toggle",penalty)]:
-    env=instrument_cashflows(json.dumps(payload),credit_market,AS_OF,"discounting")
+    env=instrument_cashflows(payload,credit_market,AS_OF,"discounting")
     flows=env.to_dataframe()
     print(name,flows[["date","kind","amount"]].head(10))
     dated_payload=deepcopy(payload)
@@ -163,7 +163,7 @@ for name,payload in [("contract",contract),("penalty_and_toggle",penalty)]:
         dated_payload["instrument"]["spec"]["covenants"]["pik_toggles"]=[]
         name="margin_step_only"  # Seasoned floating PIK needs an updated balance, not replay.
     for day in [date(2025,7,14),date(2025,7,16)]:
-        pv=price_instrument(json.dumps(dated_payload),tracks.build_market("credit",day),day).value.amount
+        pv=price_instrument(dated_payload,tracks.build_market("credit",day),day).value.amount
         event_rows.append({"contract":name,"valuation_date":day,"pv_usd":pv})
 print(pd.DataFrame(event_rows))
 ```
@@ -186,9 +186,9 @@ d.update({"id":"C2-DDTL","upfront_fee":None,"amortization":"none","ddtl":{
         {"date":"2025-07-15","amount":{"amount":"600000","currency":"USD"}}],
     "commitment_steps":[],"usage_fee_bp":"25","commitment_fee_bp":"50",
     "fee_base":"undrawn","oid_policy":{"withheld_bp":"200"}}})
-ddtl_value=price_instrument(json.dumps(ddtl),credit_market,AS_OF,metrics=["all_in_rate","oid_eir_rate"])
+ddtl_value=price_instrument(ddtl,credit_market,AS_OF,metrics=["all_in_rate","oid_eir_rate"])
 no_commitment_fee=deepcopy(ddtl);no_commitment_fee["instrument"]["spec"]["ddtl"]["commitment_fee_bp"]="0"
-free_value=price_instrument(json.dumps(no_commitment_fee),credit_market,AS_OF).value.amount
+free_value=price_instrument(no_commitment_fee,credit_market,AS_OF).value.amount
 print({"DDTL_net_pv_usd":ddtl_value.value.amount,"commitment_fee_pv_usd":ddtl_value.value.amount-free_value,
        "effective_rate":ddtl_value.metrics["oid_eir_rate"]})
 ```
@@ -201,7 +201,7 @@ scheduled=deepcopy(revolver_payload)
 scheduled["instrument"]["spec"]["draw_repay_spec"]={"deterministic":[
     {"date":"2025-04-15","amount":{"amount":"2000000","currency":"USD"},"is_draw":True},
     {"date":"2026-04-15","amount":{"amount":"1000000","currency":"USD"},"is_draw":False}]}
-scheduled_value=price_instrument(json.dumps(scheduled),credit_market,AS_OF,
+scheduled_value=price_instrument(scheduled,credit_market,AS_OF,
     metrics=["available_capacity","utilization_rate","weighted_average_cost"])
 print({"static_pv":revolver_value.value.amount,"scheduled_draw_repay_pv":scheduled_value.value.amount,
        **scheduled_value.metrics})
@@ -226,8 +226,8 @@ low.insert(ForwardCurve.flat("USD-SOFR-3M",AS_OF,-.005,"act_360"))
 floor_case=deepcopy(contract)
 floor_case["instrument"]["spec"]["rate"]["floating"]["index_floor_bp"]="0"
 no_floor=deepcopy(floor_case);no_floor["instrument"]["spec"]["rate"]["floating"]["index_floor_bp"]=None
-floor_pv=price_instrument(json.dumps(floor_case),low,AS_OF).value.amount
-unfloored_pv=price_instrument(json.dumps(no_floor),low,AS_OF).value.amount
+floor_pv=price_instrument(floor_case,low,AS_OF).value.amount
+unfloored_pv=price_instrument(no_floor,low,AS_OF).value.amount
 print({"zero_floor_usd":floor_pv,"no_floor_usd":unfloored_pv,"floor_value_usd":floor_pv-unfloored_pv})
 ```
 {/* /notebook-block */}
@@ -263,8 +263,8 @@ The outputs are dollars for a one-basis-point credit-quote shock and retain the 
 ```python exec id=c2-exercise-credit-risk role=exercise
 credit_loan=deepcopy(contract);credit_loan["instrument"]["spec"]["credit_curve_id"]="ACME-HZD"
 credit_line=deepcopy(revolver_payload);credit_line["instrument"]["spec"]["credit_curve_id"]="ACME-HZD"
-loan_cs=price_instrument(json.dumps(credit_loan),credit_market,AS_OF,metrics=["cs01"])
-line_cs=price_instrument(json.dumps(credit_line),credit_market,AS_OF,metrics=["cs01"])
+loan_cs=price_instrument(credit_loan,credit_market,AS_OF,metrics=["cs01"])
+line_cs=price_instrument(credit_line,credit_market,AS_OF,metrics=["cs01"])
 print("Term loan:",loan_cs.metrics,"Revolver:",line_cs.metrics)
 print("An undrawn line has contingent exposure: future borrower draws and default can be dependent. Its current utilization metric cannot measure that conditional exposure.")
 ```

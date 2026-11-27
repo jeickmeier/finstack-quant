@@ -370,8 +370,8 @@ bermudan_spec = {
     "instrument_pricing_overrides": {"model_config": {
         "hw1f_mean_reversion": 0.05, "hw1f_sigma": 0.01, "mc_paths": 8192, "tree_steps": 160}},
 }
-bermudan_json = json.dumps({"schema": "finstack_quant.instrument/1",
-                           "instrument": {"type": "bermudan_swaption", "spec": bermudan_spec}})
+bermudan_json = {"schema": "finstack_quant.instrument/1",
+                 "instrument": {"type": "bermudan_swaption", "spec": bermudan_spec}}
 bermudan_market = MarketContext().insert(DiscountCurve.flat("USD-OIS", dt.date(2026, 1, 15), 0.03, "act_365f"))
 mc_bermudan = price_instrument(bermudan_json, bermudan_market, "2026-01-15", "monte_carlo_hull_white_1f")
 tree_bermudan = price_instrument(bermudan_json, bermudan_market, "2026-01-15", "hull_white_1f")

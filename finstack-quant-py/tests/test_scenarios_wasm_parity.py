@@ -120,7 +120,7 @@ def test_scenario_spec_predicates_match_the_shared_golden() -> None:
 def test_horizon_explain_and_factor_contribution_match_the_shared_golden() -> None:
     golden = GOLDEN["horizon"]
     result = compute_horizon_return(
-        json.dumps(golden["instrument"]),
+        golden["instrument"],
         MarketContext.from_json(json.dumps(golden["market"])),
         golden["as_of"],
         ScenarioSpec.from_json(json.dumps(golden["scenario"])),

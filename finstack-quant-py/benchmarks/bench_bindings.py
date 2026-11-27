@@ -1623,7 +1623,7 @@ class TestValuationsBenchmarks:
         assert "dv01" in result
 
     def test_deposit_valuation_result_round_trip(self, benchmark) -> None:
-        valuation = price_instrument(DEPOSIT_INSTRUMENT_JSON, _BENCH_MARKET, "2025-01-15", metrics=["dv01"])
+        valuation = price_instrument(json.loads(DEPOSIT_INSTRUMENT_JSON), _BENCH_MARKET, "2025-01-15", metrics=["dv01"])
         assert valuation.instrument_id == "DEP-1"
         assert valuation.currency == "USD"
         assert math.isfinite(valuation.price)

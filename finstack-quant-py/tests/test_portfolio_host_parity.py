@@ -278,7 +278,7 @@ def _built_portfolio(inputs: dict[str, Any]) -> Portfolio:
     for position in spec["positions"]:
         builder = builder.position(
             position["position_id"],
-            json.dumps({"schema": "finstack_quant.instrument/1", "instrument": position["instrument_spec"]}),
+            {"schema": "finstack_quant.instrument/1", "instrument": position["instrument_spec"]},
             position["quantity"],
             entity_id=position["entity_id"],
             unit=position["unit"],

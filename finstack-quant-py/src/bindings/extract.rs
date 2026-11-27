@@ -1,17 +1,20 @@
-//! Shared polymorphic extraction helpers for PyO3 bindings.
+//! Shared argument extraction helpers for PyO3 bindings.
 //!
-//! Each helper accepts a `&Bound<'_, PyAny>` and tries two paths:
+//! A Python `str` argument is a value (a label, a code, a date), never a JSON
+//! document. A parameter that takes a typed object is declared with its
+//! `#[pyclass]` type, so no helper is needed for it; JSON text reaches such a
+//! parameter through the class's own `from_json`.
 //!
-//! 1. **Typed fast path** — cast to the corresponding `#[pyclass]` wrapper
-//!    and use the inner Rust value directly: the `*Access` enums borrow it
-//!    (no clone), and [`extract_instrument`] clones it (no JSON).
-//! 2. **Canonical JSON path** — extract a Python `str` (or envelope `dict`),
-//!    then deserialize the same serde contract used by Rust.
+//! What remains here is the one input with two structured forms and the unit
+//! coercers:
 //!
-//! The `*Access` enums wrap both paths behind a `Deref<Target = T>` impl so
-//! pipeline functions can accept `T | str` without branching.
-//! [`extract_instrument_json`] is the exception: it serializes a typed
-//! instrument to envelope text, for Rust APIs that take JSON.
+//! - [`extract_instrument`]: a typed instrument instance (cloned, no JSON) or
+//!   a canonical envelope `dict`. An envelope dict is the only form for an
+//!   instrument that has no typed class.
+//! - [`extract_instrument_json`]: the same input as envelope text, for Rust
+//!   APIs that take text.
+//! - [`envelope_json_text`]: envelope `dict` or text, for the validators whose
+//!   subject is the envelope document itself.
 
 use pyo3::prelude::*;
 
@@ -95,8 +98,8 @@ use finstack_quant_valuations::pricer::ParsedInstrument;
 
 // Instrument — typed-or-JSON extraction
 
-/// A polymorphic instrument argument: a typed instance's native payload, or
-/// canonical envelope JSON text from a `dict` or `str`.
+/// An instrument argument: a typed instance's native payload, or canonical
+/// envelope JSON text serialized from an envelope `dict`.
 ///
 /// The typed arm skips the JSON round trip; the envelope arm parses through
 /// the Rust envelope loader. Both prepare instruments identically: overrides
@@ -153,8 +156,9 @@ impl InstrumentArg {
     }
 }
 
-/// Extract an instrument argument from a typed instrument object, an envelope
-/// `dict`, or a pre-serialized envelope string.
+/// Extract an instrument argument from a typed instrument object or an
+/// envelope `dict`. A `str` is refused: envelope text loads with
+/// `json.loads`, or with the instrument class's `from_json`.
 ///
 /// # Extending this function
 ///
@@ -258,15 +262,17 @@ pub fn extract_instrument(obj: &Bound<'_, PyAny>) -> PyResult<InstrumentArg> {
         PyStructuredCredit,
         PyStructuredCreditTranche,
     );
-    envelope_json_text(obj).map(InstrumentArg::Envelope).map_err(|_| {
-        pyo3::exceptions::PyTypeError::new_err(
-            "expected a canonical instrument envelope (dict or JSON string) or a typed instrument instance",
-        )
-    })
+    if obj.is_instance_of::<pyo3::types::PyDict>() {
+        return crate::bindings::module_utils::py_to_json_string(obj.py(), obj, "instrument")
+            .map(InstrumentArg::Envelope);
+    }
+    Err(pyo3::exceptions::PyTypeError::new_err(
+        "expected a typed instrument instance or a canonical instrument envelope dict",
+    ))
 }
 
 /// Extract canonical instrument-envelope JSON text from a typed instrument
-/// object, an envelope `dict`, or a pre-serialized envelope string.
+/// object or an envelope `dict`.
 ///
 /// Typed instances are serialized to the same `InstrumentEnvelope` the JSON
 /// loader parses. Use this only where the Rust API takes envelope text;
@@ -285,8 +291,10 @@ pub fn extract_instrument_json(obj: &Bound<'_, PyAny>) -> PyResult<String> {
 /// Canonical instrument-envelope JSON text from an envelope `dict` (as
 /// returned by `instrument_envelope_from_spec`) or pre-serialized JSON `str`.
 ///
-/// A `str` is passed through unchanged so the Rust parser reports its own
-/// errors; a `dict` is serialized with `json.dumps`.
+/// Only for the validators whose subject is the envelope document itself
+/// (`validate_instrument_json` and its siblings). A `str` is passed through
+/// unchanged so the Rust parser reports its own errors; a `dict` is serialized
+/// with `json.dumps`.
 ///
 /// # Errors
 ///

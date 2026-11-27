@@ -46,8 +46,8 @@ from finstack_quant.valuations.market import (
 from tests.tests_typed_helpers import canonical_structured_credit_json, projection_curve
 
 
-def _equity_envelope(instrument_id: str, price: float) -> str:
-    return json.dumps({
+def _equity_envelope(instrument_id: str, price: float) -> dict:
+    return {
         "schema": "finstack_quant.instrument/1",
         "instrument": {
             "type": "equity",
@@ -64,7 +64,7 @@ def _equity_envelope(instrument_id: str, price: float) -> str:
                 "attributes": {},
             },
         },
-    })
+    }
 
 
 def _fixed_spec() -> CompositeSpec:

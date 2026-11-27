@@ -125,7 +125,7 @@ wire=json.loads(base.to_json())
 positions=pd.DataFrame([{"position":iid,"currency":row["value_native"]["currency"],
     "native_value":float(row["value_native"]["amount"]),"usd_value":float(row["value_base"]["amount"])}
     for iid,row in wire["position_values"].items()])
-bbb=tranche_metrics(json.dumps(holding["deal"]),"BBB",market,AS_OF)
+bbb=tranche_metrics(holding["deal"],"BBB",market,AS_OF)
 bbb_pv=holding["quantity"]*bbb.pv
 combined_base=base.total_value+bbb_pv
 positions.loc[len(positions)]={"position":"CLO-BBB","currency":"USD","native_value":bbb_pv,"usd_value":bbb_pv}
@@ -140,7 +140,7 @@ print(positions)
 from _shared.instrument_fixtures import instrument_envelope
 individual_rows=[]
 for position in book_input["positions"]:
-    one=price_instrument(json.dumps(instrument_envelope(position["instrument_spec"])),market,AS_OF,metrics=[])
+    one=price_instrument(instrument_envelope(position["instrument_spec"]),market,AS_OF,metrics=[])
     currency=str(one.value.currency)
     fx_rate=1.0 if currency=="USD" else market.fx_required().rate(currency,"USD",AS_OF, "cashflow_date").rate
     direct_native=one.value.amount*position["quantity"]
@@ -263,7 +263,7 @@ def capstone_scenario_value(shock):
     cdr=spec["default_spec"]["cdr"]+.10*max(hazard,0.)
     spec["default_spec"]["cdr"]=cdr
     tranche_value=holding["quantity"]*tranche_metrics(
-        json.dumps(scenario_deal),"BBB",scenario_market,AS_OF).pv
+        scenario_deal,"BBB",scenario_market,AS_OF).pv
     return native_value,tranche_value
 
 zero_native,zero_bbb=capstone_scenario_value(np.zeros(8))
@@ -344,7 +344,7 @@ stress.insert_price("CONVERT",80.,"USD")
 stressed_deal=deepcopy(holding["deal"])
 stressed_deal["instrument"]["spec"].update({"default_spec":{"curve":"constant","cdr":.05},
     "recovery_spec":{"rate":.25,"recovery_lag":6}})
-bbb_stress=tranche_metrics(json.dumps(stressed_deal),"BBB",stress,AS_OF).pv*holding["quantity"]
+bbb_stress=tranche_metrics(stressed_deal,"BBB",stress,AS_OF).pv*holding["quantity"]
 stressed=value_portfolio(book,stress,metrics=[])
 stress_wire=json.loads(stressed.to_json())
 scenario=pd.DataFrame([{"position":iid,"base_usd":float(row["value_base"]["amount"]),
@@ -389,7 +389,7 @@ replay_market.insert_price("CONVERT",100*equity_ratio,"USD")
 replay_market.insert(HazardCurve("CONVERT-RISKY",AS_OF,[(1.0,.025+credit_change_bp/10000)],recovery_rate=0.,day_count="act_365f"))
 replay_native=value_portfolio(book,replay_market,metrics=[])
 replay_wire=json.loads(replay_native.to_json())
-replay_bbb=holding["quantity"]*tranche_metrics(json.dumps(holding["deal"]),"BBB",replay_market,AS_OF).pv
+replay_bbb=holding["quantity"]*tranche_metrics(holding["deal"],"BBB",replay_market,AS_OF).pv
 replay_position_rows=[]
 for iid,row in wire["position_values"].items():
     base_value=float(row["value_base"]["amount"])
@@ -416,19 +416,19 @@ from finstack_quant.models.correlation import CorrelatedBernoulli
 waterfall_rows=[]
 for label,payload,m in [("base",holding["deal"],market),("joint_stress",stressed_deal,stress)]:
     for tranche in ["AAA","BBB","EQUITY"]:
-        out=tranche_metrics(json.dumps(payload),tranche,m,AS_OF)
+        out=tranche_metrics(payload,tranche,m,AS_OF)
         waterfall_rows.append({"case":label,"tranche":tranche,"PV":out.pv,"WAL":out.wal})
-first_loss_base=tranche_breakeven_cdr(json.dumps(holding["deal"]),"BBB",market,AS_OF)
-first_loss_stress=tranche_breakeven_cdr(json.dumps(stressed_deal),"BBB",stress,AS_OF)
+first_loss_base=tranche_breakeven_cdr(holding["deal"],"BBB",market,AS_OF)
+first_loss_stress=tranche_breakeven_cdr(stressed_deal,"BBB",stress,AS_OF)
 waterfall_table=pd.DataFrame(waterfall_rows)
 print(waterfall_table.to_string(index=False));print({"BBB_first_loss_CDR_base":first_loss_base,"BBB_first_loss_CDR_lower_recovery":first_loss_stress})
 # One-period stressed trace has immediate recovery so every distribution shares one known date.
 trace=tracks.clo_deal(one_period=True);ts=trace["instrument"]["spec"]
 ts.update(default_spec={"curve":"constant","cdr":.05},recovery_spec={"rate":.25,"recovery_lag":0})
-flows=json.loads(instrument_cashflows(json.dumps(trace),market,AS_OF,"discounting").to_json())["flows"]
+flows=json.loads(instrument_cashflows(trace,market,AS_OF,"discounting").to_json())["flows"]
 cash_flows=[flow for flow in flows if flow["date"]>AS_OF.isoformat() and flow["kind"]!="defaulted_notional"]
 trace_df=market.get_discount("USD-OIS").df(90/365)
-trace_rows=[{"tranche":tranche,"stressed_one_period_cash":tranche_metrics(json.dumps(trace),tranche,market,AS_OF).pv/trace_df} for tranche in ["AAA","BBB","EQUITY"]]
+trace_rows=[{"tranche":tranche,"stressed_one_period_cash":tranche_metrics(trace,tranche,market,AS_OF).pv/trace_df} for tranche in ["AAA","BBB","EQUITY"]]
 print(pd.DataFrame(trace_rows).to_string(index=False))
 print("Trace contains remaining post-as-of cash only; exported defaulted-notional rows are loss records, not investor cash receipts, and zero-PV as-of records are excluded from the remaining-value reconciliation.")
 rev=tracks.credit_extension()["ANALYST-REVOLVER"]["instrument"]["spec"]
@@ -443,7 +443,7 @@ expected_draw_table=pd.DataFrame(draw_rows);print(expected_draw_table.to_string(
 convert_rows=[]
 for stock in [50.,100.,150.]:
     m=tracks.build_market("credit", core_stage="common");m.insert_price("CONVERT",stock,"USD")
-    out=price_instrument(json.dumps(tracks.credit_extension()["ANALYST-CONVERT"]),m,AS_OF,model="tree",metrics=["bond_floor","conversion_value","parity","delta"])
+    out=price_instrument(tracks.credit_extension()["ANALYST-CONVERT"],m,AS_OF,model="tree",metrics=["bond_floor","conversion_value","parity","delta"])
     convert_rows.append({"stock":stock,"PV":out.value.amount,**out.metrics})
 convert_regimes=pd.DataFrame(convert_rows)
 print(convert_regimes.to_string(index=False))
@@ -599,7 +599,7 @@ for day in dates:
     valuation=value_portfolio(Portfolio.from_spec(json.dumps(dated_spec)),dated,metrics=[])
     dated_wire=json.loads(valuation.to_json())
     by_position={iid:float(row["value_base"]["amount"]) for iid,row in dated_wire["position_values"].items()}
-    bbb_dated=tranche_metrics(json.dumps(holding["deal"]),"BBB",dated,day).pv*holding["quantity"]
+    bbb_dated=tranche_metrics(holding["deal"],"BBB",dated,day).pv*holding["quantity"]
     cumulative_vm_cash=0.0
     sleeves={"common":sum(value for iid,value in by_position.items() if iid in common_ids),
              "track_extension":sum(value for iid,value in by_position.items() if iid not in common_ids)}
@@ -779,7 +779,7 @@ print(positions)
 from _shared.instrument_fixtures import instrument_envelope
 individual_rows=[]
 for position in book_input["positions"]:
-    one=price_instrument(json.dumps(instrument_envelope(position["instrument_spec"])),market,AS_OF,metrics=[])
+    one=price_instrument(instrument_envelope(position["instrument_spec"]),market,AS_OF,metrics=[])
     currency=str(one.value.currency)
     fx_rate=1.0 if currency=="USD" else market.fx_required().rate(currency,"USD",AS_OF, "cashflow_date").rate
     direct_native=one.value.amount*position["quantity"]
@@ -1040,7 +1040,7 @@ for label,m,s,vol in [("base",market,5200.,.20),("joint_stress",stress,4160.,.30
     option_strip_pv=2*1_000_000*float(np.sum(width*np.array(options)/strike_grid**2))
     forward_cash_correction=-1_000_000*discount*(2*((forward/k0-1)-math.log(forward/k0))+.04)
     replication=option_strip_pv+forward_cash_correction
-    native=price_instrument(json.dumps(variance),m,AS_OF,metrics=["variance_expected"]).value.amount
+    native=price_instrument(variance,m,AS_OF,metrics=["variance_expected"]).value.amount
     replica_rows.append({"case":label,"fixed_option_inventory_PV":option_strip_pv,"forward_cash_correction":forward_cash_correction,
         "replication_PV":replication,"native_variance_PV":native,"finite_strike_residual":replication-native})
 # Fixed finite strikes introduce a quantified quadrature residual when the forward moves across the grid.
@@ -1060,7 +1060,7 @@ for label,m in [("base",market),("joint_stress",stress)]:
     for deliverable in ["UST-DELIVERABLE-A","UST-DELIVERABLE-B"]:
         proxy=deepcopy(future_inputs["UST-FUTURE"])
         proxy["instrument"]["spec"].update(ctd_bond_id=deliverable,ctd_bond=future_inputs[deliverable]["instrument"]["spec"])
-        out=price_instrument(json.dumps(proxy),m,AS_OF,model="bond_future_clean_price_proxy",metrics=["futures_price","conversion_factor","dv01"])
+        out=price_instrument(proxy,m,AS_OF,model="bond_future_clean_price_proxy",metrics=["futures_price","conversion_factor","dv01"])
         quote=proxy["instrument"]["spec"]["terms"]["entry_price"]
         delivery_rows.append({"case":label,"deliverable":deliverable,"fair_future":out.metrics["futures_price"],
             "conversion_factor":out.metrics["conversion_factor"],"gross_basis_pct":out.metrics["conversion_factor"]*(out.metrics["futures_price"]-quote),"DV01":out.metrics["dv01"]})
@@ -1222,10 +1222,10 @@ for day in dates:
     dated_wire=json.loads(valuation.to_json())
     by_position={iid:float(row["value_base"]["amount"]) for iid,row in dated_wire["position_values"].items()}
     future=deepcopy(tracks.vol_extension()["UST-FUTURE"])
-    future_mark=price_instrument(json.dumps(future),dated,day,model="bond_future_clean_price_proxy",metrics=["futures_price"])
+    future_mark=price_instrument(future,dated,day,model="bond_future_clean_price_proxy",metrics=["futures_price"])
     cumulative_vm_cash=future_mark.value.amount
     future["instrument"]["spec"]["terms"]["entry_price"]=future_mark.metrics["futures_price"]
-    reset_mark=price_instrument(json.dumps(future),dated,day,model="bond_future_clean_price_proxy").value.amount
+    reset_mark=price_instrument(future,dated,day,model="bond_future_clean_price_proxy").value.amount
     sleeves={"common":sum(value for iid,value in by_position.items() if iid in common_ids),
              "track_extension":sum(value for iid,value in by_position.items() if iid not in common_ids)}
     total=valuation.total_value
@@ -1247,10 +1247,10 @@ from datetime import date
 end_date=dates[-1];elapsed=(end_date-AS_OF).days/365;remaining=1-elapsed
 observed=[(AS_OF+timedelta(days=i),history_quotes(AS_OF+timedelta(days=i))["spx"]) for i in range((end_date-AS_OF).days+1) if (AS_OF+timedelta(days=i)).weekday()<5]
 dated.insert_series(ScalarTimeSeries("SPX-CLOSE",observed,"step","error"))
-full=price_instrument(json.dumps(variance),dated,end_date,metrics=["variance_expected"])
+full=price_instrument(variance,dated,end_date,metrics=["variance_expected"])
 forward_only=deepcopy(variance);forward_only["instrument"]["spec"]["start_date"]=end_date.isoformat()
-forward_result=price_instrument(json.dumps(forward_only),dated,end_date,metrics=["variance_expected"])
-initial=price_instrument(json.dumps(variance),market,AS_OF,metrics=["variance_expected"])
+forward_result=price_instrument(forward_only,dated,end_date,metrics=["variance_expected"])
+initial=price_instrument(variance,market,AS_OF,metrics=["variance_expected"])
 # This daily-close contract annualizes at 252 and blends by return-sample count.
 # Calendar year fractions are used only to discount to settlement.
 maturity=date.fromisoformat(variance["instrument"]["spec"]["maturity"])

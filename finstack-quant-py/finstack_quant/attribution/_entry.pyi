@@ -82,9 +82,9 @@ def attribute_pnl(instrument: object, inputs: AttributionInputs | Mapping[str, A
 
     Parameters
     ----------
-    instrument : Bond | TermLoan | InterestRateSwap | Swaption | CapFloor | CreditDefaultSwap | CdsIndex | CdsTranche | FxForward | FxOption | ConvertibleBond | EquityOption | StructuredCredit | CompositeInstrument | str
+    instrument : Bond | TermLoan | InterestRateSwap | Swaption | CapFloor | CreditDefaultSwap | CdsIndex | CdsTranche | FxForward | FxOption | ConvertibleBond | EquityOption | StructuredCredit | CompositeInstrument | dict
         Typed instrument wrapper from ``finstack_quant.valuations`` or a
-        canonical v1 instrument envelope JSON string
+        canonical v1 instrument envelope dict
         (``{"schema": "finstack_quant.instrument/1", "instrument": {...}}``).
     inputs : AttributionInputs or Mapping[str, Any] or str
         The Rust ``AttributionInputs`` serde form (the document WASM
@@ -152,7 +152,7 @@ def attribute_pnl(instrument: object, inputs: AttributionInputs | Mapping[str, A
     ...     "method": "parallel",
     ... }
     >>> try:
-    ...     attribute_pnl("{}", inputs)
+    ...     attribute_pnl({}, inputs)
     ... except ValueError as exc:
     ...     "instrument envelope" in str(exc)
     True
@@ -161,7 +161,7 @@ def attribute_pnl(instrument: object, inputs: AttributionInputs | Mapping[str, A
     ------
     ValueError
         If ``inputs`` is malformed (a missing or unknown key included), an
-        instrument JSON, method, config or ISO date cannot be parsed, the FX
+        instrument envelope, method, config or ISO date cannot be parsed, the FX
         provider cannot supply a coherent market snapshot, or attribution
         validation, pricing, or result serialization fails.
     KeyError
@@ -192,8 +192,8 @@ def attribute_pnl_many(inputs: AttributionInputs | Mapping[str, Any] | str, inst
         ``credit_factor_model`` and ``credit_factor_detail_options``), applied
         to every instrument. Date-like values use their local calendar date.
     instruments : list[object]
-        Typed instrument wrappers or canonical instrument envelope JSON
-        strings, in the row order wanted.
+        Typed instrument wrappers or canonical instrument envelope dicts,
+        in the row order wanted.
 
     Returns
     -------
@@ -250,7 +250,7 @@ def pnl_bridge(
     Parameters
     ----------
     instrument : object
-        Typed instrument wrapper or canonical instrument envelope JSON.
+        Typed instrument wrapper or canonical instrument envelope dict.
     market_t0 : MarketContext
         Opening market state.
     market_t1 : MarketContext
@@ -270,7 +270,7 @@ def pnl_bridge(
     Raises
     ------
     ValueError
-        If the instrument JSON, a date, or the currency is malformed, or
+        If the instrument envelope, a date, or the currency is malformed, or
         pricing fails validation.
     KeyError
         If a curve or FX rate needed for pricing or conversion is missing.
@@ -283,7 +283,7 @@ def pnl_bridge(
     >>> from finstack_quant.core.market_data import MarketContext
     >>> market = MarketContext()
     >>> try:
-    ...     pnl_bridge("{}", market, market, "2025-01-15", "2025-01-16", "USD")
+    ...     pnl_bridge({}, market, market, "2025-01-15", "2025-01-16", "USD")
     ... except ValueError as exc:
     ...     "instrument envelope" in str(exc)
     True

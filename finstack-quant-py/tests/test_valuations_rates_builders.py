@@ -467,7 +467,7 @@ def test_bond_builder_credit_models_preserve_explicit_model_contract() -> None:
     tree_document["instrument"]["spec"]["instrument_pricing_overrides"] = {
         "model_config": {"hw1f_mean_reversion": 0.03, "hw1f_sigma": 0.01}
     }
-    tree_result = price_instrument(json.dumps(tree_document), market, AS_OF, model="tree")
+    tree_result = price_instrument(tree_document, market, AS_OF, model="tree")
     assert bullet_result.currency == "USD"
     assert 0.0 < callable_result.price < bullet_result.price < puttable_result.price < 1_500_000.0
     assert 0.0 < hazard_result.price < 1_500_000.0
@@ -487,7 +487,7 @@ def test_bond_builder_credit_models_preserve_explicit_model_contract() -> None:
     stochastic_spec["instrument_pricing_overrides"] = {
         "model_config": {"hazard_sigma": 0.01, "mc_paths": 2, "tree_steps": 4}
     }
-    stochastic_result = price_instrument(json.dumps(stochastic_document), market, AS_OF, model="rates_credit")
+    stochastic_result = price_instrument(stochastic_document, market, AS_OF, model="rates_credit")
     assert stochastic_result.details is not None
     assert stochastic_result.details["type"] == "monte_carlo"
     diagnostics = stochastic_result.details["data"]
@@ -838,7 +838,7 @@ def test_deposit_builder_retains_exact_rate_and_matches_wire_pricing() -> None:
     assert Deposit.from_json(deposit.to_json()).fixed_rate == rate
     market = MarketContext().insert(DiscountCurve.flat("USD-OIS", "2025-01-15", 0.05, day_count="act_365f"))
     direct = price_instrument(deposit, market, "2025-01-15", metrics=["dv01"])
-    wire = price_instrument(deposit.to_json(), market, "2025-01-15", metrics=["dv01"])
+    wire = price_instrument(json.loads(deposit.to_json()), market, "2025-01-15", metrics=["dv01"])
     assert direct.value == wire.value
     assert direct.metrics == wire.metrics
 
@@ -862,5 +862,6 @@ def test_forward_rate_agreement_builder_preserves_fixing_and_exact_rate() -> Non
     assert fra.fixed_rate == Decimal("0.047505")
     assert fra.fixing_date == ForwardRateAgreement.example().fixing_date
     assert fra.forward_curve_id == "USD-SOFR-3M"
-    assert price_instrument(fra, market, base).value == price_instrument(fra.to_json(), market, base).value
+    wire_value = price_instrument(json.loads(fra.to_json()), market, base).value
+    assert price_instrument(fra, market, base).value == wire_value
     assert fra.to_builder().build().to_json() == fra.to_json()

@@ -20,12 +20,12 @@ MARKET = (
 QUOTE_METRICS = ("ytm", "ytw", "z_spread", "oas", "asw_par", "asw_market", "i_spread")
 
 
-def _quoted_json(bond: Bond, clean_price_pct: float) -> str:
+def _quoted_json(bond: Bond, clean_price_pct: float) -> dict:
     spec = json.loads(bond.to_json())
     spec["instrument"]["spec"].setdefault("instrument_pricing_overrides", {}).setdefault("market_quotes", {})[
         "quoted_clean_price_pct"
     ] = clean_price_pct
-    return json.dumps(spec)
+    return spec
 
 
 def _callable() -> Bond:

@@ -21,7 +21,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 /// The validated instrument payload of a typed instrument wrapper or a
-/// canonical envelope (`dict` or JSON text), through the canonical loader.
+/// canonical envelope `dict`, through the canonical loader.
 fn instrument_payload(obj: &Bound<'_, PyAny>) -> PyResult<InstrumentJson> {
     extract_instrument(obj)?
         .into_instrument_json()
@@ -141,8 +141,8 @@ pub(crate) fn attribute_pnl_many(
 ///
 /// Parameters
 /// ----------
-/// instrument : Bond | InterestRateSwap | ... | str
-///     Typed instrument wrapper or canonical instrument envelope JSON.
+/// instrument : Bond | InterestRateSwap | ... | dict
+///     Typed instrument wrapper or canonical instrument envelope dict.
 /// market_t0 : MarketContext
 ///     Opening market state.
 /// market_t1 : MarketContext
@@ -162,7 +162,7 @@ pub(crate) fn attribute_pnl_many(
 /// Raises
 /// ------
 /// ValueError
-///     If the instrument JSON, a date, or the currency is
+///     If the instrument envelope, a date, or the currency is
 ///     malformed, or pricing fails validation.
 /// KeyError
 ///     If a curve or FX rate needed for pricing or conversion is missing.

@@ -91,7 +91,7 @@ AS_OF = date(2025, 1, 15)
 from finstack_quant.models import bs_price
 market = tracks.build_market("vol")
 inputs = tracks.variance_inputs()
-result = price_instrument(json.dumps(inputs["SPX-VARIANCE"]), market, AS_OF,
+result = price_instrument(inputs["SPX-VARIANCE"], market, AS_OF,
     model="discounting", metrics=["variance_expected", "variance_realized"])
 T, spot, dividend_yield = 1.0, 5200.0, 0.015
 df = market.get_discount("USD-OIS").df(T)
@@ -181,7 +181,7 @@ seasoned_market.insert_series(ScalarTimeSeries("SPX-CLOSE",closes,"step","error"
 seasoned=deepcopy(inputs["SPX-VARIANCE"])
 # Explicitly choose a flat 20% forward-volatility assumption to isolate accrued-versus-forward accounting.
 seasoned["instrument"]["spec"]["instrument_pricing_overrides"]={"market_quotes":{"implied_volatility":.20}}
-seasoned_result=price_instrument(json.dumps(seasoned),seasoned_market,seasoned_date,model="discounting",
+seasoned_result=price_instrument(seasoned,seasoned_market,seasoned_date,model="discounting",
     metrics=["variance_expected","variance_realized","variance_vega","vega","variance_strike_vol"])
 elapsed=(seasoned_date-AS_OF).days/365;remaining=1-elapsed
 # Settlement counts N daily returns on the weekday schedule and pays 252/N * sum(r^2).
@@ -231,7 +231,7 @@ print("This disclosed two-state payoff calculation is not a native volatility-sw
 <ExecutedOutput lesson="V2" block="v2-vol-convexity" />
 {/* notebook-block notebook="02_pricing/instruments/vix_and_variance.ipynb" cell="v2-workflow-5" role="build" */}
 ```python exec id=v2-workflow-5 role=build
-vix_values = {iid: price_instrument(json.dumps(inputs[iid]), market, AS_OF, model="discounting").value.amount
+vix_values = {iid: price_instrument(inputs[iid], market, AS_OF, model="discounting").value.amount
               for iid in ["VIX-FUTURE", "VIX-CALL"]}
 print(pd.Series(vix_values, name="pv_usd"))
 ```
@@ -315,7 +315,7 @@ fx_payload=instrument_envelope({"type":"fx_variance_swap","spec":{"id":"V2-EURUS
     "domestic_discount_curve_id":"USD-OIS","foreign_discount_curve_id":"EUR-OIS",
     "vol_surface_id":"EURUSD-VAR-VOL","day_count":"act_365f","attributes":{}}})
 fx_market.insert_price("EURUSD-SPOT",1.08)
-fx_result=price_instrument(json.dumps(fx_payload),fx_market,AS_OF,model="discounting",metrics=["variance_expected"])
+fx_result=price_instrument(fx_payload,fx_market,AS_OF,model="discounting",metrics=["variance_expected"])
 print({"EURUSD_expected_variance":fx_result.metrics["variance_expected"],"USD_pv":fx_result.value.amount})
 ```
 {/* /notebook-block */}

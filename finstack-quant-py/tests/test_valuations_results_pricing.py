@@ -465,10 +465,12 @@ def test_partial_metric_override_patch_retains_existing_theta_period(patch: dict
     period = {"count": 1, "unit": "weeks"}
     document["instrument"]["spec"]["metric_pricing_overrides"] = {"theta_period": period}
     raw = json.dumps(document)
-    baseline = price_instrument(raw, _market(), AS_OF, metrics=["theta"])
+    baseline = price_instrument(document, _market(), AS_OF, metrics=["theta"])
     prepared = json.loads(validate_instrument_json(raw, metric_pricing_overrides=patch))
     assert prepared["instrument"]["spec"]["metric_pricing_overrides"]["theta_period"] == period
-    patched = price_instrument(raw, _market(), AS_OF, metrics=["theta"], extras={"metric_pricing_overrides": patch})
+    patched = price_instrument(
+        document, _market(), AS_OF, metrics=["theta"], extras={"metric_pricing_overrides": patch}
+    )
     assert patched["theta"] == pytest.approx(baseline["theta"])
 
 
@@ -477,9 +479,8 @@ def test_explicit_null_metric_override_patch_clears_theta_period() -> None:
     document["instrument"]["spec"]["metric_pricing_overrides"] = {
         "theta_period": {"count": 1, "unit": "weeks"},
     }
-    raw = json.dumps(document)
     patched = price_instrument(
-        raw, _market(), AS_OF, metrics=["theta"], extras={"metric_pricing_overrides": {"theta_period": None}}
+        document, _market(), AS_OF, metrics=["theta"], extras={"metric_pricing_overrides": {"theta_period": None}}
     )
     baseline = price_instrument(_bond(), _market(), AS_OF, metrics=["theta"])
     assert patched["theta"] == pytest.approx(baseline["theta"])
@@ -496,16 +497,14 @@ def test_term_loan_cs01_uses_the_quote_anchor(quote_field: str, low_quote: float
         document["instrument"]["spec"]["instrument_pricing_overrides"] = {
             "market_quotes": {quote_field: quote},
         }
-        result = price_instrument(
-            json.dumps(document), _market(), AS_OF, model="discounting", metrics=["cs01", "bucketed_cs01"]
-        )
+        result = price_instrument(document, _market(), AS_OF, model="discounting", metrics=["cs01", "bucketed_cs01"])
         assert result["bucketed_cs01"] == pytest.approx(result["cs01"])
         results.append(result["cs01"])
     assert results[0] != pytest.approx(results[1])
 
 
 def test_every_pricing_entry_point_accepts_the_same_metric_pricing_overrides_types() -> None:
-    """``price_instrument``, on a typed object or its JSON, and ``validate_instrument_json`` share one coercion."""
+    """``price_instrument``, on a typed object or its envelope, and ``validate_instrument_json`` share one coercion."""
     from finstack_quant.valuations.instruments import PriceExtras
 
     market = _market()
@@ -523,7 +522,8 @@ def test_every_pricing_entry_point_accepts_the_same_metric_pricing_overrides_typ
         json.dumps({"metric_pricing_overrides": as_dict}),
     ):
         assert price_instrument(bond, market, AS_OF, metrics=["theta"], extras=extras)["theta"] == expected
-        assert price_instrument(bond.to_json(), market, AS_OF, metrics=["theta"], extras=extras)["theta"] == expected
+        envelope = json.loads(bond.to_json())
+        assert price_instrument(envelope, market, AS_OF, metrics=["theta"], extras=extras)["theta"] == expected
     for value in (typed, as_dict, json.dumps(as_dict)):
         prepared = json.loads(validate_instrument_json(bond.to_json(), metric_pricing_overrides=value))
         assert prepared["instrument"]["spec"]["metric_pricing_overrides"]["theta_period"] == as_dict["theta_period"]
@@ -541,7 +541,8 @@ def test_call_time_market_quote_overrides_match_typed_and_wire_pricing() -> None
     typed = price_instrument(bond, market, AS_OF, metrics=metrics, extras=PriceExtras(**extras))
     assert typed["clean_price"] == pytest.approx(float(bond.notional.amount) * 0.9825)
     assert price_instrument(bond, market, AS_OF, metrics=metrics, extras=extras)["ytm"] == typed["ytm"]
-    assert price_instrument(wire, market, AS_OF, metrics=metrics, extras=json.dumps(extras))["ytm"] == typed["ytm"]
+    via_wire = price_instrument(json.loads(wire), market, AS_OF, metrics=metrics, extras=json.dumps(extras))
+    assert via_wire["ytm"] == typed["ytm"]
     assert bond.to_json() == wire
     original = price_instrument(bond, market, AS_OF, metrics=metrics)
     assert original["clean_price"] != typed["clean_price"]
@@ -558,7 +559,7 @@ def test_call_time_market_quote_overrides_match_typed_and_wire_pricing() -> None
     )
     assert cleared["clean_price"] == original["clean_price"]
     assert stored.to_json() == before
-    for instrument in [bond, wire]:
+    for instrument in [bond, json.loads(wire)]:
         with pytest.raises(ValueError, match="instrument_pricing_overrides"):
             price_instrument(
                 instrument,
@@ -671,7 +672,7 @@ def test_calculate_var_diversifies_offsetting_positions() -> None:
     bond_var = calculate_var([_bond()], _market(), history, AS_OF).var
     swap_var = calculate_var([_swap()], _market(), history, AS_OF).var
     # Long bond (loses when rates rise) against a pay-fixed swap (gains).
-    hedged = calculate_var([_bond(), _swap().to_json()], _market(), history, AS_OF)
+    hedged = calculate_var([_bond(), json.loads(_swap().to_json())], _market(), history, AS_OF)
 
     assert bond_var < -1.0
     assert swap_var < -1.0
@@ -745,7 +746,8 @@ def test_instrument_envelope_dict_is_accepted_by_instrument_entry_points() -> No
 
     priced = price_instrument(envelope, _market(), AS_OF)
     assert priced.price == price_instrument(bond, _market(), AS_OF).price
-    assert priced.price == price_instrument(json.dumps(envelope), _market(), AS_OF).price
+    with pytest.raises(TypeError, match="typed instrument instance or a canonical instrument envelope dict"):
+        price_instrument(json.dumps(envelope), _market(), AS_OF)
 
     canonical = validate_instrument_json(envelope)
     assert json.loads(canonical) == envelope
@@ -760,7 +762,7 @@ def test_instrument_envelope_dict_is_accepted_by_instrument_entry_points() -> No
     var = calculate_var([envelope], _market(), _rate_history(), AS_OF)
     assert var.var == calculate_var([bond], _market(), _rate_history(), AS_OF).var
 
-    with pytest.raises(TypeError, match="dict or JSON string"):
+    with pytest.raises(TypeError, match="typed instrument instance or a canonical instrument envelope dict"):
         price_instrument(1.5, _market(), AS_OF)
     with pytest.raises(TypeError, match="dict or JSON string"):
         validate_instrument_json(1.5)

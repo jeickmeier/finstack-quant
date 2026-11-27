@@ -95,7 +95,7 @@ discounts = {'simple': 1 / (1 + r * years), 'annual': (1 + r) ** -years,
              'semiannual': (1 + r / 2) ** (-2 * years), 'continuous': math.exp(-r * years)}
 market = build_market('foundations')
 curve = market.get_discount('USD-OIS')
-bond = json.dumps(instruments('foundations')['USD-CORP'])
+bond = instruments('foundations')['USD-CORP']
 flows = json.loads(instrument_cashflows(bond, market, AS_OF, 'discounting').to_json())
 manual_pv = sum(flow['amount'] * curve.df(DayCount.ACT_365F.year_fraction(AS_OF, date.fromisoformat(flow['date'])))
                 for flow in flows['flows'] if date.fromisoformat(flow['date']) > AS_OF)

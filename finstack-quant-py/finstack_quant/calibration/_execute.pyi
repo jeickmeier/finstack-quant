@@ -177,9 +177,9 @@ def calibrate_bermudan_lmm_base_vol(
 
     Parameters
     ----------
-    instrument : Swaption | str
-        Typed Bermudan swaption instrument or its canonical instrument JSON
-        envelope.
+    instrument : Swaption | dict
+        Typed Bermudan swaption instrument or its canonical instrument
+        envelope dict.
     market : MarketContext
         Market carrying the required discount and swaption-volatility inputs.
     as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
@@ -204,7 +204,7 @@ def calibrate_bermudan_lmm_base_vol(
     --------
     >>> from finstack_quant.calibration import calibrate_bermudan_lmm_base_vol
     >>> from finstack_quant.core.market_data import MarketContext
-    >>> calibrate_bermudan_lmm_base_vol("{}", MarketContext(), "2025-01-01")
+    >>> calibrate_bermudan_lmm_base_vol({}, MarketContext(), "2025-01-01")
     Traceback (most recent call last):
     ValueError: ...
 

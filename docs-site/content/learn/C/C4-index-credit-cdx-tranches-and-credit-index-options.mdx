@@ -81,7 +81,7 @@ from finstack_quant.calibration import calibrate
 inputs = tracks.credit_index_inputs()
 market = tracks.build_market("credit")
 calibration = calibrate(tracks.credit_calibration_envelope())
-index = price_instrument(json.dumps(inputs["ANALYST-CDX"]), market, AS_OF, model="hazard_rate")
+index = price_instrument(inputs["ANALYST-CDX"], market, AS_OF, model="hazard_rate")
 hazard_approx = 120 / 10000 / (1 - 0.4)
 print(pd.DataFrame([{"names": 125, "coupon_bp": 100, "calibration_par_bp": 120,
                "hazard_approx_decimal": hazard_approx, "index_pv_usd": index.value.amount}]))
@@ -94,8 +94,8 @@ print(pd.DataFrame([{"names": 125, "coupon_bp": 100, "calibration_par_bp": 120,
 payer = inputs["CDX-PAYER"]
 knockout = deepcopy(payer)
 knockout["instrument"]["spec"]["knockout"] = True
-nonko = price_instrument(json.dumps(payer), market, AS_OF, model="bloomberg_cdso", metrics=["cs01", "bucketed_cs01"])
-ko = price_instrument(json.dumps(knockout), market, AS_OF, model="bloomberg_cdso")
+nonko = price_instrument(payer, market, AS_OF, model="bloomberg_cdso", metrics=["cs01", "bucketed_cs01"])
+ko = price_instrument(knockout, market, AS_OF, model="bloomberg_cdso")
 fep_increment = nonko.value.amount - ko.value.amount
 print(pd.DataFrame({"case": ["non-knockout payer", "knockout payer", "front-end increment"],
               "usd": [nonko.value.amount, ko.value.amount, fep_increment]}))
@@ -130,10 +130,10 @@ s["pricing"]="constituents"
 s["constituents"]=[{"credit":{"credit_curve_id":"CDX-HAZ","recovery_rate":.4,"reference_entity":"SYNTHETIC-CONSTITUENT"},
                      "weight":1/125,"defaulted":False} for _ in range(125)]
 validate_instrument_json(json.dumps(constituent_index))
-by_name=price_instrument(json.dumps(constituent_index),market,AS_OF,model="hazard_rate",metrics=["par_spread"])
+by_name=price_instrument(constituent_index,market,AS_OF,model="hazard_rate",metrics=["par_spread"])
 post_default=deepcopy(constituent_index)
 p=post_default["instrument"]["spec"];p["version"]=2;p["index_factor"]=124/125;p["constituents"][-1]["defaulted"]=True
-survivors=price_instrument(json.dumps(post_default),market,AS_OF,model="hazard_rate",metrics=["par_spread"])
+survivors=price_instrument(post_default,market,AS_OF,model="hazard_rate",metrics=["par_spread"])
 print({"single_curve_pv":index.value.amount,"constituent_pv":by_name.value.amount,
        "survivor_pv":survivors.value.amount,"settled_default_cash_usd":1_000_000*.6/125,
        "par_spread_before":by_name.metrics["par_spread"],"par_spread_after":survivors.metrics["par_spread"]})
@@ -145,13 +145,13 @@ print({"single_curve_pv":index.value.amount,"constituent_pv":by_name.value.amoun
 ```python exec id=c4-option-risk role=build
 quoted=deepcopy(payer)
 quoted["instrument"]["spec"].setdefault("instrument_pricing_overrides",{}).setdefault("market_quotes",{})["quoted_premium"]=nonko.value.amount
-option_risk=price_instrument(json.dumps(quoted),market,AS_OF,model="bloomberg_cdso",
+option_risk=price_instrument(quoted,market,AS_OF,model="bloomberg_cdso",
     metrics=["implied_vol","vega","spread_dv01","par_spread"])
 receiver=deepcopy(payer);receiver["instrument"]["spec"]["option_type"]="put"
-receiver_price=price_instrument(json.dumps(receiver),market,AS_OF,model="bloomberg_cdso").value.amount
+receiver_price=price_instrument(receiver,market,AS_OF,model="bloomberg_cdso").value.amount
 post_option=deepcopy(payer)
 post_option["instrument"]["spec"].update({"index_factor":124/125,"realized_loss":.6/125})
-post_option_price=price_instrument(json.dumps(post_option),market,AS_OF,model="bloomberg_cdso").value.amount
+post_option_price=price_instrument(post_option,market,AS_OF,model="bloomberg_cdso").value.amount
 print(pd.Series(option_risk.metrics))
 print({"payer_pv":nonko.value.amount,"receiver_pv":receiver_price,"post_default_payer_pv":post_option_price})
 print("Implied volatility here inverts the model PV stamped as market_quotes.quoted_premium; it is a consistency diagnostic, not an independent market calibration.")
@@ -171,7 +171,7 @@ tranche_rows = []
 for rho in [0.15, 0.25, 0.40]:
     scenario_market = tracks.build_market("credit")
     scenario_market.insert(BaseCorrelationCurve("CDX-BASE-CORR", [(3.0, rho), (7.0, rho), (15.0, rho), (100.0, rho)]))
-    result = price_instrument(json.dumps(inputs["CDX-0-3"]), scenario_market, AS_OF, model="hazard_rate")
+    result = price_instrument(inputs["CDX-0-3"], scenario_market, AS_OF, model="hazard_rate")
     tranche_rows.append({"base_correlation": rho, "0_3_protection_pv_usd": result.value.amount})
 print(pd.DataFrame(tranche_rows))
 ```
@@ -186,10 +186,10 @@ for quote in one_bp["market_data"]:
     if quote["kind"]=="cds_quote":quote["spread_bp"]+=1.
 bumped_market=tracks.build_market("credit")
 bumped_market.insert(calibrate(one_bp).market.get_hazard("CDX-HAZ"))
-index_base=price_instrument(json.dumps(inputs["ANALYST-CDX"]),market,AS_OF,model="hazard_rate").value.amount
-index_bumped=price_instrument(json.dumps(inputs["ANALYST-CDX"]),bumped_market,AS_OF,model="hazard_rate").value.amount
-tranche_base=price_instrument(json.dumps(inputs["CDX-0-3"]),market,AS_OF,model="hazard_rate").value.amount
-tranche_bumped=price_instrument(json.dumps(inputs["CDX-0-3"]),bumped_market,AS_OF,model="hazard_rate").value.amount
+index_base=price_instrument(inputs["ANALYST-CDX"],market,AS_OF,model="hazard_rate").value.amount
+index_bumped=price_instrument(inputs["ANALYST-CDX"],bumped_market,AS_OF,model="hazard_rate").value.amount
+tranche_base=price_instrument(inputs["CDX-0-3"],market,AS_OF,model="hazard_rate").value.amount
+tranche_bumped=price_instrument(inputs["CDX-0-3"],bumped_market,AS_OF,model="hazard_rate").value.amount
 tranche_delta=(tranche_bumped-tranche_base)/(index_bumped-index_base)
 print({"index_1bp_pnl":index_bumped-index_base,"tranche_1bp_pnl":tranche_bumped-tranche_base,
        "tranche_delta_in_index_units":tranche_delta})
@@ -207,7 +207,7 @@ Finally raise only the payer strike. With a fixed underlying distribution, buyin
 ```python exec id=c4-workflow-6 role=build
 higher_strike = deepcopy(payer)
 higher_strike["instrument"]["spec"]["strike"] = {"spread": "0.015"}
-higher = price_instrument(json.dumps(higher_strike), market, AS_OF, model="bloomberg_cdso").value.amount
+higher = price_instrument(higher_strike, market, AS_OF, model="bloomberg_cdso").value.amount
 print(pd.Series({"100bp_strike_usd": nonko.value.amount, "150bp_strike_usd": higher}))
 ```
 {/* /notebook-block */}
@@ -226,8 +226,8 @@ The formal CS01 match is exact in the displayed arithmetic. It deliberately cann
 ```python exec id=c4-exercise-hedge role=exercise
 from finstack_quant.valuations.instruments import tranche_metrics
 holding=tracks.clo_bbb_holding()
-bbb=tranche_metrics(json.dumps(holding["deal"]),"BBB",market,AS_OF)
-index_cs=price_instrument(json.dumps(inputs["ANALYST-CDX"]),market,AS_OF,model="hazard_rate",metrics=["cs01"])
+bbb=tranche_metrics(holding["deal"],"BBB",market,AS_OF)
+index_cs=price_instrument(inputs["ANALYST-CDX"],market,AS_OF,model="hazard_rate",metrics=["cs01"])
 hedge_units=-bbb.cs01/index_cs.metrics["cs01"]
 print({"BBB_zspread_CS01":bbb.cs01,"index_quote_CS01_per_1m":index_cs.metrics["cs01"],
        "formal_index_units":hedge_units})
@@ -242,8 +242,8 @@ joint_market=tracks.build_market("credit")
 joint_market.insert(calibrate(joint_quotes).market.get_hazard("CDX-HAZ"))
 loss_deal=deepcopy(holding["deal"]);ls=loss_deal["instrument"]["spec"]
 ls["default_spec"]={"curve":"constant","cdr":.05};ls["recovery_spec"]={"rate":.25,"recovery_lag":6}
-stress_bbb=tranche_metrics(json.dumps(loss_deal),"BBB",joint_market,AS_OF)
-stress_index=price_instrument(json.dumps(inputs["ANALYST-CDX"]),joint_market,AS_OF,model="hazard_rate")
+stress_bbb=tranche_metrics(loss_deal,"BBB",joint_market,AS_OF)
+stress_index=price_instrument(inputs["ANALYST-CDX"],joint_market,AS_OF,model="hazard_rate")
 residual=stress_bbb.pv-bbb.pv+hedge_units*(stress_index.value.amount-index_cs.value.amount)
 print({"BBB_stress_pnl":stress_bbb.pv-bbb.pv,
        "index_hedge_pnl":hedge_units*(stress_index.value.amount-index_cs.value.amount),"joint_residual":residual})
@@ -266,8 +266,8 @@ for quote in stressed_calibration["market_data"]:
 stressed_market=tracks.build_market("credit")
 stressed_market.insert(calibrate(stressed_calibration).market.get_hazard("CDX-HAZ"))
 stressed_strike=deepcopy(payer);stressed_strike["instrument"]["spec"]["strike"]={"spread":"0.022"}
-initial_cost=price_instrument(json.dumps(stressed_strike),market,AS_OF,model="bloomberg_cdso").value.amount
-stress_value=price_instrument(json.dumps(stressed_strike),stressed_market,AS_OF,model="bloomberg_cdso").value.amount
+initial_cost=price_instrument(stressed_strike,market,AS_OF,model="bloomberg_cdso").value.amount
+stress_value=price_instrument(stressed_strike,stressed_market,AS_OF,model="bloomberg_cdso").value.amount
 print({"220bp_strike_cost":initial_cost,"value_after_100bp_parallel_quote_widening":stress_value,
        "scenario_gain_before_financing":stress_value-initial_cost})
 ```

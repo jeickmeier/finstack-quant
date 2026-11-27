@@ -43,7 +43,7 @@ def test_structured_credit_rejects_retired_behavior_overrides() -> None:  # sche
     spec["behavior_overrides"] = {"recovery_rate": 0.7, "recovery_lag_months": 9}
     market = MarketContext.from_json(json.dumps(fixture["market"]))
     with pytest.raises(ValueError, match="behavior_overrides"):
-        price_instrument(json.dumps(fixture["instrument"]), market, fixture["as_of"], "discounting", [])
+        price_instrument(fixture["instrument"], market, fixture["as_of"], "discounting", [])
 
 
 def test_structured_credit_inactive_reinvestment_matches_no_reinvestment() -> None:
@@ -59,9 +59,7 @@ def test_structured_credit_inactive_reinvestment_matches_no_reinvestment() -> No
     market = MarketContext.from_json(json.dumps(fixture["market"]))
 
     def value() -> float:
-        return price_instrument(
-            json.dumps(fixture["instrument"]), market, fixture["as_of"], "discounting", []
-        ).value.amount
+        return price_instrument(fixture["instrument"], market, fixture["as_of"], "discounting", []).value.amount
 
     expected = value()
     spec["pool"]["reinvestment_period"] = {
@@ -105,7 +103,7 @@ def test_structured_credit_ineligible_reinvestment_conserves_cash(
             curve["base"] = fixture["as_of"]
             curve["knot_points"] = [[0.0, 1.0], [20.0, 1.0]]
     result = price_instrument(
-        json.dumps(fixture["instrument"]),
+        fixture["instrument"],
         MarketContext.from_json(json.dumps(fixture["market"])),
         fixture["as_of"],
         "discounting",
@@ -129,7 +127,7 @@ def test_structured_credit_predefaulted_collateral_pays_recovery_once() -> None:
     )
     fixture["market"]["curves"][0]["knot_points"] = [[0.0, 1.0], [20.0, 1.0]]
     result = price_instrument(
-        json.dumps(fixture["instrument"]),
+        fixture["instrument"],
         MarketContext.from_json(json.dumps(fixture["market"])),
         fixture["as_of"],
         "discounting",
@@ -151,7 +149,7 @@ def test_active_volatility_override_separates_scalar_and_node_risk() -> None:
 
     def price() -> ValuationResult:
         return price_instrument(
-            json.dumps(fixture["instrument"]),
+            fixture["instrument"],
             MarketContext.from_json(json.dumps(fixture["market"])),
             fixture["as_of"],
             "black76",
@@ -205,7 +203,7 @@ def test_icma_mid_coupon_duration_and_convexity() -> None:
         ).read_text()
     )
     result = price_instrument(
-        json.dumps(fixture["instrument"]),
+        fixture["instrument"],
         MarketContext.from_json(json.dumps(fixture["market"])),
         "2024-05-31",
         "discounting",
@@ -278,7 +276,7 @@ def test_hull_white_partial_coupon_spread_through_json_pricer() -> None:
     as_of = date.fromisoformat(fixture["as_of"])
     expiry = date(2026, 4, 1)
     result = price_instrument(
-        json.dumps(fixture["instrument"]),
+        fixture["instrument"],
         MarketContext.from_json(json.dumps(fixture["market"])),
         fixture["as_of"],
         "hull_white_1f",
@@ -348,7 +346,7 @@ def test_inflation_reference_months_compounding_and_registry_contracts() -> None
     market = MarketContext.from_json(json.dumps(fixture["market"]))
 
     def price() -> ValuationResult:
-        return price_instrument(json.dumps(fixture["instrument"]), market, fixture["as_of"], "discounting", [])
+        return price_instrument(fixture["instrument"], market, fixture["as_of"], "discounting", [])
 
     expected = 1_000_000 * (0.10 - (1.02**5 - 1))
     assert price().value.amount == pytest.approx(expected, abs=1e-7)
@@ -366,7 +364,7 @@ def test_convertible_clean_exercise_and_variable_conversion() -> None:
         ).read_text()
     )
     result = price_instrument(
-        json.dumps(fixture["instrument"]),
+        fixture["instrument"],
         MarketContext.from_json(json.dumps(fixture["market"])),
         fixture["as_of"],
         "tree",
@@ -404,7 +402,7 @@ def test_convertible_cross_gamma_uses_the_effective_volatility_quote() -> None:
         fixture["market"]["prices"]["AAPL"]["unitless"] = spot
         fixture["market"]["prices"]["AAPL-VOL"]["unitless"] = vol
         return price_instrument(
-            json.dumps(fixture["instrument"]),
+            fixture["instrument"],
             MarketContext.from_json(json.dumps(fixture["market"])),
             fixture["as_of"],
             "tree",
@@ -437,7 +435,7 @@ def test_mortgage_settlement_seasoned_io_and_financing() -> None:
     market = MarketContext.from_json(json.dumps(fixture["market"]))
 
     def price(name: str, metrics: list[str]) -> ValuationResult:
-        return price_instrument(json.dumps(fixture[name]), market, fixture["as_of"], "discounting", metrics)
+        return price_instrument(fixture[name], market, fixture["as_of"], "discounting", metrics)
 
     # 1000 purchased current face, a full monthly 4% coupon, less ten days' accrued interest.
     assert price("tba", []).value.amount == pytest.approx(1000 * 0.04 * (1 / 12 - 10 / 360), abs=1e-9)
@@ -464,7 +462,7 @@ def test_tba_delivery_excludes_prior_receivable_and_adjusts_payment_date() -> No
     fixture["tba"]["instrument"]["spec"]["assumed_pool"]["issue_date"] = "2025-01-01"
     fixture["market"]["curves"][0]["knot_points"] = [[0.0, 1.0], [40.0, math.exp(-0.04 * 40)]]
     result = price_instrument(
-        json.dumps(fixture["tba"]),
+        fixture["tba"],
         MarketContext.from_json(json.dumps(fixture["market"])),
         fixture["as_of"],
         "discounting",
@@ -483,7 +481,7 @@ def test_credit_tranche_loss_and_complete_issuer_coverage() -> None:
     # The SciPy reference pins live with the Rust test that shares them, in the credit crate.
     reference = json.loads((valuations / "credit/tests/fixtures/production_tranche_loss_reference.json").read_text())
     result = price_instrument(
-        json.dumps(f["instrument"]),
+        f["instrument"],
         MarketContext.from_json(json.dumps(f["market"])),
         f["as_of"],
         "hazard_rate",
@@ -519,7 +517,7 @@ def test_bespoke_cds_frequency_and_stub_price_the_configured_payments() -> None:
         premium = f["instrument"]["instrument"]["spec"]["premium_leg"]
         premium["stub"] = stub
         assert PremiumLegSpec.from_json(json.dumps(premium)).date_regime == "bespoke"
-        value = price_instrument(json.dumps(f["instrument"]), market, f["as_of"], "hazard_rate", []).value.amount
+        value = price_instrument(f["instrument"], market, f["as_of"], "hazard_rate", []).value.amount
         previous = date(2025, 1, 1)
         expected = 0.0
         for payment in dates:
@@ -539,7 +537,7 @@ def test_cds_option_exercise_payment_cannot_precede_expiry() -> None:
     f["instrument"]["instrument"]["spec"]["exercise_settlement_date"] = "2025-12-31"
     market = MarketContext.from_json(json.dumps(f["market"]))
     with pytest.raises((ValueError, RuntimeError), match=r"exercise_settlement_date.*expiry"):
-        price_instrument(json.dumps(f["instrument"]), market, f["as_of"], "bloomberg_cdso", [])
+        price_instrument(f["instrument"], market, f["as_of"], "bloomberg_cdso", [])
 
 
 def test_structured_credit_representative_collateral_preserves_pv() -> None:
@@ -553,9 +551,7 @@ def test_structured_credit_representative_collateral_preserves_pv() -> None:
     market = MarketContext.from_json(json.dumps(fixture["market"]))
 
     def value() -> float:
-        return price_instrument(
-            json.dumps(fixture["instrument"]), market, fixture["as_of"], "discounting", []
-        ).value.amount
+        return price_instrument(fixture["instrument"], market, fixture["as_of"], "discounting", []).value.amount
 
     expected = value()
     asset = pool["assets"].pop()
@@ -592,7 +588,7 @@ def test_structured_credit_enhancement_includes_current_collateral_and_reserve()
     spec["tranches"]["tranches"][0]["current_balance"]["amount"] = "80000000"
     spec["pool"]["reserve_account"]["amount"] = "20000000"
     result = price_instrument(
-        json.dumps(fixture["instrument"]),
+        fixture["instrument"],
         MarketContext.from_json(json.dumps(fixture["market"])),
         fixture["as_of"],
         "discounting",

@@ -44,7 +44,9 @@ def test_standalone_simm_nets_trades_and_rejects_unsupported_inputs() -> None:
     single = calculate_simm([payer], market, as_of)
     assert single.amount > 0.0
     assert single.approximation
-    assert calculate_simm([payer.to_json()], market, as_of).amount == single.amount
+    assert calculate_simm([json.loads(payer.to_json())], market, as_of).amount == single.amount
+    with pytest.raises(TypeError, match="typed instrument instance or a canonical instrument envelope dict"):
+        calculate_simm([payer.to_json()], market, as_of)
     assert calculate_simm([payer, receiver], market, as_of).amount == pytest.approx(0.0, abs=1e-5)
     with pytest.raises(ValueError, match="does not support SIMM"):
         calculate_simm([Deposit.example()], market, as_of)

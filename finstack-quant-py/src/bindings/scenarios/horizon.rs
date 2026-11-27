@@ -22,9 +22,9 @@ use crate::bindings::core::market_data::context::PyMarketContext;
 ///
 /// Parameters
 /// ----------
-/// instrument : Instrument | str
+/// instrument : Instrument | dict
 ///     Typed instrument (``Bond``, ``CreditDefaultSwap``, ``InterestRateSwap``,
-///     ...) or a canonical v1 instrument envelope JSON string.
+///     ...) or a canonical v1 instrument envelope dict.
 /// market : MarketContext
 ///     A ``MarketContext``. Never mutated; the scenario
 ///     is applied to an internal copy.

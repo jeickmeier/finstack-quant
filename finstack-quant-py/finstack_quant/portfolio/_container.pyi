@@ -114,7 +114,7 @@ class PortfolioBuilder:
             Unique position identifier.
         instrument : object
             Any typed instrument wrapper, or a canonical instrument-envelope
-            JSON string. The instrument's own ``id`` becomes ``instrument_id``.
+            dict. The instrument's own ``id`` becomes ``instrument_id``.
         quantity : float
             Signed holding; its meaning follows ``unit``. Must be finite.
         entity_id : str, optional
@@ -136,7 +136,7 @@ class PortfolioBuilder:
         Raises
         ------
         TypeError
-            If ``instrument`` is not a typed instrument, an envelope dict or a JSON string.
+            If ``instrument`` is not a typed instrument or an envelope dict.
         ValueError
             If the instrument payload is invalid, ``quantity`` is not finite,
             ``unit`` is unknown, or the builder was already consumed.
@@ -254,8 +254,8 @@ class Position:
         position_id : str
             Identifier unique within the containing portfolio.
         instrument : object
-            Typed instrument or canonical instrument envelope (dictionary or
-            JSON text). Its instrument identifier is copied to the position.
+            Typed instrument or canonical instrument envelope dict. Its
+            instrument identifier is copied to the position.
         quantity : float
             Finite signed holding in the selected unit. A percentage
             quantity must be between -100 and 100 inclusive.

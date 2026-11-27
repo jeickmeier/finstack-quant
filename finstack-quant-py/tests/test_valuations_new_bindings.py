@@ -9,7 +9,6 @@ Covers:
 from __future__ import annotations
 
 from datetime import date
-import json
 
 import pytest
 
@@ -23,14 +22,14 @@ from finstack_quant.valuations.instruments import (
 from tests.tests_typed_helpers import projection_curve
 
 
-def _instrument_json(instrument: dict[str, object]) -> str:
-    return json.dumps({"schema": "finstack_quant.instrument/1", "instrument": instrument})
+def _instrument_json(instrument: dict[str, object]) -> dict:
+    return {"schema": "finstack_quant.instrument/1", "instrument": instrument}
 
 
 # B4 — instrument_cashflows
 
 
-def _build_deposit_market() -> tuple[str, MarketContext]:
+def _build_deposit_market() -> tuple[dict, MarketContext]:
     inst_json = _instrument_json({
         "type": "deposit",
         "spec": {
@@ -146,7 +145,7 @@ def test_instrument_cashflows_unsupported_model_raises() -> None:
         instrument_cashflows(inst_json, market, "2025-01-15", "monte_carlo_gbm").to_json()
 
 
-def _revolving_credit_json(*, gearing: str | None = None, credit_curve: bool = False) -> str:
+def _revolving_credit_json(*, gearing: str | None = None, credit_curve: bool = False) -> dict:
     return _instrument_json({
         "type": "revolving_credit",
         "spec": {

@@ -58,12 +58,12 @@ def _approx(value: float) -> object:
     return pytest.approx(value, rel=1e-15, abs=0)
 
 
-def _deal_json() -> str:
-    return canonical_structured_credit_json(calendar_id="NOT_A_CALENDAR")
+def _deal_json() -> dict:
+    return json.loads(canonical_structured_credit_json(calendar_id="NOT_A_CALENDAR"))
 
 
-def _valid_deal_json() -> str:
-    return canonical_structured_credit_json()
+def _valid_deal_json() -> dict:
+    return json.loads(canonical_structured_credit_json())
 
 
 def _market() -> MarketContext:
@@ -230,5 +230,7 @@ def test_invalid_deal_reports_an_actionable_error() -> None:
 
 def test_malformed_json_raises_rather_than_panics() -> None:
     """Garbage input must be rejected cleanly at the boundary."""
-    with pytest.raises(ValueError, match=r"(?i)json|parse|expected"):
+    with pytest.raises(TypeError, match="typed instrument instance or a canonical instrument envelope dict"):
         instruments.tranche_breakeven_cdr("{not valid json", "CLONOTES-A", MarketContext(), "2024-01-01")
+    with pytest.raises(ValueError, match=r"(?i)json|parse|expected"):
+        instruments.tranche_breakeven_cdr({"not": "an envelope"}, "CLONOTES-A", MarketContext(), "2024-01-01")

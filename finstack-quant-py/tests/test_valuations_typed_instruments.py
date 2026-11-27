@@ -169,15 +169,19 @@ class TestBondTyped:
         bond = _fixed_bond()
         market = _market()
         typed = price_instrument(bond, market, "2024-06-30")
-        via_json = price_instrument(bond.to_json(), market, "2024-06-30")
+        via_json = price_instrument(json.loads(bond.to_json()), market, "2024-06-30")
         assert _without_timestamp(typed) == _without_timestamp(via_json)
+        with pytest.raises(TypeError, match="typed instrument instance or a canonical instrument envelope dict"):
+            price_instrument(bond.to_json(), market, "2024-06-30")
 
     def test_price_instrument_accepts_typed(self) -> None:
         bond = _fixed_bond()
         market = _market()
         typed = price_instrument(bond, market, "2024-06-30", "discounting", ["ytm", "dv01"])
-        via_json = price_instrument(bond.to_json(), market, "2024-06-30", "discounting", ["ytm", "dv01"])
+        via_json = price_instrument(json.loads(bond.to_json()), market, "2024-06-30", "discounting", ["ytm", "dv01"])
         assert _without_timestamp(typed) == _without_timestamp(via_json)
+        with pytest.raises(TypeError, match="typed instrument instance or a canonical instrument envelope dict"):
+            price_instrument(bond.to_json(), market, "2024-06-30", "discounting", ["ytm", "dv01"])
 
     def test_price_instrument_returns_typed_result(self) -> None:
         """``price_instrument`` hands back a ``ValuationResult``, not JSON."""
@@ -211,8 +215,10 @@ class TestBondTyped:
         bond = _fixed_bond()
         market = _market()
         typed = instrument_cashflows(bond, market, "2024-06-30", "discounting").to_json()
-        via_json = instrument_cashflows(bond.to_json(), market, "2024-06-30", "discounting").to_json()
+        via_json = instrument_cashflows(json.loads(bond.to_json()), market, "2024-06-30", "discounting").to_json()
         assert json.loads(typed) == json.loads(via_json)
+        with pytest.raises(TypeError, match="typed instrument instance or a canonical instrument envelope dict"):
+            instrument_cashflows(bond.to_json(), market, "2024-06-30", "discounting")
 
 
 class TestTermLoanTyped:
@@ -244,8 +250,10 @@ class TestTermLoanTyped:
         loan = TermLoan.example()
         market = _market()
         typed = price_instrument(loan, market, "2024-06-30")
-        via_json = price_instrument(loan.to_json(), market, "2024-06-30")
+        via_json = price_instrument(json.loads(loan.to_json()), market, "2024-06-30")
         assert _without_timestamp(typed) == _without_timestamp(via_json)
+        with pytest.raises(TypeError, match="typed instrument instance or a canonical instrument envelope dict"):
+            price_instrument(loan.to_json(), market, "2024-06-30")
 
 
 class TestUnionExtraction:

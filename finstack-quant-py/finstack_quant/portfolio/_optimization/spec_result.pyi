@@ -24,7 +24,7 @@ class CandidatePosition:
     --------
     >>> from finstack_quant.portfolio import CandidatePosition
     >>> try:
-    ...     CandidatePosition("C1", "E1", "not-an-instrument")
+    ...     CandidatePosition("C1", "E1", {"schema": "not-an-instrument"})
     ... except ValueError:
     ...     print("invalid instrument payload")
     invalid instrument payload
@@ -50,8 +50,8 @@ class CandidatePosition:
             Must be unique among candidates and absent from existing positions.
         entity_id : str
             Owning entity for the candidate.
-        instrument : Bond | InterestRateSwap | ... | str
-            Typed instrument wrapper or canonical instrument-envelope JSON.
+        instrument : Bond | InterestRateSwap | ... | dict
+            Typed instrument wrapper or canonical instrument-envelope dict.
         unit : str | dict | None
             Position unit: ``"units"`` (default), ``"face_value"``,
             ``"percentage"``, or the mapping ``{"notional": "USD"}`` /
@@ -67,7 +67,7 @@ class CandidatePosition:
         Raises
         ------
         TypeError
-            If ``instrument`` is not a typed instrument, an envelope dict or a string.
+            If ``instrument`` is not a typed instrument or an envelope dict.
         ValueError
             If the instrument payload is invalid or ``unit`` is unknown.
 
@@ -75,7 +75,7 @@ class CandidatePosition:
         --------
         >>> from finstack_quant.portfolio import CandidatePosition
         >>> try:
-        ...     CandidatePosition("C1", "E1", "{}")
+        ...     CandidatePosition("C1", "E1", {})
         ... except ValueError:
         ...     print("invalid instrument payload")
         invalid instrument payload

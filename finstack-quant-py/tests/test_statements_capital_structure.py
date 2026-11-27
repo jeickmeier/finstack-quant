@@ -22,16 +22,18 @@ from finstack_quant.valuations.instruments import Bond, InterestRateSwap, TermLo
 SWEEP_PRIORITIES = ["fees", "interest", "amortization", "sweep", "equity"]
 
 
-def _debt_envelope_json(instrument_id: str) -> str:
-    return Bond.fixed(
-        instrument_id,
-        Money(25_000_000.0, Currency("USD")),
-        Rate(0.05),
-        date(2025, 1, 15),
-        date(2030, 1, 15),
-        StubKind.SHORT_FRONT,
-        "USD-OIS",
-    ).to_json()
+def _debt_envelope_json(instrument_id: str) -> dict:
+    return json.loads(
+        Bond.fixed(
+            instrument_id,
+            Money(25_000_000.0, Currency("USD")),
+            Rate(0.05),
+            date(2025, 1, 15),
+            date(2030, 1, 15),
+            StubKind.SHORT_FRONT,
+            "USD-OIS",
+        ).to_json()
+    )
 
 
 class TestEcfSweepSpec:
@@ -239,6 +241,8 @@ class TestModelBuilderCapitalStructure:
         b.value("x", [("2025Q1", 1.0)])
         model = b.build()
         assert '"TL-A"' in model.to_json()
+        with pytest.raises(TypeError, match="typed instrument instance or a canonical instrument envelope dict"):
+            statements.ModelBuilder("deal").add_debt("TL-A", json.dumps(_debt_envelope_json("TL-A")))
 
     def test_reporting_currency_and_fx_policy(self) -> None:
         b = statements.ModelBuilder("deal")
@@ -269,7 +273,7 @@ class TestModelBuilderCapitalStructure:
             payment_classes=[first_lien],
         )
         b = statements.ModelBuilder("deal")
-        b.add_debt(loan.id, loan.to_json())
+        b.add_debt(loan.id, loan)
         b.waterfall(ws)
         b.periods("2025Q1..Q1", None)
         b.value("x", [("2025Q1", 1.0)])

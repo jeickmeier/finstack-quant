@@ -30,9 +30,9 @@ from finstack_quant.valuations.composite import (
 from finstack_quant.valuations.instruments import price_instrument
 
 
-def equity_envelope(instrument_id: str, price: float) -> str:
+def equity_envelope(instrument_id: str, price: float) -> dict:
     """Return a canonical explicit-price equity envelope."""
-    return json.dumps({
+    return {
         "schema": "finstack_quant.instrument/1",
         "instrument": {
             "type": "equity",
@@ -49,7 +49,7 @@ def equity_envelope(instrument_id: str, price: float) -> str:
                 "attributes": {},
             },
         },
-    })
+    }
 
 
 def fixed_spec() -> CompositeSpec:
@@ -138,7 +138,7 @@ def test_portfolio_primitive_exposures_net_composite_legs_against_direct_positio
     market = MarketContext()
     resolved = fixed_spec().initialize(market, dt.date(2025, 1, 1)).instrument
     composite = json.loads(resolved.to_json())["instrument"]
-    direct = json.loads(equity_envelope("A", 100.0))["instrument"]
+    direct = equity_envelope("A", 100.0)["instrument"]
     book = Portfolio.from_spec(
         json.dumps({
             "id": "PRIMITIVE",

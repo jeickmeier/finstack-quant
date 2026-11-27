@@ -542,7 +542,7 @@ class ModelBuilder:
         """
         ...
 
-    def add_debt(self, id: str, instrument: Any | str) -> ModelBuilder:
+    def add_debt(self, id: str, instrument: Any) -> ModelBuilder:
         """
         Attach a canonical debt or hedge instrument to the capital structure.
 
@@ -563,7 +563,7 @@ class ModelBuilder:
             Market-aware evaluation rejects duplicate identifiers.
         instrument:
             A typed instrument object, or its canonical
-            ``finstack_quant.instrument/1`` envelope as a dict or JSON text.
+            ``finstack_quant.instrument/1`` envelope dict.
 
         Returns
         -------

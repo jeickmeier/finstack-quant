@@ -32,9 +32,7 @@ def test_ndf_quote_orientation_preserves_long_base_payoff(reciprocal: bool) -> N
     spec["contract_rate"] = 1.0 / 7.0 if reciprocal else 7.0
     spec["observed_fixing"] = 1.0 / 8.0 if reciprocal else 8.0
     spec["quote_convention"] = "settlement_per_base" if reciprocal else "base_per_settlement"
-    result = price_instrument(
-        json.dumps(instrument), MarketContext.from_json(json.dumps(market)), "2024-01-02", "discounting", []
-    )
+    result = price_instrument(instrument, MarketContext.from_json(json.dumps(market)), "2024-01-02", "discounting", [])
     assert result.value.amount == pytest.approx(-125_000.0, abs=1e-8)
 
 
@@ -49,7 +47,7 @@ def test_total_trade_rebate_and_paid_at_hit_state(expired: bool) -> None:
     spec["rebate_timing"] = "at_hit" if expired else "at_expiry"
     spec["expiry_fixing"] = 100.0
     result = price_instrument(
-        json.dumps(instrument),
+        instrument,
         MarketContext.from_json(json.dumps(market)),
         spec["expiry"] if expired else "2024-01-02",
         "barrier_bs_continuous",
@@ -72,18 +70,18 @@ def test_quanto_asset_financing_and_required_market_inputs() -> None:
 
     expected = 8000.0 * (cdf((math.log(1.2) - log_mean) / 0.2) - cdf((math.log(0.8) - log_mean) / 0.2))
     market = MarketContext.from_json(json.dumps(f["market"]))
-    result = price_instrument(json.dumps(f["instrument"]), market, f["as_of"], "static_replication", [])
+    result = price_instrument(f["instrument"], market, f["as_of"], "static_replication", [])
     assert result.value.amount == pytest.approx(expected, abs=0.02)
     f["instrument"]["instrument"]["spec"]["instrument_pricing_overrides"] = {
         "market_quotes": {"implied_volatility": 0.4}
     }
     expected_override = 8000.0 * (cdf(math.log(1.2) / 0.4) - cdf(math.log(0.8) / 0.4))
-    overridden = price_instrument(json.dumps(f["instrument"]), market, f["as_of"], "static_replication", [])
+    overridden = price_instrument(f["instrument"], market, f["as_of"], "static_replication", [])
     assert overridden.value.amount == pytest.approx(expected_override, abs=0.02)
     del f["market"]["prices"]["EURUSD"]
     without_fx_price = MarketContext.from_json(json.dumps(f["market"]))
     with pytest.raises(KeyError, match="EURUSD"):
-        price_instrument(json.dumps(f["instrument"]), without_fx_price, f["as_of"], "static_replication", [])
+        price_instrument(f["instrument"], without_fx_price, f["as_of"], "static_replication", [])
 
 
 def test_quanto_rejects_asset_spot_currency_mismatch() -> None:
@@ -91,7 +89,7 @@ def test_quanto_rejects_asset_spot_currency_mismatch() -> None:
     f["market"]["prices"]["SPX-SPOT"]["price"]["currency"] = "USD"
     market = MarketContext.from_json(json.dumps(f["market"]))
     with pytest.raises(ValueError, match=r"(?i)currency"):
-        price_instrument(json.dumps(f["instrument"]), market, f["as_of"], "static_replication", [])
+        price_instrument(f["instrument"], market, f["as_of"], "static_replication", [])
 
 
 def test_discrete_barrier_contract_cannot_use_continuous_analytical_engine() -> None:
@@ -101,7 +99,7 @@ def test_discrete_barrier_contract_cannot_use_continuous_analytical_engine() -> 
     spec["monitoring"] = {"type": "discrete", "observation_dates": [spec["expiry"]]}
     loaded = MarketContext.from_json(json.dumps(market))
     with pytest.raises(RuntimeError, match="continuous monitoring"):
-        price_instrument(json.dumps(instrument), loaded, "2024-01-02", "barrier_bs_continuous", [])
+        price_instrument(instrument, loaded, "2024-01-02", "barrier_bs_continuous", [])
 
 
 def test_fixed_ndf_exports_only_settlement_cash() -> None:
@@ -115,7 +113,7 @@ def test_fixed_ndf_exports_only_settlement_cash() -> None:
     assert row["amount"] == pytest.approx(10_000_000 * (1 / 7.30 - 1 / 7.25))
     assert row.get("principal_delta") is None
     assert row.get("principal_date") is None
-    pv = price_instrument(json.dumps(instrument), loaded, "2025-03-14", "discounting", [])
+    pv = price_instrument(instrument, loaded, "2025-03-14", "discounting", [])
     assert row["native_pv"] == pytest.approx(pv.value.amount)
 
 
@@ -147,8 +145,8 @@ def test_variance_settlement_includes_preceding_close() -> None:
     ]
     variance = 252 * math.log(1.1) ** 2 / 3
     loaded = MarketContext.from_json(json.dumps(market))
-    settlement = price_instrument(json.dumps(instrument), loaded, spec["maturity"], "discounting", [])
+    settlement = price_instrument(instrument, loaded, spec["maturity"], "discounting", [])
     assert float(settlement.value.amount) == pytest.approx(1_000_000 * (variance - 0.04), abs=1e-7)
     del spec["previous_close_date"]
     with pytest.raises((ValueError, RuntimeError), match="previous_close_date"):
-        price_instrument(json.dumps(instrument), loaded, spec["maturity"], "discounting", [])
+        price_instrument(instrument, loaded, spec["maturity"], "discounting", [])

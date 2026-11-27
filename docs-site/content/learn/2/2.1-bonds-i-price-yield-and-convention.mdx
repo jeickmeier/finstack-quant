@@ -100,7 +100,7 @@ metrics = ['clean_price', 'dirty_price', 'accrued', 'ytm']
 priced = price_instrument(typed, market, AS_OF, metrics=metrics)
 yield_quote = copy.deepcopy(base)
 yield_quote['instrument']['spec']['instrument_pricing_overrides'] = {'market_quotes': {'quoted_ytm': priced.get_metric('ytm')}}
-roundtrip = price_instrument(json.dumps(yield_quote), market, AS_OF, metrics=metrics)
+roundtrip = price_instrument(yield_quote, market, AS_OF, metrics=metrics)
 settlement_rows = []
 for fixed_quote in (False, True):
     rows = []
@@ -109,7 +109,7 @@ for fixed_quote in (False, True):
         bond['instrument']['spec']['settlement_days'] = days
         if fixed_quote:
             bond['instrument']['spec']['instrument_pricing_overrides'] = {'market_quotes': {'quoted_clean_price_pct': 99.0}}
-        result = price_instrument(json.dumps(bond), market, AS_OF, metrics=metrics)
+        result = price_instrument(bond, market, AS_OF, metrics=metrics)
         rows.append({name: result.get_metric(name) for name in metrics})
     if fixed_quote:
         pass
@@ -143,7 +143,7 @@ market=build_market('foundations')
 callable_spec=instruments('foundations')['USD-CORP']
 callable_spec['instrument']['spec']['call_put']={'calls':[{'start':'2027-01-15','end':'2029-01-15','price_pct_of_par':101.0}],'puts':[]}
 callable_spec['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'quoted_clean_price_pct':102.0},'model_config':{'hw1f_sigma':0.01,'hw1f_mean_reversion':0.03}}
-workouts=price_instrument(json.dumps(callable_spec),market,AS_OF,metrics=['ytm','ytw'])
+workouts=price_instrument(callable_spec,market,AS_OF,metrics=['ytm','ytw'])
 print({'typed_price':price_instrument(built,market,AS_OF).price,'ytm_decimal':workouts.get_metric('ytm'),'ytw_decimal':workouts.get_metric('ytw')})
 ```
 {/* /notebook-block */}
@@ -173,7 +173,7 @@ schedule = (CashFlowSchedule.builder().principal(Money(2_000_000.0, 'USD'), date
     .build())
 amortizer = Bond.from_cashflows('LESSON-AMORTIZER', schedule, 'semi_annual', 'USD-OIS')
 amortized = price_instrument(amortizer, market, AS_OF, metrics=['duration_mod', 'ytm'])
-bullet = price_instrument(json.dumps(instruments('foundations')['USD-CORP']), market, AS_OF, metrics=['duration_mod'])
+bullet = price_instrument(instruments('foundations')['USD-CORP'], market, AS_OF, metrics=['duration_mod'])
 print({'amortizer_duration': amortized.get_metric('duration_mod'), 'bullet_duration': bullet.get_metric('duration_mod')})
 ```
 {/* /notebook-block */}
@@ -232,7 +232,7 @@ metrics = ['clean_price', 'dirty_price', 'accrued', 'ytm']
 priced = price_instrument(typed, market, AS_OF, metrics=metrics)
 yield_quote = copy.deepcopy(base)
 yield_quote['instrument']['spec']['instrument_pricing_overrides'] = {'market_quotes': {'quoted_ytm': priced.get_metric('ytm')}}
-roundtrip = price_instrument(json.dumps(yield_quote), market, AS_OF, metrics=metrics)
+roundtrip = price_instrument(yield_quote, market, AS_OF, metrics=metrics)
 settlement_rows = []
 for fixed_quote in (False, True):
     rows = []
@@ -241,7 +241,7 @@ for fixed_quote in (False, True):
         bond['instrument']['spec']['settlement_days'] = days
         if fixed_quote:
             bond['instrument']['spec']['instrument_pricing_overrides'] = {'market_quotes': {'quoted_clean_price_pct': 99.0}}
-        result = price_instrument(json.dumps(bond), market, AS_OF, metrics=metrics)
+        result = price_instrument(bond, market, AS_OF, metrics=metrics)
         rows.append({name: result.get_metric(name) for name in metrics})
     if fixed_quote:
         pass
@@ -298,10 +298,10 @@ AS_OF = date(2025, 1, 15)
 contract=instruments('foundations')['USD-CORP']
 contract['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'quoted_clean_price_pct':99.0}}
 market=build_market('foundations')
-result=price_instrument(json.dumps(contract),market,AS_OF,metrics=['ytm','dirty_price'])
+result=price_instrument(contract,market,AS_OF,metrics=['ytm','dirty_price'])
 settle=add_business_days(AS_OF,1,'usny')
 flow_contract=instruments('foundations')['USD-CORP']
-flows=json.loads(instrument_cashflows(json.dumps(flow_contract),market,AS_OF,'discounting').to_json())['flows']
+flows=json.loads(instrument_cashflows(flow_contract,market,AS_OF,'discounting').to_json())['flows']
 dated=[(date.fromisoformat(f['date']),float(f['amount'])) for f in flows if date.fromisoformat(f['date'])>settle]
 price=result.get_metric('dirty_price');xirr=mwr_xirr([(settle,-price)]+dated)
 npv=-price+sum(amount/(1+xirr)**((day-settle).days/365) for day,amount in dated)

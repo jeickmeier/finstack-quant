@@ -31,8 +31,8 @@ AS_OF_T0 = "2025-01-15"
 AS_OF_T1 = "2025-01-16"
 
 
-def _bond_json() -> str:
-    return json.dumps({
+def _bond_json() -> dict:
+    return {
         "schema": "finstack_quant.instrument/1",
         "instrument": {
             "type": "bond",
@@ -60,7 +60,7 @@ def _bond_json() -> str:
                 "attributes": {"tags": [], "meta": {}},
             },
         },
-    })
+    }
 
 
 def _market_json(as_of: str, shift: float = 0.0) -> str:
@@ -203,7 +203,7 @@ def test_validate_attribution_json_rejects_wrong_schema() -> None:
     envelope = {
         "schema": "finstack_quant.attribution/99",
         "spec": {
-            "instrument": json.loads(_bond_json()),
+            "instrument": _bond_json(),
             "market_t0": json.loads(_market_json(AS_OF_T0)),
             "market_t1": json.loads(_market_json(AS_OF_T1)),
             "as_of_t0": AS_OF_T0,
@@ -357,12 +357,12 @@ def test_return_contribution_rejects_derived_overflow(positions: list[dict], fac
 
 @pytest.mark.parametrize("method", ["parallel", {"waterfall": default_waterfall_order()}, {"taylor": {}}])
 def test_principal_redemption_is_total_return_without_coupon_income(method: object) -> None:
-    instrument = json.loads(_bond_json())
+    instrument = _bond_json()
     instrument["instrument"]["spec"]["maturity"] = "2025-01-15"
     instrument["instrument"]["spec"]["cashflow_spec"]["fixed"]["rate"] = "0.0"
     market = _market_state("2025-01-14")
     result = attribute_pnl(
-        json.dumps(instrument),
+        instrument,
         {
             "market_t0": market,
             "market_t1": market,
@@ -398,7 +398,7 @@ def test_deposit_principal_redemption_is_not_coupon_income() -> None:
     }
     market = _market_state("2025-01-14")
     result = attribute_pnl(
-        json.dumps(instrument),
+        instrument,
         {
             "market_t0": market,
             "market_t1": market,

@@ -65,7 +65,7 @@ def test_direct_hazard_shock_and_retired_mode_rejection() -> None:
 
     with pytest.raises((ValueError, RuntimeError), match=r"(?i)calibration|recipe"):
         price_instrument(
-            json.dumps(fixture["instrument"]),
+            fixture["instrument"],
             market,
             fixture["as_of"],
             metrics=["cs01"],
@@ -115,7 +115,7 @@ def test_frn_time_roll_preserves_raw_index_excluding_coupon_spread() -> None:
         MarketContext.from_json(json.dumps(market)),
         fixture["as_of"],
         None,
-        [json.dumps(instrument)],
+        [instrument],
     )
     assert result.report.time_roll["failed_instruments"] == []
     series = next(
@@ -128,7 +128,7 @@ def test_frn_time_roll_preserves_raw_index_excluding_coupon_spread() -> None:
         result.market,
         result.report.time_roll["new_date"],
         None,
-        result.instruments,
+        [json.loads(text) for text in result.instruments],
     )
     assert repeated.report.time_roll["failed_instruments"] == []
     assert json.loads(repeated.market.to_json())["series"] == json.loads(result.market.to_json())["series"]

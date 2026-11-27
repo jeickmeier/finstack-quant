@@ -188,9 +188,11 @@ def test_deterministic_facility_prices_the_same_typed_and_as_json() -> None:
     facility = RevolvingCredit.example()
     ctx = market()
     typed = price_instrument(facility, ctx, AS_OF, metrics=["dv01"])
-    via_json = price_instrument(facility.to_json(), ctx, AS_OF, "default", metrics=["dv01"])
+    via_json = price_instrument(json.loads(facility.to_json()), ctx, AS_OF, "default", metrics=["dv01"])
     assert typed.value.amount == pytest.approx(via_json.value.amount, rel=1e-12)
     assert typed.metrics["dv01"] == pytest.approx(via_json.metrics["dv01"], rel=1e-9)
+    with pytest.raises(TypeError, match="typed instrument instance or a canonical instrument envelope dict"):
+        price_instrument(facility.to_json(), ctx, AS_OF, "default", metrics=["dv01"])
     # A deterministic schedule has no simulated draws, hence no draw option cost.
     assert price_instrument(facility, ctx, AS_OF, metrics=["draw_option_cost"])["draw_option_cost"] == 0.0
     with pytest.raises(ValueError, match="stochastic"):
@@ -204,7 +206,8 @@ def test_expected_cashflows_matches_the_json_schedule() -> None:
     frame = schedule.to_pandas()
     assert not frame.empty
     assert not schedule.to_polars().is_empty()
-    via_json = json.loads(instrument_cashflows(facility.to_json(), ctx, AS_OF, "discounting").to_json())
+    envelope = json.loads(facility.to_json())
+    via_json = json.loads(instrument_cashflows(envelope, ctx, AS_OF, "discounting").to_json())
     assert len(json.loads(schedule.to_json())["flows"]) == len(via_json["flows"])
 
 

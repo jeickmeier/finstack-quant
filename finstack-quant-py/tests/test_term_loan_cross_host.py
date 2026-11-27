@@ -16,7 +16,7 @@ from finstack_quant.core.market_data import MarketContext
 from finstack_quant.valuations.instruments import instrument_cashflows, price_instrument
 
 ROOT = Path(__file__).parents[2]
-INSTRUMENT = (ROOT / "finstack-quant/valuations/tests/instruments/json_examples/term_loan.json").read_text()
+INSTRUMENT = json.loads((ROOT / "finstack-quant/valuations/tests/instruments/json_examples/term_loan.json").read_text())
 PINNED = json.loads((Path(__file__).parent / "fixtures" / "term_loan_cross_host.json").read_text())
 MARKET = MarketContext.from_json(json.dumps(PINNED["market"]))
 

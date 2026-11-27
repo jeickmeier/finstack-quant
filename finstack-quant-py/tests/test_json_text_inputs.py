@@ -849,6 +849,7 @@ CASES = [
         lambda deal: tranche_metrics(deal, TRANCHE_ID, _market(), AS_OF),
         StructuredCredit.from_json,
         lambda: StructuredCredit.example().to_json(),
+        rejects_text=TypeError,
     ),
     Case(
         "finstack_config",
@@ -926,6 +927,7 @@ CASES = [
         lambda bond: price_instrument(bond, _market(), AS_OF, metrics=["dv01", "ytm"]),
         Bond.from_json,
         lambda: _bond().to_json(),
+        rejects_text=TypeError,
     ),
     # --- Parameters with no typed class: the loader is `json.loads`. ---
     Case(
@@ -949,6 +951,7 @@ CASES = [
         lambda: _bond().to_json(),
         differs={"empty-array": ("TypeError", "ValueError"), "number": ("TypeError", "ValueError")},
         ruling=RULING_C,
+        rejects_text=TypeError,
     ),
     Case(
         "dict_records_returns",

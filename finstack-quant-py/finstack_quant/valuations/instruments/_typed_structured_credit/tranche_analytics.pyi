@@ -1051,7 +1051,7 @@ class ScenarioTable:
         ...
 
 def tranche_discount_margin(
-    instrument: StructuredCredit | str,
+    instrument: StructuredCredit | dict[str, Any],
     tranche_id: str,
     market: MarketContext,
     as_of: datetime.date | str,
@@ -1067,9 +1067,9 @@ def tranche_discount_margin(
 
     Parameters
     ----------
-    instrument : StructuredCredit or str
-        Tagged JSON for a ``StructuredCredit`` deal, or a typed
-        ``StructuredCredit`` instance.
+    instrument : StructuredCredit or dict
+        Typed ``StructuredCredit`` instance, or the deal's canonical
+        instrument envelope dict.
     tranche_id : str
         Identifier of the floating-rate tranche whose contractual cashflows
         are spread-discounted.
@@ -1095,7 +1095,7 @@ def tranche_discount_margin(
     KeyError
         If ``tranche_id`` is not part of the deal.
     ValueError
-        If the JSON or date is malformed, the deal fails validation, the
+        If the envelope or date is malformed, the deal fails validation, the
         tranche is missing or fixed-rate, ``market_price_pct`` is not finite and
         positive, required market data is unavailable, or the spread solve
         fails or exceeds ±5000 bp.
@@ -1105,7 +1105,7 @@ def tranche_discount_margin(
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.valuations.instruments import tranche_discount_margin
     >>> try:
-    ...     tranche_discount_margin("{}", "A", MarketContext(), "2026-01-01", 100.0)
+    ...     tranche_discount_margin({}, "A", MarketContext(), "2026-01-01", 100.0)
     ... except ValueError as exc:
     ...     print("schema" in str(exc))
     True
@@ -1114,7 +1114,7 @@ def tranche_discount_margin(
     ...
 
 def tranche_breakeven_cdr(
-    instrument: StructuredCredit | str,
+    instrument: StructuredCredit | dict[str, Any],
     tranche_id: str,
     market: MarketContext,
     as_of: datetime.date | str,
@@ -1123,9 +1123,9 @@ def tranche_breakeven_cdr(
 
     Parameters
     ----------
-    instrument : StructuredCredit or str
-        Tagged JSON for a ``StructuredCredit`` deal, or a typed
-        ``StructuredCredit`` instance.
+    instrument : StructuredCredit or dict
+        Typed ``StructuredCredit`` instance, or the deal's canonical
+        instrument envelope dict.
     tranche_id : str
         Identifier of the tranche within the deal.
     market : MarketContext
@@ -1144,7 +1144,7 @@ def tranche_breakeven_cdr(
     KeyError
         If ``tranche_id`` is not part of the deal.
     ValueError
-        If the instrument JSON is malformed, the deal fails validation, the
+        If the instrument envelope is malformed, the deal fails validation, the
         tranche id is not part of the deal, or required market data is missing.
 
     Examples
@@ -1152,7 +1152,7 @@ def tranche_breakeven_cdr(
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.valuations.instruments import tranche_breakeven_cdr
     >>> try:
-    ...     tranche_breakeven_cdr("{}", "A", MarketContext(), "2026-01-01")
+    ...     tranche_breakeven_cdr({}, "A", MarketContext(), "2026-01-01")
     ... except ValueError as exc:
     ...     print("schema" in str(exc))
     True
@@ -1161,7 +1161,7 @@ def tranche_breakeven_cdr(
     ...
 
 def tranche_oas(
-    instrument: StructuredCredit | str,
+    instrument: StructuredCredit | dict[str, Any],
     tranche_id: str,
     market: MarketContext,
     as_of: datetime.date | str,
@@ -1172,9 +1172,9 @@ def tranche_oas(
 
     Parameters
     ----------
-    instrument : StructuredCredit or str
-        Tagged JSON for a ``StructuredCredit`` deal, or a typed
-        ``StructuredCredit`` instance.
+    instrument : StructuredCredit or dict
+        Typed ``StructuredCredit`` instance, or the deal's canonical
+        instrument envelope dict.
     tranche_id : str
         Identifier of the tranche within the deal.
     market : MarketContext
@@ -1200,7 +1200,7 @@ def tranche_oas(
     KeyError
         If ``tranche_id`` is not part of the deal.
     ValueError
-        If the instrument JSON is malformed, the deal fails validation, the
+        If the instrument envelope is malformed, the deal fails validation, the
         tranche id is not part of the deal, or required market data is missing.
 
     Examples
@@ -1208,7 +1208,7 @@ def tranche_oas(
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.valuations.instruments import tranche_oas
     >>> try:
-    ...     tranche_oas("{}", "A", MarketContext(), "2026-01-01", 100.0)
+    ...     tranche_oas({}, "A", MarketContext(), "2026-01-01", 100.0)
     ... except ValueError as exc:
     ...     print("schema" in str(exc))
     True
@@ -1217,7 +1217,7 @@ def tranche_oas(
     ...
 
 def tranche_metrics(
-    instrument: StructuredCredit | str,
+    instrument: StructuredCredit | dict[str, Any],
     tranche_id: str,
     market: MarketContext,
     as_of: datetime.date | str,
@@ -1233,9 +1233,9 @@ def tranche_metrics(
 
     Parameters
     ----------
-    instrument : StructuredCredit or str
-        Tagged JSON for a ``StructuredCredit`` deal, or a typed
-        ``StructuredCredit`` instance.
+    instrument : StructuredCredit or dict
+        Typed ``StructuredCredit`` instance, or the deal's canonical
+        instrument envelope dict.
     tranche_id : str
         Identifier of the tranche within the deal.
     market : MarketContext
@@ -1263,7 +1263,7 @@ def tranche_metrics(
     KeyError
         If ``tranche_id`` is not part of the deal.
     ValueError
-        If the instrument JSON is malformed, the deal fails validation, the
+        If the instrument envelope is malformed, the deal fails validation, the
         tranche id is not part of the deal, required market data is missing, or a
         ``metrics`` id is unknown.
 
@@ -1272,7 +1272,7 @@ def tranche_metrics(
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.valuations.instruments import tranche_metrics
     >>> try:
-    ...     tranche_metrics("{}", "A", MarketContext(), "2026-01-01")
+    ...     tranche_metrics({}, "A", MarketContext(), "2026-01-01")
     ... except ValueError as exc:
     ...     print("schema" in str(exc))
     True
@@ -1281,7 +1281,7 @@ def tranche_metrics(
     ...
 
 def tranche_scenario_table(
-    instrument: StructuredCredit | str,
+    instrument: StructuredCredit | dict[str, Any],
     tranche_id: str,
     market: MarketContext,
     as_of: datetime.date | str,
@@ -1291,9 +1291,9 @@ def tranche_scenario_table(
 
     Parameters
     ----------
-    instrument : StructuredCredit or str
-        Tagged JSON for a ``StructuredCredit`` deal, or a typed
-        ``StructuredCredit`` instance.
+    instrument : StructuredCredit or dict
+        Typed ``StructuredCredit`` instance, or the deal's canonical
+        instrument envelope dict.
     tranche_id : str
         Identifier of the tranche within the deal.
     market : MarketContext
@@ -1316,7 +1316,7 @@ def tranche_scenario_table(
     KeyError
         If ``tranche_id`` is not part of the deal.
     ValueError
-        If the instrument JSON is malformed, the deal fails validation, the
+        If the instrument envelope is malformed, the deal fails validation, the
         tranche id is not part of the deal, or required market data is missing.
 
     Examples
@@ -1324,7 +1324,7 @@ def tranche_scenario_table(
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.valuations.instruments import tranche_scenario_table
     >>> try:
-    ...     tranche_scenario_table("{}", "A", MarketContext(), "2026-01-01", "{}")
+    ...     tranche_scenario_table({}, "A", MarketContext(), "2026-01-01", "{}")
     ... except ValueError as exc:
     ...     print("schema" in str(exc))
     True

@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import datetime as dt
 from datetime import date
-import json
 
 from finstack_quant import reporting
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
@@ -16,7 +15,7 @@ from finstack_quant.valuations.instruments import price_instrument
 
 
 def main() -> None:
-    bond = json.dumps({
+    bond = {
         "schema": "finstack_quant.instrument/1",
         "instrument": {
             "type": "bond",
@@ -44,7 +43,7 @@ def main() -> None:
                 "attributes": {"tags": [], "meta": {}},
             },
         },
-    })
+    }
 
     # Standard-tenor curve so key-rate (bucketed) DV01 buckets are populated.
     mc = MarketContext().insert(
@@ -81,7 +80,7 @@ def main() -> None:
     ts = reporting.instrument_tearsheet(
         result,
         cashflows=cashflows,
-        definition=json.loads(bond)["instrument"],
+        definition=bond["instrument"],
         title="ACME 4.25% 2034 Senior Notes",
         generated=dt.date.today(),
     )

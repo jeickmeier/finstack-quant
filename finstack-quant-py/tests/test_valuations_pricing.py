@@ -30,8 +30,8 @@ def _money(amount: str) -> dict[str, str]:
     return {"amount": amount, "currency": "USD"}
 
 
-def _instrument_json(instrument: dict[str, object]) -> str:
-    return json.dumps({"schema": "finstack_quant.instrument/1", "instrument": instrument})
+def _instrument_json(instrument: dict[str, object]) -> dict:
+    return {"schema": "finstack_quant.instrument/1", "instrument": instrument}
 
 
 def _tranche(
@@ -62,7 +62,7 @@ def _tranche(
     }
 
 
-def _structured_credit_json() -> str:
+def _structured_credit_json() -> dict:
     pool = {
         "id": "POOL",
         "deal_type": "abs",
@@ -254,7 +254,7 @@ def _cms_spread_market() -> MarketContext:
     return MarketContext.from_json(text)
 
 
-def _tarn_json() -> str:
+def _tarn_json() -> dict:
     return _instrument_json({
         "type": "tarn",
         "spec": {
@@ -286,7 +286,7 @@ def _tarn_json() -> str:
     })
 
 
-def _snowball_json() -> str:
+def _snowball_json() -> dict:
     return _instrument_json({
         "type": "snowball",
         "spec": {
@@ -322,7 +322,7 @@ def _snowball_json() -> str:
     })
 
 
-def _inverse_floater_json() -> str:
+def _inverse_floater_json() -> dict:
     return _instrument_json({
         "type": "snowball",
         "spec": {
@@ -350,7 +350,7 @@ def _inverse_floater_json() -> str:
     })
 
 
-def _callable_range_accrual_json() -> str:
+def _callable_range_accrual_json() -> dict:
     return _instrument_json({
         "type": "callable_range_accrual",
         "spec": {
@@ -398,7 +398,7 @@ def _callable_range_accrual_json() -> str:
     })
 
 
-def _bermudan_swaption_json() -> str:
+def _bermudan_swaption_json() -> dict:
     return _instrument_json({
         "type": "bermudan_swaption",
         "spec": {
@@ -448,7 +448,7 @@ def _bermudan_swaption_json() -> str:
     })
 
 
-def _cms_spread_option_json() -> str:
+def _cms_spread_option_json() -> dict:
     return _instrument_json({
         "type": "cms_spread_option",
         "spec": {
@@ -489,7 +489,7 @@ def test_bermudan_swaption_json_validates() -> None:
 def test_validate_instrument_json_rejects_invalid_override_ownership(
     overrides: dict[str, object],
 ) -> None:
-    instrument = json.loads(_structured_credit_json())
+    instrument = _structured_credit_json()
     instrument["instrument"]["spec"]["pricing_overrides"] = overrides  # schema-rejection-test: pricing_overrides
 
     with pytest.raises(ValueError, match="unknown field"):
@@ -497,7 +497,7 @@ def test_validate_instrument_json_rejects_invalid_override_ownership(
 
 
 def test_validate_instrument_json_accepts_focused_nested_overrides() -> None:
-    instrument = json.loads(_structured_credit_json())
+    instrument = _structured_credit_json()
     spec = instrument["instrument"]["spec"]
     spec["instrument_pricing_overrides"] = {"model_config": {"mc_paths": 2}}
     spec["metric_pricing_overrides"] = {"bump_config": {"rate_bump_bp": 3.0}}
@@ -590,13 +590,13 @@ def test_structured_credit_stochastic_json_details_include_all_tranches() -> Non
 
 @pytest.mark.parametrize("antithetic", [False, True])
 def test_structured_credit_stochastic_rejects_one_independent_estimator(antithetic: bool) -> None:
-    instrument = json.loads(_structured_credit_json())
+    instrument = _structured_credit_json()
     config = instrument["instrument"]["spec"]["instrument_pricing_overrides"]["model_config"]
     config.update(mc_paths=1, mc_antithetic=antithetic)
     market = _market()
     with pytest.raises(ValueError, match="at least two independent estimators"):
         price_instrument(
-            json.dumps(instrument),
+            instrument,
             market,
             "2024-01-01",
             "structured_credit_stochastic",
@@ -616,9 +616,9 @@ def test_structured_credit_stochastic_json_missing_market_data_raises() -> None:
 
 
 def test_python_pricing_routes_validate_instrument_before_other_inputs() -> None:
-    payload = json.loads(_structured_credit_json())
+    payload = _structured_credit_json()
     payload["instrument"]["spec"]["cleanup_call_decimal"] = -0.5
-    invalid = json.dumps(payload)
+    invalid = payload
     # An empty market: a route that reached for market data first would raise KeyError.
     market = MarketContext()
 
@@ -649,10 +649,10 @@ def test_structured_credit_waterfall_rules_prices_through_json() -> None:
     # rebuilt binding must accept and price a deal that configures it (here an
     # available-funds cap on the senior). Before the field existed the
     # deny-unknown-fields deserialization rejected this payload.
-    payload = json.loads(_structured_credit_json())
+    payload = _structured_credit_json()
     payload["instrument"]["spec"]["waterfall_rules"] = {"afc": {"capped_tranches": ["SR"]}}
     result = price_instrument(
-        json.dumps(payload),
+        payload,
         _market(),
         "2024-01-01",
         "structured_credit_stochastic",
@@ -735,7 +735,7 @@ def test_commodity_spot_cash_claim_survives_json_replay() -> None:
     market["curves"] = [curve]
     market["surfaces"] = []
     market["prices"] = {}
-    encoded = validate_instrument_json(json.dumps(envelope))
+    encoded = json.loads(validate_instrument_json(json.dumps(envelope)))
     loaded = MarketContext.from_json(json.dumps(market))
     value = price_instrument(encoded, loaded, "2024-01-15", model="black76")
     assert float(value.price) == pytest.approx(10_000.0, abs=1e-8)

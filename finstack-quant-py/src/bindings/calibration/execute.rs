@@ -199,10 +199,10 @@ pub(super) fn calibrate(
 ///
 /// Parameters
 /// ----------
-/// instrument : Swaption | str
-///     Typed Bermudan swaption instrument or its canonical instrument JSON
-///     envelope (any typed instrument object accepted by the pricing helpers
-///     is unwrapped the same way).
+/// instrument : Swaption | dict
+///     Typed Bermudan swaption instrument or its canonical instrument
+///     envelope dict (any typed instrument object accepted by the pricing
+///     helpers is unwrapped the same way).
 /// market : MarketContext
 ///     Market carrying the required discount and swaption-volatility inputs.
 /// as_of : datetime.date | str

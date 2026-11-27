@@ -456,8 +456,8 @@ fn unit_label(unit: &PositionUnit) -> PyResult<String> {
     })
 }
 
-/// Build a validated runtime instrument from a typed instrument wrapper or
-/// canonical envelope JSON (`dict` or `str`).
+/// Build a validated runtime instrument from a typed instrument wrapper or a
+/// canonical envelope `dict`.
 ///
 /// Envelope text keeps the plain serde decode and its error text; a typed
 /// instance is validated and boxed directly.
@@ -579,9 +579,9 @@ impl PyPortfolioBuilder {
     /// ----------
     /// position_id : str
     ///     Unique position identifier.
-    /// instrument : Bond | InterestRateSwap | ... | str
+    /// instrument : Bond | InterestRateSwap | ... | dict
     ///     Any typed instrument wrapper, or a canonical instrument-envelope
-    ///     JSON string. The instrument's own ``id`` becomes ``instrument_id``.
+    ///     dict. The instrument's own ``id`` becomes ``instrument_id``.
     /// quantity : float
     ///     Signed holding; its meaning follows ``unit``. Must be finite.
     /// entity_id : str | None
@@ -599,7 +599,7 @@ impl PyPortfolioBuilder {
     /// Raises
     /// ------
     /// TypeError
-    ///     If ``instrument`` is not a typed instrument, an envelope dict or a JSON string.
+    ///     If ``instrument`` is not a typed instrument or an envelope dict.
     /// ValueError
     ///     If the instrument payload is invalid, ``quantity`` is not finite,
     ///     or ``unit`` is unknown.

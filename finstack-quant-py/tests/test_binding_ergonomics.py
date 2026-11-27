@@ -222,8 +222,8 @@ class TestDateArguments:
         from finstack_quant.valuations.instruments import price_instrument
 
         bond, market = self._bond(), self._market()
-        from_str = price_instrument(bond.to_json(), market, "2024-01-01")
-        from_date = price_instrument(bond.to_json(), market, datetime.date(2024, 1, 1))
+        from_str = price_instrument(bond, market, "2024-01-01")
+        from_date = price_instrument(bond, market, datetime.date(2024, 1, 1))
         assert from_str.price == from_date.price
 
     def test_as_of_rejects_non_date_with_a_useful_message(self) -> None:
@@ -231,7 +231,7 @@ class TestDateArguments:
 
         bond, market = self._bond(), self._market()
         with pytest.raises(TypeError, match="expected a date-like object") as excinfo:
-            price_instrument(bond.to_json(), market, 20240101)
+            price_instrument(bond, market, 20240101)
         # The message has to say what to do next, not merely that it failed.
         message = str(excinfo.value)
         assert "datetime.date" in message
@@ -246,7 +246,7 @@ class TestDateArguments:
         # generic "invalid input"; this pins the actual diagnostic and echoes
         # back the offending text.
         with pytest.raises(ValueError, match=r"Invalid date '01/01/2024'"):
-            price_instrument(bond.to_json(), market, "01/01/2024")
+            price_instrument(bond, market, "01/01/2024")
 
 
 class TestDateAcceptanceIsUniform:

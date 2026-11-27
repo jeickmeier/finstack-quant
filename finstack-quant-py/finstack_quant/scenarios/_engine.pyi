@@ -497,8 +497,9 @@ class ApplicationResult:
         Returns
         -------
         list[str] or None
-            Canonical instrument-envelope JSON strings in input order, accepted
-            by subsequent scenario calls and instrument ``from_json`` constructors.
+            Canonical instrument-envelope JSON strings in input order. Each
+            loads with ``json.loads`` for a subsequent scenario call, or with an
+            instrument ``from_json`` constructor.
             ``None`` means no inventory was supplied; an empty list stays empty.
             The original Python objects are never mutated.
 
@@ -675,9 +676,9 @@ def apply_scenario(
         Copied financial model; omit for market-only scenarios.
     as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
         Valuation date (ISO 8601 accepted).
-    instruments : Sequence[Instrument | str] | None, default None
+    instruments : Sequence[Instrument | dict] | None, default None
         Typed instruments (``Bond``, ``CreditDefaultSwap``, ...) or canonical
-        instrument-envelope JSON strings. Required when the scenario contains
+        instrument-envelope dicts. Required when the scenario contains
         instrument-scoped operations; also used for carry under
         ``time_roll_forward``. Shocked copies are returned as canonical envelope JSON strings in
         ``ApplicationResult.instruments``.

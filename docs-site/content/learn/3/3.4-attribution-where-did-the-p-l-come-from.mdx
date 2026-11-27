@@ -91,7 +91,7 @@ for start, end in zip(history_dates[:-1], history_dates[1:], strict=True):
     brinson_periods.append(json.loads(bf.to_json()))
     p_snap, b_snap = [], []
     for iid in ids:
-        risk = price_instrument(json.dumps(instruments('base')[iid]), start_market, start, metrics=['ytm','duration_mod','z_spread','spread_duration'])
+        risk = price_instrument(instruments('base')[iid], start_market, start, metrics=['ytm','duration_mod','z_spread','spread_duration'])
         curve_id = 'USD-OIS' if iid=='USD-CORP' else 'EUR-OIS'
         tenor = 5.0
         z0 = -math.log(start_market.get_discount(curve_id).df(tenor))/tenor
@@ -145,7 +145,7 @@ waterfall_totals=dict.fromkeys(fields,0.0);waterfall_totals["reporting_fx_transl
 instrument_rows=[]
 for iid,env in instruments("base").items():
  result=attribute_pnl(
-     json.dumps(env),
+     env,
      {
          "market_t0": m0,
          "market_t1": m1,
@@ -155,8 +155,8 @@ for iid,env in instruments("base").items():
      },
  )
  result_wire=json.loads(result.to_json())
- p0=price_instrument(json.dumps(env),m0,a0).value.amount
- p1=price_instrument(json.dumps(env),m1,a1).value.amount
+ p0=price_instrument(env,m0,a0).value.amount
+ p1=price_instrument(env,m1,a1).value.amount
  currency=result_wire["total_pnl"]["currency"]
  fx0=history_quotes(a0)["eur_usd"] if currency=="EUR" else 1.0
  fx1=history_quotes(a1)["eur_usd"] if currency=="EUR" else 1.0
@@ -168,7 +168,7 @@ print(pd.DataFrame(instrument_rows).to_string(index=False))
 print("USD factor waterfall:",waterfall_totals)
 Path("book-pnl-waterfall.svg").write_text(waterfall_chart(list(waterfall_totals),list(waterfall_totals.values()),theme=INSTITUTIONAL))
 taylor=attribute_pnl(
-    json.dumps(instruments("base")["USD-CORP"]),
+    instruments("base")["USD-CORP"],
     {
         "market_t0": m0,
         "market_t1": m1,

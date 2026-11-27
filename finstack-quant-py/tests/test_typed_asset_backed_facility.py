@@ -184,7 +184,7 @@ def test_projection_reconciles_with_the_lender_cashflows_and_the_price() -> None
     assert _metric(facility, "abf_facility_irr") == pytest.approx(irr)
 
     typed = price_instrument(facility, _market(), CLOSE, metrics=["dv01"])
-    wire = price_instrument(facility.to_json(), _market(), CLOSE, metrics=["dv01"])
+    wire = price_instrument(json.loads(facility.to_json()), _market(), CLOSE, metrics=["dv01"])
     assert float(typed.price) == pytest.approx(float(wire.price))
     assert typed.metrics["dv01"] == pytest.approx(wire.metrics["dv01"])
     assert float(typed.price) > 0.0
@@ -215,7 +215,7 @@ def test_projection_frame_keeps_the_rust_currency_check() -> None:
 def test_facility_is_accepted_as_a_typed_composite_leg() -> None:
     facility = _facility()
     typed = CompositeLegSpec(facility.id, facility, 1.0)
-    serialized = CompositeLegSpec(facility.id, facility.to_json(), 1.0)
+    serialized = CompositeLegSpec(facility.id, json.loads(facility.to_json()), 1.0)
     assert json.loads(typed.to_json()) == json.loads(serialized.to_json())
 
 

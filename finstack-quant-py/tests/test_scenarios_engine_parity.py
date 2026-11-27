@@ -59,8 +59,8 @@ def _market(as_of: str = AS_OF) -> MarketContext:
     return market
 
 
-def _deposit_json() -> str:
-    return json.dumps({
+def _deposit_json() -> dict:
+    return {
         "schema": "finstack_quant.instrument/1",
         "instrument": {
             "type": "deposit",
@@ -75,7 +75,7 @@ def _deposit_json() -> str:
                 "attributes": {},
             },
         },
-    })
+    }
 
 
 def _up_25() -> ScenarioSpec:
@@ -179,7 +179,7 @@ def test_instrument_mutating_scenario_without_instruments_raises_value_error() -
 
 
 def test_bare_instrument_payloads_use_the_shared_envelope_loader() -> None:
-    bare = json.dumps(json.loads(_deposit_json())["instrument"])
+    bare = _deposit_json()["instrument"]
     with pytest.raises(ValueError, match="invalid instrument envelope JSON"):
         apply_scenario(_up_25(), _market(), AS_OF, instruments=[bare])
     with pytest.raises(ValueError, match="invalid instrument envelope JSON"):
@@ -206,6 +206,8 @@ def test_instruments_are_accepted_as_json_envelopes_for_carry() -> None:
     assert list(carry["instrument_id"]) == ["DEP-0"]
     assert list(carry["currency"]) == ["USD"]
     assert carry_tbl.to_polars().height == 1
+    with pytest.raises(TypeError, match="typed instrument instance or a canonical instrument envelope dict"):
+        apply_scenario(spec, _market(), AS_OF, instruments=[json.dumps(_deposit_json())])
 
 
 # ---------------------------------------------------------------------------
@@ -621,7 +623,7 @@ def test_shocked_instrument_copies_survive_result_round_trips(with_model: bool) 
             ScenarioSpec("half", [OperationSpec.instrument_price_pct_by_type(["bond"], -50.0)]),
             _market(),
             AS_OF,
-            instruments=restored.instruments,
+            instruments=[json.loads(text) for text in restored.instruments],
         )
         assert next_result.instruments is not None
         next_shock = json.loads(next_result.instruments[0])["instrument"]["spec"]["scenario_pricing_overrides"][

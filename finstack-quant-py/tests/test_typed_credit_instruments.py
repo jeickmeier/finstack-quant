@@ -269,8 +269,10 @@ class TestCreditDefaultSwapTyped:
         cds = _cds()
         market = MarketContext.from_json(_market_json())
         typed = price_instrument(cds, market, "2024-01-01", "hazard_rate")
-        via_json = price_instrument(_cds_hand_written_json(), market, "2024-01-01", "hazard_rate")
+        via_json = price_instrument(json.loads(_cds_hand_written_json()), market, "2024-01-01", "hazard_rate")
         assert _without_timestamp(typed) == _without_timestamp(via_json)
+        with pytest.raises(TypeError, match="typed instrument instance or a canonical instrument envelope dict"):
+            price_instrument(_cds_hand_written_json(), market, "2024-01-01", "hazard_rate")
 
 
 class TestPremiumLegSpecTyped:

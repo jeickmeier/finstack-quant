@@ -29,10 +29,10 @@ def _golden() -> tuple[dict[str, Any], MarketContext]:
     return fixture.body["instrument"], MarketContext.from_json(json.dumps(fixture.body["market"]["data"]))
 
 
-def _with_spec(envelope: dict[str, Any], **fields: Any) -> str:
+def _with_spec(envelope: dict[str, Any], **fields: Any) -> dict[str, Any]:
     copied = copy.deepcopy(envelope)
     copied["instrument"]["spec"].update(fields)
-    return json.dumps(copied)
+    return copied
 
 
 def _touch(**fields: Any) -> dict[str, Any]:
@@ -57,7 +57,7 @@ def _touch(**fields: Any) -> dict[str, Any]:
     return {"schema": "finstack_quant.instrument/1", "instrument": {"type": "fx_touch_option", "spec": spec}}
 
 
-def _theta(instrument: str, market: MarketContext) -> float:
+def _theta(instrument: dict[str, Any], market: MarketContext) -> float:
     return price_instrument(instrument, market, AS_OF, metrics=["theta"])["theta"]
 
 
@@ -69,13 +69,12 @@ def test_theta_equals_spot_held_reprice(case: str) -> None:
     """Theta equals the one-day reprice with the as-of spot's observed state."""
     golden, market = _golden()
     envelope = golden if case == "fx_barrier_option" else _touch()
-    instrument = json.dumps(envelope)
     # EURUSD spot 1.10 sits below the 1.25 barrier: the roll observes no breach.
     observed = _with_spec(envelope, observed_barrier_breached=False)
 
-    theta = _theta(instrument, market)
+    theta = _theta(envelope, market)
     rolled_pv = float(price_instrument(observed, market.condition(ROLLED), ROLLED).price)
-    base_pv = float(price_instrument(instrument, market, AS_OF).price)
+    base_pv = float(price_instrument(envelope, market, AS_OF).price)
     assert theta == pytest.approx(rolled_pv - base_pv, rel=1e-9, abs=1e-9)
     assert theta == _theta(observed, market)
 
@@ -87,7 +86,7 @@ def test_theta_equals_spot_held_reprice(case: str) -> None:
 def test_seasoned_pricing_still_requires_observed_state(envelope: str) -> None:
     """Only theta rolls the observed state; ordinary seasoned pricing still raises ValueError."""
     golden, market = _golden()
-    instrument = json.dumps(golden if envelope == "fx_barrier_option" else _touch())
+    instrument = golden if envelope == "fx_barrier_option" else _touch()
     with pytest.raises(ValueError, match="observed_barrier_breached"):
         price_instrument(instrument, market, ROLLED)
 
@@ -95,4 +94,4 @@ def test_seasoned_pricing_still_requires_observed_state(envelope: str) -> None:
 def test_fx_barrier_golden_theta_is_negative() -> None:
     """A long up-and-out call far from its barrier decays."""
     golden, market = _golden()
-    assert _theta(json.dumps(golden), market) < 0.0
+    assert _theta(golden, market) < 0.0

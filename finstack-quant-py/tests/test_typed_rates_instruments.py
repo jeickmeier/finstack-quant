@@ -185,8 +185,10 @@ class TestInterestRateSwapTyped:
         swap = _payer_swap()
         market = MarketContext.from_json(_market_json())
         typed = price_instrument(swap, market, "2024-01-01", "discounting")
-        via_json = price_instrument(_payer_swap_hand_written_json(), market, "2024-01-01", "discounting")
+        via_json = price_instrument(json.loads(_payer_swap_hand_written_json()), market, "2024-01-01", "discounting")
         assert _without_timestamp(typed) == _without_timestamp(via_json)
+        with pytest.raises(TypeError, match="typed instrument instance or a canonical instrument envelope dict"):
+            price_instrument(_payer_swap_hand_written_json(), market, "2024-01-01", "discounting")
 
     def test_builder_setters_accept_keyword_value(self) -> None:
         """Every builder setter's `value` parameter name must match its text_signature."""
@@ -416,7 +418,7 @@ def test_listed_options_use_native_typed_terms_and_preserve_price() -> None:
         assert option.id != edited.id
         assert option.terms.to_dict() == edited.terms.to_dict()
         price = price_instrument(edited, market, as_of).value
-        wire_price = price_instrument(edited.to_json(), market, as_of).value
+        wire_price = price_instrument(json.loads(edited.to_json()), market, as_of).value
         assert price == wire_price == price_instrument(option, market, as_of).value
 
 
@@ -437,4 +439,5 @@ def test_other_listed_futures_roundtrip_typed_terms_at_exchange_marks() -> None:
         assert edited.terms.to_json() == terms.to_json()
         as_of = datetime.date(2025, 1, 2)
         market = MarketContext()
-        assert price_instrument(edited, market, as_of).value == price_instrument(edited.to_json(), market, as_of).value
+        wire_value = price_instrument(json.loads(edited.to_json()), market, as_of).value
+        assert price_instrument(edited, market, as_of).value == wire_value

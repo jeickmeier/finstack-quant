@@ -8,8 +8,6 @@ convention; the same case runs in
 
 from __future__ import annotations
 
-import json
-
 import pytest
 
 from finstack_quant.core.market_data import MarketContext, ScalarTimeSeries
@@ -22,12 +20,12 @@ AS_OF = "2026-05-04"
 ROLLED = "2026-05-05"
 
 
-def _golden() -> tuple[str, MarketContext]:
+def _golden() -> tuple[dict, MarketContext]:
     fixture = GoldenFixture.from_path(fixture_path("pricing/bloomberg/irs/usd_sofr_5y_receive_fixed_swpm.json"))
-    return json.dumps(fixture.body["instrument"]), _resolve_market(fixture.body["market"])
+    return fixture.body["instrument"], _resolve_market(fixture.body["market"])
 
 
-def _theta(instrument: str, market: MarketContext) -> float:
+def _theta(instrument: dict, market: MarketContext) -> float:
     return price_instrument(instrument, market, AS_OF, metrics=["theta"])["theta"]
 
 

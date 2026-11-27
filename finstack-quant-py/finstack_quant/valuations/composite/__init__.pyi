@@ -15,8 +15,8 @@ Examples
 >>> from finstack_quant.core.market_data import MarketContext
 >>> from finstack_quant.core.money import Money
 >>> from finstack_quant.valuations.composite import CompositeLegSpec, CompositeSpec, RebalanceRule, WeightingMethod
->>> def _equity(instrument_id: str, price: float) -> str:
-...     return json.dumps({
+>>> def _equity(instrument_id: str, price: float) -> dict:
+...     return {
 ...         "schema": "finstack_quant.instrument/1",
 ...         "instrument": {
 ...             "type": "equity",
@@ -33,7 +33,7 @@ Examples
 ...                 "attributes": {"tags": [], "meta": {}},
 ...             },
 ...         },
-...     })
+...     }
 >>> _leg_a = CompositeLegSpec("A", _equity("A", 100.0), 1.0)
 >>> _leg_b = CompositeLegSpec("B", _equity("B", 90.0), -1.0)
 >>> _spec = CompositeSpec(
@@ -101,8 +101,8 @@ class CompositeLegSpec:
         ----------
         instrument_id : str
             Stable identifier that must equal the embedded instrument identifier.
-        instrument : Any | str
-            Typed instrument wrapper or canonical instrument-envelope JSON string.
+        instrument : Any
+            Typed instrument wrapper or canonical instrument-envelope dict.
         score : float
             Finite non-zero signed leg score: the unit quantity under
             fixed-quantity weighting, or a scale-free signed target score under
@@ -220,7 +220,7 @@ class CompositeLegSpec:
         ...     WeightingMethod,
         ... )
         >>> def _equity(instrument_id, price):
-        ...     return json.dumps({
+        ...     return {
         ...         "schema": "finstack_quant.instrument/1",
         ...         "instrument": {
         ...             "type": "equity",
@@ -237,7 +237,7 @@ class CompositeLegSpec:
         ...                 "attributes": {"tags": [], "meta": {}},
         ...             },
         ...         },
-        ...     })
+        ...     }
         >>> _leg_a = CompositeLegSpec("A", _equity("A", 100.0), 1.0)
         >>> _leg_a.instrument_dict()["instrument"]["type"]
         'equity'
@@ -702,7 +702,7 @@ class CompositeSpec:
     ...     Money(1_000_000.0, Currency("USD")),
     ...     [
     ...         CompositeLegSpec(_loan.id, _loan, 1.0),
-    ...         CompositeLegSpec("TERM-LOAN-ALT", json.dumps(_other), -1.0),
+    ...         CompositeLegSpec("TERM-LOAN-ALT", _other, -1.0),
     ...     ],
     ...     WeightingMethod.fixed_quantity(),
     ...     RebalanceRule.manual(),
@@ -801,7 +801,7 @@ class CompositeSpec:
         ...     Money(1_000_000.0, Currency("USD")),
         ...     [
         ...         CompositeLegSpec(_loan.id, _loan, 1.0),
-        ...         CompositeLegSpec("TERM-LOAN-ALT", json.dumps(_other), -1.0),
+        ...         CompositeLegSpec("TERM-LOAN-ALT", _other, -1.0),
         ...     ],
         ...     WeightingMethod.fixed_quantity(),
         ...     RebalanceRule.manual(),
@@ -1087,7 +1087,7 @@ class CompositeInstrument:
     ...     Money(1_000_000.0, Currency("USD")),
     ...     [
     ...         CompositeLegSpec(_loan.id, _loan, 1.0),
-    ...         CompositeLegSpec("TERM-LOAN-ALT", json.dumps(_other), -1.0),
+    ...         CompositeLegSpec("TERM-LOAN-ALT", _other, -1.0),
     ...     ],
     ...     WeightingMethod.fixed_quantity(),
     ...     RebalanceRule.manual(),
@@ -1133,7 +1133,7 @@ class CompositeInstrument:
         ...     Money(1_000_000.0, Currency("USD")),
         ...     [
         ...         CompositeLegSpec(_loan.id, _loan, 1.0),
-        ...         CompositeLegSpec("TERM-LOAN-ALT", json.dumps(_other), -1.0),
+        ...         CompositeLegSpec("TERM-LOAN-ALT", _other, -1.0),
         ...     ],
         ...     WeightingMethod.fixed_quantity(),
         ...     RebalanceRule.manual(),
@@ -1296,7 +1296,7 @@ class CompositeInstrument:
         ...     WeightingMethod,
         ... )
         >>> def _equity(instrument_id, price):
-        ...     return json.dumps({
+        ...     return {
         ...         "schema": "finstack_quant.instrument/1",
         ...         "instrument": {
         ...             "type": "equity",
@@ -1313,7 +1313,7 @@ class CompositeInstrument:
         ...                 "attributes": {"tags": [], "meta": {}},
         ...             },
         ...         },
-        ...     })
+        ...     }
         >>> _spec = CompositeSpec(
         ...     "A-B",
         ...     Currency("USD"),
@@ -1387,7 +1387,7 @@ class CompositeRebalanceResult:
     ...     Money(1_000_000.0, Currency("USD")),
     ...     [
     ...         CompositeLegSpec(_loan.id, _loan, 1.0),
-    ...         CompositeLegSpec("TERM-LOAN-ALT", json.dumps(_other), -1.0),
+    ...         CompositeLegSpec("TERM-LOAN-ALT", _other, -1.0),
     ...     ],
     ...     WeightingMethod.fixed_quantity(),
     ...     RebalanceRule.manual(),
@@ -1436,7 +1436,7 @@ class CompositeRebalanceResult:
         ...     Money(1_000_000.0, Currency("USD")),
         ...     [
         ...         CompositeLegSpec(_loan.id, _loan, 1.0),
-        ...         CompositeLegSpec("TERM-LOAN-ALT", json.dumps(_other), -1.0),
+        ...         CompositeLegSpec("TERM-LOAN-ALT", _other, -1.0),
         ...     ],
         ...     WeightingMethod.fixed_quantity(),
         ...     RebalanceRule.manual(),
@@ -1596,8 +1596,8 @@ class CompositeExposureReport:
     >>> from finstack_quant.core.currency import Currency
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.core.money import Money
-    >>> def _equity(instrument_id: str, price: float) -> str:
-    ...     return json.dumps({
+    >>> def _equity(instrument_id: str, price: float) -> dict:
+    ...     return {
     ...         "schema": "finstack_quant.instrument/1",
     ...         "instrument": {
     ...             "type": "equity",
@@ -1614,7 +1614,7 @@ class CompositeExposureReport:
     ...                 "attributes": {"tags": [], "meta": {}},
     ...             },
     ...         },
-    ...     })
+    ...     }
     >>> _spec = CompositeSpec(
     ...     "A-B",
     ...     Currency("USD"),
@@ -1745,7 +1745,7 @@ class CompositeExposureReport:
         ...     WeightingMethod,
         ... )
         >>> def _equity(instrument_id, price):
-        ...     return json.dumps({
+        ...     return {
         ...         "schema": "finstack_quant.instrument/1",
         ...         "instrument": {
         ...             "type": "equity",
@@ -1762,7 +1762,7 @@ class CompositeExposureReport:
         ...                 "attributes": {"tags": [], "meta": {}},
         ...             },
         ...         },
-        ...     })
+        ...     }
         >>> _spec = CompositeSpec(
         ...     "A-B",
         ...     Currency("USD"),
@@ -1864,8 +1864,8 @@ class CompositeHistoryResult:
     >>> from finstack_quant.core.currency import Currency
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.core.money import Money
-    >>> def _equity(instrument_id: str, price: float) -> str:
-    ...     return json.dumps({
+    >>> def _equity(instrument_id: str, price: float) -> dict:
+    ...     return {
     ...         "schema": "finstack_quant.instrument/1",
     ...         "instrument": {
     ...             "type": "equity",
@@ -1882,7 +1882,7 @@ class CompositeHistoryResult:
     ...                 "attributes": {"tags": [], "meta": {}},
     ...             },
     ...         },
-    ...     })
+    ...     }
     >>> _spec = CompositeSpec(
     ...     "A-B",
     ...     Currency("USD"),
@@ -2008,7 +2008,7 @@ class CompositeHistoryResult:
         ...     WeightingMethod,
         ... )
         >>> def _equity(instrument_id, price):
-        ...     return json.dumps({
+        ...     return {
         ...         "schema": "finstack_quant.instrument/1",
         ...         "instrument": {
         ...             "type": "equity",
@@ -2025,7 +2025,7 @@ class CompositeHistoryResult:
         ...                 "attributes": {"tags": [], "meta": {}},
         ...             },
         ...         },
-        ...     })
+        ...     }
         >>> _spec = CompositeSpec(
         ...     "A-B",
         ...     Currency("USD"),
@@ -2214,8 +2214,8 @@ def history_from_spec(
     >>> from finstack_quant.core.currency import Currency
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.core.money import Money
-    >>> def _equity(instrument_id: str, price: float) -> str:
-    ...     return json.dumps({
+    >>> def _equity(instrument_id: str, price: float) -> dict:
+    ...     return {
     ...         "schema": "finstack_quant.instrument/1",
     ...         "instrument": {
     ...             "type": "equity",
@@ -2232,7 +2232,7 @@ def history_from_spec(
     ...                 "attributes": {"tags": [], "meta": {}},
     ...             },
     ...         },
-    ...     })
+    ...     }
     >>> _spec = CompositeSpec(
     ...     "A-B",
     ...     Currency("USD"),
@@ -2287,8 +2287,8 @@ def history(
     >>> from finstack_quant.core.currency import Currency
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.core.money import Money
-    >>> def _equity(instrument_id: str, price: float) -> str:
-    ...     return json.dumps({
+    >>> def _equity(instrument_id: str, price: float) -> dict:
+    ...     return {
     ...         "schema": "finstack_quant.instrument/1",
     ...         "instrument": {
     ...             "type": "equity",
@@ -2305,7 +2305,7 @@ def history(
     ...                 "attributes": {"tags": [], "meta": {}},
     ...             },
     ...         },
-    ...     })
+    ...     }
     >>> _spec = CompositeSpec(
     ...     "A-B",
     ...     Currency("USD"),

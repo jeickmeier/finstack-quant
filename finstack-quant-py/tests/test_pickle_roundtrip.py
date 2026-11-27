@@ -229,7 +229,7 @@ class TestRoundTrips:
             "USD-OIS",
         )
         market = MarketContext.from_json(market_json)
-        result = price_instrument(bond.to_json(), market, datetime.date(2024, 1, 1))
+        result = price_instrument(bond, market, datetime.date(2024, 1, 1))
         restored = pickle.loads(pickle.dumps(result))  # noqa: S301
         assert restored.price == result.price
         assert restored.currency == result.currency

@@ -27,7 +27,7 @@ def test_seasoned_accrued_precedes_projected_losses(cdr: float) -> None:
     f = fixture()
     f["instrument"]["instrument"]["spec"]["default_spec"]["cdr"] = cdr
     result = price_instrument(
-        json.dumps(f["instrument"]),
+        f["instrument"],
         MarketContext.from_json(json.dumps(f["market"])),
         "2024-02-15",
         "discounting",
@@ -43,7 +43,7 @@ def test_effective_model_rates() -> None:
     spec["prepayment_spec"]["cpr"] = 0.36
     spec["default_spec"]["cdr"] = 0.07
     result = price_instrument(
-        json.dumps(f["instrument"]),
+        f["instrument"],
         MarketContext.from_json(json.dumps(f["market"])),
         f["as_of"],
         "discounting",
@@ -59,7 +59,7 @@ def test_recovery_risk_uses_credit_model_recovery() -> None:
     spec["default_spec"]["cdr"] = 0.03
     spec["recovery_spec"]["rate"] = 0.55
     result = price_instrument(
-        json.dumps(f["instrument"]),
+        f["instrument"],
         MarketContext.from_json(json.dumps(f["market"])),
         f["as_of"],
         "discounting",
@@ -87,7 +87,7 @@ def test_clean_dirty_settlement_target_and_typed_date() -> None:
     as_of = "2024-02-15"
     market = MarketContext.from_json(json.dumps(f["market"]))
     base = price_instrument(
-        json.dumps(f["instrument"]),
+        f["instrument"],
         market,
         as_of,
         "discounting",
@@ -119,7 +119,7 @@ def test_clean_dirty_settlement_target_and_typed_date() -> None:
     for quote in [{"quoted_clean_price_pct": clean}, {"quoted_dirty_price_currency": dirty}]:
         spec["instrument_pricing_overrides"] = {"market_quotes": quote}
         priced = price_instrument(
-            json.dumps(f["instrument"]),
+            f["instrument"],
             market,
             as_of,
             "discounting",

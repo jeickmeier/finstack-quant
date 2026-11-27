@@ -110,7 +110,7 @@ cross = fx.rate('EUR', 'JPY', AS_OF, "cashflow_date")
 eur_jpy_quote = FxPairConvention('EUR', 'JPY', 0.01)
 config = FinstackConfig(rounding_mode=RoundingMode.BANKERS)
 market = build_market('foundations')
-bond = json.dumps(instruments('foundations')['USD-CORP'])
+bond = instruments('foundations')['USD-CORP']
 first = price_instrument(bond, market, AS_OF)
 second = price_instrument(bond, market, AS_OF)
 # No financial rounding mode is selected unless configured, so the stamp omits it;

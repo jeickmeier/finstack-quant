@@ -108,7 +108,7 @@ def test_keyrate_section_shows_every_rust_vega_bucket() -> None:
     spec["exercise_style"] = "european"
     spec["strike"] = 120.0
     result = price_instrument(
-        json.dumps(fixture["instrument"]),
+        fixture["instrument"],
         MarketContext.from_json(json.dumps(fixture["market"])),
         fixture["as_of"],
         "black76",

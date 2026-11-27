@@ -32,8 +32,7 @@ from finstack_quant.valuations.instruments._typed_revolving_credit.revolving_cre
 from finstack_quant.valuations.instruments._typed_structured_credit.structured_credit import StructuredCredit
 
 _InstrumentInput = (
-    str
-    | dict[str, Any]
+    dict[str, Any]
     | Bond
     | TermLoan
     | Deposit
@@ -147,7 +146,7 @@ def price_instrument(
 
     Parameters
     ----------
-    instrument : typed instrument, dict or str
+    instrument : typed instrument or dict
         Typed instrument instance (:class:`Bond`, :class:`TermLoan`,
         :class:`InterestRateSwap`, :class:`Swaption`, :class:`CapFloor`,
         :class:`CreditDefaultSwap`, :class:`CdsIndex`, :class:`FxForward`,
@@ -155,8 +154,9 @@ def price_instrument(
         :class:`EquityOption`, :class:`StructuredCredit`, :class:`RevolvingCredit`,
         :class:`AssetBackedFacility`, :class:`CdsOption`,
         :class:`~finstack_quant.valuations.composite.CompositeInstrument`) or a
-        canonical ``finstack_quant.instrument/1`` envelope, as the dict
-        :func:`instrument_envelope_from_spec` returns or as JSON text.
+        canonical ``finstack_quant.instrument/1`` envelope as the dict
+        :func:`instrument_envelope_from_spec` returns. Envelope text loads
+        with ``json.loads``.
     market : MarketContext
         ``MarketContext``.
     as_of : datetime.date | datetime.datetime | pd.Timestamp | str
@@ -239,8 +239,8 @@ def price_instrument(
         quanto inputs, asset-currency mismatches, and an analytical barrier model
         requested for discrete monitoring; the message retains the cause.
     TypeError
-        If ``instrument`` is not a typed instrument, an envelope dict or a string, or
-        ``market`` is neither a ``MarketContext`` nor a string.
+        If ``instrument`` is not a typed instrument or an envelope dict, or
+        ``market`` is not a ``MarketContext``.
 
     Notes
     -----
@@ -1430,10 +1430,10 @@ def instrument_cashflows(
 
     Parameters
     ----------
-    instrument : typed instrument, dict or str
+    instrument : typed instrument or dict
         Typed instrument supported by :func:`price_instrument` or a canonical
-        ``finstack_quant.instrument/1`` envelope, as the dict
-        :func:`instrument_envelope_from_spec` returns or as JSON text.
+        ``finstack_quant.instrument/1`` envelope as the dict
+        :func:`instrument_envelope_from_spec` returns.
     market : MarketContext
         ``MarketContext``.
     as_of : datetime.date | datetime.datetime | pd.Timestamp | str
@@ -1450,7 +1450,7 @@ def instrument_cashflows(
     Raises
     ------
     TypeError
-        If ``instrument`` is not a typed instrument, an envelope dict or a JSON string.
+        If ``instrument`` is not a typed instrument or an envelope dict.
     KeyError
         If a curve or fixing series the instrument depends on is missing
         from ``market``.

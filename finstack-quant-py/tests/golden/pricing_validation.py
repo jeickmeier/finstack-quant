@@ -22,10 +22,10 @@ SCHEMA_RESOURCE_DIRS = (
 )
 
 
-def validated_instrument_json(instrument_json: dict[str, Any]) -> str:
-    """Validate fixture instrument JSON and return the executable JSON string."""
+def validated_instrument_json(instrument_json: dict[str, Any]) -> dict[str, Any]:
+    """Validate fixture instrument JSON and return the executable envelope dict."""
     _validate_instrument_envelope_schema(instrument_json)
-    return validate_instrument_json(json.dumps(instrument_json))
+    return json.loads(validate_instrument_json(json.dumps(instrument_json)))
 
 
 def requested_metrics(expected: dict[str, float]) -> list[str]:

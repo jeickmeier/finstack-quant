@@ -106,7 +106,7 @@ def bumped(bp):
 
 
 dv01 = (value(bumped(1))[0] - value(bumped(-1))[0]) / 2
-actual = price_instrument(json.dumps(f["instrument"]), market, as_of, model="normal", metrics=["vega", "dv01"])
+actual = price_instrument(f["instrument"], market, as_of, model="normal", metrics=["vega", "dv01"])
 reference = {"npv": base[0], "vega": base[1], "dv01": dv01}
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument(

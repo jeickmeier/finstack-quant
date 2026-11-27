@@ -451,7 +451,7 @@ def test_waterfall_introspection_and_custom_waterfall_round_trip() -> None:
 
 def test_tranche_metrics_report_the_to_call_twins() -> None:
     deal = _clo()
-    metrics = tranche_metrics(deal.to_json(), "A", _market(), "2024-01-01")
+    metrics = tranche_metrics(deal, "A", _market(), "2024-01-01")
     assert metrics.wal_to_call is not None
     assert metrics.wal_to_call < metrics.wal
     assert metrics.z_spread_to_call_bp is not None
@@ -749,7 +749,7 @@ def test_typed_only_clo_reproduces_the_regression_golden() -> None:
     assert typed_spec == expected_spec
 
     market = _resolve_market(body["market"])
-    result = price_instrument(deal.to_json(), market, fixture.metadata.valuation_date, model=body["model"])
+    result = price_instrument(deal, market, fixture.metadata.valuation_date, model=body["model"])
     tolerance = fixture.tolerances["npv"]
     assert float(result.price) == pytest.approx(fixture.expected["npv"], abs=tolerance.abs, rel=tolerance.rel)
 
@@ -887,7 +887,7 @@ def test_structured_credit_has_the_typed_instrument_surface() -> None:
     assert "USD-OIS" in json.dumps(deal.market_dependencies())
 
     typed = price_instrument(deal, market, CLOSE, metrics=["wal"])
-    wire = price_instrument(deal.to_json(), market, CLOSE, metrics=["wal"])
+    wire = price_instrument(json.loads(deal.to_json()), market, CLOSE, metrics=["wal"])
     assert typed.value.amount == pytest.approx(wire.value.amount)
     assert typed.get_metric("wal") == pytest.approx(wire.get_metric("wal"))
 
@@ -1060,7 +1060,7 @@ def test_standalone_tranche_prices_the_same_cashflows_inside_a_portfolio() -> No
     assert price.value.amount == pytest.approx(expected, abs=0.01)
     assert price.value.amount < standalone.pv  # The active call shortens the selected note.
     assert price.metrics["wal"] == pytest.approx(standalone.metrics["wal"])
-    assert price_instrument(note.to_json(), market, CLOSE).value == price.value
+    assert price_instrument(json.loads(note.to_json()), market, CLOSE).value == price.value
     book = Portfolio.builder("NOTE", USD, CLOSE).build().with_position(Position("B", note, -2.0))
     priced = value_portfolio(book, market, metrics=[])
     assert priced.total_value == pytest.approx(-2.0 * expected, abs=0.01)

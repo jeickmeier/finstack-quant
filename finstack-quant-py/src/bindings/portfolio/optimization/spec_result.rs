@@ -49,8 +49,8 @@ impl PyCandidatePosition {
     ///     optimization raises ``PortfolioError`` for a collision.
     /// entity_id : str
     ///     Owning entity for the candidate.
-    /// instrument : Bond | InterestRateSwap | ... | str
-    ///     Typed instrument wrapper or canonical instrument-envelope JSON.
+    /// instrument : Bond | InterestRateSwap | ... | dict
+    ///     Typed instrument wrapper or canonical instrument-envelope dict.
     /// unit : str | dict | None
     ///     Position unit (``"units"`` default, ``"face_value"``,
     ///     ``"percentage"``, or the mapping ``{"notional": "USD"}`` /

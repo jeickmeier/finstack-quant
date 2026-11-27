@@ -98,7 +98,7 @@ spec=convert["instrument"]["spec"]
 floor_bond["spec"].update({"id":"CONVERT-FLOOR-BOND","notional":spec["notional"],
     "issue_date":spec["issue_date"],"maturity":spec["maturity"],"cashflow_spec":spec["cashflow_spec"],
     "discount_curve_id":spec["discount_curve_id"],"credit_curve_id":spec["credit_curve_id"],"settlement_days":0})
-floor_payload=json.dumps(instrument_envelope(floor_bond))
+floor_payload=instrument_envelope(floor_bond)
 floor_value=price_instrument(floor_payload,credit_market,AS_OF,model="hazard_rate").value.amount
 floor_flows=instrument_cashflows(floor_payload,credit_market,AS_OF,model="hazard_rate").to_dataframe()
 # The native floor snaps each coupon to the nearest tree step; the matched bond
@@ -114,7 +114,7 @@ print(pd.Series({"matched_bond_floor_usd":floor_value,"native_convert_floor_usd"
 ```python exec id=convertible-analytical-limit-proof role=build
 from finstack_quant.models import bs_price
 reference=tracks.convertible_limit()
-tree=price_instrument(json.dumps(reference),credit_market,AS_OF,model="tree").value.amount
+tree=price_instrument(reference,credit_market,AS_OF,model="tree").value.amount
 analytical=1000*math.exp(-.04)+10*bs_price(dict(spot=100., strike=100., rate=.04, dividend_yield=0., volatility=.25, time_to_expiry=1., option_type="call"))
 print(pd.Series({"tree_usd":tree,"analytical_usd":analytical,"residual_usd":tree-analytical,
            "absolute_tolerance_usd":.20}))
@@ -129,12 +129,12 @@ The first check compares the model delta with a finite spot move. The typed buil
 
 {/* notebook-block notebook="02_pricing/instruments/convertible_bonds.ipynb" cell="convertible-delta-hedge" role="build" */}
 ```python exec id=convertible-delta-hedge role=build
-base_value=price_instrument(json.dumps(convert),credit_market,AS_OF,model="tree",metrics=["delta"])
+base_value=price_instrument(convert,credit_market,AS_OF,model="tree",metrics=["delta"])
 hedge_rows=[]
 for spot in [90.,110.]:
     scenario=tracks.build_market("credit")
     scenario.insert_price("CONVERT",spot,"USD")
-    value=price_instrument(json.dumps(convert),scenario,AS_OF,model="tree").value.amount
+    value=price_instrument(convert,scenario,AS_OF,model="tree").value.amount
     hedge_rows.append({"spot":spot,"convert_pnl_usd":value-base_value.value.amount,
         "equity_hedge_pnl_usd":-base_value.metrics["delta"]*(spot-100),
         "hedged_pnl_usd":value-base_value.value.amount-base_value.metrics["delta"]*(spot-100)})
@@ -153,12 +153,12 @@ rebuilt=(ConvertibleBond.builder().id("C5-REBUILT").notional(Money(1_000_000.,"U
     .conversion(ConversionSpec(ratio=10_000., policy="voluntary", anti_dilution="none", dividend_adjustment="none")).spot_id("CONVERT").vol_surface_id("CONVERT-VOL").div_yield_id("CONVERT-DIVYIELD")
     .cashflow_spec(s["cashflow_spec"]).recovery_rate(0.).build())
 validate_instrument_json(rebuilt.to_json())
-greeks=price_instrument(rebuilt.to_json(),credit_market,AS_OF,model="tree",metrics=["delta","conversion01","dividend01"])
+greeks=price_instrument(rebuilt,credit_market,AS_OF,model="tree",metrics=["delta","conversion01","dividend01"])
 up=deepcopy(convert);down=deepcopy(convert)
 up["instrument"]["spec"]["conversion"]["ratio"]*=1.01
 down["instrument"]["spec"]["conversion"]["ratio"]*=.99
-manual_conversion01=(price_instrument(json.dumps(up),credit_market,AS_OF,model="tree").value.amount-
-    price_instrument(json.dumps(down),credit_market,AS_OF,model="tree").value.amount)/2
+manual_conversion01=(price_instrument(up,credit_market,AS_OF,model="tree").value.amount-
+    price_instrument(down,credit_market,AS_OF,model="tree").value.amount)/2
 print(pd.Series(greeks.metrics))
 ```
 {/* /notebook-block */}
@@ -178,7 +178,7 @@ for threshold,required_days in [(120.,20),(130.,10),(130.,20),(130.,30),(150.,20
         {"start":"2027-01-15","end":"2030-01-15","price_pct_of_par":100.}]}
     called["instrument"]["spec"]["soft_call_trigger"]={"threshold_pct":threshold,"observation_days":30,
                                                        "required_days_above":required_days}
-    value=price_instrument(json.dumps(called),credit_market,AS_OF,model="tree").value.amount
+    value=price_instrument(called,credit_market,AS_OF,model="tree").value.amount
     call_rows.append({"threshold_pct":threshold,"required_days_of_30":required_days,"pv_usd":value})
 print(pd.DataFrame(call_rows))
 print("The native tree uses an instantaneous-node barrier with a BGK-style heuristic for the k-of-n requirement; it does not count realized path observations. Its one trigger applies to every call window.")
@@ -192,7 +192,7 @@ The 112 quote is USD 1.12 million, versus USD 980,000 conversion value at stock 
 {/* notebook-block notebook="02_pricing/instruments/convertible_bonds.ipynb" cell="c5-quoted-premium" role="build" */}
 ```python exec id=c5-quoted-premium role=build
 quote_market=tracks.build_market("credit");quote_market.insert_price("CONVERT",98.,"USD")
-quote_risk=price_instrument(json.dumps(convert),quote_market,AS_OF,model="tree",metrics=["delta","conversion_value"])
+quote_risk=price_instrument(convert,quote_market,AS_OF,model="tree",metrics=["delta","conversion_value"])
 quoted_bond_value=1_000_000*1.12
 conversion_value=10_000*98.
 print({"quoted_bond_value":quoted_bond_value,"conversion_value":conversion_value,
@@ -214,12 +214,12 @@ The equity short contributes minus delta times the stock move. Reprice the conve
 
 {/* notebook-block notebook="02_pricing/instruments/convertible_bonds.ipynb" cell="c5-exercise-hedge" role="exercise" */}
 ```python exec id=c5-exercise-hedge role=exercise
-base=price_instrument(json.dumps(convert),credit_market,AS_OF,model="tree",metrics=["delta"])
+base=price_instrument(convert,credit_market,AS_OF,model="tree",metrics=["delta"])
 short_shares=base.metrics["delta"]
 results=[]
 for spot in [90.,110.]:
     m=tracks.build_market("credit");m.insert_price("CONVERT",spot,"USD")
-    new_value=price_instrument(json.dumps(convert),m,AS_OF,model="tree").value.amount
+    new_value=price_instrument(convert,m,AS_OF,model="tree").value.amount
     equity_pnl=-short_shares*(spot-100.)
     results.append({"spot":spot,"convert_pnl":new_value-base.value.amount,"equity_pnl":equity_pnl,
                     "net_pnl":new_value-base.value.amount+equity_pnl})
@@ -244,8 +244,8 @@ for spot in [50.,100.,150.]:
     base_market=tracks.build_market("credit");base_market.insert_price("CONVERT",spot,"USD")
     widened=tracks.build_market("credit");widened.insert_price("CONVERT",spot,"USD")
     widened.insert(HazardCurve("CONVERT-RISKY",AS_OF,[(1.0,.035)],recovery_rate=0.,day_count="act_365f"))
-    before=price_instrument(json.dumps(convert),base_market,AS_OF,model="tree",metrics=["bond_floor","conversion_value"])
-    after=price_instrument(json.dumps(convert),widened,AS_OF,model="tree",metrics=["bond_floor","conversion_value"])
+    before=price_instrument(convert,base_market,AS_OF,model="tree",metrics=["bond_floor","conversion_value"])
+    after=price_instrument(convert,widened,AS_OF,model="tree",metrics=["bond_floor","conversion_value"])
     credit_rows.append({"spot":spot,"convert_credit_pnl":after.value.amount-before.value.amount,
         "floor_credit_pnl":after.metrics["bond_floor"]-before.metrics["bond_floor"],"parity":after.metrics["conversion_value"]})
 print(pd.DataFrame(credit_rows))
@@ -268,7 +268,7 @@ for policy in ["none","weighted_average","full_ratchet"]:
     p=deepcopy(convert);p["instrument"]["spec"]["conversion"].update({"anti_dilution":policy,"dilution_events":[dilution_event]})
     instrument=ConvertibleBond.from_json(json.dumps(p))
     adjusted.append({"policy":policy,"effective_ratio":instrument.effective_conversion_ratio,
-        "pv_usd":price_instrument(json.dumps(p),credit_market,AS_OF,model="tree").value.amount})
+        "pv_usd":price_instrument(p,credit_market,AS_OF,model="tree").value.amount})
 wa_price=100.*(1_000_000+100_000*80/100)/(1_000_000+100_000)
 print(pd.DataFrame(adjusted))
 print("The event is already effective at valuation. Apply the contract's actual corporate-action terms once; a hypothetical future financing belongs in a scenario.")

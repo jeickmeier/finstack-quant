@@ -250,8 +250,8 @@ tabular_methods!(PyApplicationReport);
 /// one was supplied), and the application report.
 ///
 /// The input objects are copied. ``instruments`` returns the shocked copies as
-/// canonical envelope JSON strings, accepted by subsequent scenario calls and
-/// instrument ``from_json`` constructors.
+/// canonical envelope JSON strings; load one with ``json.loads`` or the
+/// instrument class's ``from_json`` before passing it to another call.
 #[pyclass(
     name = "ApplicationResult",
     module = "finstack_quant.scenarios",
@@ -398,9 +398,9 @@ tabular_methods!(PyApplicationResult);
 ///     A ``FinancialModelSpec``; omit for market-only execution.
 /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
 ///     Valuation date (ISO 8601 accepted).
-/// instruments : list[Instrument | str] | None, default None
+/// instruments : list[Instrument | dict] | None, default None
 ///     Typed instruments (``Bond``, ``CreditDefaultSwap``, ...) or canonical
-///     instrument-envelope JSON strings. Required when the scenario contains
+///     instrument-envelope dicts. Required when the scenario contains
 ///     instrument-scoped operations; also used for carry when the scenario
 ///     contains ``time_roll_forward``. Shocked copies are returned in ``ApplicationResult.instruments``.
 /// config : FinstackConfig | None, default None

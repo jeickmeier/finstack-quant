@@ -68,7 +68,7 @@ from finstack_quant.valuations.instruments import price_instrument
 AS_OF = date(2025, 1, 15)
 
 market = build_market("rates")
-swap = json.dumps(instruments("rates")["USD-PAYER-IRS"])
+swap = instruments("rates")["USD-PAYER-IRS"]
 original_market = json.loads(market.to_json())
 quantity = 1.0  # One position unit already contains USD 2m contractual notional.
 grid_simm = dict(zip(["2W", "1M", "3M", "6M", "1Y", "2Y", "3Y", "5Y", "10Y", "15Y", "20Y", "30Y"], [14/365, 1/12, .25, .5, 1, 2, 3, 5, 10, 15, 20, 30]))
@@ -147,7 +147,7 @@ from finstack_quant.valuations import calculate_simm
 from finstack_quant.valuations.instruments import InterestRateSwap
 
 # One contractual swap in the SIMM netting set; the native mapping uses its own risk conventions.
-native_simm = calculate_simm([InterestRateSwap.from_json(swap)], market, AS_OF, version="v2_6")
+native_simm = calculate_simm([InterestRateSwap.from_json(json.dumps(swap))], market, AS_OF, version="v2_6")
 assert native_simm.amount > 0 and native_simm.approximation
 print("Instrument-derived SIMM estimate (USD):", native_simm.amount)
 assert simm_result.amount > 0
@@ -182,14 +182,14 @@ from _shared.analyst_book import calibration_envelope
 from finstack_quant.calibration import calibrate
 from finstack_quant.core.dates import prev_cds_date, prev_cds_semiannual_roll, next_semiannual_cds_maturity
 credit_market=build_market("base")
-cds=json.dumps(instruments("base")["ACME-CDS"])
+cds=instruments("base")["ACME-CDS"]
 cds_base=price_instrument(cds,credit_market,AS_OF).value.amount
 # The standard2Y credit node is absent from the original quote strip.
 # Add a synthetic par quote from the existing curve, retaining every original quote.
 roll=prev_cds_semiannual_roll(AS_OF)
 two_year=copy.deepcopy(instruments("base")["ACME-CDS"])
 two_year["instrument"]["spec"]["premium_leg"].update({"start":prev_cds_date(AS_OF).isoformat(),"end":next_semiannual_cds_maturity(date(roll.year+2,roll.month,roll.day)).isoformat()})
-synthetic_2y=price_instrument(json.dumps(two_year),credit_market,AS_OF,metrics=["par_spread"]).get_metric("par_spread")
+synthetic_2y=price_instrument(two_year,credit_market,AS_OF,metrics=["par_spread"]).get_metric("par_spread")
 credit_plan=calibration_envelope("base")
 quote=copy.deepcopy(next(q for q in credit_plan["market_data"] if q["kind"]=="cds_quote"))
 quote.update({"id":"SIMM-CDS-2Y","spread_bp":synthetic_2y});quote["pillar"]["tenor"]["count"]=2
@@ -349,8 +349,8 @@ net_mtm=swap_pv+cds_base
 gross_positive=max(swap_pv,0)+max(cds_base,0)
 ngr=max(net_mtm,0)/gross_positive if gross_positive>0 else 0.0
 schedule=margin_api.ScheduleImCalculator.bcbs_standard()
-swap_contract=json.loads(swap)["instrument"]["spec"]
-cds_contract=json.loads(cds)["instrument"]["spec"]
+swap_contract=swap["instrument"]["spec"]
+cds_contract=cds["instrument"]["spec"]
 trade_terms=[{"position":"USD-PAYER-IRS","asset_class":"interest_rate","notional_usd":float(swap_contract["notional"]["amount"]),"start":swap_contract["fixed_leg"]["start"],"end":swap_contract["fixed_leg"]["end"]},{"position":"ACME-CDS","asset_class":"credit","notional_usd":float(cds_contract["notional"]["amount"]),"start":cds_contract["premium_leg"]["start"],"end":cds_contract["premium_leg"]["end"]}]
 schedule_rows=[{**terms,"maturity_years":(date.fromisoformat(terms["end"])-AS_OF).days/365} for terms in trade_terms]
 assert trade_terms[0]["start"]=="2025-04-15" and trade_terms[0]["end"]=="2028-04-15"

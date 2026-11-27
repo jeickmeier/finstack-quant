@@ -66,8 +66,8 @@ def test_typed_from_json_reports_the_rust_type_mismatch() -> None:
         Bond.from_json(TermLoan.example().to_json())
 
 
-def _equity_envelope(instrument_id: str, price: float) -> str:
-    return json.dumps({
+def _equity_envelope(instrument_id: str, price: float) -> dict:
+    return {
         "schema": "finstack_quant.instrument/1",
         "instrument": {
             "type": "equity",
@@ -84,7 +84,7 @@ def _equity_envelope(instrument_id: str, price: float) -> str:
                 "attributes": {},
             },
         },
-    })
+    }
 
 
 def test_composite_rebalance_result_wire_carries_the_instrument_envelope() -> None:
@@ -109,7 +109,7 @@ def test_composite_rebalance_result_wire_carries_the_instrument_envelope() -> No
     instrument = CompositeInstrument.from_json(json.dumps(wire["instrument"]))
     assert instrument.to_json() == result.instrument.to_json()
     assert CompositeRebalanceResult.from_json(result.to_json()).to_json() == result.to_json()
-    wire["instrument"] = json.loads(_equity_envelope("A", 100.0))
+    wire["instrument"] = _equity_envelope("A", 100.0)
     with pytest.raises(ValueError, match=r"expected instrument type `composite`, got `equity`"):
         CompositeRebalanceResult.from_json(json.dumps(wire))
 

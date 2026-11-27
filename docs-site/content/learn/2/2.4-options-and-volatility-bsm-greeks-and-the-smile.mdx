@@ -296,7 +296,7 @@ option=(EquityOption.builder().id('TYPED-SPX-CALL').underlying_ticker('SPX').str
  .expiry(raw['expiry']).quantity(100.0).currency('USD').discount_curve_id('USD-OIS').spot_id('SPX-SPOT')
  .div_yield_id('SPX-DIV').vol_surface_id('SPX-VOL').build())
 r=price_instrument(option,market,AS_OF,metrics=['delta','gamma','vega','theta'])
-original=price_instrument(json.dumps(instruments('options')['SPX-CALL']),market,AS_OF)
+original=price_instrument(instruments('options')['SPX-CALL'],market,AS_OF)
 t=(option.expiry-AS_OF).days/365
 smile={strike:get_surface_vol(market.get_surface('SPX-VOL'),t,strike) for strike in (4000,5200,6400)}
 print({'native_price_USD':r.price,'smile_decimal':smile,'position_greeks':{key:r.get_metric(key) for key in ('delta','gamma','vega','theta')}})
@@ -428,7 +428,7 @@ option=(FxOption.builder().id('EURUSD-GK').base_currency(Currency('EUR')).quote_
 import json
 wire=json.loads(option.to_json())
 wire['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'implied_volatility':vol}}
-native=price_instrument(json.dumps(wire),market,AS_OF).price
+native=price_instrument(wire,market,AS_OF).price
 manual=1_000_000*bs_price(dict(spot=spot, strike=strike, rate=rd, dividend_yield=rf, volatility=vol, time_to_expiry=t, option_type="call"))
 print({'USD_rate':rd,'EUR_rate':rf,'EURUSD_forward':forward,'smile_vol':vol,'native_USD_price':native,'GK_USD_price':manual})
 ```

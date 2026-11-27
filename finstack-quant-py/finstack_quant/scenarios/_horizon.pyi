@@ -27,7 +27,7 @@ class HorizonResult:
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.scenarios import compose_scenarios, compute_horizon_return
     >>> try:
-    ...     compute_horizon_return("{}", MarketContext(), "2025-01-15", compose_scenarios([]))
+    ...     compute_horizon_return({}, MarketContext(), "2025-01-15", compose_scenarios([]))
     ... except ValueError as exc:
     ...     print(str(exc).split(":")[0])
     Validation error
@@ -383,10 +383,10 @@ def compute_horizon_return(
 
     Parameters
     ----------
-    instrument : Instrument | str
+    instrument : Instrument | dict
         Typed instrument (``Bond``, ``CreditDefaultSwap``,
-        ``InterestRateSwap``, ...) or a canonical v1 instrument envelope JSON
-        string.
+        ``InterestRateSwap``, ...) or a canonical v1 instrument envelope
+        dict.
     market : MarketContext
         ``MarketContext``; never mutated.
     as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
@@ -443,7 +443,7 @@ def compute_horizon_return(
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.scenarios import compose_scenarios, compute_horizon_return
     >>> try:
-    ...     compute_horizon_return("{}", MarketContext(), "2025-01-15", compose_scenarios([]))
+    ...     compute_horizon_return({}, MarketContext(), "2025-01-15", compose_scenarios([]))
     ... except ValueError as exc:
     ...     print(str(exc).split(":")[0])
     Validation error
