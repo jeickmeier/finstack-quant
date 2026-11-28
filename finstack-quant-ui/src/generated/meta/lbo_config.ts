@@ -666,7 +666,7 @@ export default [
   {
     "path": "#/$defs/d_dffc33b1175f7681824d",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/$defs/LboCheckMappings",
-    "description": "Node-id mappings forwarded to the [`lbo_model_checks`] suite.\n\nSupplying this runs the crate's existing LBO check suite against the same\nevaluated statement results used for the transaction arithmetic, so the\nreport and the returns are guaranteed to describe one evaluation."
+    "description": "Node-id mappings from which the LBO model check suite is built.\n\nThe suite runs against the same evaluated statement results used for the\ntransaction arithmetic, so the report and the returns describe one\nevaluation."
   },
   {
     "path": "#/$defs/d_dffc33b1175f7681824d/properties/credit",

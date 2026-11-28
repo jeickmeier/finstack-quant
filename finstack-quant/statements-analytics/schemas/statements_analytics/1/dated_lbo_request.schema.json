@@ -346,6 +346,100 @@
       ],
       "type": "object"
     },
+    "CreditMapping": {
+      "additionalProperties": false,
+      "description": "Maps node IDs for credit underwriting analysis.\n\nUsed by [`super::suites::credit_underwriting_checks`] to build leverage,\ncoverage, cash-flow, and trend checks. Unknown JSON keys are rejected, so\na misspelled optional key fails instead of silently disabling its check.",
+      "properties": {
+        "cash_burn_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Monthly cash burn node (for liquidity runway)."
+        },
+        "cash_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Cash / liquidity node."
+        },
+        "config": {
+          "$ref": "#/$defs/CheckConfig",
+          "default": {
+            "default_relative_tolerance": 0.0,
+            "default_tolerance": 0.0,
+            "materiality_threshold": 0.0,
+            "min_severity": "info"
+          },
+          "description": "Comparison and reporting policy of the suite. Identities are compared\nexactly unless a tolerance is stated here."
+        },
+        "coverage_min_warn": {
+          "description": "Minimum coverage ratio that triggers a warning; defaults to `1.5`.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "debt_node": {
+          "$ref": "#/$defs/Id",
+          "description": "Total debt node."
+        },
+        "ebitda_node": {
+          "$ref": "#/$defs/Id",
+          "description": "EBITDA node."
+        },
+        "fcf_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Free cash flow node."
+        },
+        "interest_expense_node": {
+          "$ref": "#/$defs/Id",
+          "description": "Interest expense node."
+        },
+        "leverage_warn": {
+          "description": "`(min, max)` leverage warning range; defaults to `(0.0, 6.0)`.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "double",
+              "type": "number"
+            },
+            {
+              "format": "double",
+              "type": "number"
+            }
+          ],
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "debt_node",
+        "ebitda_node",
+        "interest_expense_node"
+      ],
+      "type": "object"
+    },
     "Currency": {
       "description": "ISO 4217 currency enumeration",
       "oneOf": [
@@ -1316,6 +1410,68 @@
         }
       ]
     },
+    "LboCheckMappings": {
+      "additionalProperties": false,
+      "description": "Node-id mappings from which the LBO model check suite is built.\n\nThe suite runs against the same evaluated statement results used for the\ntransaction arithmetic, so the report and the returns describe one\nevaluation.",
+      "properties": {
+        "credit": {
+          "$ref": "#/$defs/CreditMapping",
+          "description": "Credit node mapping used for the leverage and coverage checks."
+        },
+        "three_statement": {
+          "$ref": "#/$defs/ThreeStatementMapping",
+          "description": "Three-statement node mapping (balance sheet, income statement, cash flow)."
+        }
+      },
+      "required": [
+        "three_statement",
+        "credit"
+      ],
+      "type": "object"
+    },
+    "LboCheckSuite": {
+      "description": "The check suite a dated LBO runs on its own statement result.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "An explicit suite of built-in and formula checks.",
+          "properties": {
+            "kind": {
+              "const": "spec",
+              "type": "string"
+            },
+            "spec": {
+              "$ref": "#/$defs/CheckSuiteSpec",
+              "description": "Built-in and formula checks to resolve and run."
+            }
+          },
+          "required": [
+            "kind",
+            "spec"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The LBO model suite: the three-statement and credit-underwriting\nchecks merged by [`lbo_model_checks`], which replaces the credit\nmapping's leverage warning range with 0 to 8.",
+          "properties": {
+            "kind": {
+              "const": "lbo",
+              "type": "string"
+            },
+            "mappings": {
+              "$ref": "#/$defs/LboCheckMappings",
+              "description": "Node mappings the two merged suites read."
+            }
+          },
+          "required": [
+            "kind",
+            "mappings"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "LboDebtFunding": {
       "additionalProperties": false,
       "description": "Cash proceeds and opening contractual face of one named debt source.",
@@ -1441,7 +1597,7 @@
           "type": "boolean"
         },
         "suite": {
-          "$ref": "#/$defs/CheckSuiteSpec",
+          "$ref": "#/$defs/LboCheckSuite",
           "description": "Checks run on the same statement result used for the transaction."
         }
       },
@@ -1657,6 +1813,308 @@
         "as_of",
         "observed_through",
         "currency"
+      ],
+      "type": "object"
+    },
+    "ThreeStatementMapping": {
+      "additionalProperties": false,
+      "description": "Maps node IDs for a three-statement financial model (income statement,\nbalance sheet, cash flow statement).\n\nRequired nodes must always be populated. Optional nodes (`Option<NodeId>`)\nenable additional checks when present; the suite factory will skip the\ncorresponding check when the node is `None`. Unknown JSON keys are\nrejected, so a misspelled optional key fails instead of silently\ndisabling its check.",
+      "properties": {
+        "assets_nodes": {
+          "description": "Total-assets nodes (balance sheet).",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "type": "array"
+        },
+        "capex_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Capital expenditures node (cash flow statement)."
+        },
+        "cash_node": {
+          "$ref": "#/$defs/Id",
+          "description": "Cash / cash-equivalents node (balance sheet)."
+        },
+        "cff_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Cash from financing node (cash flow statement)."
+        },
+        "cfi_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Cash from investing node (cash flow statement)."
+        },
+        "cfo_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Cash from operations node (cash flow statement)."
+        },
+        "config": {
+          "$ref": "#/$defs/CheckConfig",
+          "default": {
+            "default_relative_tolerance": 0.0,
+            "default_tolerance": 0.0,
+            "materiality_threshold": 0.0,
+            "min_severity": "info"
+          },
+          "description": "Comparison and reporting policy of the suite. Identities are compared\nexactly unless a tolerance is stated here."
+        },
+        "cs_interest_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Capital-structure interest node; when present the interest\nreconciliation compares against it directly instead of testing an\nimplied rate."
+        },
+        "current_assets_nodes": {
+          "default": [],
+          "description": "Current-asset nodes summed into net working capital.",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "type": "array"
+        },
+        "current_liabilities_nodes": {
+          "default": [],
+          "description": "Current-liability nodes summed into net working capital.",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "type": "array"
+        },
+        "debt_balance_nodes": {
+          "default": [],
+          "description": "Debt-balance / optional-rate pairs used to test the implied interest\nrate against `interest_expense_node`.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "$ref": "#/$defs/Id"
+              },
+              {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Id"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "depreciation_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Depreciation / amortization expense node (income statement)."
+        },
+        "dividends_equity_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Dividends charged against equity (balance sheet / equity roll-forward);\nenables the dividend reconciliation together with `dividends_node`."
+        },
+        "dividends_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Dividends paid node (cash flow statement / financing)."
+        },
+        "equity_nodes": {
+          "description": "Total-equity nodes (balance sheet).",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "type": "array"
+        },
+        "intangible_additions_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Intangible-asset additions node; enables the capex reconciliation\ntogether with `capex_node`."
+        },
+        "interest_expense_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Interest expense node (income statement)."
+        },
+        "liabilities_nodes": {
+          "description": "Total-liabilities nodes (balance sheet).",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "type": "array"
+        },
+        "net_income_node": {
+          "$ref": "#/$defs/Id",
+          "description": "Net income node (income statement)."
+        },
+        "opening_cash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DatedOpening"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Opening cash at the start of the model's first period. The cash\nroll-forward runs only when it and `total_cf_node` are both given."
+        },
+        "opening_retained_earnings": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DatedOpening"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Opening retained earnings at the start of the model's first period.\nThe retained-earnings reconciliation runs only when it is given."
+        },
+        "ppe_additions_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "PP&E additions node; enables the capex reconciliation together with\n`capex_node`."
+        },
+        "ppe_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "PP&E balance node (balance sheet)."
+        },
+        "pretax_income_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Pre-tax income node (income statement)."
+        },
+        "retained_earnings_node": {
+          "$ref": "#/$defs/Id",
+          "description": "Retained earnings node (balance sheet)."
+        },
+        "tax_expense_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Income tax expense node (income statement)."
+        },
+        "total_cf_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Total cash flow node (cash flow statement)."
+        },
+        "wc_change_cf_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Change-in-working-capital node (cash flow statement, operating)."
+        }
+      },
+      "required": [
+        "assets_nodes",
+        "liabilities_nodes",
+        "equity_nodes",
+        "cash_node",
+        "retained_earnings_node",
+        "net_income_node"
       ],
       "type": "object"
     }

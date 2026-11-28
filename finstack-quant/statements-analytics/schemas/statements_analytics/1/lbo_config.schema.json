@@ -1003,7 +1003,7 @@
     },
     "LboCheckMappings": {
       "additionalProperties": false,
-      "description": "Node-id mappings forwarded to the [`lbo_model_checks`] suite.\n\nSupplying this runs the crate's existing LBO check suite against the same\nevaluated statement results used for the transaction arithmetic, so the\nreport and the returns are guaranteed to describe one evaluation.",
+      "description": "Node-id mappings from which the LBO model check suite is built.\n\nThe suite runs against the same evaluated statement results used for the\ntransaction arithmetic, so the report and the returns describe one\nevaluation.",
       "properties": {
         "credit": {
           "$ref": "#/$defs/CreditMapping",

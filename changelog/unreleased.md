@@ -2,6 +2,18 @@
 
 ## Itemized changes
 
+### Statements: a dated LBO can run the LBO model check suite
+
+`DatedLboRequest.checks.suite` is now a tagged choice, so the dated evaluator
+can run the LBO model check suite (the three-statement and credit checks) as
+well as an explicit suite. `required` gates either: a required suite that does
+not pass is an error. On the same model the dated run gives the same check
+report the retired `evaluate_lbo` gave. `LboCheckSuite` is the new Rust type;
+`LboCheckMappings` moves beside it unchanged. Wire change, old → new:
+
+- `"checks": {"suite": {<CheckSuiteSpec>}, "required": ..}` → `"checks": {"suite": {"kind": "spec", "spec": {<CheckSuiteSpec>}}, "required": ..}`
+- new: `"checks": {"suite": {"kind": "lbo", "mappings": {"three_statement": .., "credit": ..}}, "required": ..}`
+
 ### Statements: the dated LBO result round-trips through JSON in Python
 
 Python `DatedLboResult` gains `to_json()`, `from_json(text)` and pickle

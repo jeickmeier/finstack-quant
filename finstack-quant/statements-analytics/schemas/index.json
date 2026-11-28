@@ -146,7 +146,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dated_lbo_request.schema.json",
-      "bytes": 58904,
+      "bytes": 72630,
       "kind": "input",
       "path": "schemas/statements_analytics/1/dated_lbo_request.schema.json",
       "summary": "Acquisition and exit dates, recognized funding and projected exit assumptions.",
@@ -407,7 +407,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json",
-      "bytes": 42596,
+      "bytes": 42538,
       "kind": "input",
       "path": "schemas/statements_analytics/1/lbo_config.schema.json",
       "summary": "Transaction assumptions for an LBO evaluation.",

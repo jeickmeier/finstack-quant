@@ -821,6 +821,347 @@
       "node_count": 4
     },
     "dated_lbo": {
+      "checked": {
+        "checks": {
+          "outcome": "pass",
+          "results": [
+            {
+              "category": "accounting_identity",
+              "check_id": "balance_sheet_articulation",
+              "check_name": "Balance Sheet Articulation",
+              "comparisons": [
+                {
+                  "actual": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
+                  "difference": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "expected": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
+                  "identity": "balance_sheet_articulation",
+                  "period": "2025Q1",
+                  "tolerance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  }
+                },
+                {
+                  "actual": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
+                  "difference": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "expected": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
+                  "identity": "balance_sheet_articulation",
+                  "period": "2025Q2",
+                  "tolerance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  }
+                },
+                {
+                  "actual": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
+                  "difference": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "expected": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
+                  "identity": "balance_sheet_articulation",
+                  "period": "2025Q3",
+                  "tolerance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  }
+                },
+                {
+                  "actual": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
+                  "difference": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "expected": {
+                    "amount": "100",
+                    "currency": "USD"
+                  },
+                  "identity": "balance_sheet_articulation",
+                  "period": "2025Q4",
+                  "tolerance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  }
+                },
+                {
+                  "actual": {
+                    "amount": "120",
+                    "currency": "USD"
+                  },
+                  "difference": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "expected": {
+                    "amount": "120",
+                    "currency": "USD"
+                  },
+                  "identity": "balance_sheet_articulation",
+                  "period": "2026Q1",
+                  "tolerance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  }
+                }
+              ],
+              "evaluated": 5,
+              "findings": [],
+              "outcome": "pass"
+            },
+            {
+              "category": "internal_consistency",
+              "check_id": "growth_rate_consistency",
+              "check_name": "Growth Rate Consistency",
+              "evaluated": 5,
+              "findings": [],
+              "outcome": "pass"
+            },
+            {
+              "category": "data_quality",
+              "check_id": "non_finite",
+              "check_name": "Non-Finite Value",
+              "evaluated": 15,
+              "findings": [],
+              "outcome": "pass"
+            },
+            {
+              "category": "data_quality",
+              "check_id": "missing_value",
+              "check_name": "Missing Value",
+              "evaluated": 15,
+              "findings": [],
+              "outcome": "pass"
+            },
+            {
+              "category": "data_quality",
+              "check_id": "credit_inputs_non_finite",
+              "check_name": "Credit Inputs Non-Finite",
+              "evaluated": 10,
+              "findings": [],
+              "outcome": "pass"
+            },
+            {
+              "category": "credit_reasonableness",
+              "check_id": "leverage_range",
+              "check_name": "Leverage Range",
+              "evaluated": 5,
+              "findings": [],
+              "outcome": "pass"
+            },
+            {
+              "category": "credit_reasonableness",
+              "check_id": "coverage_floor",
+              "check_name": "Coverage Floor",
+              "evaluated": 5,
+              "findings": [
+                {
+                  "check_id": "coverage_floor",
+                  "materiality": {
+                    "absolute": 1.0,
+                    "reference_label": "denominator",
+                    "reference_value": 100.0,
+                    "relative": null
+                  },
+                  "message": "Coverage ratio 1.00x in 2025Q1 below Warning floor 1.50x",
+                  "nodes": [
+                    "ebitda",
+                    "ebitda"
+                  ],
+                  "period": "2025Q1",
+                  "severity": "warning"
+                },
+                {
+                  "check_id": "coverage_floor",
+                  "materiality": {
+                    "absolute": 1.0,
+                    "reference_label": "denominator",
+                    "reference_value": 100.0,
+                    "relative": null
+                  },
+                  "message": "Coverage ratio 1.00x in 2025Q2 below Warning floor 1.50x",
+                  "nodes": [
+                    "ebitda",
+                    "ebitda"
+                  ],
+                  "period": "2025Q2",
+                  "severity": "warning"
+                },
+                {
+                  "check_id": "coverage_floor",
+                  "materiality": {
+                    "absolute": 1.0,
+                    "reference_label": "denominator",
+                    "reference_value": 100.0,
+                    "relative": null
+                  },
+                  "message": "Coverage ratio 1.00x in 2025Q3 below Warning floor 1.50x",
+                  "nodes": [
+                    "ebitda",
+                    "ebitda"
+                  ],
+                  "period": "2025Q3",
+                  "severity": "warning"
+                },
+                {
+                  "check_id": "coverage_floor",
+                  "materiality": {
+                    "absolute": 1.0,
+                    "reference_label": "denominator",
+                    "reference_value": 100.0,
+                    "relative": null
+                  },
+                  "message": "Coverage ratio 1.00x in 2025Q4 below Warning floor 1.50x",
+                  "nodes": [
+                    "ebitda",
+                    "ebitda"
+                  ],
+                  "period": "2025Q4",
+                  "severity": "warning"
+                },
+                {
+                  "check_id": "coverage_floor",
+                  "materiality": {
+                    "absolute": 1.0,
+                    "reference_label": "denominator",
+                    "reference_value": 120.0,
+                    "relative": null
+                  },
+                  "message": "Coverage ratio 1.00x in 2026Q1 below Warning floor 1.50x",
+                  "nodes": [
+                    "ebitda",
+                    "ebitda"
+                  ],
+                  "period": "2026Q1",
+                  "severity": "warning"
+                }
+              ],
+              "outcome": "pass"
+            },
+            {
+              "category": "credit_reasonableness",
+              "check_id": "trend_ebitda",
+              "check_name": "Trend",
+              "evaluated": 5,
+              "findings": [],
+              "outcome": "pass"
+            },
+            {
+              "category": "credit_reasonableness",
+              "check_id": "trend_net_debt",
+              "check_name": "Trend",
+              "evaluated": 5,
+              "findings": [],
+              "outcome": "pass"
+            }
+          ],
+          "summary": {
+            "errors": 0,
+            "failed": 0,
+            "incomplete": 0,
+            "infos": 0,
+            "passed": 9,
+            "total_checks": 9,
+            "unevaluated": 0,
+            "warnings": 5
+          }
+        },
+        "entry_date": "2025-03-31",
+        "entry_earnings": {
+          "amount": "100",
+          "currency": "USD"
+        },
+        "entry_enterprise_value": {
+          "amount": "800",
+          "currency": "USD"
+        },
+        "exit": {
+          "common_equity_residual": {
+            "amount": "880",
+            "currency": "USD"
+          },
+          "enterprise_value": {
+            "amount": "1080",
+            "currency": "USD"
+          },
+          "funded_moic": null,
+          "net_debt": {
+            "amount": "200",
+            "currency": "USD"
+          },
+          "other_claims": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "sized_moic": 2.838709677419355,
+          "sponsor_proceeds": {
+            "amount": "880",
+            "currency": "USD"
+          }
+        },
+        "exit_earnings": {
+          "amount": "120",
+          "currency": "USD"
+        },
+        "exit_valuation_date": "2026-03-31",
+        "funding": {
+          "cash_uses": {
+            "amount": "810",
+            "currency": "USD"
+          },
+          "committed_cash_sources": null,
+          "debt_cash_proceeds": {
+            "amount": "500",
+            "currency": "USD"
+          },
+          "funding_gap": null,
+          "opening_debt_face": {
+            "amount": "500",
+            "currency": "USD"
+          },
+          "required_sponsor_cash": {
+            "amount": "310",
+            "currency": "USD"
+          }
+        },
+        "run": {
+          "market_content_hash": "sha256:3b61d6d907002a1ceb52e85384017f811218f6d652aeef0034a002c03ff53aa7",
+          "model_content_hash": "sha256:084d40d3325c4aa4830a42a580e205f8ddb4de82c58d3e7b60bd6963e19e75c8",
+          "model_id": "dated-lbo-checked",
+          "observation_cutoff": {
+            "through": "2025-03-31"
+          },
+          "run_id": "sha256:954b3052af8a83ba5a485815b133f3d6adb3739ab74bf92dd31934f6a713b1bc",
+          "source_snapshot": "lbo-parity-2025Q1",
+          "valuation_date": "2025-03-31"
+        }
+      },
       "funded": {
         "checks": null,
         "entry_date": "2025-12-31",

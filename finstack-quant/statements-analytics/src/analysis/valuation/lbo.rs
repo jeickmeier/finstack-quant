@@ -39,8 +39,9 @@
 //! - Koller, T., Goedhart, M., & Wessels, D. (2020). *Valuation: Measuring and
 //!   Managing the Value of Companies* (7th ed.). Wiley. Ch. 36. `docs/REFERENCES.md#koller-valuation`
 
-use crate::analysis::checks::{CreditMapping, ThreeStatementMapping, lbo_model_checks};
+use crate::analysis::checks::lbo_model_checks;
 use crate::analysis::valuation::corporate::extract_currency_from_model;
+use crate::analysis::valuation::lbo_funding::LboCheckMappings;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::money::Money;
 use finstack_quant_statements::checks::CheckReport;
@@ -70,21 +71,6 @@ pub struct LboTranche {
     /// Amount funded at close, in the model currency. Must be finite and
     /// non-negative.
     pub amount: f64,
-}
-
-/// Node-id mappings forwarded to the [`lbo_model_checks`] suite.
-///
-/// Supplying this runs the crate's existing LBO check suite against the same
-/// evaluated statement results used for the transaction arithmetic, so the
-/// report and the returns are guaranteed to describe one evaluation.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct LboCheckMappings {
-    /// Three-statement node mapping (balance sheet, income statement, cash flow).
-    pub three_statement: ThreeStatementMapping,
-    /// Credit node mapping used for the leverage and coverage checks.
-    pub credit: CreditMapping,
 }
 
 /// Transaction assumptions for an LBO evaluation.

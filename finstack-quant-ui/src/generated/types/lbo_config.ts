@@ -93,11 +93,11 @@ export interface LboConfigWire {
   transaction_fees: number;
 }
 /**
- * Node-id mappings forwarded to the [`lbo_model_checks`] suite.
+ * Node-id mappings from which the LBO model check suite is built.
  *
- * Supplying this runs the crate's existing LBO check suite against the same
- * evaluated statement results used for the transaction arithmetic, so the
- * report and the returns are guaranteed to describe one evaluation.
+ * The suite runs against the same evaluated statement results used for the
+ * transaction arithmetic, so the report and the returns describe one
+ * evaluation.
  */
 export interface DDffc33B1175F7681824D {
   credit: D_5884433B163D26991C12;

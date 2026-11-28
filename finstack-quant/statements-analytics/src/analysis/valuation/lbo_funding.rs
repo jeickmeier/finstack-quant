@@ -9,6 +9,7 @@ use finstack_quant_statements::checks::CheckReport;
 use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements::types::FinancialModelSpec;
 
+use crate::analysis::checks::{CreditMapping, ThreeStatementMapping, lbo_model_checks};
 use finstack_quant_core::money::Money;
 use finstack_quant_statements::{Error, Result};
 use serde::{Deserialize, Serialize};
@@ -349,13 +350,59 @@ impl LboEarnings {
     }
 }
 
+/// Node-id mappings from which the LBO model check suite is built.
+///
+/// The suite runs against the same evaluated statement results used for the
+/// transaction arithmetic, so the report and the returns describe one
+/// evaluation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct LboCheckMappings {
+    /// Three-statement node mapping (balance sheet, income statement, cash flow).
+    pub three_statement: ThreeStatementMapping,
+    /// Credit node mapping used for the leverage and coverage checks.
+    pub credit: CreditMapping,
+}
+
+/// The check suite a dated LBO runs on its own statement result.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum LboCheckSuite {
+    /// An explicit suite of built-in and formula checks.
+    Spec {
+        /// Built-in and formula checks to resolve and run.
+        spec: finstack_quant_statements::checks::CheckSuiteSpec,
+    },
+    /// The LBO model suite: the three-statement and credit-underwriting
+    /// checks merged by [`lbo_model_checks`], which replaces the credit
+    /// mapping's leverage warning range with 0 to 8.
+    Lbo {
+        /// Node mappings the two merged suites read.
+        mappings: Box<LboCheckMappings>,
+    },
+}
+
+impl LboCheckSuite {
+    /// Build the runnable suite.
+    fn resolve(&self) -> Result<finstack_quant_statements::checks::CheckSuite> {
+        match self {
+            Self::Spec { spec } => spec.resolve(),
+            Self::Lbo { mappings } => {
+                lbo_model_checks(mappings.three_statement.clone(), mappings.credit.clone())
+            }
+        }
+    }
+}
+
 /// Optional statement check suite and its effect on the LBO qualification.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct LboQualification {
     /// Checks run on the same statement result used for the transaction.
-    pub suite: finstack_quant_statements::checks::CheckSuiteSpec,
+    pub suite: LboCheckSuite,
     /// Require a passing suite before publishing a funded return.
     pub required: bool,
 }
@@ -578,5 +625,198 @@ mod funding_tests {
         assert_eq!(insolvency.exit.common_equity_residual, usd(-160));
         assert_eq!(insolvency.exit.sponsor_proceeds, usd(0));
         assert_eq!(insolvency.exit.funded_moic, Some(0.0));
+    }
+
+    /// The funded worked example with one scalar node for formula checks.
+    fn checked_example() -> (FinancialModelSpec, DatedLboRequest) {
+        use finstack_quant_statements::builder::ModelBuilder;
+        use time::macros::date;
+
+        let entry = PeriodId::annual(2025).unwrap();
+        let exit = PeriodId::annual(2028).unwrap();
+        let close = date!(2025 - 12 - 31);
+        let usd = |value| Money::from((value, Currency::USD));
+        let mut builder = ModelBuilder::new("dated-buyout");
+        builder.periods("2025..2028", Some("2025")).unwrap();
+        builder.with_meta("currency", serde_json::json!("USD"));
+        builder.source_snapshot("actuals-2025-12-31");
+        // Every node holds all four years, so a suite that reads each period is complete.
+        let years: Vec<PeriodId> = (2025..=2028)
+            .map(|year| PeriodId::annual(year).unwrap())
+            .collect();
+        let series = |values: [i64; 4]| -> Vec<(PeriodId, Money)> {
+            years.iter().copied().zip(values.map(usd)).collect()
+        };
+        builder.value_money("ebitda", &series([100, 105, 112, 120]));
+        builder.value_money("funded_debt", &series([520, 500, 470, 440]));
+        builder.value_money("eligible_cash", &series([10, 20, 30, 40]));
+        let headroom: Vec<_> = years.iter().map(|year| (*year, 1.5.into())).collect();
+        builder.value("covenant_headroom", &headroom);
+        for node in [
+            "ebitda",
+            "funded_debt",
+            "eligible_cash",
+            "covenant_headroom",
+        ] {
+            builder.availability_dates(node, &[(entry, close)]).unwrap();
+        }
+        let model = builder.build().unwrap();
+        let earnings = |period, multiple: i64| LboEarnings {
+            node: "ebitda".into(),
+            period,
+            multiple: DecimalWire(rust_decimal::Decimal::from(multiple)),
+            basis: LboEarningsBasis::AsObserved,
+        };
+        let request = DatedLboRequest {
+            cut: super::super::corporate::StatementValuationCut {
+                as_of: close,
+                observed_through: close,
+                currency: Currency::USD,
+            },
+            exit_valuation_date: date!(2028 - 12 - 31),
+            entry: earnings(entry, 8),
+            funding: LboFunding {
+                date: close,
+                acquisition: LboAcquisition::CashFreeDebtFree,
+                transaction_fees: usd(20),
+                closing_credits: usd(0),
+                debt: vec![LboDebtFunding {
+                    name: "term".into(),
+                    cash_proceeds: usd(500),
+                    opening_face: usd(520),
+                }],
+                sponsor_commitment: Some(usd(320)),
+            },
+            exit: earnings(exit, 9),
+            exit_debt_node: "funded_debt".into(),
+            exit_cash_node: "eligible_cash".into(),
+            exit_claims_node: None,
+            checks: None,
+        };
+        (model, request)
+    }
+
+    fn spec_suite(formula: &str) -> LboCheckSuite {
+        serde_json::from_value(serde_json::json!({
+            "kind": "spec",
+            "spec": {
+                "name": "lbo",
+                "builtin_checks": [],
+                "formula_checks": [{
+                    "id": "headroom",
+                    "name": "Covenant headroom",
+                    "category": "internal_consistency",
+                    "severity": "error",
+                    "mode": "predicate",
+                    "scope": "all_periods",
+                    "formula": formula,
+                    "message_template": "Headroom out of bounds in {period}",
+                    "tolerance": null
+                }]
+            }
+        }))
+        .unwrap()
+    }
+
+    fn lbo_mappings() -> LboCheckMappings {
+        serde_json::from_value(serde_json::json!({
+            "three_statement": {
+                "assets_nodes": ["ebitda"],
+                "liabilities_nodes": ["funded_debt"],
+                "equity_nodes": ["eligible_cash"],
+                "cash_node": "eligible_cash",
+                "retained_earnings_node": "eligible_cash",
+                "net_income_node": "ebitda"
+            },
+            "credit": {
+                "debt_node": "funded_debt",
+                "ebitda_node": "ebitda",
+                "interest_expense_node": "ebitda"
+            }
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn a_spec_suite_runs_on_the_dated_result_and_blocks_only_when_required() {
+        use finstack_quant_statements::checks::CheckOutcome;
+
+        let (model, mut request) = checked_example();
+        request.checks = Some(LboQualification {
+            suite: spec_suite("covenant_headroom > 1"),
+            required: true,
+        });
+        let passed = evaluate_dated_lbo(&model, &request, None).unwrap();
+        assert_eq!(passed.checks.unwrap().outcome, CheckOutcome::Pass);
+        assert_eq!(passed.exit.funded_moic, Some(2.125));
+
+        request.checks = Some(LboQualification {
+            suite: spec_suite("covenant_headroom > 10"),
+            required: false,
+        });
+        let reported = evaluate_dated_lbo(&model, &request, None).unwrap();
+        assert_eq!(reported.checks.unwrap().outcome, CheckOutcome::Fail);
+        assert_eq!(reported.exit.funded_moic, Some(2.125));
+
+        request.checks = Some(LboQualification {
+            suite: spec_suite("covenant_headroom > 10"),
+            required: true,
+        });
+        let blocked = evaluate_dated_lbo(&model, &request, None).unwrap_err();
+        assert!(
+            blocked
+                .to_string()
+                .contains("Required LBO check suite returned Fail")
+        );
+    }
+
+    #[test]
+    fn the_lbo_suite_is_lbo_model_checks_run_on_the_dated_result() {
+        let (model, mut request) = checked_example();
+        let mappings = lbo_mappings();
+        request.checks = Some(LboQualification {
+            suite: LboCheckSuite::Lbo {
+                mappings: Box::new(mappings.clone()),
+            },
+            required: false,
+        });
+
+        let report = evaluate_dated_lbo(&model, &request, None)
+            .unwrap()
+            .checks
+            .unwrap();
+
+        let results = request.cut.evaluate(&model, None).unwrap();
+        let direct = lbo_model_checks(mappings.three_statement, mappings.credit)
+            .unwrap()
+            .run(&model, &results)
+            .unwrap();
+        assert_eq!(
+            serde_json::to_value(&report).unwrap(),
+            serde_json::to_value(&direct).unwrap()
+        );
+        assert!(!report.results.is_empty());
+    }
+
+    #[test]
+    fn the_check_suite_choice_is_tagged_on_the_wire() {
+        let spec = serde_json::to_value(spec_suite("covenant_headroom > 1")).unwrap();
+        assert_eq!(spec["kind"], "spec");
+        assert!(spec["spec"]["formula_checks"].is_array());
+
+        let lbo = serde_json::to_value(LboCheckSuite::Lbo {
+            mappings: Box::new(lbo_mappings()),
+        })
+        .unwrap();
+        assert_eq!(lbo["kind"], "lbo");
+        assert_eq!(lbo["mappings"]["credit"]["debt_node"], "funded_debt");
+
+        let untagged =
+            serde_json::json!({ "name": "lbo", "builtin_checks": [], "formula_checks": [] });
+        assert!(serde_json::from_value::<LboCheckSuite>(untagged).is_err());
+        let unknown = serde_json::json!({ "kind": "zzz" });
+        assert!(serde_json::from_value::<LboCheckSuite>(unknown).is_err());
+        let extra = serde_json::json!({ "kind": "lbo", "mappings": lbo["mappings"], "zzz": 1 });
+        assert!(serde_json::from_value::<LboCheckSuite>(extra).is_err());
     }
 }

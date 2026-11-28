@@ -415,6 +415,14 @@ def analytics_cases() -> dict[str, Any]:
             "short": dated_lbo(commitment="300"),
             "funded": dated_lbo(commitment="320"),
             "insolvent": dated_lbo(commitment="320", exit_multiple="3"),
+            # The LBO model check suite (three-statement and credit checks) run by the dated
+            # request, on a dated variant of the model the retired evaluator's check golden used.
+            "checked": doc(
+                sa.evaluate_dated_lbo(
+                    st.FinancialModelSpec.from_json(json.dumps(INPUTS["dated_lbo_checked_model"])),
+                    sa.DatedLboRequest.from_json(json.dumps(INPUTS["dated_lbo_checked_request"])),
+                )
+            ),
         },
         "dcf_sensitivity": {
             "gordon_growth": doc(

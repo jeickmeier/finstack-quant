@@ -3,11 +3,12 @@
 from collections.abc import Sequence
 from datetime import date
 from decimal import Decimal
-from typing import Literal, TypedDict
+from typing import Any, Literal, TypedDict
 
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.statements import CheckReport, CheckSuiteSpec, FinancialModelSpec
+from finstack_quant.statements_analytics._valuation.corporate import LboCheckMappings
 from finstack_quant.statements_analytics._valuation.inputs import StatementValuationCut
 
 class _CashFree(TypedDict):
@@ -21,8 +22,16 @@ class _SellerAndRefinancing(TypedDict):
 
 _Acquisition = _CashFree | _SellerAndRefinancing
 
+class _SpecSuite(TypedDict):
+    kind: Literal["spec"]
+    spec: CheckSuiteSpec | dict[str, Any]
+
+class _LboSuite(TypedDict):
+    kind: Literal["lbo"]
+    mappings: LboCheckMappings | dict[str, Any]
+
 class _Qualification(TypedDict):
-    suite: CheckSuiteSpec
+    suite: _SpecSuite | _LboSuite
     required: bool
 
 class LboEarnings:
@@ -355,7 +364,14 @@ class DatedLboRequest:
         exit_claims_node : str | None
             Optional node for other claims ranking ahead of common equity.
         checks : _Qualification | None
-            Optional exact statement check suite and requirement policy.
+            Optional check suite and requirement policy:
+            ``{"suite": ..., "required": bool}``. ``suite`` is a tagged choice:
+            ``{"kind": "spec", "spec": CheckSuiteSpec}`` runs an explicit suite
+            of built-in and formula checks, and
+            ``{"kind": "lbo", "mappings": LboCheckMappings}`` runs the LBO model
+            suite (three-statement and credit checks) built from node mappings.
+            With ``required`` true, a suite that does not pass raises instead of
+            returning a result.
 
         Raises
         ------

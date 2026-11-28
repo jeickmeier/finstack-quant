@@ -155,7 +155,7 @@ test('evaluateDatedLbo blocks on a required check suite and reports an optional 
       commit(320)(document);
       const suite = structuredClone(INPUTS.dated_lbo_check_suite);
       suite.formula_checks[0].formula = formula;
-      document.checks = { suite, required };
+      document.checks = { suite: { kind: 'spec', spec: suite }, required };
     });
 
   assert.throws(
@@ -167,4 +167,22 @@ test('evaluateDatedLbo blocks on a required check suite and reports an optional 
   assert.equal(reported.checks.outcome, 'fail');
   const passed = sa.evaluateDatedLbo(model(), checked('term_amortization >= 0', true));
   assert.equal(passed.checks.outcome, 'pass');
+});
+
+test('evaluateDatedLbo runs the LBO model check suite from node mappings', () => {
+  const result = sa.evaluateDatedLbo(
+    INPUTS.dated_lbo_checked_model,
+    INPUTS.dated_lbo_checked_request
+  );
+  assert.equal(result.checks.outcome, 'pass');
+  assert.equal(result.checks.summary.total_checks, 9);
+  assert.equal(result.checks.summary.warnings, 5);
+
+  const untagged = request((document) => {
+    document.checks = { suite: INPUTS.dated_lbo_check_suite, required: false };
+  });
+  assert.throws(
+    () => sa.evaluateDatedLbo(model(), untagged),
+    (error) => /missing field `kind`/.test(error.message)
+  );
 });

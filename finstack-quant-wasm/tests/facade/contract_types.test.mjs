@@ -565,7 +565,7 @@ test('namespace results match their published result types', () => {
     PARITY_INPUTS.dated_lbo_model,
     datedRequest(
       { amount: '320', currency: 'USD' },
-      { suite: PARITY_INPUTS.dated_lbo_check_suite, required: true }
+      { suite: { kind: 'spec', spec: PARITY_INPUTS.dated_lbo_check_suite }, required: true }
     )
   );
   assert.equal(sizedLbo.exit.funded_moic, null);
@@ -574,6 +574,20 @@ test('namespace results match their published result types', () => {
   assert.equal(fundedLbo.checks.outcome, 'pass');
   declarations.push(['dated_lbo_sized', 'types.statements_analytics.DatedLboResult', sizedLbo]);
   declarations.push(['dated_lbo_funded', 'types.statements_analytics.DatedLboResult', fundedLbo]);
+  // The request with each arm of its check-suite choice.
+  declarations.push([
+    'dated_lbo_request_spec',
+    'types.statements_analytics.DatedLboRequest',
+    datedRequest(null, {
+      suite: { kind: 'spec', spec: PARITY_INPUTS.dated_lbo_check_suite },
+      required: true,
+    }),
+  ]);
+  declarations.push([
+    'dated_lbo_request_lbo',
+    'types.statements_analytics.DatedLboRequest',
+    PARITY_INPUTS.dated_lbo_checked_request,
+  ]);
   const tornado = (terminalValue, options) =>
     statements_analytics.dcfSensitivity(
       PARITY_INPUTS.dcf_model,

@@ -733,6 +733,24 @@ export type CreditScoringModel =
       model: "zmijewski";
     };
 /**
+ * The check suite a dated LBO runs on its own statement result.
+ */
+export type LboCheckSuite =
+  | {
+      kind: "spec";
+      /**
+       * Built-in and formula checks to resolve and run.
+       */
+      spec: CheckSuiteSpec;
+    }
+  | {
+      kind: "lbo";
+      /**
+       * Node mappings the two merged suites read.
+       */
+      mappings: LboCheckMappings;
+    };
+/**
  * How a matched earnings observation is read.
  */
 export type LboEarningsBasis = "as_observed" | "trailing_additive";
@@ -3859,7 +3877,157 @@ export interface LboQualification {
   /**
    * Checks run on the same statement result used for the transaction.
    */
-  suite: CheckSuiteSpec;
+  suite: LboCheckSuite;
+}
+/**
+ * Node-id mappings from which the LBO model check suite is built.
+ *
+ * The suite runs against the same evaluated statement results used for the
+ * transaction arithmetic, so the report and the returns describe one
+ * evaluation.
+ */
+export interface LboCheckMappings {
+  /**
+   * Credit node mapping used for the leverage and coverage checks.
+   */
+  credit: CreditMapping;
+  /**
+   * Three-statement node mapping (balance sheet, income statement, cash flow).
+   */
+  three_statement: ThreeStatementMapping;
+}
+/**
+ * Maps node IDs for a three-statement financial model (income statement,
+ * balance sheet, cash flow statement).
+ *
+ * Required nodes must always be populated. Optional nodes (`Option<NodeId>`)
+ * enable additional checks when present; the suite factory will skip the
+ * corresponding check when the node is `None`. Unknown JSON keys are
+ * rejected, so a misspelled optional key fails instead of silently
+ * disabling its check.
+ */
+export interface ThreeStatementMapping {
+  /**
+   * Total-assets nodes (balance sheet).
+   */
+  assets_nodes: Id[];
+  /**
+   * Capital expenditures node (cash flow statement).
+   */
+  capex_node?: Id | null;
+  /**
+   * Cash / cash-equivalents node (balance sheet).
+   */
+  cash_node: Id;
+  /**
+   * Cash from financing node (cash flow statement).
+   */
+  cff_node?: Id | null;
+  /**
+   * Cash from investing node (cash flow statement).
+   */
+  cfi_node?: Id | null;
+  /**
+   * Cash from operations node (cash flow statement).
+   */
+  cfo_node?: Id | null;
+  /**
+   * Comparison and reporting policy of the suite. Identities are compared
+   * exactly unless a tolerance is stated here.
+   */
+  config?: CheckConfig;
+  /**
+   * Capital-structure interest node; when present the interest
+   * reconciliation compares against it directly instead of testing an
+   * implied rate.
+   */
+  cs_interest_node?: Id | null;
+  /**
+   * Current-asset nodes summed into net working capital.
+   */
+  current_assets_nodes?: Id[];
+  /**
+   * Current-liability nodes summed into net working capital.
+   */
+  current_liabilities_nodes?: Id[];
+  /**
+   * Debt-balance / optional-rate pairs used to test the implied interest
+   * rate against `interest_expense_node`.
+   */
+  debt_balance_nodes?: [Id, Id | null][];
+  /**
+   * Depreciation / amortization expense node (income statement).
+   */
+  depreciation_node?: Id | null;
+  /**
+   * Dividends charged against equity (balance sheet / equity roll-forward);
+   * enables the dividend reconciliation together with `dividends_node`.
+   */
+  dividends_equity_node?: Id | null;
+  /**
+   * Dividends paid node (cash flow statement / financing).
+   */
+  dividends_node?: Id | null;
+  /**
+   * Total-equity nodes (balance sheet).
+   */
+  equity_nodes: Id[];
+  /**
+   * Intangible-asset additions node; enables the capex reconciliation
+   * together with `capex_node`.
+   */
+  intangible_additions_node?: Id | null;
+  /**
+   * Interest expense node (income statement).
+   */
+  interest_expense_node?: Id | null;
+  /**
+   * Total-liabilities nodes (balance sheet).
+   */
+  liabilities_nodes: Id[];
+  /**
+   * Net income node (income statement).
+   */
+  net_income_node: Id;
+  /**
+   * Opening cash at the start of the model's first period. The cash
+   * roll-forward runs only when it and `total_cf_node` are both given.
+   */
+  opening_cash?: DatedOpening | null;
+  /**
+   * Opening retained earnings at the start of the model's first period.
+   * The retained-earnings reconciliation runs only when it is given.
+   */
+  opening_retained_earnings?: DatedOpening | null;
+  /**
+   * PP&E additions node; enables the capex reconciliation together with
+   * `capex_node`.
+   */
+  ppe_additions_node?: Id | null;
+  /**
+   * PP&E balance node (balance sheet).
+   */
+  ppe_node?: Id | null;
+  /**
+   * Pre-tax income node (income statement).
+   */
+  pretax_income_node?: Id | null;
+  /**
+   * Retained earnings node (balance sheet).
+   */
+  retained_earnings_node: Id;
+  /**
+   * Income tax expense node (income statement).
+   */
+  tax_expense_node?: Id | null;
+  /**
+   * Total cash flow node (cash flow statement).
+   */
+  total_cf_node?: Id | null;
+  /**
+   * Change-in-working-capital node (cash flow statement, operating).
+   */
+  wc_change_cf_node?: Id | null;
 }
 /**
  * Authored earnings observation and timing for one transaction multiple.
@@ -5415,156 +5583,6 @@ export interface InterestExpenseReconciliation {
    */
   tolerance_pct?: number | null;
   [k: string]: unknown;
-}
-/**
- * Node-id mappings forwarded to the [`lbo_model_checks`] suite.
- *
- * Supplying this runs the crate's existing LBO check suite against the same
- * evaluated statement results used for the transaction arithmetic, so the
- * report and the returns are guaranteed to describe one evaluation.
- */
-export interface LboCheckMappings {
-  /**
-   * Credit node mapping used for the leverage and coverage checks.
-   */
-  credit: CreditMapping;
-  /**
-   * Three-statement node mapping (balance sheet, income statement, cash flow).
-   */
-  three_statement: ThreeStatementMapping;
-}
-/**
- * Maps node IDs for a three-statement financial model (income statement,
- * balance sheet, cash flow statement).
- *
- * Required nodes must always be populated. Optional nodes (`Option<NodeId>`)
- * enable additional checks when present; the suite factory will skip the
- * corresponding check when the node is `None`. Unknown JSON keys are
- * rejected, so a misspelled optional key fails instead of silently
- * disabling its check.
- */
-export interface ThreeStatementMapping {
-  /**
-   * Total-assets nodes (balance sheet).
-   */
-  assets_nodes: Id[];
-  /**
-   * Capital expenditures node (cash flow statement).
-   */
-  capex_node?: Id | null;
-  /**
-   * Cash / cash-equivalents node (balance sheet).
-   */
-  cash_node: Id;
-  /**
-   * Cash from financing node (cash flow statement).
-   */
-  cff_node?: Id | null;
-  /**
-   * Cash from investing node (cash flow statement).
-   */
-  cfi_node?: Id | null;
-  /**
-   * Cash from operations node (cash flow statement).
-   */
-  cfo_node?: Id | null;
-  /**
-   * Comparison and reporting policy of the suite. Identities are compared
-   * exactly unless a tolerance is stated here.
-   */
-  config?: CheckConfig;
-  /**
-   * Capital-structure interest node; when present the interest
-   * reconciliation compares against it directly instead of testing an
-   * implied rate.
-   */
-  cs_interest_node?: Id | null;
-  /**
-   * Current-asset nodes summed into net working capital.
-   */
-  current_assets_nodes?: Id[];
-  /**
-   * Current-liability nodes summed into net working capital.
-   */
-  current_liabilities_nodes?: Id[];
-  /**
-   * Debt-balance / optional-rate pairs used to test the implied interest
-   * rate against `interest_expense_node`.
-   */
-  debt_balance_nodes?: [Id, Id | null][];
-  /**
-   * Depreciation / amortization expense node (income statement).
-   */
-  depreciation_node?: Id | null;
-  /**
-   * Dividends charged against equity (balance sheet / equity roll-forward);
-   * enables the dividend reconciliation together with `dividends_node`.
-   */
-  dividends_equity_node?: Id | null;
-  /**
-   * Dividends paid node (cash flow statement / financing).
-   */
-  dividends_node?: Id | null;
-  /**
-   * Total-equity nodes (balance sheet).
-   */
-  equity_nodes: Id[];
-  /**
-   * Intangible-asset additions node; enables the capex reconciliation
-   * together with `capex_node`.
-   */
-  intangible_additions_node?: Id | null;
-  /**
-   * Interest expense node (income statement).
-   */
-  interest_expense_node?: Id | null;
-  /**
-   * Total-liabilities nodes (balance sheet).
-   */
-  liabilities_nodes: Id[];
-  /**
-   * Net income node (income statement).
-   */
-  net_income_node: Id;
-  /**
-   * Opening cash at the start of the model's first period. The cash
-   * roll-forward runs only when it and `total_cf_node` are both given.
-   */
-  opening_cash?: DatedOpening | null;
-  /**
-   * Opening retained earnings at the start of the model's first period.
-   * The retained-earnings reconciliation runs only when it is given.
-   */
-  opening_retained_earnings?: DatedOpening | null;
-  /**
-   * PP&E additions node; enables the capex reconciliation together with
-   * `capex_node`.
-   */
-  ppe_additions_node?: Id | null;
-  /**
-   * PP&E balance node (balance sheet).
-   */
-  ppe_node?: Id | null;
-  /**
-   * Pre-tax income node (income statement).
-   */
-  pretax_income_node?: Id | null;
-  /**
-   * Retained earnings node (balance sheet).
-   */
-  retained_earnings_node: Id;
-  /**
-   * Income tax expense node (income statement).
-   */
-  tax_expense_node?: Id | null;
-  /**
-   * Total cash flow node (cash flow statement).
-   */
-  total_cf_node?: Id | null;
-  /**
-   * Change-in-working-capital node (cash flow statement, operating).
-   */
-  wc_change_cf_node?: Id | null;
 }
 /**
  * Transaction assumptions for an LBO evaluation.

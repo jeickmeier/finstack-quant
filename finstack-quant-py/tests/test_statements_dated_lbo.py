@@ -228,7 +228,7 @@ def test_a_required_check_suite_blocks_the_result_and_an_optional_one_is_reporte
     def checked(formula: str, required: bool) -> Callable[[dict[str, Any]], Any]:
         def edit(request: dict[str, Any]) -> None:
             _commit(320)(request)
-            request["checks"] = {"suite": _suite(formula), "required": required}
+            request["checks"] = {"suite": {"kind": "spec", "spec": _suite(formula)}, "required": required}
 
         return edit
 
@@ -241,3 +241,36 @@ def test_a_required_check_suite_blocks_the_result_and_an_optional_one_is_reporte
 
     passed = evaluate_dated_lbo(_model(), _request(checked("term_amortization >= 0", required=True)))
     assert json.loads(passed.checks.to_json())["outcome"] == "pass"
+
+
+def test_the_lbo_arm_runs_the_lbo_model_check_suite_from_node_mappings() -> None:
+    model = FinancialModelSpec.from_json(json.dumps(INPUTS["dated_lbo_checked_model"]))
+    request = DatedLboRequest.from_json(json.dumps(INPUTS["dated_lbo_checked_request"]))
+
+    result = evaluate_dated_lbo(model, request)
+
+    report = json.loads(result.checks.to_json())
+    assert report["outcome"] == "pass"
+    assert report["summary"]["total_checks"] == 9
+    assert report["summary"]["warnings"] == 5
+    assert result.exit.sized_moic == pytest.approx(880 / 310)
+
+
+@pytest.mark.parametrize(
+    ("suite", "message"),
+    [
+        ({"name": "lbo", "builtin_checks": [], "formula_checks": []}, "missing field `kind`"),
+        ({"kind": "zzz"}, "unknown variant `zzz`"),
+        ({"kind": "spec"}, "missing field `spec`"),
+        (
+            {**INPUTS["dated_lbo_checked_request"]["checks"]["suite"], "zzz": 1},
+            "unknown field `zzz`",
+        ),
+    ],
+    ids=["untagged", "unknown-kind", "spec-without-spec", "unknown-field"],
+)
+def test_the_check_suite_choice_must_be_tagged(suite: dict[str, Any], message: str) -> None:
+    document = copy.deepcopy(INPUTS["dated_lbo_request"])
+    document["checks"] = {"suite": suite, "required": False}
+    with pytest.raises(ValueError, match=message):
+        DatedLboRequest.from_json(json.dumps(document))

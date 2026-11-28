@@ -249,6 +249,12 @@ test('statements_analytics matches the cross-host golden', () => {
       short: datedLbo('300'),
       funded: datedLbo('320'),
       insolvent: datedLbo('320', '3'),
+      // The LBO model check suite run by the dated request, on a dated variant of the
+      // model the retired evaluator's check golden used.
+      checked: sa.evaluateDatedLbo(
+        INPUTS.dated_lbo_checked_model,
+        INPUTS.dated_lbo_checked_request
+      ),
     },
     capital_structure_summary: {
       full_year: sa.capitalStructureSummary(capitalStructure.results, capitalStructure.model, {
