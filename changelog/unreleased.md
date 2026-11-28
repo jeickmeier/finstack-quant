@@ -2,16 +2,25 @@
 
 ## Itemized changes
 
-### Statements: `evaluate_lbo` is removed; the dated evaluator is the only LBO evaluator
+### Statements: one LBO evaluator, `evaluate_lbo`, on the dated contract
 
-`evaluate_lbo` (WASM `evaluateLbo`), `LboConfig`, `LboTranche` and `LboResult`
-are removed from Rust, Python and WASM, with the `lbo_config` and `lbo_result`
-schemas. `evaluate_dated_lbo` (WASM `evaluateDatedLbo`) is the LBO evaluator.
-`LboCheckMappings` stays. There is no conversion from an `LboConfig`: the dated
-request needs dates and funding terms the old config never carried, so a caller
-authors a `DatedLboRequest`.
+`evaluate_lbo` (WASM `evaluateLbo`) now takes an `LboRequest` and returns an
+`LboResult` that follow the accepted contract
+STATEMENTS-ANALYTICS-VALUATION-03: explicit entry and exit dates, a funding
+reconciliation with the required sponsor cash and any funding gap, an exit
+bridge with a signed residual and sponsor proceeds floored at zero, and a
+sized and a funded MOIC. The 0.11 evaluator of the same name is removed from
+Rust, Python and WASM, with `LboConfig`, `LboTranche`, the old `LboResult`
+and the `lbo_config` schema. `LboCheckMappings` stays.
 
-Request fields, `LboConfig` → `DatedLboRequest`:
+`evaluate_lbo`, `LboResult` and the schema id `lbo_result` keep their 0.11
+names with a different shape. An old call fails; it is never valued. Python
+raises `TypeError` for a config dict and `ValueError` for an old document
+given to `LboRequest` or `LboResult.from_json`, WASM throws a validation
+error, and Rust does not compile. There is no conversion from an `LboConfig`:
+the request needs dates and funding terms the old config never carried.
+
+Request fields, 0.11 `LboConfig` → `LboRequest`:
 
 - `entry_multiple`, `entry_metric_node`, `entry_period` → `entry: {multiple, node, period, basis}`
 - `exit_multiple`, `exit_metric_node`, `exit_period` → `exit: {multiple, node, period, basis}`
@@ -28,7 +37,7 @@ Inputs the old config did not have, which a caller must now supply:
 - optionally `funding.sponsor_commitment`. Without it the result sizes the deal and reports no funded return
 - a model with a source snapshot, an actual entry period that ends on the entry date, a projected exit period that ends on the exit date, and an availability date on or before the entry date for every observed value
 
-Result fields, `LboResult` → `DatedLboResult`:
+Result fields, 0.11 `LboResult` → `LboResult`:
 
 - `entry_enterprise_value` → `entry_enterprise_value`
 - `entry_metric`, `exit_metric` (numbers) → `entry_earnings`, `exit_earnings` (money)
@@ -39,47 +48,49 @@ Result fields, `LboResult` → `DatedLboResult`:
 - `exit_enterprise_value` → `exit.enterprise_value`
 - `exit_net_debt` → `exit.net_debt`; other claims are `exit.other_claims`
 - `exit_equity_proceeds` → `exit.common_equity_residual` (signed) and `exit.sponsor_proceeds` (floored at zero)
-- `moic` → `exit.sized_moic` (proceeds over required sponsor cash) and `exit.funded_moic` (proceeds over the commitment, only when the commitment covers the uses)
+- `moic` → `exit.sized_moic` (proceeds over required sponsor cash) and `exit.funded_moic` (proceeds over the sponsor commitment, only when the funding gap is exactly zero)
 - `checks` → `checks`
 - new: `run`, `entry_date`, `exit_valuation_date`
 
-### UI: the LBO report runs the dated evaluator
+The request can run the LBO model check suite. `checks.suite` is a tagged
+choice: `{"kind": "spec", "spec": {<CheckSuiteSpec>}}` for an explicit suite,
+or `{"kind": "lbo", "mappings": {"three_statement": .., "credit": ..}}` for
+the three-statement and credit checks that the 0.11 `check_mappings` ran.
+`required` gates either: a required suite that does not pass is an error. On
+a model with the same values, the check report is the one the 0.11 evaluator
+gave. `LboCheckSuite` is the new Rust type.
+
+Python `LboRequest` and `LboResult` have `to_json()`, `from_json(text)` and
+pickle support, and `to_json()` writes the object WASM `evaluateLbo` returns.
+The evaluator has Python and WASM tests and a shared cross-host golden built
+on the record's worked example.
+
+For code written against `master` after 2026-11-19, where this evaluator had
+longer names:
+
+- `evaluate_dated_lbo` → `evaluate_lbo`; WASM `evaluateDatedLbo` → `evaluateLbo`
+- `DatedLboRequest` → `LboRequest`; `DatedLboResult` → `LboResult`
+- schemas `dated_lbo_request` / `dated_lbo_result` → `lbo_request` / `lbo_result`
+- `"checks": {"suite": {<CheckSuiteSpec>}, "required": ..}` → `"checks": {"suite": {"kind": "spec", "spec": {<CheckSuiteSpec>}}, "required": ..}`
+- Python `DatedLboResult` had no `to_json()` or `from_json`; `LboResult` has both
+- Rust: the file `valuation/lbo_funding.rs` is now `valuation/lbo.rs`. The `analysis::*` paths change only by the three renames above
+
+### UI: the LBO report runs the new `evaluateLbo`
 
 `LboReport`, `useEvaluateLbo` and the statements workbench's LBO panel now
-edit a `DatedLboRequest` and call `statements_analytics.evaluateDatedLbo`.
-The report shows the funding reconciliation, the exit bridge with its signed
-residual and floored sponsor proceeds, the sized and funded MOIC, and the
-statement run. The hook and registry ids keep their names. Changed for a
-host:
+edit an `LboRequest` and show the new `LboResult`: the funding
+reconciliation, the exit bridge with its signed residual and floored sponsor
+proceeds, the sized and funded MOIC, and the statement run. The hook, the
+component and their registry ids keep their names. Changed for a host:
 
-- `EvaluateLboRequest.configJson` → `requestJson` (a `DatedLboRequest`)
-- `LboReport` prop `defaultConfig` → `defaultRequest`; its result is a `DatedLboResult`
-- the contracts `lbo_config` / `lbo_result` → `dated_lbo_request` / `dated_lbo_result`
+- `EvaluateLboRequest.configJson` → `requestJson` (an `LboRequest`)
+- `LboReport` prop `defaultConfig` → `defaultRequest`
+- the contract `lbo_config` → `lbo_request`; `lbo_result` keeps its id with the new shape
 - the panel needs a model with a source snapshot and an actual entry period whose observations are available by the entry date; Rust's refusal is shown otherwise
 
 The analyst fixture's deal now enters at 2025Q1 and nets exit debt against
 cash: a 1.131x funded MOIC, where the old fixture showed 1.080x for a
 2024Q1 entry with gross debt.
-
-### Statements: a dated LBO can run the LBO model check suite
-
-`DatedLboRequest.checks.suite` is now a tagged choice, so the dated evaluator
-can run the LBO model check suite (the three-statement and credit checks) as
-well as an explicit suite. `required` gates either: a required suite that does
-not pass is an error. On the same model the dated run gives the same check
-report the retired `evaluate_lbo` gave. `LboCheckSuite` is the new Rust type;
-`LboCheckMappings` moves beside it unchanged. Wire change, old → new:
-
-- `"checks": {"suite": {<CheckSuiteSpec>}, "required": ..}` → `"checks": {"suite": {"kind": "spec", "spec": {<CheckSuiteSpec>}}, "required": ..}`
-- new: `"checks": {"suite": {"kind": "lbo", "mappings": {"three_statement": .., "credit": ..}}, "required": ..}`
-
-### Statements: the dated LBO result round-trips through JSON in Python
-
-Python `DatedLboResult` gains `to_json()`, `from_json(text)` and pickle
-support, as every other result has. `to_json()` writes the object WASM
-`evaluateDatedLbo` returns. The dated evaluator now has Python and WASM tests
-and a shared cross-host golden built on the worked example of
-STATEMENTS-ANALYTICS-VALUATION-03.
 
 ### Portfolio: one `scenario_pnl`, taking a list of scenarios
 

@@ -411,7 +411,7 @@ pub struct LboQualification {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
-pub struct DatedLboRequest {
+pub struct LboRequest {
     /// Valuation date, reporting currency and entry observation cut.
     pub cut: super::corporate::StatementValuationCut,
     /// Exit date in the verified projected statement.
@@ -440,7 +440,7 @@ pub struct DatedLboRequest {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
-pub struct DatedLboResult {
+pub struct LboResult {
     /// Accepted statement run for all financial inputs and checks.
     pub run: finstack_quant_statements::evaluator::RunProvenance,
     /// Effective closing date used for the initial funding bridge.
@@ -479,11 +479,11 @@ pub struct DatedLboResult {
 /// # Errors
 /// Rejects incompatible dates, incomplete statement evidence, wrong units or
 /// currency, invalid funding, or a failed or incomplete required check suite.
-pub fn evaluate_dated_lbo(
+pub fn evaluate_lbo(
     model: &FinancialModelSpec,
-    request: &DatedLboRequest,
+    request: &LboRequest,
     market: Option<&MarketContext>,
-) -> Result<DatedLboResult> {
+) -> Result<LboResult> {
     let entry_date = request.cut.as_of;
     if request.funding.date != entry_date || request.exit_valuation_date <= entry_date {
         return Err(Error::invalid_input(
@@ -545,7 +545,7 @@ pub fn evaluate_dated_lbo(
             Ok(report)
         })
         .transpose()?;
-    Ok(DatedLboResult {
+    Ok(LboResult {
         run,
         entry_date,
         exit_valuation_date: request.exit_valuation_date,
@@ -562,7 +562,7 @@ pub fn evaluate_dated_lbo(
 mod funding_tests {
     use super::*;
     #[test]
-    fn dated_lbo_distinguishes_sizing_funded_return_and_limited_liability() {
+    fn lbo_distinguishes_sizing_funded_return_and_limited_liability() {
         use finstack_quant_statements::builder::ModelBuilder;
         use time::macros::date;
 
@@ -587,7 +587,7 @@ mod funding_tests {
             multiple: DecimalWire(rust_decimal::Decimal::from(multiple)),
             basis: LboEarningsBasis::AsObserved,
         };
-        let mut request = DatedLboRequest {
+        let mut request = LboRequest {
             cut: super::super::corporate::StatementValuationCut {
                 as_of: close,
                 observed_through: close,
@@ -613,22 +613,22 @@ mod funding_tests {
             exit_claims_node: None,
             checks: None,
         };
-        let shortage = evaluate_dated_lbo(&model, &request, None).unwrap();
+        let shortage = evaluate_lbo(&model, &request, None).unwrap();
         assert_eq!(shortage.funding.funding_gap, Some(usd(20)));
         assert_eq!(shortage.exit.sized_moic, Some(2.125));
         assert_eq!(shortage.exit.funded_moic, None);
         request.funding.sponsor_commitment = Some(usd(320));
-        let funded = evaluate_dated_lbo(&model, &request, None).unwrap();
+        let funded = evaluate_lbo(&model, &request, None).unwrap();
         assert_eq!(funded.exit.funded_moic, Some(2.125));
         request.exit = earnings(exit, 2);
-        let insolvency = evaluate_dated_lbo(&model, &request, None).unwrap();
+        let insolvency = evaluate_lbo(&model, &request, None).unwrap();
         assert_eq!(insolvency.exit.common_equity_residual, usd(-160));
         assert_eq!(insolvency.exit.sponsor_proceeds, usd(0));
         assert_eq!(insolvency.exit.funded_moic, Some(0.0));
     }
 
     /// The funded worked example with one scalar node for formula checks.
-    fn checked_example() -> (FinancialModelSpec, DatedLboRequest) {
+    fn checked_example() -> (FinancialModelSpec, LboRequest) {
         use finstack_quant_statements::builder::ModelBuilder;
         use time::macros::date;
 
@@ -667,7 +667,7 @@ mod funding_tests {
             multiple: DecimalWire(rust_decimal::Decimal::from(multiple)),
             basis: LboEarningsBasis::AsObserved,
         };
-        let request = DatedLboRequest {
+        let request = LboRequest {
             cut: super::super::corporate::StatementValuationCut {
                 as_of: close,
                 observed_through: close,
@@ -746,7 +746,7 @@ mod funding_tests {
             suite: spec_suite("covenant_headroom > 1"),
             required: true,
         });
-        let passed = evaluate_dated_lbo(&model, &request, None).unwrap();
+        let passed = evaluate_lbo(&model, &request, None).unwrap();
         assert_eq!(passed.checks.unwrap().outcome, CheckOutcome::Pass);
         assert_eq!(passed.exit.funded_moic, Some(2.125));
 
@@ -754,7 +754,7 @@ mod funding_tests {
             suite: spec_suite("covenant_headroom > 10"),
             required: false,
         });
-        let reported = evaluate_dated_lbo(&model, &request, None).unwrap();
+        let reported = evaluate_lbo(&model, &request, None).unwrap();
         assert_eq!(reported.checks.unwrap().outcome, CheckOutcome::Fail);
         assert_eq!(reported.exit.funded_moic, Some(2.125));
 
@@ -762,7 +762,7 @@ mod funding_tests {
             suite: spec_suite("covenant_headroom > 10"),
             required: true,
         });
-        let blocked = evaluate_dated_lbo(&model, &request, None).unwrap_err();
+        let blocked = evaluate_lbo(&model, &request, None).unwrap_err();
         assert!(
             blocked
                 .to_string()
@@ -781,7 +781,7 @@ mod funding_tests {
             required: false,
         });
 
-        let report = evaluate_dated_lbo(&model, &request, None)
+        let report = evaluate_lbo(&model, &request, None)
             .unwrap()
             .checks
             .unwrap();

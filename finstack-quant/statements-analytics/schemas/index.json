@@ -145,24 +145,6 @@
       "type_name": "CreditScoringModel"
     },
     {
-      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dated_lbo_request.schema.json",
-      "bytes": 72630,
-      "kind": "input",
-      "path": "schemas/statements_analytics/1/dated_lbo_request.schema.json",
-      "summary": "Acquisition and exit dates, recognized funding and projected exit assumptions.",
-      "title": "DatedLboRequest",
-      "type_name": "DatedLboRequest"
-    },
-    {
-      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dated_lbo_result.schema.json",
-      "bytes": 45900,
-      "kind": "output",
-      "path": "schemas/statements_analytics/1/dated_lbo_result.schema.json",
-      "summary": "Reconciled sources and uses and qualified sponsor returns.",
-      "title": "DatedLboResult",
-      "type_name": "DatedLboResult"
-    },
-    {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_distribution_result.schema.json",
       "bytes": 28469,
       "kind": "output",
@@ -449,6 +431,24 @@
       "summary": "Reconciled funding gap and identified debt proportions.",
       "title": "LboFundingResult",
       "type_name": "LboFundingResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_request.schema.json",
+      "bytes": 72619,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/lbo_request.schema.json",
+      "summary": "Acquisition and exit dates, recognized funding and projected exit assumptions.",
+      "title": "LboRequest",
+      "type_name": "LboRequest"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json",
+      "bytes": 45889,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/lbo_result.schema.json",
+      "summary": "Reconciled sources and uses and qualified sponsor returns.",
+      "title": "LboResult",
+      "type_name": "LboResult"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lease_spec.schema.json",

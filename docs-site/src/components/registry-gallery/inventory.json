@@ -645,7 +645,7 @@
     {
       "name": "lbo-report",
       "type": "registry:component",
-      "docs": "Edit a DatedLboRequest with the schema form over the generated dated_lbo_request contract, every string node field as an id-combobox over the supplied model node ids. The facade has no standalone DatedLboRequest parse, so the request is checked structurally here and validated by Rust (unknown keys included) when it is evaluated; Evaluate LBO passes the JSON to the caller (usually the useEvaluateLbo request). The native DatedLboResult (statements_analytics.evaluateDatedLbo) is shown as returned: required sponsor cash, sponsor proceeds and the sized and funded MOIC tiles, the sources and uses (cash uses, debt proceeds and face, required sponsor cash, committed sources and the funding gap), the entry and exit dates, earnings and enterprise values with the exit net debt, other claims, signed residual and floored sponsor proceeds, the statement run the figures come from, and the statement-check-report when the request elects a check suite. A value Rust does not report (a funded MOIC with an open funding gap, the commitment figures of a sizing-only request) is shown as undefined. Rust needs a model with a source snapshot and an actual entry period whose observations are available by the entry date, and returns its refusal otherwise. Returns are MOIC only: IRR is not part of the native result. Nothing is calculated. Accepts defaultRequest, nodeIds, onSubmit, result, loading, error, formatValue and density props.",
+      "docs": "Edit an LboRequest with the schema form over the generated lbo_request contract, every string node field as an id-combobox over the supplied model node ids. The facade has no standalone LboRequest parse, so the request is checked structurally here and validated by Rust (unknown keys included) when it is evaluated; Evaluate LBO passes the JSON to the caller (usually the useEvaluateLbo request). The native LboResult (statements_analytics.evaluateLbo) is shown as returned: required sponsor cash, sponsor proceeds and the sized and funded MOIC tiles, the sources and uses (cash uses, debt proceeds and face, required sponsor cash, committed sources and the funding gap), the entry and exit dates, earnings and enterprise values with the exit net debt, other claims, signed residual and floored sponsor proceeds, the statement run the figures come from, and the statement-check-report when the request elects a check suite. A value Rust does not report (a funded MOIC with an open funding gap, the commitment figures of a sizing-only request) is shown as undefined. Rust needs a model with a source snapshot and an actual entry period whose observations are available by the entry date, and returns its refusal otherwise. Returns are MOIC only: IRR is not part of the native result. Nothing is calculated. Accepts defaultRequest, nodeIds, onSubmit, result, loading, error, formatValue and density props.",
       "worker": "none"
     },
     {
@@ -1593,14 +1593,6 @@
       "type": "registry:lib"
     },
     {
-      "name": "contract-dated-lbo-request",
-      "type": "registry:lib"
-    },
-    {
-      "name": "contract-dated-lbo-result",
-      "type": "registry:lib"
-    },
-    {
       "name": "contract-dcf-options",
       "type": "registry:lib"
     },
@@ -1610,6 +1602,14 @@
     },
     {
       "name": "contract-forecast-metrics",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-lbo-request",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-lbo-result",
       "type": "registry:lib"
     },
     {

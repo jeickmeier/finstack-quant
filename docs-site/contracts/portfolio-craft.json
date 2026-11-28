@@ -611,7 +611,7 @@
       "finstack_quant.statements_analytics.add_roll_forward_with_opening",
       "finstack_quant.statements_analytics.dcf_sensitivity",
       "finstack_quant.statements_analytics.evaluate_dcf",
-      "finstack_quant.statements_analytics.evaluate_dated_lbo",
+      "finstack_quant.statements_analytics.evaluate_lbo",
       "finstack_quant.statements_analytics.evaluate_scenario_set",
       "finstack_quant.statements_analytics.generate_tornado_entries",
       "finstack_quant.statements_analytics.goal_seek",
@@ -627,7 +627,7 @@
       "finstack_quant.statements_analytics.SensitivityResult",
       "finstack_quant.statements_analytics.ScenarioResults",
       "finstack_quant.statements_analytics.GoalSeekResult",
-      "finstack_quant.statements_analytics.DatedLboResult",
+      "finstack_quant.statements_analytics.LboResult",
       "finstack_quant.statements_analytics.BridgeChart",
       "finstack_quant.statements.MonteCarloResults"
     ],

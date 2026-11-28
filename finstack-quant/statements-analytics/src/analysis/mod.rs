@@ -104,10 +104,10 @@ pub use valuation::corporate::types::{
     DcfPeriodRow, DcfProjection, ExitMultipleBump, StatementValuationCut, TerminalFcffBasis,
 };
 pub use valuation::corporate::wacc::{DcfSensitivityResult, WaccInputs, dcf_sensitivity, wacc};
-pub use valuation::lbo_funding::{
-    DatedLboRequest, DatedLboResult, LboAcquisition, LboCheckMappings, LboCheckSuite,
-    LboDebtFunding, LboEarnings, LboEarningsBasis, LboExitBridge, LboFunding, LboFundingResult,
-    LboQualification, evaluate_dated_lbo,
+pub use valuation::lbo::{
+    LboAcquisition, LboCheckMappings, LboCheckSuite, LboDebtFunding, LboEarnings, LboEarningsBasis,
+    LboExitBridge, LboFunding, LboFundingResult, LboQualification, LboRequest, LboResult,
+    evaluate_lbo,
 };
 pub use valuation::orchestrator::{
     CorporateAnalysis, CorporateAnalysisBuilder, CorporateAnalysisOptions, run_corporate_analysis,

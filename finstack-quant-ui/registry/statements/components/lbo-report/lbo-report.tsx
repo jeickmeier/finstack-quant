@@ -1,8 +1,8 @@
 "use client";
 import { useCallback, useState } from "react";
 import type { MoneyValue as Money } from "finstack-quant-wasm";
-import type { DatedLboRequestWire } from "@/lib/finstack/generated/types/dated_lbo_request";
-import type { DatedLboResultWire } from "@/lib/finstack/generated/types/dated_lbo_result";
+import type { LboRequestWire } from "@/lib/finstack/generated/types/lbo_request";
+import type { LboResultWire } from "@/lib/finstack/generated/types/lbo_result";
 import { formatExact, formatRaw } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import {
@@ -21,14 +21,14 @@ import {
 } from "@/components/finstack/shared/primitives/native-display/native-display";
 
 export interface LboReportProps {
-  /** Initial DatedLboRequest; remount to load another. Omitted starts empty. */
-  defaultRequest?: DatedLboRequestWire;
+  /** Initial LboRequest; remount to load another. Omitted starts empty. */
+  defaultRequest?: LboRequestWire;
   /** Model node ids offered for every node field of the request. */
   nodeIds: readonly string[];
-  /** Receives the structurally valid DatedLboRequest JSON on Evaluate; Rust validates it. */
+  /** Receives the structurally valid LboRequest JSON on Evaluate; Rust validates it. */
   onSubmit(requestJson: string): void;
-  /** Native DatedLboResult; null while none is available. */
-  result: DatedLboResultWire | null | undefined;
+  /** Native LboResult; null while none is available. */
+  result: LboResultWire | null | undefined;
   loading?: boolean;
   /** Native error, shown as returned. */
   error?: string;
@@ -37,9 +37,9 @@ export interface LboReportProps {
   density?: "compact" | "comfortable";
 }
 /**
- * Edits a Rust DatedLboRequest with the schema form over the generated
+ * Edits a Rust LboRequest with the schema form over the generated
  * contract (node fields as id-comboboxes over the model's nodes) and presents
- * the native DatedLboResult as returned: the funding reconciliation, the exit
+ * the native LboResult as returned: the funding reconciliation, the exit
  * bridge with its signed residual and floored sponsor proceeds, the sized and
  * funded MOIC, the statement run the figures come from, and the check report
  * when the request elects one. Nothing is calculated here; a return Rust does

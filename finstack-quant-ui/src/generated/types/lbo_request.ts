@@ -8,28 +8,28 @@
  * the JSON shape is the struct's fields plus a `type` tag. Convert into a
  * boxed [`Check`] via [`BuiltinCheckSpec::to_check`].
  */
-export type D_9Fd88Ddc5B6Cebcf8047 =
-  | (DCb190551B553B39470C8 & {
+export type D_1D9Ae995E311Db7207Cc =
+  | (D_75F83Dcd7D597E4A6Dbc & {
       type: "balance_sheet_articulation";
       [k: string]: unknown;
     })
-  | (D_55Fbf84Ca0B065F3Fc12 & {
+  | (D_65Ed9Cacd2Dd2Baccdd2 & {
       type: "retained_earnings_reconciliation";
       [k: string]: unknown;
     })
-  | (D_7Fb910Fd9491Fb992985 & {
+  | (D_2956Fe47Cec747B9A016 & {
       type: "cash_reconciliation";
       [k: string]: unknown;
     })
-  | (D_9E4Eb5D1A04Ec1664743 & {
+  | (D_85C8Faac6Ffa02Dd6D45 & {
       type: "missing_value";
       [k: string]: unknown;
     })
-  | (D_55F4A63656Be03C81C3D & {
+  | (DEbad0Ba01D9347C802Ff & {
       type: "sign_convention";
       [k: string]: unknown;
     })
-  | (D_9E7Fab67Ecd76Dc42Fa6 & {
+  | (D_9Eb3914Bf0A8460Ab684 & {
       type: "non_finite";
       [k: string]: unknown;
     });
@@ -73,19 +73,19 @@ export type D_9Fd88Ddc5B6Cebcf8047 =
  * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
  * safely share and clone IDs with minimal synchronization overhead.
  */
-export type D_01Ca299C383Df0D33483 = string;
+export type D_792786A40F06Da51Db5E = string;
 
 /**
  * Acquisition and exit dates, recognized funding and projected exit assumptions.
  */
-export interface DatedLboRequestWire {
+export interface LboRequestWire {
   /**
    * Optional report and decision policy for statement checks.
    */
-  checks?: D_14C2Ddfd760A527Ec1E6 | null;
-  cut: DA53Be5B97302018805Ed;
-  entry: D_4324B28527A825669Bc3;
-  exit: D_4324B28527A825669Bc31;
+  checks?: D_5Bc17887A77Dc321Db81 | null;
+  cut: D_0Dabb19Ff5E645Fdd5D7;
+  entry: D_11F2D34Aad52C0F1Cbc9;
+  exit: D_11F2D34Aad52C0F1Cbc91;
   /**
    * Exact projected cash node eligible in the exit equity bridge.
    */
@@ -102,12 +102,12 @@ export interface DatedLboRequestWire {
    * Exit date in the verified projected statement.
    */
   exit_valuation_date: string;
-  funding: D_1440D7181738973A60Ed;
+  funding: D_7A0D3Eb83D7275960E9C;
 }
 /**
  * Optional statement check suite and its effect on the LBO qualification.
  */
-export interface D_14C2Ddfd760A527Ec1E6 {
+export interface D_5Bc17887A77Dc321Db81 {
   /**
    * Require a passing suite before publishing a funded return.
    */
@@ -118,22 +118,22 @@ export interface D_14C2Ddfd760A527Ec1E6 {
   suite:
     | {
         kind: "spec";
-        spec: D_2D1163E130B7B7573072;
+        spec: DD5De81327D17008D09E8;
       }
     | {
         kind: "lbo";
-        mappings: DC79Ad3F3Ae3243F7D18F;
+        mappings: D_5667B052Da810672C517;
       };
 }
 /**
  * Built-in and formula checks to resolve and run.
  */
-export interface D_2D1163E130B7B7573072 {
+export interface DD5De81327D17008D09E8 {
   /**
    * Built-in checks to include.
    */
-  builtin_checks?: D_9Fd88Ddc5B6Cebcf8047[];
-  config?: D_9E4545Fb89459251A255;
+  builtin_checks?: D_1D9Ae995E311Db7207Cc[];
+  config?: D_16A37449572B20F0A954;
   /**
    * Suite description.
    */
@@ -141,7 +141,7 @@ export interface D_2D1163E130B7B7573072 {
   /**
    * User-defined formula checks.
    */
-  formula_checks?: D_6117675D76B2D6092Ec1[];
+  formula_checks?: D_43616D2Ac420127Ac056[];
   /**
    * Suite name.
    */
@@ -162,19 +162,19 @@ export interface D_2D1163E130B7B7573072 {
  * missing balance is incomplete and names the nodes without a value; the
  * check passes only when every period is complete and within tolerance.
  */
-export interface DCb190551B553B39470C8 {
+export interface D_75F83Dcd7D597E4A6Dbc {
   /**
    * Node IDs whose values represent total assets.
    */
-  assets_nodes: D_01Ca299C383Df0D33483[];
+  assets_nodes: D_792786A40F06Da51Db5E[];
   /**
    * Node IDs whose values represent total equity.
    */
-  equity_nodes: D_01Ca299C383Df0D33483[];
+  equity_nodes: D_792786A40F06Da51Db5E[];
   /**
    * Node IDs whose values represent total liabilities.
    */
-  liabilities_nodes: D_01Ca299C383Df0D33483[];
+  liabilities_nodes: D_792786A40F06Da51Db5E[];
   /**
    * Absolute tolerance override in the balances' units; replaces both
    * terms of the suite's
@@ -212,11 +212,11 @@ export interface DCb190551B553B39470C8 {
  * `|opening retained earnings|`, with no floor. The check passes only when
  * every period is complete and within tolerance.
  */
-export interface D_55Fbf84Ca0B065F3Fc12 {
+export interface D_65Ed9Cacd2Dd2Baccdd2 {
   /**
    * Node for dividends recognized in retained earnings in each period.
    */
-  dividends_node?: D_01Ca299C383Df0D33483 | null;
+  dividends_node?: D_792786A40F06Da51Db5E | null;
   /**
    * Sign convention of `dividends_node`. Defaults to
    * [`SignConventionPolicy::MagnitudePositive`].
@@ -263,11 +263,11 @@ export interface D_55Fbf84Ca0B065F3Fc12 {
    * safely share and clone IDs with minimal synchronization overhead.
    */
   net_income_node: string;
-  opening_balance: D_40B802128497Afc09Bbd;
+  opening_balance: D_9Dc2A997E4Efc74054Bd;
   /**
    * Signed direct retained-earnings entries, each a distinct node.
    */
-  other_adjustments?: D_01Ca299C383Df0D33483[];
+  other_adjustments?: D_792786A40F06Da51Db5E[];
   /**
    * A phantom-typed identifier that prevents mixing different kinds of IDs.
    *
@@ -319,7 +319,7 @@ export interface D_55Fbf84Ca0B065F3Fc12 {
 /**
  * Opening retained earnings at the start of the model's first period.
  */
-export interface D_40B802128497Afc09Bbd {
+export interface D_9Dc2A997E4Efc74054Bd {
   /**
    * Date of the balance: the start of the model's first period.
    */
@@ -328,12 +328,12 @@ export interface D_40B802128497Afc09Bbd {
    * The balance on that date, in the units and currency of the
    * reconciled balance node. A known zero is a typed zero.
    */
-  value: DC766Deb42B46D8Df1Dc4 | number;
+  value: D_649053C01Da37A6E9D3C | number;
 }
 /**
  * Currency-aware amount
  */
-export interface DC766Deb42B46D8Df1Dc4 {
+export interface D_649053C01Da37A6E9D3C {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -530,11 +530,11 @@ export interface DC766Deb42B46D8Df1Dc4 {
  * a missing input is incomplete; the check passes only when every enabled
  * comparison is complete and within tolerance.
  */
-export interface D_7Fb910Fd9491Fb992985 {
+export interface D_2956Fe47Cec747B9A016 {
   /**
    * Signed FX and cash-scope adjustment nodes, each included once.
    */
-  adjustment_nodes?: D_01Ca299C383Df0D33483[];
+  adjustment_nodes?: D_792786A40F06Da51Db5E[];
   /**
    * A phantom-typed identifier that prevents mixing different kinds of IDs.
    *
@@ -579,17 +579,17 @@ export interface D_7Fb910Fd9491Fb992985 {
   /**
    * Node for cash from financing.
    */
-  cff_node?: D_01Ca299C383Df0D33483 | null;
+  cff_node?: D_792786A40F06Da51Db5E | null;
   /**
    * Node for cash from investing.
    */
-  cfi_node?: D_01Ca299C383Df0D33483 | null;
+  cfi_node?: D_792786A40F06Da51Db5E | null;
   /**
    * Node for cash from operations; configure all three components or
    * none.
    */
-  cfo_node?: D_01Ca299C383Df0D33483 | null;
-  opening_balance: D_40B802128497Afc09Bbd1;
+  cfo_node?: D_792786A40F06Da51Db5E | null;
+  opening_balance: D_9Dc2A997E4Efc74054Bd1;
   /**
    * Absolute tolerance override in the cash units; replaces both terms of
    * the suite's [`CheckConfig`](crate::checks::CheckConfig) allowance.
@@ -641,7 +641,7 @@ export interface D_7Fb910Fd9491Fb992985 {
 /**
  * Opening cash at the start of the model's first period.
  */
-export interface D_40B802128497Afc09Bbd1 {
+export interface D_9Dc2A997E4Efc74054Bd1 {
   /**
    * Date of the balance: the start of the model's first period.
    */
@@ -650,7 +650,7 @@ export interface D_40B802128497Afc09Bbd1 {
    * The balance on that date, in the units and currency of the
    * reconciled balance node. A known zero is a typed zero.
    */
-  value: DC766Deb42B46D8Df1Dc4 | number;
+  value: D_649053C01Da37A6E9D3C | number;
 }
 /**
  * Checks that every required node has a value in every period of the
@@ -667,11 +667,11 @@ export interface D_40B802128497Afc09Bbd1 {
  * A required node the model does not know, or one listed twice, is a
  * configuration error.
  */
-export interface D_9E4Eb5D1A04Ec1664743 {
+export interface D_85C8Faac6Ffa02Dd6D45 {
   /**
    * Nodes that must have a value in every in-scope period.
    */
-  required_nodes: D_01Ca299C383Df0D33483[];
+  required_nodes: D_792786A40F06Da51Db5E[];
   /**
    * Which periods are in scope: all, actuals only or forecasts only.
    */
@@ -690,15 +690,15 @@ export interface D_9E4Eb5D1A04Ec1664743 {
  * A node the model does not know, a node listed twice, or a node in both
  * groups is a configuration error.
  */
-export interface D_55F4A63656Be03C81C3D {
+export interface DEbad0Ba01D9347C802Ff {
   /**
    * Nodes expected to be non-positive.
    */
-  negative_nodes?: D_01Ca299C383Df0D33483[];
+  negative_nodes?: D_792786A40F06Da51Db5E[];
   /**
    * Nodes expected to be non-negative.
    */
-  positive_nodes?: D_01Ca299C383Df0D33483[];
+  positive_nodes?: D_792786A40F06Da51Db5E[];
   [k: string]: unknown;
 }
 /**
@@ -715,17 +715,17 @@ export interface D_55F4A63656Be03C81C3D {
  * error. A cell in a period the model's plan does not have, and a node
  * whose result units contradict the model's, are errors.
  */
-export interface D_9E7Fab67Ecd76Dc42Fa6 {
+export interface D_9Eb3914Bf0A8460Ab684 {
   /**
    * The nodes to check: `"all"` or a list of node identifiers.
    */
-  nodes: "all" | D_01Ca299C383Df0D33483[];
+  nodes: "all" | D_792786A40F06Da51Db5E[];
   [k: string]: unknown;
 }
 /**
  * Suite configuration.
  */
-export interface D_9E4545Fb89459251A255 {
+export interface D_16A37449572B20F0A954 {
   /**
    * **Relative** tolerance as a fraction of the identity's reference
    * value (1e-9 allows 10 on a reference of 1e10). Zero, the default,
@@ -766,7 +766,7 @@ export interface D_9E4545Fb89459251A255 {
  * condition, is missing or unavailable. A division by zero, a domain error
  * or an overflow is an execution error, for an advisory check too.
  */
-export interface D_6117675D76B2D6092Ec1 {
+export interface D_43616D2Ac420127Ac056 {
   /**
    * Category grouping.
    */
@@ -823,23 +823,23 @@ export interface D_6117675D76B2D6092Ec1 {
 /**
  * Node mappings the two merged suites read.
  */
-export interface DC79Ad3F3Ae3243F7D18F {
-  credit: DE70F6942395Bbeed6Fb8;
-  three_statement: DF5C37B460B7F82B15C39;
+export interface D_5667B052Da810672C517 {
+  credit: DC123F042F0Db656D9D3D;
+  three_statement: D_91B4357668E35C4Cbf33;
 }
 /**
  * Credit node mapping used for the leverage and coverage checks.
  */
-export interface DE70F6942395Bbeed6Fb8 {
+export interface DC123F042F0Db656D9D3D {
   /**
    * Monthly cash burn node (for liquidity runway).
    */
-  cash_burn_node?: D_01Ca299C383Df0D33483 | null;
+  cash_burn_node?: D_792786A40F06Da51Db5E | null;
   /**
    * Cash / liquidity node.
    */
-  cash_node?: D_01Ca299C383Df0D33483 | null;
-  config?: D_9E4545Fb89459251A2551;
+  cash_node?: D_792786A40F06Da51Db5E | null;
+  config?: D_16A37449572B20F0A9541;
   /**
    * Minimum coverage ratio that triggers a warning; defaults to `1.5`.
    */
@@ -929,7 +929,7 @@ export interface DE70F6942395Bbeed6Fb8 {
   /**
    * Free cash flow node.
    */
-  fcf_node?: D_01Ca299C383Df0D33483 | null;
+  fcf_node?: D_792786A40F06Da51Db5E | null;
   /**
    * A phantom-typed identifier that prevents mixing different kinds of IDs.
    *
@@ -983,7 +983,7 @@ export interface DE70F6942395Bbeed6Fb8 {
  * Comparison and reporting policy of the suite. Identities are compared
  * exactly unless a tolerance is stated here.
  */
-export interface D_9E4545Fb89459251A2551 {
+export interface D_16A37449572B20F0A9541 {
   /**
    * **Relative** tolerance as a fraction of the identity's reference
    * value (1e-9 allows 10 on a reference of 1e10). Zero, the default,
@@ -1011,15 +1011,15 @@ export interface D_9E4545Fb89459251A2551 {
 /**
  * Three-statement node mapping (balance sheet, income statement, cash flow).
  */
-export interface DF5C37B460B7F82B15C39 {
+export interface D_91B4357668E35C4Cbf33 {
   /**
    * Total-assets nodes (balance sheet).
    */
-  assets_nodes: D_01Ca299C383Df0D33483[];
+  assets_nodes: D_792786A40F06Da51Db5E[];
   /**
    * Capital expenditures node (cash flow statement).
    */
-  capex_node?: D_01Ca299C383Df0D33483 | null;
+  capex_node?: D_792786A40F06Da51Db5E | null;
   /**
    * A phantom-typed identifier that prevents mixing different kinds of IDs.
    *
@@ -1064,65 +1064,65 @@ export interface DF5C37B460B7F82B15C39 {
   /**
    * Cash from financing node (cash flow statement).
    */
-  cff_node?: D_01Ca299C383Df0D33483 | null;
+  cff_node?: D_792786A40F06Da51Db5E | null;
   /**
    * Cash from investing node (cash flow statement).
    */
-  cfi_node?: D_01Ca299C383Df0D33483 | null;
+  cfi_node?: D_792786A40F06Da51Db5E | null;
   /**
    * Cash from operations node (cash flow statement).
    */
-  cfo_node?: D_01Ca299C383Df0D33483 | null;
-  config?: D_9E4545Fb89459251A2552;
+  cfo_node?: D_792786A40F06Da51Db5E | null;
+  config?: D_16A37449572B20F0A9542;
   /**
    * Capital-structure interest node; when present the interest
    * reconciliation compares against it directly instead of testing an
    * implied rate.
    */
-  cs_interest_node?: D_01Ca299C383Df0D33483 | null;
+  cs_interest_node?: D_792786A40F06Da51Db5E | null;
   /**
    * Current-asset nodes summed into net working capital.
    */
-  current_assets_nodes?: D_01Ca299C383Df0D33483[];
+  current_assets_nodes?: D_792786A40F06Da51Db5E[];
   /**
    * Current-liability nodes summed into net working capital.
    */
-  current_liabilities_nodes?: D_01Ca299C383Df0D33483[];
+  current_liabilities_nodes?: D_792786A40F06Da51Db5E[];
   /**
    * Debt-balance / optional-rate pairs used to test the implied interest
    * rate against `interest_expense_node`.
    */
-  debt_balance_nodes?: [D_01Ca299C383Df0D33483, D_01Ca299C383Df0D33483 | null][];
+  debt_balance_nodes?: [D_792786A40F06Da51Db5E, D_792786A40F06Da51Db5E | null][];
   /**
    * Depreciation / amortization expense node (income statement).
    */
-  depreciation_node?: D_01Ca299C383Df0D33483 | null;
+  depreciation_node?: D_792786A40F06Da51Db5E | null;
   /**
    * Dividends charged against equity (balance sheet / equity roll-forward);
    * enables the dividend reconciliation together with `dividends_node`.
    */
-  dividends_equity_node?: D_01Ca299C383Df0D33483 | null;
+  dividends_equity_node?: D_792786A40F06Da51Db5E | null;
   /**
    * Dividends paid node (cash flow statement / financing).
    */
-  dividends_node?: D_01Ca299C383Df0D33483 | null;
+  dividends_node?: D_792786A40F06Da51Db5E | null;
   /**
    * Total-equity nodes (balance sheet).
    */
-  equity_nodes: D_01Ca299C383Df0D33483[];
+  equity_nodes: D_792786A40F06Da51Db5E[];
   /**
    * Intangible-asset additions node; enables the capex reconciliation
    * together with `capex_node`.
    */
-  intangible_additions_node?: D_01Ca299C383Df0D33483 | null;
+  intangible_additions_node?: D_792786A40F06Da51Db5E | null;
   /**
    * Interest expense node (income statement).
    */
-  interest_expense_node?: D_01Ca299C383Df0D33483 | null;
+  interest_expense_node?: D_792786A40F06Da51Db5E | null;
   /**
    * Total-liabilities nodes (balance sheet).
    */
-  liabilities_nodes: D_01Ca299C383Df0D33483[];
+  liabilities_nodes: D_792786A40F06Da51Db5E[];
   /**
    * A phantom-typed identifier that prevents mixing different kinds of IDs.
    *
@@ -1168,25 +1168,25 @@ export interface DF5C37B460B7F82B15C39 {
    * Opening cash at the start of the model's first period. The cash
    * roll-forward runs only when it and `total_cf_node` are both given.
    */
-  opening_cash?: D_40B802128497Afc09Bbd2 | null;
+  opening_cash?: D_9Dc2A997E4Efc74054Bd2 | null;
   /**
    * Opening retained earnings at the start of the model's first period.
    * The retained-earnings reconciliation runs only when it is given.
    */
-  opening_retained_earnings?: D_40B802128497Afc09Bbd2 | null;
+  opening_retained_earnings?: D_9Dc2A997E4Efc74054Bd2 | null;
   /**
    * PP&E additions node; enables the capex reconciliation together with
    * `capex_node`.
    */
-  ppe_additions_node?: D_01Ca299C383Df0D33483 | null;
+  ppe_additions_node?: D_792786A40F06Da51Db5E | null;
   /**
    * PP&E balance node (balance sheet).
    */
-  ppe_node?: D_01Ca299C383Df0D33483 | null;
+  ppe_node?: D_792786A40F06Da51Db5E | null;
   /**
    * Pre-tax income node (income statement).
    */
-  pretax_income_node?: D_01Ca299C383Df0D33483 | null;
+  pretax_income_node?: D_792786A40F06Da51Db5E | null;
   /**
    * A phantom-typed identifier that prevents mixing different kinds of IDs.
    *
@@ -1231,21 +1231,21 @@ export interface DF5C37B460B7F82B15C39 {
   /**
    * Income tax expense node (income statement).
    */
-  tax_expense_node?: D_01Ca299C383Df0D33483 | null;
+  tax_expense_node?: D_792786A40F06Da51Db5E | null;
   /**
    * Total cash flow node (cash flow statement).
    */
-  total_cf_node?: D_01Ca299C383Df0D33483 | null;
+  total_cf_node?: D_792786A40F06Da51Db5E | null;
   /**
    * Change-in-working-capital node (cash flow statement, operating).
    */
-  wc_change_cf_node?: D_01Ca299C383Df0D33483 | null;
+  wc_change_cf_node?: D_792786A40F06Da51Db5E | null;
 }
 /**
  * Comparison and reporting policy of the suite. Identities are compared
  * exactly unless a tolerance is stated here.
  */
-export interface D_9E4545Fb89459251A2552 {
+export interface D_16A37449572B20F0A9542 {
   /**
    * **Relative** tolerance as a fraction of the identity's reference
    * value (1e-9 allows 10 on a reference of 1e10). Zero, the default,
@@ -1274,7 +1274,7 @@ export interface D_9E4545Fb89459251A2552 {
  * An explicit opening balance at the first period boundary of a
  * roll-forward identity.
  */
-export interface D_40B802128497Afc09Bbd2 {
+export interface D_9Dc2A997E4Efc74054Bd2 {
   /**
    * Date of the balance: the start of the model's first period.
    */
@@ -1283,12 +1283,12 @@ export interface D_40B802128497Afc09Bbd2 {
    * The balance on that date, in the units and currency of the
    * reconciled balance node. A known zero is a typed zero.
    */
-  value: DC766Deb42B46D8Df1Dc4 | number;
+  value: D_649053C01Da37A6E9D3C | number;
 }
 /**
  * Valuation date, reporting currency and entry observation cut.
  */
-export interface DA53Be5B97302018805Ed {
+export interface D_0Dabb19Ff5E645Fdd5D7 {
   /**
    * Effective calendar date from which projected cash receipts are discounted.
    */
@@ -1466,7 +1466,7 @@ export interface DA53Be5B97302018805Ed {
 /**
  * Earnings basis and matching purchase multiple on the entry date.
  */
-export interface D_4324B28527A825669Bc3 {
+export interface D_11F2D34Aad52C0F1Cbc9 {
   /**
    * Earnings dimension matched to the multiple's convention.
    */
@@ -1487,7 +1487,7 @@ export interface D_4324B28527A825669Bc3 {
 /**
  * Projected earnings basis and exit multiple at the elected exit date.
  */
-export interface D_4324B28527A825669Bc31 {
+export interface D_11F2D34Aad52C0F1Cbc91 {
   /**
    * Earnings dimension matched to the multiple's convention.
    */
@@ -1508,7 +1508,7 @@ export interface D_4324B28527A825669Bc31 {
 /**
  * Date, actual closing uses and named admissible cash sources.
  */
-export interface D_1440D7181738973A60Ed {
+export interface D_7A0D3Eb83D7275960E9C {
   /**
    * Purchase consideration and refinancing election.
    */
@@ -1517,12 +1517,12 @@ export interface D_1440D7181738973A60Ed {
         kind: "cash_free_debt_free";
       }
     | {
-        closing_reserves: DC766Deb42B46D8Df1Dc41;
+        closing_reserves: D_649053C01Da37A6E9D3C1;
         kind: "seller_and_refinancing";
-        refinancing: DC766Deb42B46D8Df1Dc42;
-        seller_consideration: DC766Deb42B46D8Df1Dc43;
+        refinancing: D_649053C01Da37A6E9D3C2;
+        seller_consideration: D_649053C01Da37A6E9D3C3;
       };
-  closing_credits: DC766Deb42B46D8Df1Dc44;
+  closing_credits: D_649053C01Da37A6E9D3C4;
   /**
    * Effective investment and refinancing date.
    */
@@ -1530,17 +1530,17 @@ export interface D_1440D7181738973A60Ed {
   /**
    * Admitted cash debt sources and their separately identified opening face.
    */
-  debt: D_24D159Badb6A2996C61A[];
+  debt: D_8884F68A948341650A0E[];
   /**
    * Actual sponsor cash committed at entry, or absent for a sizing case.
    */
-  sponsor_commitment?: DC766Deb42B46D8Df1Dc47 | null;
-  transaction_fees: DC766Deb42B46D8Df1Dc48;
+  sponsor_commitment?: D_649053C01Da37A6E9D3C7 | null;
+  transaction_fees: D_649053C01Da37A6E9D3C8;
 }
 /**
  * Cash contributed to transaction reserves at close.
  */
-export interface DC766Deb42B46D8Df1Dc41 {
+export interface D_649053C01Da37A6E9D3C1 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -1717,7 +1717,7 @@ export interface DC766Deb42B46D8Df1Dc41 {
 /**
  * Cash required at close to refinance resolved obligations.
  */
-export interface DC766Deb42B46D8Df1Dc42 {
+export interface D_649053C01Da37A6E9D3C2 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -1894,7 +1894,7 @@ export interface DC766Deb42B46D8Df1Dc42 {
 /**
  * Agreed nonnegative purchase consideration paid to the seller.
  */
-export interface DC766Deb42B46D8Df1Dc43 {
+export interface D_649053C01Da37A6E9D3C3 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -2071,7 +2071,7 @@ export interface DC766Deb42B46D8Df1Dc43 {
 /**
  * Separate nonnegative credit against otherwise required closing uses.
  */
-export interface DC766Deb42B46D8Df1Dc44 {
+export interface D_649053C01Da37A6E9D3C4 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -2248,18 +2248,18 @@ export interface DC766Deb42B46D8Df1Dc44 {
 /**
  * Cash proceeds and opening contractual face of one named debt source.
  */
-export interface D_24D159Badb6A2996C61A {
-  cash_proceeds: DC766Deb42B46D8Df1Dc45;
+export interface D_8884F68A948341650A0E {
+  cash_proceeds: D_649053C01Da37A6E9D3C5;
   /**
    * Unique identity matching the source debt instrument.
    */
   name: string;
-  opening_face: DC766Deb42B46D8Df1Dc46;
+  opening_face: D_649053C01Da37A6E9D3C6;
 }
 /**
  * Actual cash proceeds credited at closing, in transaction currency.
  */
-export interface DC766Deb42B46D8Df1Dc45 {
+export interface D_649053C01Da37A6E9D3C5 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -2436,7 +2436,7 @@ export interface DC766Deb42B46D8Df1Dc45 {
 /**
  * Contractual face outstanding immediately after closing.
  */
-export interface DC766Deb42B46D8Df1Dc46 {
+export interface D_649053C01Da37A6E9D3C6 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -2628,7 +2628,7 @@ export interface DC766Deb42B46D8Df1Dc46 {
  * assert_eq!(notional.amount(), 1_000_000.0);
  * ```
  */
-export interface DC766Deb42B46D8Df1Dc47 {
+export interface D_649053C01Da37A6E9D3C7 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -2820,7 +2820,7 @@ export interface DC766Deb42B46D8Df1Dc47 {
  * assert_eq!(notional.amount(), 1_000_000.0);
  * ```
  */
-export interface DC766Deb42B46D8Df1Dc48 {
+export interface D_649053C01Da37A6E9D3C8 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with

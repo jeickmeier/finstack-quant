@@ -46,8 +46,8 @@ import type { DatedCovenantReportsWire } from "@/lib/finstack/generated/types/da
 import type { DcfSensitivityResultWire } from "@/lib/finstack/generated/types/dcf_sensitivity_result";
 import type { FutureBreachWire } from "@/lib/finstack/generated/types/future_breach";
 import type { InstrumentCashflowWire } from "@/lib/finstack/generated/types/instrument_cashflow";
-import type { DatedLboRequestWire } from "@/lib/finstack/generated/types/dated_lbo_request";
-import type { DatedLboResultWire } from "@/lib/finstack/generated/types/dated_lbo_result";
+import type { LboRequestWire } from "@/lib/finstack/generated/types/lbo_request";
+import type { LboResultWire } from "@/lib/finstack/generated/types/lbo_result";
 import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
 import type { TableEnvelopeWire } from "@/lib/finstack/generated/types/table_envelope";
 import type {
@@ -278,9 +278,9 @@ export const statementDcf =
 export const statementDcfSensitivity =
   data.statementDcfSensitivity as unknown as DcfSensitivityResultWire;
 export const statementLbo =
-  data.statementLbo as unknown as DatedLboResultWire;
+  data.statementLbo as unknown as LboResultWire;
 export const statementLboRequest =
-  data.statementLboRequest as unknown as DatedLboRequestWire;
+  data.statementLboRequest as unknown as LboRequestWire;
 export const statementSensitivity =
   data.statementSensitivity as unknown as StatementSensitivity;
 export const statementGoalSeekRun =

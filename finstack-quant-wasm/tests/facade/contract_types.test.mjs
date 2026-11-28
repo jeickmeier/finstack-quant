@@ -537,43 +537,43 @@ test('namespace results match their published result types', () => {
     statements_analytics.peerStats([1.0, 2.0, 3.0, 4.0]),
   ]);
 
-  // DatedLboResult with its nullable members null (sizing only) and populated (a
+  // LboResult with its nullable members null (sizing only) and populated (a
   // funded deal that runs a check suite).
   const datedRequest = (commitment, checks) => ({
-    ...PARITY_INPUTS.dated_lbo_request,
-    funding: { ...PARITY_INPUTS.dated_lbo_request.funding, sponsor_commitment: commitment },
+    ...PARITY_INPUTS.lbo_request,
+    funding: { ...PARITY_INPUTS.lbo_request.funding, sponsor_commitment: commitment },
     checks,
   });
-  const sizedLbo = statements_analytics.evaluateDatedLbo(
-    PARITY_INPUTS.dated_lbo_model,
+  const sizedLbo = statements_analytics.evaluateLbo(
+    PARITY_INPUTS.lbo_model,
     datedRequest(null, null)
   );
-  const fundedLbo = statements_analytics.evaluateDatedLbo(
-    PARITY_INPUTS.dated_lbo_model,
+  const fundedLbo = statements_analytics.evaluateLbo(
+    PARITY_INPUTS.lbo_model,
     datedRequest(
       { amount: '320', currency: 'USD' },
-      { suite: { kind: 'spec', spec: PARITY_INPUTS.dated_lbo_check_suite }, required: true }
+      { suite: { kind: 'spec', spec: PARITY_INPUTS.lbo_check_suite }, required: true }
     )
   );
   assert.equal(sizedLbo.exit.funded_moic, null);
   assert.equal(sizedLbo.checks, null);
   assert.equal(fundedLbo.exit.funded_moic, 2.125);
   assert.equal(fundedLbo.checks.outcome, 'pass');
-  declarations.push(['dated_lbo_sized', 'types.statements_analytics.DatedLboResult', sizedLbo]);
-  declarations.push(['dated_lbo_funded', 'types.statements_analytics.DatedLboResult', fundedLbo]);
+  declarations.push(['lbo_sized', 'types.statements_analytics.LboResult', sizedLbo]);
+  declarations.push(['lbo_funded', 'types.statements_analytics.LboResult', fundedLbo]);
   // The request with each arm of its check-suite choice.
   declarations.push([
-    'dated_lbo_request_spec',
-    'types.statements_analytics.DatedLboRequest',
+    'lbo_request_spec',
+    'types.statements_analytics.LboRequest',
     datedRequest(null, {
-      suite: { kind: 'spec', spec: PARITY_INPUTS.dated_lbo_check_suite },
+      suite: { kind: 'spec', spec: PARITY_INPUTS.lbo_check_suite },
       required: true,
     }),
   ]);
   declarations.push([
-    'dated_lbo_request_lbo',
-    'types.statements_analytics.DatedLboRequest',
-    PARITY_INPUTS.dated_lbo_checked_request,
+    'lbo_request_lbo',
+    'types.statements_analytics.LboRequest',
+    PARITY_INPUTS.lbo_checked_request,
   ]);
   // DcfSensitivityResult, with its nullable `terminal_growth_up` both null and populated.
   const tornado = (terminalValue, options) =>

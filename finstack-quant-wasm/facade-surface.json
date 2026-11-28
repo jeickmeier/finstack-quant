@@ -4242,10 +4242,10 @@
       "evaluateCorporateDcf",
       "evaluateCovenants",
       "evaluateCreditContext",
-      "evaluateDatedLbo",
       "evaluateDcf",
       "evaluateDcfFromResults",
       "evaluateDcfMonteCarlo",
+      "evaluateLbo",
       "evaluateScenarioSet",
       "evaluateScenarioSetWithMarket",
       "explainFormula",
@@ -4344,7 +4344,7 @@
   "statements_analytics.dcfSensitivity": {
     "kind": "function"
   },
-  "statements_analytics.evaluateDatedLbo": {
+  "statements_analytics.evaluateLbo": {
     "kind": "function"
   },
   "statements_analytics.wacc": {

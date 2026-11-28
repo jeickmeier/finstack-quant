@@ -1890,24 +1890,6 @@ export const importHarnesses = {
       name: "contract-credit-assessment",
       modules: modules.length,
     })),
-  "contract-dated-lbo-request": () =>
-    Promise.all([
-      import("@/lib/finstack/generated/schemas/dated_lbo_request.json"),
-      import("@/lib/finstack/generated/types/dated_lbo_request"),
-      import("@/lib/finstack/generated/meta/dated_lbo_request"),
-    ]).then((modules) => ({
-      name: "contract-dated-lbo-request",
-      modules: modules.length,
-    })),
-  "contract-dated-lbo-result": () =>
-    Promise.all([
-      import("@/lib/finstack/generated/schemas/dated_lbo_result.json"),
-      import("@/lib/finstack/generated/types/dated_lbo_result"),
-      import("@/lib/finstack/generated/meta/dated_lbo_result"),
-    ]).then((modules) => ({
-      name: "contract-dated-lbo-result",
-      modules: modules.length,
-    })),
   "contract-dcf-options": () =>
     Promise.all([
       import("@/lib/finstack/generated/schemas/dcf_options.json"),
@@ -1933,6 +1915,24 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/forecast_metrics"),
     ]).then((modules) => ({
       name: "contract-forecast-metrics",
+      modules: modules.length,
+    })),
+  "contract-lbo-request": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/lbo_request.json"),
+      import("@/lib/finstack/generated/types/lbo_request"),
+      import("@/lib/finstack/generated/meta/lbo_request"),
+    ]).then((modules) => ({
+      name: "contract-lbo-request",
+      modules: modules.length,
+    })),
+  "contract-lbo-result": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/lbo_result.json"),
+      import("@/lib/finstack/generated/types/lbo_result"),
+      import("@/lib/finstack/generated/meta/lbo_result"),
+    ]).then((modules) => ({
+      name: "contract-lbo-result",
       modules: modules.length,
     })),
   "contract-relative-value-report-config": () =>

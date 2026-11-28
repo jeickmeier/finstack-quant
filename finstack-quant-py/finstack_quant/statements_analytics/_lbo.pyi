@@ -298,14 +298,14 @@ class LboFunding:
         """Return the reconstruction callable and native JSON arguments for pickle."""
         ...
 
-class DatedLboRequest:
+class LboRequest:
     """Point-in-time assumptions for an acquisition and projected exit.
 
     Examples
     --------
-    >>> from finstack_quant.statements_analytics import DatedLboRequest
+    >>> from finstack_quant.statements_analytics import LboRequest
     >>> from finstack_quant.core.money import Money
-    >>> from finstack_quant.statements_analytics import DatedLboRequest, LboDebtFunding, LboEarnings
+    >>> from finstack_quant.statements_analytics import LboRequest, LboDebtFunding, LboEarnings
     >>> from finstack_quant.statements_analytics import LboFunding, StatementValuationCut
     >>> close, exit_valuation_date = "2025-12-31", "2026-12-31"
     >>> def usd(n):
@@ -318,7 +318,7 @@ class DatedLboRequest:
     ...     debt=[LboDebtFunding(name="term", cash_proceeds=usd(500), opening_face=usd(520))],
     ...     sponsor_commitment=usd(320),
     ... )
-    >>> request = DatedLboRequest(
+    >>> request = LboRequest(
     ...     cut=StatementValuationCut(close, close, "USD"),
     ...     exit_valuation_date=exit_valuation_date,
     ...     entry=LboEarnings(node="ebitda", period="2025", multiple="8", basis="as_observed"),
@@ -327,7 +327,7 @@ class DatedLboRequest:
     ...     exit_debt_node="debt",
     ...     exit_cash_node="cash",
     ... )
-    >>> isinstance(request, DatedLboRequest)
+    >>> isinstance(request, LboRequest)
     True
     """
     def __init__(
@@ -397,8 +397,8 @@ class DatedLboRequest:
         ...
 
     @staticmethod
-    def from_json(json: str) -> DatedLboRequest:
-        """Rebuild the native DatedLboRequest from its JSON record.
+    def from_json(json: str) -> LboRequest:
+        """Rebuild the native LboRequest from its JSON record.
 
         Parameters
         ----------
@@ -407,7 +407,7 @@ class DatedLboRequest:
 
         Returns
         -------
-        DatedLboRequest
+        LboRequest
             Decoded native value.
 
         Raises
@@ -417,9 +417,9 @@ class DatedLboRequest:
 
         Examples
         --------
-        >>> from finstack_quant.statements_analytics import DatedLboRequest
+        >>> from finstack_quant.statements_analytics import LboRequest
         >>> try:
-        ...     DatedLboRequest.from_json("null")
+        ...     LboRequest.from_json("null")
         ... except ValueError:
         ...     print("A record is required")
         A record is required
@@ -619,13 +619,13 @@ class LboExitBridge:
         """
         ...
 
-class DatedLboResult:
+class LboResult:
     """Dated LBO investment and exit evidence.
 
     Examples
     --------
-    >>> from finstack_quant.statements_analytics import DatedLboResult
-    >>> hasattr(DatedLboResult, "funding")
+    >>> from finstack_quant.statements_analytics import LboResult
+    >>> hasattr(LboResult, "funding")
     True
     """
 
@@ -763,7 +763,7 @@ class DatedLboResult:
         str
             JSON holding the run's provenance, both dates, the entry and exit
             earnings and values, the funding reconciliation, the exit bridge
-            and the check report. It is the object WASM ``evaluateDatedLbo``
+            and the check report. It is the object WASM ``evaluateLbo``
             returns.
 
         Raises
@@ -774,7 +774,7 @@ class DatedLboResult:
         ...
 
     @staticmethod
-    def from_json(json: str) -> DatedLboResult:
+    def from_json(json: str) -> LboResult:
         """Rebuild a dated LBO result from its JSON record.
 
         Parameters
@@ -784,7 +784,7 @@ class DatedLboResult:
 
         Returns
         -------
-        DatedLboResult
+        LboResult
             Decoded result. Nothing is recomputed.
 
         Raises
@@ -794,9 +794,9 @@ class DatedLboResult:
 
         Examples
         --------
-        >>> from finstack_quant.statements_analytics import DatedLboResult
+        >>> from finstack_quant.statements_analytics import LboResult
         >>> try:
-        ...     DatedLboResult.from_json("null")
+        ...     LboResult.from_json("null")
         ... except ValueError:
         ...     print("A record is required")
         A record is required
@@ -807,25 +807,25 @@ class DatedLboResult:
         """Return the reconstruction callable and native JSON arguments for pickle."""
         ...
 
-def evaluate_dated_lbo(
+def evaluate_lbo(
     model: FinancialModelSpec,
-    request: DatedLboRequest,
+    request: LboRequest,
     market: MarketContext | None = None,
-) -> DatedLboResult:
+) -> LboResult:
     """Reconcile dated acquisition funding and calculate projected sponsor returns.
 
     Parameters
     ----------
     model : FinancialModelSpec
         Identified statement model containing approved actual and projected periods.
-    request : DatedLboRequest
+    request : LboRequest
         Closing terms and exit assumptions in one transaction currency.
     market : MarketContext or None
         Market data required by linked capital observations. None uses no market data.
 
     Returns
     -------
-    DatedLboResult
+    LboResult
         Reconciled funding and only the sponsor multiples supported by the transaction.
 
     Raises
@@ -835,9 +835,9 @@ def evaluate_dated_lbo(
 
     Examples
     --------
-    >>> from finstack_quant.statements_analytics import evaluate_dated_lbo
+    >>> from finstack_quant.statements_analytics import evaluate_lbo
     >>> from finstack_quant.core.money import Money
-    >>> from finstack_quant.statements_analytics import DatedLboRequest, LboDebtFunding, LboEarnings
+    >>> from finstack_quant.statements_analytics import LboRequest, LboDebtFunding, LboEarnings
     >>> from finstack_quant.statements_analytics import LboFunding, StatementValuationCut
     >>> close, exit_valuation_date = "2025-12-31", "2026-12-31"
     >>> def usd(n):
@@ -850,7 +850,7 @@ def evaluate_dated_lbo(
     ...     debt=[LboDebtFunding(name="term", cash_proceeds=usd(500), opening_face=usd(520))],
     ...     sponsor_commitment=usd(320),
     ... )
-    >>> request = DatedLboRequest(
+    >>> request = LboRequest(
     ...     cut=StatementValuationCut(close, close, "USD"),
     ...     exit_valuation_date=exit_valuation_date,
     ...     entry=LboEarnings(node="ebitda", period="2025", multiple="8", basis="as_observed"),
@@ -866,7 +866,7 @@ def evaluate_dated_lbo(
     >>> _ = builder.availability_dates("ebitda", [("2025", close)])
     >>> _ = builder.value_money("debt", [("2026", usd(440))])
     >>> _ = builder.value_money("cash", [("2026", usd(40))])
-    >>> evaluate_dated_lbo(builder.build(), request).exit.funded_moic
+    >>> evaluate_lbo(builder.build(), request).exit.funded_moic
     2.125
     """
     ...

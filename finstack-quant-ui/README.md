@@ -578,12 +578,12 @@ Use as WACC button sets the form's WACC field, through the form's optional
 passes the returned number on the user's click only, never after an edit since
 the rate was calculated, and valuing stays the form's own action. The native
 fixture is `tests/statements/wacc/cases.json`.
-`useEvaluateLbo` (`use-evaluate-lbo`) passes the model and `DatedLboRequest`
-JSON to `statements_analytics.evaluateDatedLbo`. The Valuation tab's
+`useEvaluateLbo` (`use-evaluate-lbo`) passes the model and `LboRequest`
+JSON to `statements_analytics.evaluateLbo`. The Valuation tab's
 `LboReport` edits the request with a schema form over the generated
-`dated_lbo_request` contract (string node fields as id-comboboxes; checked
+`lbo_request` contract (string node fields as id-comboboxes; checked
 structurally and validated by Rust on evaluation, as there is no standalone
-`DatedLboRequest` parse) and shows the returned funding reconciliation, exit
+`LboRequest` parse) and shows the returned funding reconciliation, exit
 bridge, sized and funded MOIC, statement run and check report. Rust needs a
 model with a source snapshot and an actual entry period whose observations
 are available by the entry date; it returns its refusal otherwise, and the

@@ -23,7 +23,7 @@ export const statements_analytics = {
   backtestForecast: wasm.backtestForecast,
   generateTornadoEntries: wasm.generateTornadoEntries,
   dcfSensitivity: wasm.dcfSensitivity,
-  evaluateDatedLbo: wasm.evaluateDatedLbo,
+  evaluateLbo: wasm.evaluateLbo,
   wacc: wasm.wacc,
   goalSeek: wasm.goalSeek,
   goalSeekSpec: wasm.goalSeekSpec,

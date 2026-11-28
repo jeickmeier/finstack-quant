@@ -4769,72 +4769,6 @@
       }
     },
     {
-      "name": "contract-dated-lbo-request",
-      "type": "registry:lib",
-      "title": "Dated lbo request contract",
-      "description": "Generated schema, wire types and metadata for the canonical Rust dated_lbo_request contract. Validation is structural; native validation remains required.",
-      "files": [
-        {
-          "path": "src/generated/schemas/dated_lbo_request.json",
-          "type": "registry:file",
-          "target": "lib/finstack/generated/schemas/dated_lbo_request.json"
-        },
-        {
-          "path": "src/generated/types/dated_lbo_request.ts",
-          "type": "registry:file",
-          "target": "lib/finstack/generated/types/dated_lbo_request.ts"
-        },
-        {
-          "path": "src/generated/meta/dated_lbo_request.ts",
-          "type": "registry:file",
-          "target": "lib/finstack/generated/meta/dated_lbo_request.ts"
-        }
-      ],
-      "registryDependencies": [],
-      "dependencies": [],
-      "categories": [],
-      "meta": {
-        "version": "0.2.0",
-        "wasmVersion": "0.11.0",
-        "schemaIds": [
-          "https://finstack_quant.dev/schemas/statements_analytics/1/dated_lbo_request.schema.json"
-        ]
-      }
-    },
-    {
-      "name": "contract-dated-lbo-result",
-      "type": "registry:lib",
-      "title": "Dated lbo result contract",
-      "description": "Generated schema, wire types and metadata for the canonical Rust dated_lbo_result contract. Validation is structural; native validation remains required.",
-      "files": [
-        {
-          "path": "src/generated/schemas/dated_lbo_result.json",
-          "type": "registry:file",
-          "target": "lib/finstack/generated/schemas/dated_lbo_result.json"
-        },
-        {
-          "path": "src/generated/types/dated_lbo_result.ts",
-          "type": "registry:file",
-          "target": "lib/finstack/generated/types/dated_lbo_result.ts"
-        },
-        {
-          "path": "src/generated/meta/dated_lbo_result.ts",
-          "type": "registry:file",
-          "target": "lib/finstack/generated/meta/dated_lbo_result.ts"
-        }
-      ],
-      "registryDependencies": [],
-      "dependencies": [],
-      "categories": [],
-      "meta": {
-        "version": "0.2.0",
-        "wasmVersion": "0.11.0",
-        "schemaIds": [
-          "https://finstack_quant.dev/schemas/statements_analytics/1/dated_lbo_result.schema.json"
-        ]
-      }
-    },
-    {
       "name": "contract-dcf-options",
       "type": "registry:lib",
       "title": "Dcf options contract",
@@ -4930,6 +4864,72 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/statements_analytics/1/forecast_metrics.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-lbo-request",
+      "type": "registry:lib",
+      "title": "Lbo request contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust lbo_request contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/lbo_request.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/lbo_request.json"
+        },
+        {
+          "path": "src/generated/types/lbo_request.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/lbo_request.ts"
+        },
+        {
+          "path": "src/generated/meta/lbo_request.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/lbo_request.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_request.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-lbo-result",
+      "type": "registry:lib",
+      "title": "Lbo result contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust lbo_result contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/lbo_result.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/lbo_result.json"
+        },
+        {
+          "path": "src/generated/types/lbo_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/lbo_result.ts"
+        },
+        {
+          "path": "src/generated/meta/lbo_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/lbo_result.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json"
         ]
       }
     },

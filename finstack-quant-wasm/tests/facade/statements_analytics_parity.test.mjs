@@ -54,15 +54,15 @@ function evaluatedCapitalStructure() {
 }
 
 /** The shared dated buyout, with an optional sponsor commitment (USD) and exit multiple. */
-function datedLbo(commitment, exitMultiple) {
-  const request = structuredClone(INPUTS.dated_lbo_request);
+function lbo(commitment, exitMultiple) {
+  const request = structuredClone(INPUTS.lbo_request);
   if (commitment !== undefined) {
     request.funding.sponsor_commitment = { amount: commitment, currency: 'USD' };
   }
   if (exitMultiple !== undefined) {
     request.exit.multiple = exitMultiple;
   }
-  return sa.evaluateDatedLbo(INPUTS.dated_lbo_model, request);
+  return sa.evaluateLbo(INPUTS.lbo_model, request);
 }
 
 const valueOf = (model, node, period) =>
@@ -237,17 +237,14 @@ test('statements_analytics matches the cross-host golden', () => {
     // The record's worked example (STATEMENTS-ANALYTICS-VALUATION-03): uses 820, debt
     // proceeds 500, required sponsor cash 320. Sizing only, a 300 commitment (a 20 gap), a
     // 320 commitment (funded, 2.125x), and a 3x exit whose negative residual is floored.
-    dated_lbo: {
-      sized: datedLbo(),
-      short: datedLbo('300'),
-      funded: datedLbo('320'),
-      insolvent: datedLbo('320', '3'),
+    lbo: {
+      sized: lbo(),
+      short: lbo('300'),
+      funded: lbo('320'),
+      insolvent: lbo('320', '3'),
       // The LBO model check suite run by the dated request, on a dated variant of the
       // model the retired evaluator's check golden used.
-      checked: sa.evaluateDatedLbo(
-        INPUTS.dated_lbo_checked_model,
-        INPUTS.dated_lbo_checked_request
-      ),
+      checked: sa.evaluateLbo(INPUTS.lbo_checked_model, INPUTS.lbo_checked_request),
     },
     capital_structure_summary: {
       full_year: sa.capitalStructureSummary(capitalStructure.results, capitalStructure.model, {

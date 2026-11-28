@@ -110,9 +110,9 @@ export function ValuationPanel({
           <h3 className="text-base font-medium">Leveraged buyout</h3>
           <p className="text-sm text-muted-foreground">
             Evaluates a dated sponsor buyout of the model natively
-            (statements_analytics.evaluateDatedLbo) from the transaction
-            request. The model needs a source snapshot and an actual entry
-            period whose observations are available by the entry date.
+            (statements_analytics.evaluateLbo) from the transaction request. The
+            model needs a source snapshot and an actual entry period whose
+            observations are available by the entry date.
           </p>
         </div>
         <LboReport

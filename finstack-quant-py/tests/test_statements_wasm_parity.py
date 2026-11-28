@@ -292,16 +292,16 @@ def analytics_cases() -> dict[str, Any]:
 
     samples: list[list[float]] = INPUTS["comps_samples"]
     dcf_spec = st.FinancialModelSpec.from_json(json.dumps(INPUTS["dcf_model"]))
-    dated_lbo_model = st.FinancialModelSpec.from_json(json.dumps(INPUTS["dated_lbo_model"]))
+    lbo_model = st.FinancialModelSpec.from_json(json.dumps(INPUTS["lbo_model"]))
 
-    def dated_lbo(commitment: str | None = None, exit_multiple: str | None = None) -> Any:
+    def lbo(commitment: str | None = None, exit_multiple: str | None = None) -> Any:
         """The shared dated buyout, with an optional sponsor commitment (USD) and exit multiple."""
-        request = json.loads(json.dumps(INPUTS["dated_lbo_request"]))
+        request = json.loads(json.dumps(INPUTS["lbo_request"]))
         if commitment is not None:
             request["funding"]["sponsor_commitment"] = {"amount": commitment, "currency": "USD"}
         if exit_multiple is not None:
             request["exit"]["multiple"] = exit_multiple
-        return doc(sa.evaluate_dated_lbo(dated_lbo_model, sa.DatedLboRequest.from_json(json.dumps(request))))
+        return doc(sa.evaluate_lbo(lbo_model, sa.LboRequest.from_json(json.dumps(request))))
 
     scenario_set = sa.ScenarioSet.from_json(json.dumps(INPUTS["scenario_set"]))
     scenario_results = sa.evaluate_scenario_set(MODEL, scenario_set)
@@ -404,17 +404,17 @@ def analytics_cases() -> dict[str, Any]:
         # The record's worked example (STATEMENTS-ANALYTICS-VALUATION-03): uses 820, debt proceeds 500,
         # required sponsor cash 320. Sizing only, a 300 commitment (a 20 gap), a 320 commitment
         # (funded, 2.125x), and a 3x exit whose negative residual is floored to zero proceeds.
-        "dated_lbo": {
-            "sized": dated_lbo(),
-            "short": dated_lbo(commitment="300"),
-            "funded": dated_lbo(commitment="320"),
-            "insolvent": dated_lbo(commitment="320", exit_multiple="3"),
+        "lbo": {
+            "sized": lbo(),
+            "short": lbo(commitment="300"),
+            "funded": lbo(commitment="320"),
+            "insolvent": lbo(commitment="320", exit_multiple="3"),
             # The LBO model check suite (three-statement and credit checks) run by the dated
             # request, on a dated variant of the model the retired evaluator's check golden used.
             "checked": doc(
-                sa.evaluate_dated_lbo(
-                    st.FinancialModelSpec.from_json(json.dumps(INPUTS["dated_lbo_checked_model"])),
-                    sa.DatedLboRequest.from_json(json.dumps(INPUTS["dated_lbo_checked_request"])),
+                sa.evaluate_lbo(
+                    st.FinancialModelSpec.from_json(json.dumps(INPUTS["lbo_checked_model"])),
+                    sa.LboRequest.from_json(json.dumps(INPUTS["lbo_checked_request"])),
                 )
             ),
         },

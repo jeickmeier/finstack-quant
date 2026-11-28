@@ -6,10 +6,10 @@ import {
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { EvaluateLboRequest } from "@/workers/finstack-contract";
 export type {
-  DatedLboResult,
+  LboResult,
   EvaluateLboRequest,
 } from "@/workers/finstack-contract";
-/** Snapshot the model and DatedLboRequest JSON. Null disables the evaluation. */
+/** Snapshot the model and LboRequest JSON. Null disables the evaluation. */
 export function evaluateLboOptions(
   client: FinstackClient | null,
   session: number,
@@ -24,7 +24,7 @@ export function evaluateLboOptions(
     queryFn: (ready) => ready.call("evaluateLbo", snapshot!),
   });
 }
-/** Native statements_analytics.evaluateDatedLbo DatedLboResult or structured failure. */
+/** Native statements_analytics.evaluateLbo LboResult or structured failure. */
 export function useEvaluateLbo(request: EvaluateLboRequest | null) {
   return useWorkerQuery((worker) =>
     evaluateLboOptions(worker.client, worker.session, request),

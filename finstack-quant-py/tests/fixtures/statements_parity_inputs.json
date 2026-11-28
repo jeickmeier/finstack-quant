@@ -1430,7 +1430,7 @@
     },
     "schema_version": 1
   },
-  "dated_lbo_model": {
+  "lbo_model": {
     "id": "dated-buyout",
     "periods": {
       "calendar": "gregorian",
@@ -1565,7 +1565,7 @@
     },
     "schema_version": 1
   },
-  "dated_lbo_request": {
+  "lbo_request": {
     "cut": {
       "as_of": "2025-12-31",
       "observed_through": "2025-12-31",
@@ -1628,7 +1628,7 @@
     "exit_claims_node": null,
     "checks": null
   },
-  "dated_lbo_check_suite": {
+  "lbo_check_suite": {
     "name": "lbo",
     "builtin_checks": [],
     "formula_checks": [
@@ -1645,7 +1645,7 @@
       }
     ]
   },
-  "dated_lbo_checked_model": {
+  "lbo_checked_model": {
     "id": "dated-lbo-checked",
     "schema_version": 1,
     "meta": {
@@ -1806,7 +1806,7 @@
     },
     "source_snapshot": "lbo-parity-2025Q1"
   },
-  "dated_lbo_checked_request": {
+  "lbo_checked_request": {
     "cut": {
       "as_of": "2025-03-31",
       "observed_through": "2025-03-31",

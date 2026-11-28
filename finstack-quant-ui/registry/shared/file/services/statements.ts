@@ -34,7 +34,7 @@ export type StatementsNative = {
     | "plSummaryReport"
     | "evaluateDcf"
     | "dcfSensitivity"
-    | "evaluateDatedLbo"
+    | "evaluateLbo"
     | "capitalStructureSummary"
     | "relativeValueReport"
     | "runSensitivity"
@@ -251,7 +251,7 @@ export function createStatementsService(
     },
     evaluateLbo(request) {
       return context.result(() =>
-        native.statements_analytics.evaluateDatedLbo(
+        native.statements_analytics.evaluateLbo(
           request.modelJson,
           request.requestJson,
         ),

@@ -10196,7 +10196,7 @@ export interface StatementsAnalyticsNamespace {
    * @returns Reconciled sources and uses, signed exit bridge and any supportable sponsor returns.
    * @throws If dates, dates of observation, monetary inputs, source data or required checks are invalid.
    */
-  readonly evaluateDatedLbo: typeof wasm.evaluateDatedLbo;
+  readonly evaluateLbo: typeof wasm.evaluateLbo;
   /**
    * Compute weighted-average cost of capital (WACC) using exact capital weights.
    *

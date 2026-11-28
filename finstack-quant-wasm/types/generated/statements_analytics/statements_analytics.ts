@@ -733,50 +733,6 @@ export type CreditScoringModel =
       model: "zmijewski";
     };
 /**
- * The check suite a dated LBO runs on its own statement result.
- */
-export type LboCheckSuite =
-  | {
-      kind: "spec";
-      /**
-       * Built-in and formula checks to resolve and run.
-       */
-      spec: CheckSuiteSpec;
-    }
-  | {
-      kind: "lbo";
-      /**
-       * Node mappings the two merged suites read.
-       */
-      mappings: LboCheckMappings;
-    };
-/**
- * How a matched earnings observation is read.
- */
-export type LboEarningsBasis = "as_observed" | "trailing_additive";
-/**
- * Economic form of the seller consideration at close.
- */
-export type LboAcquisition =
-  | {
-      kind: "cash_free_debt_free";
-    }
-  | {
-      /**
-       * Cash contributed to transaction reserves at close.
-       */
-      closing_reserves: Money;
-      kind: "seller_and_refinancing";
-      /**
-       * Cash required at close to refinance resolved obligations.
-       */
-      refinancing: Money;
-      /**
-       * Agreed nonnegative purchase consideration paid to the seller.
-       */
-      seller_consideration: Money;
-    };
-/**
  * Supported day-count conventions with industry-standard definitions.
  *
  * Each variant implements a specific day count convention as defined by
@@ -1293,6 +1249,50 @@ export type ImpairedEclOutcome =
       weight: DecimalWire;
       status: "zero_weight";
     };
+/**
+ * Economic form of the seller consideration at close.
+ */
+export type LboAcquisition =
+  | {
+      kind: "cash_free_debt_free";
+    }
+  | {
+      /**
+       * Cash contributed to transaction reserves at close.
+       */
+      closing_reserves: Money;
+      kind: "seller_and_refinancing";
+      /**
+       * Cash required at close to refinance resolved obligations.
+       */
+      refinancing: Money;
+      /**
+       * Agreed nonnegative purchase consideration paid to the seller.
+       */
+      seller_consideration: Money;
+    };
+/**
+ * The check suite a dated LBO runs on its own statement result.
+ */
+export type LboCheckSuite =
+  | {
+      kind: "spec";
+      /**
+       * Built-in and formula checks to resolve and run.
+       */
+      spec: CheckSuiteSpec;
+    }
+  | {
+      kind: "lbo";
+      /**
+       * Node mappings the two merged suites read.
+       */
+      mappings: LboCheckMappings;
+    };
+/**
+ * How a matched earnings observation is read.
+ */
+export type LboEarningsBasis = "as_observed" | "trailing_additive";
 /**
  * Convention that determines how `growth_rate` compounds in a lease.
  *
@@ -3826,381 +3826,6 @@ export interface CurvePctParams {
   start?: number | null;
 }
 /**
- * Acquisition and exit dates, recognized funding and projected exit assumptions.
- */
-export interface DatedLboRequest {
-  /**
-   * Optional report and decision policy for statement checks.
-   */
-  checks?: LboQualification | null;
-  /**
-   * Valuation date, reporting currency and entry observation cut.
-   */
-  cut: StatementValuationCut;
-  /**
-   * Earnings basis and matching purchase multiple on the entry date.
-   */
-  entry: LboEarnings;
-  /**
-   * Projected earnings basis and exit multiple at the elected exit date.
-   */
-  exit: LboEarnings;
-  /**
-   * Exact projected cash node eligible in the exit equity bridge.
-   */
-  exit_cash_node: string;
-  /**
-   * Exact projected non-debt claims or selling costs payable ahead of equity.
-   */
-  exit_claims_node?: string | null;
-  /**
-   * Exact projected closing debt node, measured as financing face.
-   */
-  exit_debt_node: string;
-  /**
-   * Exit date in the verified projected statement.
-   */
-  exit_valuation_date: DateWire;
-  /**
-   * Date, actual closing uses and named admissible cash sources.
-   */
-  funding: LboFunding;
-}
-/**
- * Optional statement check suite and its effect on the LBO qualification.
- */
-export interface LboQualification {
-  /**
-   * Require a passing suite before publishing a funded return.
-   */
-  required: boolean;
-  /**
-   * Checks run on the same statement result used for the transaction.
-   */
-  suite: LboCheckSuite;
-}
-/**
- * Node-id mappings from which the LBO model check suite is built.
- *
- * The suite runs against the same evaluated statement results used for the
- * transaction arithmetic, so the report and the returns describe one
- * evaluation.
- */
-export interface LboCheckMappings {
-  /**
-   * Credit node mapping used for the leverage and coverage checks.
-   */
-  credit: CreditMapping;
-  /**
-   * Three-statement node mapping (balance sheet, income statement, cash flow).
-   */
-  three_statement: ThreeStatementMapping;
-}
-/**
- * Maps node IDs for a three-statement financial model (income statement,
- * balance sheet, cash flow statement).
- *
- * Required nodes must always be populated. Optional nodes (`Option<NodeId>`)
- * enable additional checks when present; the suite factory will skip the
- * corresponding check when the node is `None`. Unknown JSON keys are
- * rejected, so a misspelled optional key fails instead of silently
- * disabling its check.
- */
-export interface ThreeStatementMapping {
-  /**
-   * Total-assets nodes (balance sheet).
-   */
-  assets_nodes: Id[];
-  /**
-   * Capital expenditures node (cash flow statement).
-   */
-  capex_node?: Id | null;
-  /**
-   * Cash / cash-equivalents node (balance sheet).
-   */
-  cash_node: Id;
-  /**
-   * Cash from financing node (cash flow statement).
-   */
-  cff_node?: Id | null;
-  /**
-   * Cash from investing node (cash flow statement).
-   */
-  cfi_node?: Id | null;
-  /**
-   * Cash from operations node (cash flow statement).
-   */
-  cfo_node?: Id | null;
-  /**
-   * Comparison and reporting policy of the suite. Identities are compared
-   * exactly unless a tolerance is stated here.
-   */
-  config?: CheckConfig;
-  /**
-   * Capital-structure interest node; when present the interest
-   * reconciliation compares against it directly instead of testing an
-   * implied rate.
-   */
-  cs_interest_node?: Id | null;
-  /**
-   * Current-asset nodes summed into net working capital.
-   */
-  current_assets_nodes?: Id[];
-  /**
-   * Current-liability nodes summed into net working capital.
-   */
-  current_liabilities_nodes?: Id[];
-  /**
-   * Debt-balance / optional-rate pairs used to test the implied interest
-   * rate against `interest_expense_node`.
-   */
-  debt_balance_nodes?: [Id, Id | null][];
-  /**
-   * Depreciation / amortization expense node (income statement).
-   */
-  depreciation_node?: Id | null;
-  /**
-   * Dividends charged against equity (balance sheet / equity roll-forward);
-   * enables the dividend reconciliation together with `dividends_node`.
-   */
-  dividends_equity_node?: Id | null;
-  /**
-   * Dividends paid node (cash flow statement / financing).
-   */
-  dividends_node?: Id | null;
-  /**
-   * Total-equity nodes (balance sheet).
-   */
-  equity_nodes: Id[];
-  /**
-   * Intangible-asset additions node; enables the capex reconciliation
-   * together with `capex_node`.
-   */
-  intangible_additions_node?: Id | null;
-  /**
-   * Interest expense node (income statement).
-   */
-  interest_expense_node?: Id | null;
-  /**
-   * Total-liabilities nodes (balance sheet).
-   */
-  liabilities_nodes: Id[];
-  /**
-   * Net income node (income statement).
-   */
-  net_income_node: Id;
-  /**
-   * Opening cash at the start of the model's first period. The cash
-   * roll-forward runs only when it and `total_cf_node` are both given.
-   */
-  opening_cash?: DatedOpening | null;
-  /**
-   * Opening retained earnings at the start of the model's first period.
-   * The retained-earnings reconciliation runs only when it is given.
-   */
-  opening_retained_earnings?: DatedOpening | null;
-  /**
-   * PP&E additions node; enables the capex reconciliation together with
-   * `capex_node`.
-   */
-  ppe_additions_node?: Id | null;
-  /**
-   * PP&E balance node (balance sheet).
-   */
-  ppe_node?: Id | null;
-  /**
-   * Pre-tax income node (income statement).
-   */
-  pretax_income_node?: Id | null;
-  /**
-   * Retained earnings node (balance sheet).
-   */
-  retained_earnings_node: Id;
-  /**
-   * Income tax expense node (income statement).
-   */
-  tax_expense_node?: Id | null;
-  /**
-   * Total cash flow node (cash flow statement).
-   */
-  total_cf_node?: Id | null;
-  /**
-   * Change-in-working-capital node (cash flow statement, operating).
-   */
-  wc_change_cf_node?: Id | null;
-}
-/**
- * Authored earnings observation and timing for one transaction multiple.
- */
-export interface LboEarnings {
-  /**
-   * Earnings dimension matched to the multiple's convention.
-   */
-  basis: LboEarningsBasis;
-  /**
-   * Price divided by earnings, in positive multiple turns.
-   */
-  multiple: DecimalWire;
-  /**
-   * Exact node name supplying the elected earnings amount in transaction currency.
-   */
-  node: string;
-  /**
-   * Existing statement period containing the closing observation.
-   */
-  period: PeriodId;
-}
-/**
- * Dated transaction funding assumptions authored on one currency basis.
- */
-export interface LboFunding {
-  /**
-   * Purchase consideration and refinancing election.
-   */
-  acquisition: LboAcquisition;
-  /**
-   * Separate nonnegative credit against otherwise required closing uses.
-   */
-  closing_credits: Money;
-  /**
-   * Effective investment and refinancing date.
-   */
-  date: DateWire;
-  /**
-   * Admitted cash debt sources and their separately identified opening face.
-   */
-  debt: LboDebtFunding[];
-  /**
-   * Actual sponsor cash committed at entry, or absent for a sizing case.
-   */
-  sponsor_commitment?: Money | null;
-  /**
-   * Nonnegative adviser, financing, and transaction expenses paid at close.
-   */
-  transaction_fees: Money;
-}
-/**
- * Cash proceeds and opening contractual face of one named debt source.
- */
-export interface LboDebtFunding {
-  /**
-   * Actual cash proceeds credited at closing, in transaction currency.
-   */
-  cash_proceeds: Money;
-  /**
-   * Unique identity matching the source debt instrument.
-   */
-  name: string;
-  /**
-   * Contractual face outstanding immediately after closing.
-   */
-  opening_face: Money;
-}
-/**
- * Reconciled sources and uses and qualified sponsor returns.
- */
-export interface DatedLboResult {
-  /**
-   * Verdict and evidence from the elected statement checks.
-   */
-  checks?: CheckReport | null;
-  /**
-   * Effective closing date used for the initial funding bridge.
-   */
-  entry_date: DateWire;
-  /**
-   * Resolved reported entry earnings in the transaction currency.
-   */
-  entry_earnings: Money;
-  /**
-   * Entry enterprise value from the elected purchase multiple.
-   */
-  entry_enterprise_value: Money;
-  /**
-   * Signed exit residual and applicable sponsor returns.
-   */
-  exit: LboExitBridge;
-  /**
-   * Projected earnings in the same currency.
-   */
-  exit_earnings: Money;
-  /**
-   * Projected exit date used for the common-equity bridge.
-   */
-  exit_valuation_date: DateWire;
-  /**
-   * Reconciled initial uses, cash proceeds, opening face and funding gap.
-   */
-  funding: LboFundingResult;
-  /**
-   * Accepted statement run for all financial inputs and checks.
-   */
-  run: RunProvenance;
-}
-/**
- * Dated and reconciled sponsor economics on the same numeraire as entry.
- */
-export interface LboExitBridge {
-  /**
-   * Enterprise value less debt and claims, before the equity option floor.
-   */
-  common_equity_residual: Money;
-  /**
-   * Enterprise value at the elected exit date.
-   */
-  enterprise_value: Money;
-  /**
-   * Proceeds over actual cash only when the commitment reconciles the uses.
-   */
-  funded_moic?: number | null;
-  /**
-   * Debt less admitted cash at exit, which may be negative.
-   */
-  net_debt: Money;
-  /**
-   * Other signed claims deducted ahead of common equity.
-   */
-  other_claims: Money;
-  /**
-   * Proceeds over implied required cash, when required cash is positive.
-   */
-  sized_moic?: number | null;
-  /**
-   * Common equity distribution floored at zero.
-   */
-  sponsor_proceeds: Money;
-}
-/**
- * Reconciled signed funding residual and its separately reported cash and face.
- */
-export interface LboFundingResult {
-  /**
-   * Total transaction cash uses after separately authored credits.
-   */
-  cash_uses: Money;
-  /**
-   * Total explicitly committed cash sources when a sponsor commitment is supplied.
-   */
-  committed_cash_sources?: Money | null;
-  /**
-   * Cash proceeds from all admitted debt sources.
-   */
-  debt_cash_proceeds: Money;
-  /**
-   * Uses less committed cash sources. A positive amount is a shortage.
-   */
-  funding_gap?: Money | null;
-  /**
-   * Contractual face outstanding at entry, separate from proceeds.
-   */
-  opening_debt_face: Money;
-  /**
-   * Uses less debt cash proceeds, before applying sponsor cash.
-   */
-  required_sponsor_cash: Money;
-  [k: string]: unknown;
-}
-/**
  * Coherent repriced Monte Carlo enterprise and equity values by path and quantile.
  */
 export interface DcfDistributionResult {
@@ -5583,6 +5208,381 @@ export interface InterestExpenseReconciliation {
    */
   tolerance_pct?: number | null;
   [k: string]: unknown;
+}
+/**
+ * Node-id mappings from which the LBO model check suite is built.
+ *
+ * The suite runs against the same evaluated statement results used for the
+ * transaction arithmetic, so the report and the returns describe one
+ * evaluation.
+ */
+export interface LboCheckMappings {
+  /**
+   * Credit node mapping used for the leverage and coverage checks.
+   */
+  credit: CreditMapping;
+  /**
+   * Three-statement node mapping (balance sheet, income statement, cash flow).
+   */
+  three_statement: ThreeStatementMapping;
+}
+/**
+ * Maps node IDs for a three-statement financial model (income statement,
+ * balance sheet, cash flow statement).
+ *
+ * Required nodes must always be populated. Optional nodes (`Option<NodeId>`)
+ * enable additional checks when present; the suite factory will skip the
+ * corresponding check when the node is `None`. Unknown JSON keys are
+ * rejected, so a misspelled optional key fails instead of silently
+ * disabling its check.
+ */
+export interface ThreeStatementMapping {
+  /**
+   * Total-assets nodes (balance sheet).
+   */
+  assets_nodes: Id[];
+  /**
+   * Capital expenditures node (cash flow statement).
+   */
+  capex_node?: Id | null;
+  /**
+   * Cash / cash-equivalents node (balance sheet).
+   */
+  cash_node: Id;
+  /**
+   * Cash from financing node (cash flow statement).
+   */
+  cff_node?: Id | null;
+  /**
+   * Cash from investing node (cash flow statement).
+   */
+  cfi_node?: Id | null;
+  /**
+   * Cash from operations node (cash flow statement).
+   */
+  cfo_node?: Id | null;
+  /**
+   * Comparison and reporting policy of the suite. Identities are compared
+   * exactly unless a tolerance is stated here.
+   */
+  config?: CheckConfig;
+  /**
+   * Capital-structure interest node; when present the interest
+   * reconciliation compares against it directly instead of testing an
+   * implied rate.
+   */
+  cs_interest_node?: Id | null;
+  /**
+   * Current-asset nodes summed into net working capital.
+   */
+  current_assets_nodes?: Id[];
+  /**
+   * Current-liability nodes summed into net working capital.
+   */
+  current_liabilities_nodes?: Id[];
+  /**
+   * Debt-balance / optional-rate pairs used to test the implied interest
+   * rate against `interest_expense_node`.
+   */
+  debt_balance_nodes?: [Id, Id | null][];
+  /**
+   * Depreciation / amortization expense node (income statement).
+   */
+  depreciation_node?: Id | null;
+  /**
+   * Dividends charged against equity (balance sheet / equity roll-forward);
+   * enables the dividend reconciliation together with `dividends_node`.
+   */
+  dividends_equity_node?: Id | null;
+  /**
+   * Dividends paid node (cash flow statement / financing).
+   */
+  dividends_node?: Id | null;
+  /**
+   * Total-equity nodes (balance sheet).
+   */
+  equity_nodes: Id[];
+  /**
+   * Intangible-asset additions node; enables the capex reconciliation
+   * together with `capex_node`.
+   */
+  intangible_additions_node?: Id | null;
+  /**
+   * Interest expense node (income statement).
+   */
+  interest_expense_node?: Id | null;
+  /**
+   * Total-liabilities nodes (balance sheet).
+   */
+  liabilities_nodes: Id[];
+  /**
+   * Net income node (income statement).
+   */
+  net_income_node: Id;
+  /**
+   * Opening cash at the start of the model's first period. The cash
+   * roll-forward runs only when it and `total_cf_node` are both given.
+   */
+  opening_cash?: DatedOpening | null;
+  /**
+   * Opening retained earnings at the start of the model's first period.
+   * The retained-earnings reconciliation runs only when it is given.
+   */
+  opening_retained_earnings?: DatedOpening | null;
+  /**
+   * PP&E additions node; enables the capex reconciliation together with
+   * `capex_node`.
+   */
+  ppe_additions_node?: Id | null;
+  /**
+   * PP&E balance node (balance sheet).
+   */
+  ppe_node?: Id | null;
+  /**
+   * Pre-tax income node (income statement).
+   */
+  pretax_income_node?: Id | null;
+  /**
+   * Retained earnings node (balance sheet).
+   */
+  retained_earnings_node: Id;
+  /**
+   * Income tax expense node (income statement).
+   */
+  tax_expense_node?: Id | null;
+  /**
+   * Total cash flow node (cash flow statement).
+   */
+  total_cf_node?: Id | null;
+  /**
+   * Change-in-working-capital node (cash flow statement, operating).
+   */
+  wc_change_cf_node?: Id | null;
+}
+/**
+ * Actual closing proceeds and contractual opening face.
+ */
+export interface LboDebtFunding {
+  /**
+   * Actual cash proceeds credited at closing, in transaction currency.
+   */
+  cash_proceeds: Money;
+  /**
+   * Unique identity matching the source debt instrument.
+   */
+  name: string;
+  /**
+   * Contractual face outstanding immediately after closing.
+   */
+  opening_face: Money;
+}
+/**
+ * Matched earnings basis and purchase or exit multiple.
+ */
+export interface LboEarnings {
+  /**
+   * Earnings dimension matched to the multiple's convention.
+   */
+  basis: LboEarningsBasis;
+  /**
+   * Price divided by earnings, in positive multiple turns.
+   */
+  multiple: DecimalWire;
+  /**
+   * Exact node name supplying the elected earnings amount in transaction currency.
+   */
+  node: string;
+  /**
+   * Existing statement period containing the closing observation.
+   */
+  period: PeriodId;
+}
+/**
+ * Signed exit equity and available sized and funded returns.
+ */
+export interface LboExitBridge {
+  /**
+   * Enterprise value less debt and claims, before the equity option floor.
+   */
+  common_equity_residual: Money;
+  /**
+   * Enterprise value at the elected exit date.
+   */
+  enterprise_value: Money;
+  /**
+   * Proceeds over actual cash only when the commitment reconciles the uses.
+   */
+  funded_moic?: number | null;
+  /**
+   * Debt less admitted cash at exit, which may be negative.
+   */
+  net_debt: Money;
+  /**
+   * Other signed claims deducted ahead of common equity.
+   */
+  other_claims: Money;
+  /**
+   * Proceeds over implied required cash, when required cash is positive.
+   */
+  sized_moic?: number | null;
+  /**
+   * Common equity distribution floored at zero.
+   */
+  sponsor_proceeds: Money;
+}
+/**
+ * Dated closing cash sources and uses.
+ */
+export interface LboFunding {
+  /**
+   * Purchase consideration and refinancing election.
+   */
+  acquisition: LboAcquisition;
+  /**
+   * Separate nonnegative credit against otherwise required closing uses.
+   */
+  closing_credits: Money;
+  /**
+   * Effective investment and refinancing date.
+   */
+  date: DateWire;
+  /**
+   * Admitted cash debt sources and their separately identified opening face.
+   */
+  debt: LboDebtFunding[];
+  /**
+   * Actual sponsor cash committed at entry, or absent for a sizing case.
+   */
+  sponsor_commitment?: Money | null;
+  /**
+   * Nonnegative adviser, financing, and transaction expenses paid at close.
+   */
+  transaction_fees: Money;
+}
+/**
+ * Reconciled funding gap and identified debt proportions.
+ */
+export interface LboFundingResult {
+  /**
+   * Total transaction cash uses after separately authored credits.
+   */
+  cash_uses: Money;
+  /**
+   * Total explicitly committed cash sources when a sponsor commitment is supplied.
+   */
+  committed_cash_sources?: Money | null;
+  /**
+   * Cash proceeds from all admitted debt sources.
+   */
+  debt_cash_proceeds: Money;
+  /**
+   * Uses less committed cash sources. A positive amount is a shortage.
+   */
+  funding_gap?: Money | null;
+  /**
+   * Contractual face outstanding at entry, separate from proceeds.
+   */
+  opening_debt_face: Money;
+  /**
+   * Uses less debt cash proceeds, before applying sponsor cash.
+   */
+  required_sponsor_cash: Money;
+  [k: string]: unknown;
+}
+/**
+ * Optional statement check suite and its effect on the LBO qualification.
+ */
+export interface LboQualification {
+  /**
+   * Require a passing suite before publishing a funded return.
+   */
+  required: boolean;
+  /**
+   * Checks run on the same statement result used for the transaction.
+   */
+  suite: LboCheckSuite;
+}
+/**
+ * Acquisition and exit dates, recognized funding and projected exit assumptions.
+ */
+export interface LboRequest {
+  /**
+   * Optional report and decision policy for statement checks.
+   */
+  checks?: LboQualification | null;
+  /**
+   * Valuation date, reporting currency and entry observation cut.
+   */
+  cut: StatementValuationCut;
+  /**
+   * Earnings basis and matching purchase multiple on the entry date.
+   */
+  entry: LboEarnings;
+  /**
+   * Projected earnings basis and exit multiple at the elected exit date.
+   */
+  exit: LboEarnings;
+  /**
+   * Exact projected cash node eligible in the exit equity bridge.
+   */
+  exit_cash_node: string;
+  /**
+   * Exact projected non-debt claims or selling costs payable ahead of equity.
+   */
+  exit_claims_node?: string | null;
+  /**
+   * Exact projected closing debt node, measured as financing face.
+   */
+  exit_debt_node: string;
+  /**
+   * Exit date in the verified projected statement.
+   */
+  exit_valuation_date: DateWire;
+  /**
+   * Date, actual closing uses and named admissible cash sources.
+   */
+  funding: LboFunding;
+}
+/**
+ * Reconciled sources and uses and qualified sponsor returns.
+ */
+export interface LboResult {
+  /**
+   * Verdict and evidence from the elected statement checks.
+   */
+  checks?: CheckReport | null;
+  /**
+   * Effective closing date used for the initial funding bridge.
+   */
+  entry_date: DateWire;
+  /**
+   * Resolved reported entry earnings in the transaction currency.
+   */
+  entry_earnings: Money;
+  /**
+   * Entry enterprise value from the elected purchase multiple.
+   */
+  entry_enterprise_value: Money;
+  /**
+   * Signed exit residual and applicable sponsor returns.
+   */
+  exit: LboExitBridge;
+  /**
+   * Projected earnings in the same currency.
+   */
+  exit_earnings: Money;
+  /**
+   * Projected exit date used for the common-equity bridge.
+   */
+  exit_valuation_date: DateWire;
+  /**
+   * Reconciled initial uses, cash proceeds, opening face and funding gap.
+   */
+  funding: LboFundingResult;
+  /**
+   * Accepted statement run for all financial inputs and checks.
+   */
+  run: RunProvenance;
 }
 /**
  * Richer lease spec for rent roll generation: - rent steps (explicit bumps) - arbitrary free-rent windows - optional renewal with downtime + probability

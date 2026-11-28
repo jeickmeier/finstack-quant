@@ -5,7 +5,7 @@ import { LboReport } from "@/components/finstack/statements/components/lbo-repor
 import data from "../data.json";
 import { statementLbo, statementLboRequest } from "../fixtures";
 
-// Captured native statements_analytics.evaluateDatedLbo of the analyst model
+// Captured native statements_analytics.evaluateLbo of the analyst model
 // under an illustrative dated transaction; this item needs no worker. Entry
 // is the last actual quarter, and the exit bridge nets total_debt against cash.
 const result = statementLbo;

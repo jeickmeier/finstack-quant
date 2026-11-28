@@ -140,7 +140,7 @@ beforeEach(() => {
           arg.optionsJson,
         );
       case "evaluateLbo":
-        return native.evaluateDatedLbo(arg.modelJson, arg.requestJson);
+        return native.evaluateLbo(arg.modelJson, arg.requestJson);
       case "capitalStructureSummary":
         return native.capitalStructureSummary(
           arg.resultJson,

@@ -52,11 +52,11 @@ dcf_sensitivity = _sa.dcf_sensitivity
 LboEarnings = _sa.LboEarnings
 LboDebtFunding = _sa.LboDebtFunding
 LboFunding = _sa.LboFunding
-DatedLboRequest = _sa.DatedLboRequest
+LboRequest = _sa.LboRequest
 LboFundingResult = _sa.LboFundingResult
 LboExitBridge = _sa.LboExitBridge
-DatedLboResult = _sa.DatedLboResult
-evaluate_dated_lbo = _sa.evaluate_dated_lbo
+LboResult = _sa.LboResult
+evaluate_lbo = _sa.evaluate_lbo
 WaccInputs = _sa.WaccInputs
 wacc = _sa.wacc
 run_corporate_analysis = _sa.run_corporate_analysis
@@ -218,8 +218,6 @@ __all__: list[str] = [
     "CreditMeasureRow",
     "CreditScorecardExtension",
     "CreditScoringModel",
-    "DatedLboRequest",
-    "DatedLboResult",
     "DcfDistributionResult",
     "DcfInputs",
     "DcfOptions",
@@ -251,6 +249,8 @@ __all__: list[str] = [
     "LboExitBridge",
     "LboFunding",
     "LboFundingResult",
+    "LboRequest",
+    "LboResult",
     "LeaseGrowthConvention",
     "LeaseSpec",
     "ManagementFeeBase",
@@ -326,10 +326,10 @@ __all__: list[str] = [
     "evaluate_corporate_dcf",
     "evaluate_covenants",
     "evaluate_credit_context",
-    "evaluate_dated_lbo",
     "evaluate_dcf",
     "evaluate_dcf_from_results",
     "evaluate_dcf_monte_carlo",
+    "evaluate_lbo",
     "evaluate_scenario_set",
     "evaluate_scenario_set_with_market",
     "explain_formula",

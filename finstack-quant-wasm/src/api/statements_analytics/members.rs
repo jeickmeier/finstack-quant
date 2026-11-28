@@ -643,20 +643,18 @@ pub fn evaluate_dcf_monte_carlo(
 /// @param market - Market data for any instruments linked to statement observations.
 /// @returns Reconciled sources and uses, signed exit bridge and any supportable sponsor returns.
 /// @throws If dates, dates of observation, monetary inputs, source data or required checks are invalid.
-#[wasm_bindgen(js_name = evaluateDatedLbo, unchecked_return_type = "generated.statements_analytics.DatedLboResult")]
-pub fn evaluate_dated_lbo(
+#[wasm_bindgen(js_name = evaluateLbo, unchecked_return_type = "generated.statements_analytics.LboResult")]
+pub fn evaluate_lbo(
     #[wasm_bindgen(unchecked_param_type = "generated.statements.FinancialModelSpec | string")]
     model: JsValue,
-    #[wasm_bindgen(
-        unchecked_param_type = "generated.statements_analytics.DatedLboRequest | string"
-    )]
+    #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.LboRequest | string")]
     request: JsValue,
     #[wasm_bindgen(unchecked_optional_param_type = "JsonInput | null")] market: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let model = crate::api::statements::load_model(&model, "model")?;
     let request = from_js_json(&request, "request")?;
     let market = crate::utils::wire::js_opt_wire(market.as_ref(), "market")?;
-    to_js_value(&fa::evaluate_dated_lbo(&model, &request, market.as_ref()).map_err(to_js_err)?)
+    to_js_value(&fa::evaluate_lbo(&model, &request, market.as_ref()).map_err(to_js_err)?)
 }
 
 /// Measure qualified same-currency credit ratios for one borrowing in a dated statement run.

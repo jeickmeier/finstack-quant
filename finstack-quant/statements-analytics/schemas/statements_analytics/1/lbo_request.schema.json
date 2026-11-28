@@ -2119,7 +2119,7 @@
       "type": "object"
     }
   },
-  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dated_lbo_request.schema.json",
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_request.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Acquisition and exit dates, recognized funding and projected exit assumptions.",
@@ -2180,6 +2180,6 @@
     "exit_debt_node",
     "exit_cash_node"
   ],
-  "title": "DatedLboRequest",
+  "title": "LboRequest",
   "type": "object"
 }

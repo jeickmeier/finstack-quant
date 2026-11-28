@@ -99,7 +99,7 @@ a submodule.
 | Area | Key exports |
 |------|-------------|
 | Valuation | `CorporateAnalysisBuilder`, `CorporateAnalysis`, `CorporateValuationResult`, `DcfPeriodRow`, `evaluate_dcf`, `DcfOptions`, `dcf_sensitivity`, `DcfSensitivityResult`, `ExitMultipleBump`, `wacc` |
-| LBO | `evaluate_dated_lbo`, `DatedLboRequest`, `DatedLboResult`, `LboFunding`, `LboDebtFunding`, `LboAcquisition`, `LboEarnings`, `LboEarningsBasis`, `LboQualification`, `LboCheckSuite`, `LboCheckMappings`, `LboFundingResult`, `LboExitBridge` |
+| LBO | `evaluate_lbo`, `LboRequest`, `LboResult`, `LboFunding`, `LboDebtFunding`, `LboAcquisition`, `LboEarnings`, `LboEarningsBasis`, `LboQualification`, `LboCheckSuite`, `LboCheckMappings`, `LboFundingResult`, `LboExitBridge` |
 | Scenarios | `ScenarioSet`, `ScenarioDefinition`, `ScenarioResults`, `ScenarioDiff` |
 | Sensitivity | `run_sensitivity`, `SensitivityConfig`, `SensitivityMode`, `SensitivityResult`, `ParameterSpec`, `TornadoEntry`, `generate_tornado_entries` |
 | Variance | `run_variance`, `variance_bridge`, `VarianceConfig`, `VarianceReport`, `VarianceRow`, `BridgeChart`, `BridgeStep` |
@@ -257,7 +257,7 @@ are in [INVARIANTS.md](../../INVARIANTS.md).
   `runVariance`, `evaluateScenarioSet`, `evaluateScenarioSetWithMarket`,
   `backtestForecast`,
   `generateTornadoEntries`, `goalSeek`, `evaluateDcf`, `dcfSensitivity`,
-  `evaluateDatedLbo`, `runCorporateAnalysis`, `wacc`, `scenarioDiff`,
+  `evaluateLbo`, `runCorporateAnalysis`, `wacc`, `scenarioDiff`,
   `varianceBridge`, `explainFormula`, the `DependencyTracer`,
   `CorkscrewExtension` and `CreditScorecardExtension` classes, the ECL entry
   points (`classifyStage`, `computeEcl`, `computeEclWeighted`), the `add*`

@@ -16,8 +16,8 @@ import captured from "../../src/fixtures/statements/analyst-lbo.json";
 import checkReport from "../../src/fixtures/statements/analyst-check-report.json";
 import { LboReport } from "@/components/finstack/statements/components/lbo-report/lbo-report";
 import { evaluateLboOptions } from "@/hooks/statements/use-evaluate-lbo/use-evaluate-lbo";
-import type { DatedLboRequestWire } from "@/lib/finstack/generated/types/dated_lbo_request";
-import type { DatedLboResultWire } from "@/lib/finstack/generated/types/dated_lbo_result";
+import type { LboRequestWire } from "@/lib/finstack/generated/types/lbo_request";
+import type { LboResultWire } from "@/lib/finstack/generated/types/lbo_result";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import {
   unwrap,
@@ -36,8 +36,8 @@ const modelJson: string = native.validateFinancialModelJson(
   JSON.stringify(model),
 );
 const requestJson = JSON.stringify(request);
-const defaultRequest = request as unknown as DatedLboRequestWire;
-const result = captured as unknown as DatedLboResultWire;
+const defaultRequest = request as unknown as LboRequestWire;
+const result = captured as unknown as LboResultWire;
 let harness: Awaited<ReturnType<typeof startWorker>>;
 beforeAll(async () => {
   harness = await startWorker();
@@ -71,7 +71,7 @@ it(
     try {
       const returned = await query.fetchQuery(options);
       expect(serializeHost(returned)).toBe(
-        serializeHost(native.evaluateDatedLbo(modelJson, requestJson)),
+        serializeHost(native.evaluateLbo(modelJson, requestJson)),
       );
       // The captured gallery fixture is this same native result.
       expect(JSON.parse(serializeHost(returned))).toEqual(captured);
@@ -242,7 +242,7 @@ it("shows a returned check report, returns Rust withholds and native errors", ()
           funding_gap: null,
         },
         exit: { ...result.exit, funded_moic: null },
-        checks: checkReport as unknown as DatedLboResultWire["checks"],
+        checks: checkReport as unknown as LboResultWire["checks"],
       }}
     />,
   );

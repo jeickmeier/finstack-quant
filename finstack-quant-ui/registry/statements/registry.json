@@ -424,8 +424,8 @@
       "name": "lbo-report",
       "type": "registry:component",
       "title": "LBO report",
-      "description": "Edits a Rust DatedLboRequest with the generated schema form and displays the native statements_analytics dated LBO result: the funding reconciliation, the exit bridge, the sized and funded MOIC, the statement run and the optional check report.",
-      "docs": "Edit a DatedLboRequest with the schema form over the generated dated_lbo_request contract, every string node field as an id-combobox over the supplied model node ids. The facade has no standalone DatedLboRequest parse, so the request is checked structurally here and validated by Rust (unknown keys included) when it is evaluated; Evaluate LBO passes the JSON to the caller (usually the useEvaluateLbo request). The native DatedLboResult (statements_analytics.evaluateDatedLbo) is shown as returned: required sponsor cash, sponsor proceeds and the sized and funded MOIC tiles, the sources and uses (cash uses, debt proceeds and face, required sponsor cash, committed sources and the funding gap), the entry and exit dates, earnings and enterprise values with the exit net debt, other claims, signed residual and floored sponsor proceeds, the statement run the figures come from, and the statement-check-report when the request elects a check suite. A value Rust does not report (a funded MOIC with an open funding gap, the commitment figures of a sizing-only request) is shown as undefined. Rust needs a model with a source snapshot and an actual entry period whose observations are available by the entry date, and returns its refusal otherwise. Returns are MOIC only: IRR is not part of the native result. Nothing is calculated. Accepts defaultRequest, nodeIds, onSubmit, result, loading, error, formatValue and density props.",
+      "description": "Edits a Rust LboRequest with the generated schema form and displays the native statements_analytics dated LBO result: the funding reconciliation, the exit bridge, the sized and funded MOIC, the statement run and the optional check report.",
+      "docs": "Edit an LboRequest with the schema form over the generated lbo_request contract, every string node field as an id-combobox over the supplied model node ids. The facade has no standalone LboRequest parse, so the request is checked structurally here and validated by Rust (unknown keys included) when it is evaluated; Evaluate LBO passes the JSON to the caller (usually the useEvaluateLbo request). The native LboResult (statements_analytics.evaluateLbo) is shown as returned: required sponsor cash, sponsor proceeds and the sized and funded MOIC tiles, the sources and uses (cash uses, debt proceeds and face, required sponsor cash, committed sources and the funding gap), the entry and exit dates, earnings and enterprise values with the exit net debt, other claims, signed residual and floored sponsor proceeds, the statement run the figures come from, and the statement-check-report when the request elects a check suite. A value Rust does not report (a funded MOIC with an open funding gap, the commitment figures of a sizing-only request) is shown as undefined. Rust needs a model with a source snapshot and an actual entry period whose observations are available by the entry date, and returns its refusal otherwise. Returns are MOIC only: IRR is not part of the native result. Nothing is calculated. Accepts defaultRequest, nodeIds, onSubmit, result, loading, error, formatValue and density props.",
       "files": [
         {
           "path": "components/lbo-report/lbo-report.tsx",
@@ -446,8 +446,8 @@
         "@finstack/id-combobox",
         "@finstack/money-value",
         "@finstack/statement-check-report",
-        "@finstack/contract-dated-lbo-request",
-        "@finstack/contract-dated-lbo-result",
+        "@finstack/contract-lbo-request",
+        "@finstack/contract-lbo-result",
         "@finstack/finstack-codec",
         "@finstack/native-display"
       ],
@@ -460,8 +460,8 @@
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
-          "https://finstack_quant.dev/schemas/statements_analytics/1/dated_lbo_request.schema.json",
-          "https://finstack_quant.dev/schemas/statements_analytics/1/dated_lbo_result.schema.json"
+          "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_request.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json"
         ]
       }
     },
@@ -1440,7 +1440,7 @@
       "type": "registry:hook",
       "title": "useEvaluateLbo",
       "description": "Evaluates a leveraged buyout of a statement model natively through the WASM worker.",
-      "docs": "Native statements_analytics.evaluateDatedLbo of the model under the supplied DatedLboRequest JSON: the funding reconciliation with the required sponsor cash and any funding gap, the exit bridge with its signed residual and floored sponsor proceeds, the sized and funded MOIC, the statement run and, when the request elects a check suite, its report. Keyed by the complete immutable request and worker session; null disables the query. Native errors are returned unchanged.",
+      "docs": "Native statements_analytics.evaluateLbo of the model under the supplied LboRequest JSON: the funding reconciliation with the required sponsor cash and any funding gap, the exit bridge with its signed residual and floored sponsor proceeds, the sized and funded MOIC, the statement run and, when the request elects a check suite, its report. Keyed by the complete immutable request and worker session; null disables the query. Native errors are returned unchanged.",
       "files": [
         {
           "path": "hooks/use-evaluate-lbo/use-evaluate-lbo.ts",
@@ -1839,11 +1839,11 @@
           "https://finstack_quant.dev/schemas/statements_analytics/1/capital_structure_summary.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/capital_structure_summary_config.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/credit_assessment.schema.json",
-          "https://finstack_quant.dev/schemas/statements_analytics/1/dated_lbo_request.schema.json",
-          "https://finstack_quant.dev/schemas/statements_analytics/1/dated_lbo_result.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_options.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_result.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/forecast_metrics.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_request.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json",

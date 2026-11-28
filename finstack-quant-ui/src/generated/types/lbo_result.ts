@@ -41,39 +41,39 @@
  * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
  * safely share and clone IDs with minimal synchronization overhead.
  */
-export type D_6D938877195398B35Adb = string;
+export type D_0A9D916A9Dc49D94Bba5 = string;
 /**
  * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
  */
-export type D_8D4Faebbece266F05634 = string;
+export type DEba0E2D64A45982E3F3A = string;
 
 /**
  * Reconciled sources and uses and qualified sponsor returns.
  */
-export interface DatedLboResultWire {
+export interface LboResultWire {
   /**
    * Verdict and evidence from the elected statement checks.
    */
-  checks?: DB1A3C01Aac500Ed9B346 | null;
+  checks?: D_69Ed1D0Fd3Aee296Bce5 | null;
   /**
    * Effective closing date used for the initial funding bridge.
    */
   entry_date: string;
-  entry_earnings: D_3Abdbaf60C7Fe57B7Aea1;
-  entry_enterprise_value: D_3Abdbaf60C7Fe57B7Aea2;
-  exit: D_4B1F9Bb9Bc88F942A7F4;
-  exit_earnings: D_3Abdbaf60C7Fe57B7Aea8;
+  entry_earnings: DF0101272Ae2F9A75933D1;
+  entry_enterprise_value: DF0101272Ae2F9A75933D2;
+  exit: DA14F8298C0C4B21A1Ec6;
+  exit_earnings: DF0101272Ae2F9A75933D8;
   /**
    * Projected exit date used for the common-equity bridge.
    */
   exit_valuation_date: string;
-  funding: DC5067A4Bcfd83A6C2114;
-  run: D_3095931Cc64A56823Dff;
+  funding: DE8Db082867Bc51Eb8A40;
+  run: DD773306Ae7610F4082A7;
 }
 /**
  * Full report aggregating all [`CheckResult`]s from a check run.
  */
-export interface DB1A3C01Aac500Ed9B346 {
+export interface D_69Ed1D0Fd3Aee296Bce5 {
   /**
    * Verdict of the suite from the unfiltered check outcomes: `fail` when
    * any check failed, else `incomplete` when any check is incomplete,
@@ -84,14 +84,14 @@ export interface DB1A3C01Aac500Ed9B346 {
   /**
    * Individual results for each check, in declared order.
    */
-  results: D_93C16F623B8A2F7Ada90[];
-  summary: D_69Ae4D1Fc40A39A5E33A;
+  results: DA64E478Bd80B60331435[];
+  summary: D_8Cf6A34771F30E7523Cf;
   [k: string]: unknown;
 }
 /**
  * Outcome of a single check execution.
  */
-export interface D_93C16F623B8A2F7Ada90 {
+export interface DA64E478Bd80B60331435 {
   /**
    * Category this check belongs to.
    */
@@ -118,7 +118,7 @@ export interface D_93C16F623B8A2F7Ada90 {
    * checks that do not compare two numbers, for periods a check skipped,
    * and for reports serialized before this field existed.
    */
-  comparisons?: DD38Aacf3B146998C3670[];
+  comparisons?: DE423Eb660D927A5Db922[];
   /**
    * Number of periods or cells the check examined.
    */
@@ -128,7 +128,7 @@ export interface D_93C16F623B8A2F7Ada90 {
    * `materiality_threshold` filters remove advisory findings only: an
    * error-severity or coverage finding is always retained.
    */
-  findings: D_7D0E8457B7F2610D95Cf[];
+  findings: DAb7Ac1A2678059460E09[];
   /**
    * Verdict of the check, decided from all of its findings before the
    * suite's reporting filters: `fail` on an error-severity finding, else
@@ -151,19 +151,19 @@ export interface D_93C16F623B8A2F7Ada90 {
  * check computed (an exact sum for money), not a difference of the two
  * recorded sides; `tolerance` is an absolute amount in the same units.
  */
-export interface DD38Aacf3B146998C3670 {
+export interface DE423Eb660D927A5Db922 {
   /**
    * Observed (left-hand) value, in the compared nodes' units.
    */
-  actual: D_3Abdbaf60C7Fe57B7Aea | number;
+  actual: DF0101272Ae2F9A75933D | number;
   /**
    * Signed residual `actual - expected`, in the same units.
    */
-  difference: D_3Abdbaf60C7Fe57B7Aea | number;
+  difference: DF0101272Ae2F9A75933D | number;
   /**
    * Value the identity requires (right-hand side), in the same units.
    */
-  expected: D_3Abdbaf60C7Fe57B7Aea | number;
+  expected: DF0101272Ae2F9A75933D | number;
   /**
    * Stable snake_case name of the identity that was tested (for example
    * `"balance_sheet_articulation"` or `"cash_flow_components"`); a check
@@ -180,13 +180,13 @@ export interface DD38Aacf3B146998C3670 {
    * configured, otherwise
    * `max(default_tolerance, default_relative_tolerance * |reference|)`.
    */
-  tolerance: D_3Abdbaf60C7Fe57B7Aea | number;
+  tolerance: DF0101272Ae2F9A75933D | number;
   [k: string]: unknown;
 }
 /**
  * Currency-aware amount
  */
-export interface D_3Abdbaf60C7Fe57B7Aea {
+export interface DF0101272Ae2F9A75933D {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -363,7 +363,7 @@ export interface D_3Abdbaf60C7Fe57B7Aea {
 /**
  * A single finding produced by a check for a specific period or node.
  */
-export interface D_7D0E8457B7F2610D95Cf {
+export interface DAb7Ac1A2678059460E09 {
   /**
    * Identifier of the check that produced this finding.
    */
@@ -375,7 +375,7 @@ export interface D_7D0E8457B7F2610D95Cf {
    * warnings, and formula checks without a tolerance (a formula check
    * with a tolerance compares its value against zero).
    */
-  comparison?: DD38Aacf3B146998C3670 | null;
+  comparison?: DE423Eb660D927A5Db922 | null;
   /**
    * True for a coverage finding: required data was missing or unavailable,
    * so the check could not evaluate the period or cell it names. A
@@ -386,7 +386,7 @@ export interface D_7D0E8457B7F2610D95Cf {
   /**
    * Materiality context, if applicable.
    */
-  materiality?: D_232Ab0B8697E8A8D3D1C | null;
+  materiality?: D_60E7F94Bf13Dea34E179 | null;
   /**
    * Human-readable description of the issue.
    */
@@ -394,7 +394,7 @@ export interface D_7D0E8457B7F2610D95Cf {
   /**
    * Node identifiers involved in the finding.
    */
-  nodes?: D_6D938877195398B35Adb[];
+  nodes?: D_0A9D916A9Dc49D94Bba5[];
   /**
    * Period the finding relates to, if applicable.
    */
@@ -409,7 +409,7 @@ export interface D_7D0E8457B7F2610D95Cf {
  * Materiality context attached to a finding, describing its quantitative
  * significance.
  */
-export interface D_232Ab0B8697E8A8D3D1C {
+export interface D_60E7F94Bf13Dea34E179 {
   /**
    * Absolute amount of the discrepancy.
    */
@@ -432,7 +432,7 @@ export interface D_232Ab0B8697E8A8D3D1C {
 /**
  * Aggregate summary.
  */
-export interface D_69Ae4D1Fc40A39A5E33A {
+export interface D_8Cf6A34771F30E7523Cf {
   /**
    * Total number of error-severity findings across all checks.
    */
@@ -470,7 +470,7 @@ export interface D_69Ae4D1Fc40A39A5E33A {
 /**
  * Resolved reported entry earnings in the transaction currency.
  */
-export interface D_3Abdbaf60C7Fe57B7Aea1 {
+export interface DF0101272Ae2F9A75933D1 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -647,7 +647,7 @@ export interface D_3Abdbaf60C7Fe57B7Aea1 {
 /**
  * Entry enterprise value from the elected purchase multiple.
  */
-export interface D_3Abdbaf60C7Fe57B7Aea2 {
+export interface DF0101272Ae2F9A75933D2 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -824,25 +824,25 @@ export interface D_3Abdbaf60C7Fe57B7Aea2 {
 /**
  * Signed exit residual and applicable sponsor returns.
  */
-export interface D_4B1F9Bb9Bc88F942A7F4 {
-  common_equity_residual: D_3Abdbaf60C7Fe57B7Aea3;
-  enterprise_value: D_3Abdbaf60C7Fe57B7Aea4;
+export interface DA14F8298C0C4B21A1Ec6 {
+  common_equity_residual: DF0101272Ae2F9A75933D3;
+  enterprise_value: DF0101272Ae2F9A75933D4;
   /**
    * Proceeds over actual cash only when the commitment reconciles the uses.
    */
   funded_moic?: number | null;
-  net_debt: D_3Abdbaf60C7Fe57B7Aea5;
-  other_claims: D_3Abdbaf60C7Fe57B7Aea6;
+  net_debt: DF0101272Ae2F9A75933D5;
+  other_claims: DF0101272Ae2F9A75933D6;
   /**
    * Proceeds over implied required cash, when required cash is positive.
    */
   sized_moic?: number | null;
-  sponsor_proceeds: D_3Abdbaf60C7Fe57B7Aea7;
+  sponsor_proceeds: DF0101272Ae2F9A75933D7;
 }
 /**
  * Enterprise value less debt and claims, before the equity option floor.
  */
-export interface D_3Abdbaf60C7Fe57B7Aea3 {
+export interface DF0101272Ae2F9A75933D3 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -1019,7 +1019,7 @@ export interface D_3Abdbaf60C7Fe57B7Aea3 {
 /**
  * Enterprise value at the elected exit date.
  */
-export interface D_3Abdbaf60C7Fe57B7Aea4 {
+export interface DF0101272Ae2F9A75933D4 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -1196,7 +1196,7 @@ export interface D_3Abdbaf60C7Fe57B7Aea4 {
 /**
  * Debt less admitted cash at exit, which may be negative.
  */
-export interface D_3Abdbaf60C7Fe57B7Aea5 {
+export interface DF0101272Ae2F9A75933D5 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -1373,7 +1373,7 @@ export interface D_3Abdbaf60C7Fe57B7Aea5 {
 /**
  * Other signed claims deducted ahead of common equity.
  */
-export interface D_3Abdbaf60C7Fe57B7Aea6 {
+export interface DF0101272Ae2F9A75933D6 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -1550,7 +1550,7 @@ export interface D_3Abdbaf60C7Fe57B7Aea6 {
 /**
  * Common equity distribution floored at zero.
  */
-export interface D_3Abdbaf60C7Fe57B7Aea7 {
+export interface DF0101272Ae2F9A75933D7 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -1727,7 +1727,7 @@ export interface D_3Abdbaf60C7Fe57B7Aea7 {
 /**
  * Projected earnings in the same currency.
  */
-export interface D_3Abdbaf60C7Fe57B7Aea8 {
+export interface DF0101272Ae2F9A75933D8 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -1904,25 +1904,25 @@ export interface D_3Abdbaf60C7Fe57B7Aea8 {
 /**
  * Reconciled initial uses, cash proceeds, opening face and funding gap.
  */
-export interface DC5067A4Bcfd83A6C2114 {
-  cash_uses: D_3Abdbaf60C7Fe57B7Aea9;
+export interface DE8Db082867Bc51Eb8A40 {
+  cash_uses: DF0101272Ae2F9A75933D9;
   /**
    * Total explicitly committed cash sources when a sponsor commitment is supplied.
    */
-  committed_cash_sources?: D_3Abdbaf60C7Fe57B7Aea10 | null;
-  debt_cash_proceeds: D_3Abdbaf60C7Fe57B7Aea11;
+  committed_cash_sources?: DF0101272Ae2F9A75933D10 | null;
+  debt_cash_proceeds: DF0101272Ae2F9A75933D11;
   /**
    * Uses less committed cash sources. A positive amount is a shortage.
    */
-  funding_gap?: D_3Abdbaf60C7Fe57B7Aea10 | null;
-  opening_debt_face: D_3Abdbaf60C7Fe57B7Aea12;
-  required_sponsor_cash: D_3Abdbaf60C7Fe57B7Aea13;
+  funding_gap?: DF0101272Ae2F9A75933D10 | null;
+  opening_debt_face: DF0101272Ae2F9A75933D12;
+  required_sponsor_cash: DF0101272Ae2F9A75933D13;
   [k: string]: unknown;
 }
 /**
  * Total transaction cash uses after separately authored credits.
  */
-export interface D_3Abdbaf60C7Fe57B7Aea9 {
+export interface DF0101272Ae2F9A75933D9 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -2114,7 +2114,7 @@ export interface D_3Abdbaf60C7Fe57B7Aea9 {
  * assert_eq!(notional.amount(), 1_000_000.0);
  * ```
  */
-export interface D_3Abdbaf60C7Fe57B7Aea10 {
+export interface DF0101272Ae2F9A75933D10 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -2306,7 +2306,7 @@ export interface D_3Abdbaf60C7Fe57B7Aea10 {
  * assert_eq!(notional.amount(), 1_000_000.0);
  * ```
  */
-export interface D_3Abdbaf60C7Fe57B7Aea11 {
+export interface DF0101272Ae2F9A75933D11 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -2498,7 +2498,7 @@ export interface D_3Abdbaf60C7Fe57B7Aea11 {
  * assert_eq!(notional.amount(), 1_000_000.0);
  * ```
  */
-export interface D_3Abdbaf60C7Fe57B7Aea12 {
+export interface DF0101272Ae2F9A75933D12 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -2690,7 +2690,7 @@ export interface D_3Abdbaf60C7Fe57B7Aea12 {
  * assert_eq!(notional.amount(), 1_000_000.0);
  * ```
  */
-export interface D_3Abdbaf60C7Fe57B7Aea13 {
+export interface DF0101272Ae2F9A75933D13 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -2867,12 +2867,12 @@ export interface D_3Abdbaf60C7Fe57B7Aea13 {
 /**
  * Accepted statement run for all financial inputs and checks.
  */
-export interface D_3095931Cc64A56823Dff {
+export interface DD773306Ae7610F4082A7 {
   /**
    * The random stream of every stochastic forecast node in a single run,
    * in model node order: enough to replay its draws.
    */
-  forecast_streams?: D_47F06D79C9B8B21C9B0A[];
+  forecast_streams?: DF09B55798F09062Eeec4[];
   /**
    * Canonical snapshot hash of the market held for an explicitly priced run.
    * Absent if the supplied provider cannot furnish a coherent capture.
@@ -2893,7 +2893,7 @@ export interface D_3095931Cc64A56823Dff {
   observation_cutoff:
     | "full_snapshot"
     | {
-        through: D_8D4Faebbece266F05634;
+        through: DEba0E2D64A45982E3F3A;
       };
   /**
    * Identity of this evaluation run: the canonical content hash of the
@@ -2908,7 +2908,7 @@ export interface D_3095931Cc64A56823Dff {
    * Valuation date the capital structure was priced at, when the run used
    * a market.
    */
-  valuation_date?: D_8D4Faebbece266F05634 | null;
+  valuation_date?: DEba0E2D64A45982E3F3A | null;
 }
 /**
  * Replay provenance of one stochastic forecast node in a single run.
@@ -2918,7 +2918,7 @@ export interface D_3095931Cc64A56823Dff {
  * versioned key: the key version, the configured seed, the node and the
  * single-run mode. Unsigned 64-bit values are decimal strings in JSON.
  */
-export interface D_47F06D79C9B8B21C9B0A {
+export interface DF09B55798F09062Eeec4 {
   /**
    * The stochastic forecast node.
    */

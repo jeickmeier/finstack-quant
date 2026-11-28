@@ -4,7 +4,7 @@ title: "Fundamental Valuation: DCF, Sensitivity, and Scenarios"
 description: "Value the shared borrower from native unlevered cash flow, connect scenario and terminal assumptions to equity value, and separate operating value from financing returns."
 desk_question: "What assumptions justify this equity price, and how much of the answer comes after the explicit forecast?"
 references: ["#koller-valuation", "#rosenbaum-pearl-2020"]
-api: ["finstack_quant.statements.Evaluator", "finstack_quant.statements.ModelBuilder", "finstack_quant.statements.ForecastSpec", "finstack_quant.statements_analytics.evaluate_dcf", "finstack_quant.statements_analytics.wacc", "finstack_quant.statements_analytics.dcf_sensitivity", "finstack_quant.statements_analytics.evaluate_scenario_set", "finstack_quant.statements_analytics.goal_seek", "finstack_quant.statements_analytics.evaluate_dated_lbo", "finstack_quant.statements_analytics.variance_bridge", "finstack_quant.reporting.charts.tornado_chart"]
+api: ["finstack_quant.statements.Evaluator", "finstack_quant.statements.ModelBuilder", "finstack_quant.statements.ForecastSpec", "finstack_quant.statements_analytics.evaluate_dcf", "finstack_quant.statements_analytics.wacc", "finstack_quant.statements_analytics.dcf_sensitivity", "finstack_quant.statements_analytics.evaluate_scenario_set", "finstack_quant.statements_analytics.goal_seek", "finstack_quant.statements_analytics.evaluate_lbo", "finstack_quant.statements_analytics.variance_bridge", "finstack_quant.reporting.charts.tornado_chart"]
 status: "published"
 ---
 
@@ -363,13 +363,13 @@ from finstack_quant.core.money import Money
 from finstack_quant.portfolio import mwr_xirr
 from finstack_quant.statements import ModelBuilder
 from finstack_quant.statements_analytics import (
-    DatedLboRequest,
     LboDebtFunding,
     LboEarnings,
     LboFunding,
+    LboRequest,
     StatementValuationCut,
     add_roll_forward_with_opening,
-    evaluate_dated_lbo,
+    evaluate_lbo,
 )
 
 ENTRY_DATE, EXIT_DATE = "2025-12-31", "2028-12-31"
@@ -409,9 +409,9 @@ def price_buyout(entry_multiple="8", exit_multiple="9", sponsor_commitment=None)
         debt=debt_sources,
         sponsor_commitment=sponsor_commitment,
     )
-    return evaluate_dated_lbo(
+    return evaluate_lbo(
         model,
-        DatedLboRequest(
+        LboRequest(
             cut=lbo_cut, exit_valuation_date=EXIT_DATE,
             entry=LboEarnings(node="ebitda", period="2025", multiple=entry_multiple, basis="as_observed"),
             funding=funding,

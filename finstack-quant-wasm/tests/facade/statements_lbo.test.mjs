@@ -1,10 +1,10 @@
 /**
- * The dated LBO evaluator on the WASM facade: the accepted worked example, its
+ * The LBO evaluator on the WASM facade: the accepted worked example, its
  * refusals and its required-check gate.
  *
- * The model and request are the shared cross-host inputs `dated_lbo_model` and
- * `dated_lbo_request`; the Python twin is
- * `finstack-quant-py/tests/test_statements_dated_lbo.py`. Entry at 8x on 100 of
+ * The model and request are the shared cross-host inputs `lbo_model` and
+ * `lbo_request`; the Python twin is
+ * `finstack-quant-py/tests/test_statements_lbo.py`. Entry at 8x on 100 of
  * EBITDA is 800; fees of 20 make uses 820; debt proceeds of 500 leave 320 of
  * sponsor cash. Exit at 9x on 120 is 1,080 against 400 of net debt.
  *
@@ -20,13 +20,13 @@ const { statements_analytics: sa } = facade;
 const usd = (amount) => ({ amount: String(amount), currency: 'USD' });
 
 function model(edit) {
-  const document = structuredClone(INPUTS.dated_lbo_model);
+  const document = structuredClone(INPUTS.lbo_model);
   edit?.(document);
   return document;
 }
 
 function request(edit) {
-  const document = structuredClone(INPUTS.dated_lbo_request);
+  const document = structuredClone(INPUTS.lbo_request);
   edit?.(document);
   return document;
 }
@@ -37,8 +37,8 @@ const commit = (amount) => (document) => {
 
 const amount = (money) => Number(money.amount);
 
-test('evaluateDatedLbo sizes the deal and withholds the funded return', () => {
-  const result = sa.evaluateDatedLbo(model(), request());
+test('evaluateLbo sizes the deal and withholds the funded return', () => {
+  const result = sa.evaluateLbo(model(), request());
   assert.equal(result.entry_date, '2025-12-31');
   assert.equal(result.exit_valuation_date, '2028-12-31');
   assert.equal(amount(result.entry_enterprise_value), 800);
@@ -57,16 +57,16 @@ test('evaluateDatedLbo sizes the deal and withholds the funded return', () => {
   assert.deepEqual(result.run.observation_cutoff, { through: '2025-12-31' });
 });
 
-test('evaluateDatedLbo reports a funding gap, a funded return and a floored exit', () => {
-  const short = sa.evaluateDatedLbo(model(), request(commit(300)));
+test('evaluateLbo reports a funding gap, a funded return and a floored exit', () => {
+  const short = sa.evaluateLbo(model(), request(commit(300)));
   assert.equal(amount(short.funding.funding_gap), 20);
   assert.equal(short.exit.funded_moic, null);
 
-  const funded = sa.evaluateDatedLbo(model(), request(commit(320)));
+  const funded = sa.evaluateLbo(model(), request(commit(320)));
   assert.equal(amount(funded.funding.funding_gap), 0);
   assert.equal(funded.exit.funded_moic, 2.125);
 
-  const distressed = sa.evaluateDatedLbo(
+  const distressed = sa.evaluateLbo(
     model(),
     request((document) => {
       commit(320)(document);
@@ -78,16 +78,13 @@ test('evaluateDatedLbo reports a funding gap, a funded return and a floored exit
   assert.equal(distressed.exit.funded_moic, 0);
 });
 
-test('evaluateDatedLbo takes the model and the request as objects or JSON text', () => {
-  const fromObjects = sa.evaluateDatedLbo(model(), request(commit(320)));
-  const fromText = sa.evaluateDatedLbo(
-    JSON.stringify(model()),
-    JSON.stringify(request(commit(320)))
-  );
+test('evaluateLbo takes the model and the request as objects or JSON text', () => {
+  const fromObjects = sa.evaluateLbo(model(), request(commit(320)));
+  const fromText = sa.evaluateLbo(JSON.stringify(model()), JSON.stringify(request(commit(320))));
   assert.deepEqual(fromText, fromObjects);
 });
 
-test('evaluateDatedLbo refuses a request or model outside the dated contract', () => {
+test('evaluateLbo refuses a request or model outside the dated contract', () => {
   const refusals = [
     [
       'funding date is not the entry date',
@@ -142,47 +139,64 @@ test('evaluateDatedLbo refuses a request or model outside the dated contract', (
   ];
   for (const [label, editModel, editRequest, message] of refusals) {
     assert.throws(
-      () => sa.evaluateDatedLbo(model(editModel), request(editRequest)),
+      () => sa.evaluateLbo(model(editModel), request(editRequest)),
       (error) => error instanceof Error && message.test(error.message),
       label
     );
   }
 });
 
-test('evaluateDatedLbo blocks on a required check suite and reports an optional one', () => {
+test('evaluateLbo refuses a 0.11 LboConfig document', () => {
+  // `evaluateLbo` keeps the name the 0.11 evaluator used, with a new contract. An
+  // old config must fail, never be valued.
+  const oldConfig = {
+    entry_multiple: 8.0,
+    entry_metric_node: 'ebitda',
+    entry_period: '2025',
+    transaction_fees: 0.0,
+    sources: [{ name: 'debt', amount: 500.0 }],
+    exit_multiple: 9.0,
+    exit_metric_node: 'ebitda',
+    exit_net_debt_node: 'net_debt',
+    exit_period: '2028',
+  };
+  assert.throws(
+    () => sa.evaluateLbo(model(), oldConfig),
+    (e) => e.kind === 'validation' && /unknown field `entry_multiple`/.test(e.message)
+  );
+});
+
+test('evaluateLbo blocks on a required check suite and reports an optional one', () => {
   const checked = (formula, required) =>
     request((document) => {
       commit(320)(document);
-      const suite = structuredClone(INPUTS.dated_lbo_check_suite);
+      const suite = structuredClone(INPUTS.lbo_check_suite);
       suite.formula_checks[0].formula = formula;
       document.checks = { suite: { kind: 'spec', spec: suite }, required };
     });
 
   assert.throws(
-    () => sa.evaluateDatedLbo(model(), checked('term_amortization > 1000', true)),
+    () => sa.evaluateLbo(model(), checked('term_amortization > 1000', true)),
     (error) => /Required LBO check suite returned Fail/.test(error.message)
   );
-  const reported = sa.evaluateDatedLbo(model(), checked('term_amortization > 1000', false));
+  const reported = sa.evaluateLbo(model(), checked('term_amortization > 1000', false));
   assert.equal(reported.exit.funded_moic, 2.125);
   assert.equal(reported.checks.outcome, 'fail');
-  const passed = sa.evaluateDatedLbo(model(), checked('term_amortization >= 0', true));
+  const passed = sa.evaluateLbo(model(), checked('term_amortization >= 0', true));
   assert.equal(passed.checks.outcome, 'pass');
 });
 
-test('evaluateDatedLbo runs the LBO model check suite from node mappings', () => {
-  const result = sa.evaluateDatedLbo(
-    INPUTS.dated_lbo_checked_model,
-    INPUTS.dated_lbo_checked_request
-  );
+test('evaluateLbo runs the LBO model check suite from node mappings', () => {
+  const result = sa.evaluateLbo(INPUTS.lbo_checked_model, INPUTS.lbo_checked_request);
   assert.equal(result.checks.outcome, 'pass');
   assert.equal(result.checks.summary.total_checks, 9);
   assert.equal(result.checks.summary.warnings, 5);
 
   const untagged = request((document) => {
-    document.checks = { suite: INPUTS.dated_lbo_check_suite, required: false };
+    document.checks = { suite: INPUTS.lbo_check_suite, required: false };
   });
   assert.throws(
-    () => sa.evaluateDatedLbo(model(), untagged),
+    () => sa.evaluateLbo(model(), untagged),
     (error) => /missing field `kind`/.test(error.message)
   );
 });

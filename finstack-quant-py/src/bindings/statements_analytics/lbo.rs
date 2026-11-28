@@ -103,33 +103,33 @@ crate::bindings::macros::wire_methods!(
 );
 
 #[pyclass(
-    name = "DatedLboRequest",
+    name = "LboRequest",
     module = "finstack_quant.statements_analytics",
     frozen,
     from_py_object
 )]
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "DatedLboRequest")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "LboRequest")]
 #[derive(Clone)]
-struct PyDatedLboRequest {
-    inner: native::DatedLboRequest,
+struct PyLboRequest {
+    inner: native::LboRequest,
 }
 
 #[pymethods]
-impl PyDatedLboRequest {
+impl PyLboRequest {
     #[new]
     #[pyo3(signature = (**fields), text_signature = "(*, cut, exit_valuation_date, entry, funding, exit, exit_debt_node, exit_cash_node, exit_claims_node=None, checks=None)")]
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "DatedLboRequest.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "LboRequest.__init__")]
     fn new(py: Python<'_>, fields: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
         Ok(Self {
-            inner: fields_from_py(py, fields, "DatedLboRequest")?,
+            inner: fields_from_py(py, fields, "LboRequest")?,
         })
     }
 }
 
 crate::bindings::macros::wire_methods!(
-    PyDatedLboRequest,
-    native::DatedLboRequest,
-    "DatedLboRequest",
+    PyLboRequest,
+    native::LboRequest,
+    "LboRequest",
     module = "finstack_quant.statements_analytics._lbo"
 );
 
@@ -242,39 +242,39 @@ impl PyLboExitBridge {
 }
 
 #[pyclass(
-    name = "DatedLboResult",
+    name = "LboResult",
     module = "finstack_quant.statements_analytics",
     frozen,
     from_py_object
 )]
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "DatedLboResult")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "LboResult")]
 #[derive(Clone)]
-struct PyDatedLboResult {
-    inner: native::DatedLboResult,
+struct PyLboResult {
+    inner: native::LboResult,
 }
 
 #[pymethods]
-impl PyDatedLboResult {
+impl PyLboResult {
     #[getter]
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "DatedLboResult.entry_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "LboResult.entry_date")]
     fn entry_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::date_utils::date_to_py(py, self.inner.entry_date)
     }
 
     #[getter]
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "DatedLboResult.exit_valuation_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "LboResult.exit_valuation_date")]
     fn exit_valuation_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::date_utils::date_to_py(py, self.inner.exit_valuation_date)
     }
 
     #[getter]
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "DatedLboResult.run")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "LboResult.run")]
     fn run<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::json_bridge::serde_to_py(py, &self.inner.run)
     }
 
     #[getter]
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "DatedLboResult.checks")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "LboResult.checks")]
     fn checks(&self) -> Option<crate::bindings::statements::checks::PyCheckReport> {
         self.inner
             .checks
@@ -283,19 +283,19 @@ impl PyDatedLboResult {
     }
 
     #[getter]
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "DatedLboResult.entry_earnings")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "LboResult.entry_earnings")]
     fn entry_earnings(&self) -> PyMoney {
         PyMoney::from_inner(self.inner.entry_earnings)
     }
 
     #[getter]
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "DatedLboResult.entry_enterprise_value")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "LboResult.entry_enterprise_value")]
     fn entry_enterprise_value(&self) -> PyMoney {
         PyMoney::from_inner(self.inner.entry_enterprise_value)
     }
 
     #[getter]
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "DatedLboResult.funding")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "LboResult.funding")]
     fn funding(&self) -> PyLboFundingResult {
         PyLboFundingResult {
             inner: self.inner.funding.clone(),
@@ -303,13 +303,13 @@ impl PyDatedLboResult {
     }
 
     #[getter]
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "DatedLboResult.exit_earnings")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "LboResult.exit_earnings")]
     fn exit_earnings(&self) -> PyMoney {
         PyMoney::from_inner(self.inner.exit_earnings)
     }
 
     #[getter]
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "DatedLboResult.exit")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "LboResult.exit")]
     fn exit(&self) -> PyLboExitBridge {
         PyLboExitBridge {
             inner: self.inner.exit.clone(),
@@ -318,28 +318,28 @@ impl PyDatedLboResult {
 }
 
 crate::bindings::macros::wire_methods!(
-    PyDatedLboResult,
-    native::DatedLboResult,
-    "DatedLboResult",
+    PyLboResult,
+    native::LboResult,
+    "LboResult",
     module = "finstack_quant.statements_analytics._lbo"
 );
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "evaluate_dated_lbo")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "evaluate_lbo")]
 #[pyfunction]
 #[pyo3(signature = (model, request, market=None))]
-fn evaluate_dated_lbo<'py>(
+fn evaluate_lbo<'py>(
     py: Python<'py>,
     model: PyRef<'py, PyFinancialModelSpec>,
-    request: &PyDatedLboRequest,
+    request: &PyLboRequest,
     market: Option<PyRef<'py, PyMarketContext>>,
-) -> PyResult<PyDatedLboResult> {
+) -> PyResult<PyLboResult> {
     let model = model.inner.clone();
     let request = request.inner.clone();
     let market = market.map(|market| market.inner.clone());
     let inner = py
-        .detach(move || native::evaluate_dated_lbo(&model, &request, market.as_ref()))
+        .detach(move || native::evaluate_lbo(&model, &request, market.as_ref()))
         .map_err(statements_to_py)?;
-    Ok(PyDatedLboResult { inner })
+    Ok(PyLboResult { inner })
 }
 
 /// Register dated LBO types and pricing.
@@ -347,9 +347,9 @@ pub(super) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyLboEarnings>()?;
     m.add_class::<PyLboDebtFunding>()?;
     m.add_class::<PyLboFunding>()?;
-    m.add_class::<PyDatedLboRequest>()?;
+    m.add_class::<PyLboRequest>()?;
     m.add_class::<PyLboFundingResult>()?;
     m.add_class::<PyLboExitBridge>()?;
-    m.add_class::<PyDatedLboResult>()?;
-    m.add_function(wrap_pyfunction!(evaluate_dated_lbo, m)?)
+    m.add_class::<PyLboResult>()?;
+    m.add_function(wrap_pyfunction!(evaluate_lbo, m)?)
 }

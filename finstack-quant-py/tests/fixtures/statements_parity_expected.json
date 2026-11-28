@@ -820,7 +820,66 @@
       "equity": null,
       "node_count": 4
     },
-    "dated_lbo": {
+    "dcf": {
+      "currency": "USD",
+      "enterprise_value": 1341.4281163299675,
+      "equity_value": 1341.4281163299675
+    },
+    "dcf_sensitivity": {
+      "exit_multiple": {
+        "baseline_enterprise_value": {
+          "amount": "578.7329482387904",
+          "currency": "USD"
+        },
+        "entries": [
+          {
+            "downside": -49.60618979454807,
+            "parameter_id": "exit_multiple",
+            "upside": 49.60618979454807
+          },
+          {
+            "downside": 9.804209516736364,
+            "parameter_id": "wacc",
+            "upside": -9.548166706546226
+          }
+        ],
+        "terminal_growth_up": null,
+        "terminal_growth_up_clamped": false,
+        "wacc_down": 0.09000000000000001,
+        "wacc_down_clamped": false
+      },
+      "gordon_growth": {
+        "baseline_enterprise_value": {
+          "amount": "1341.4281163299675",
+          "currency": "USD"
+        },
+        "entries": [
+          {
+            "downside": 192.52997095733986,
+            "parameter_id": "wacc",
+            "upside": -149.7327288717579
+          },
+          {
+            "downside": -138.94326308195195,
+            "parameter_id": "terminal_growth",
+            "upside": 178.64133824822375
+          }
+        ],
+        "terminal_growth_up": 0.03,
+        "terminal_growth_up_clamped": false,
+        "wacc_down": 0.09000000000000001,
+        "wacc_down_clamped": false
+      }
+    },
+    "ecl": {
+      "lifetime": 33.126146531106,
+      "single": 7.807926574140965,
+      "stage": "stage1",
+      "weighted": 39.7513758373272
+    },
+    "explanation_text": "profit [2025Q1] = 60.00\nFormula: revenue - cogs\nType: Calculated\nSource: formula\n\nComponents:\n  + revenue = 100.00\n  - cogs = 40.00\n",
+    "forecast_summary": "MAE: 2.00, MAPE: 1.91% (eff_n=2), sMAPE: 1.91%, RMSE: 2.00 (n=2)",
+    "lbo": {
       "checked": {
         "checks": {
           "outcome": "pass",
@@ -1469,65 +1528,6 @@
         }
       }
     },
-    "dcf": {
-      "currency": "USD",
-      "enterprise_value": 1341.4281163299675,
-      "equity_value": 1341.4281163299675
-    },
-    "dcf_sensitivity": {
-      "exit_multiple": {
-        "baseline_enterprise_value": {
-          "amount": "578.7329482387904",
-          "currency": "USD"
-        },
-        "entries": [
-          {
-            "downside": -49.60618979454807,
-            "parameter_id": "exit_multiple",
-            "upside": 49.60618979454807
-          },
-          {
-            "downside": 9.804209516736364,
-            "parameter_id": "wacc",
-            "upside": -9.548166706546226
-          }
-        ],
-        "terminal_growth_up": null,
-        "terminal_growth_up_clamped": false,
-        "wacc_down": 0.09000000000000001,
-        "wacc_down_clamped": false
-      },
-      "gordon_growth": {
-        "baseline_enterprise_value": {
-          "amount": "1341.4281163299675",
-          "currency": "USD"
-        },
-        "entries": [
-          {
-            "downside": 192.52997095733986,
-            "parameter_id": "wacc",
-            "upside": -149.7327288717579
-          },
-          {
-            "downside": -138.94326308195195,
-            "parameter_id": "terminal_growth",
-            "upside": 178.64133824822375
-          }
-        ],
-        "terminal_growth_up": 0.03,
-        "terminal_growth_up_clamped": false,
-        "wacc_down": 0.09000000000000001,
-        "wacc_down_clamped": false
-      }
-    },
-    "ecl": {
-      "lifetime": 33.126146531106,
-      "single": 7.807926574140965,
-      "stage": "stage1",
-      "weighted": 39.7513758373272
-    },
-    "explanation_text": "profit [2025Q1] = 60.00\nFormula: revenue - cogs\nType: Calculated\nSource: formula\n\nComponents:\n  + revenue = 100.00\n  - cogs = 40.00\n",
-    "forecast_summary": "MAE: 2.00, MAPE: 1.91% (eff_n=2), sMAPE: 1.91%, RMSE: 2.00 (n=2)",
     "peer_accepts": [
       true,
       false

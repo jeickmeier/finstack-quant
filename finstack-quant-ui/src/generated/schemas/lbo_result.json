@@ -1,20 +1,94 @@
 {
-  "$defs": {
-    "AmountOrScalar": {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Reconciled sources and uses and qualified sponsor returns.",
+  "properties": {
+    "checks": {
       "anyOf": [
         {
-          "$ref": "#/$defs/Money",
-          "description": "Currency-aware amount"
+          "$ref": "#/$defs/d_69ed1d0fd3aee296bce5"
         },
         {
-          "description": "Unitless scalar (ratio, percentage, count, etc.)",
-          "format": "double",
-          "type": "number"
+          "type": "null"
         }
       ],
-      "description": "Value that can be currency-aware or unitless.\n\nUsed for node values that can represent:\n- **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)\n- **Scalar**: Unitless values (e.g., ratios, percentages, counts)"
+      "description": "Verdict and evidence from the elected statement checks."
     },
-    "CheckCategory": {
+    "entry_date": {
+      "$ref": "#/$defs/d_eba0e2d64a45982e3f3a",
+      "description": "Effective closing date used for the initial funding bridge."
+    },
+    "entry_earnings": {
+      "$ref": "#/$defs/d_f0101272ae2f9a75933d",
+      "description": "Resolved reported entry earnings in the transaction currency."
+    },
+    "entry_enterprise_value": {
+      "$ref": "#/$defs/d_f0101272ae2f9a75933d",
+      "description": "Entry enterprise value from the elected purchase multiple."
+    },
+    "exit": {
+      "$ref": "#/$defs/d_a14f8298c0c4b21a1ec6",
+      "description": "Signed exit residual and applicable sponsor returns."
+    },
+    "exit_earnings": {
+      "$ref": "#/$defs/d_f0101272ae2f9a75933d",
+      "description": "Projected earnings in the same currency."
+    },
+    "exit_valuation_date": {
+      "$ref": "#/$defs/d_eba0e2d64a45982e3f3a",
+      "description": "Projected exit date used for the common-equity bridge."
+    },
+    "funding": {
+      "$ref": "#/$defs/d_e8db082867bc51eb8a40",
+      "description": "Reconciled initial uses, cash proceeds, opening face and funding gap."
+    },
+    "run": {
+      "$ref": "#/$defs/d_d773306ae7610f4082a7",
+      "description": "Accepted statement run for all financial inputs and checks."
+    }
+  },
+  "required": [
+    "run",
+    "entry_date",
+    "exit_valuation_date",
+    "entry_earnings",
+    "entry_enterprise_value",
+    "funding",
+    "exit_earnings",
+    "exit"
+  ],
+  "title": "LboResult",
+  "type": "object",
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json",
+  "$defs": {
+    "d_0a9d916a9dc49d94bba5": {
+      "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
+      "type": "string"
+    },
+    "d_19b12c92850678074471": {
+      "description": "Which explicit observations an evaluation may read.\n\nOn the wire: `\"full_snapshot\"`, or `{\"through\": \"2025-04-25\"}`.",
+      "oneOf": [
+        {
+          "const": "full_snapshot",
+          "description": "Read every observation in the model's snapshot, with no publication\ncutoff.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Read an observation only when its availability date is on or before\nthis date, inclusive through the end of the day.",
+          "properties": {
+            "through": {
+              "$ref": "#/$defs/d_eba0e2d64a45982e3f3a"
+            }
+          },
+          "required": [
+            "through"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_35ab86546a0fcbee39a6": {
       "description": "Category that groups related checks together.",
       "oneOf": [
         {
@@ -44,110 +118,7 @@
         }
       ]
     },
-    "CheckComparison": {
-      "description": "The two values a check compared, their difference and the tolerance it\nallowed.\n\nRecorded for every numeric comparison a check performs, whether it passed\nor failed, so the verdict can be reconstructed from exported data: the\ncomparison fails exactly when `|difference| > tolerance`.\n\nEvery value is typed in the units of the compared nodes: exact money in\ntheir currency, or a scalar. `difference` is the one exact residual the\ncheck computed (an exact sum for money), not a difference of the two\nrecorded sides; `tolerance` is an absolute amount in the same units.",
-      "properties": {
-        "actual": {
-          "$ref": "#/$defs/AmountOrScalar",
-          "description": "Observed (left-hand) value, in the compared nodes' units."
-        },
-        "difference": {
-          "$ref": "#/$defs/AmountOrScalar",
-          "description": "Signed residual `actual - expected`, in the same units."
-        },
-        "expected": {
-          "$ref": "#/$defs/AmountOrScalar",
-          "description": "Value the identity requires (right-hand side), in the same units."
-        },
-        "identity": {
-          "description": "Stable snake_case name of the identity that was tested (for example\n`\"balance_sheet_articulation\"` or `\"cash_flow_components\"`); a check\nthat tests several identities per period uses a distinct label for each.",
-          "type": "string"
-        },
-        "period": {
-          "description": "Period the comparison was evaluated for, if it is period-specific.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "tolerance": {
-          "$ref": "#/$defs/AmountOrScalar",
-          "description": "Absolute tolerance applied to `|difference|`, in the same units. This\nis the effective tolerance: the per-check override when one is\nconfigured, otherwise\n`max(default_tolerance, default_relative_tolerance * |reference|)`."
-        }
-      },
-      "required": [
-        "identity",
-        "actual",
-        "expected",
-        "difference",
-        "tolerance"
-      ],
-      "type": "object"
-    },
-    "CheckFinding": {
-      "description": "A single finding produced by a check for a specific period or node.",
-      "properties": {
-        "check_id": {
-          "description": "Identifier of the check that produced this finding.",
-          "type": "string"
-        },
-        "comparison": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/CheckComparison"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The failed numeric comparison behind this finding (actual, expected and\ntolerance). `None` for findings that do not compare two numbers:\nskipped periods, missing or non-finite inputs, sign-convention\nwarnings, and formula checks without a tolerance (a formula check\nwith a tolerance compares its value against zero)."
-        },
-        "coverage": {
-          "description": "True for a coverage finding: required data was missing or unavailable,\nso the check could not evaluate the period or cell it names. A\ncoverage finding makes its check incomplete and is never removed by\nthe reporting filters.",
-          "type": "boolean"
-        },
-        "materiality": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Materiality"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Materiality context, if applicable."
-        },
-        "message": {
-          "description": "Human-readable description of the issue.",
-          "type": "string"
-        },
-        "nodes": {
-          "description": "Node identifiers involved in the finding.",
-          "items": {
-            "$ref": "#/$defs/Id"
-          },
-          "type": "array"
-        },
-        "period": {
-          "description": "Period the finding relates to, if applicable.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "severity": {
-          "$ref": "#/$defs/CheckSeverity",
-          "description": "Severity of the finding."
-        }
-      },
-      "required": [
-        "check_id",
-        "severity",
-        "message"
-      ],
-      "type": "object"
-    },
-    "CheckOutcome": {
+    "d_3644af53ded616741924": {
       "description": "Verdict of a check, or of a whole report, decided from every outcome\nbefore any reporting filter is applied.",
       "oneOf": [
         {
@@ -172,22 +143,60 @@
         }
       ]
     },
-    "CheckReport": {
+    "d_5df3315c25302264a1a6": {
+      "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
+      "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+      "type": "string"
+    },
+    "d_60e7f94bf13dea34e179": {
+      "description": "Materiality context attached to a finding, describing its quantitative\nsignificance.",
+      "properties": {
+        "absolute": {
+          "description": "Absolute amount of the discrepancy.",
+          "format": "double",
+          "type": "number"
+        },
+        "reference_label": {
+          "description": "Human-readable label for the reference (e.g. \"total_assets\").",
+          "type": "string"
+        },
+        "reference_value": {
+          "description": "The reference (denominator) value used when computing `relative`.",
+          "format": "double",
+          "type": "number"
+        },
+        "relative": {
+          "description": "Discrepancy as a decimal fraction of the reference value (0.025 is 2.5%);\n`None` when the fraction is undefined (a zero reference) or does not apply.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "absolute",
+        "reference_value",
+        "reference_label"
+      ],
+      "type": "object"
+    },
+    "d_69ed1d0fd3aee296bce5": {
       "description": "Full report aggregating all [`CheckResult`]s from a check run.",
       "properties": {
         "outcome": {
-          "$ref": "#/$defs/CheckOutcome",
+          "$ref": "#/$defs/d_3644af53ded616741924",
           "description": "Verdict of the suite from the unfiltered check outcomes: `fail` when\nany check failed, else `incomplete` when any check is incomplete,\nelse `pass` when at least one check passed, else `unevaluated` (an\nempty suite, or one with no applicable check)."
         },
         "results": {
           "description": "Individual results for each check, in declared order.",
           "items": {
-            "$ref": "#/$defs/CheckResult"
+            "$ref": "#/$defs/d_a64e478bd80b60331435"
           },
           "type": "array"
         },
         "summary": {
-          "$ref": "#/$defs/CheckSummary",
+          "$ref": "#/$defs/d_8cf6a34771f30e7523cf",
           "description": "Aggregate summary."
         }
       },
@@ -198,141 +207,7 @@
       ],
       "type": "object"
     },
-    "CheckResult": {
-      "description": "Outcome of a single check execution.",
-      "properties": {
-        "category": {
-          "$ref": "#/$defs/CheckCategory",
-          "description": "Category this check belongs to."
-        },
-        "check_id": {
-          "description": "Identifier of the check.",
-          "type": "string"
-        },
-        "check_name": {
-          "description": "Human-readable name of the check.",
-          "type": "string"
-        },
-        "comparisons": {
-          "description": "Every numeric comparison the check evaluated, passing and failing\nalike, in evaluation order. A passing check therefore still reports\nthe actual value, expected value and tolerance it was judged on.\nUnlike `findings`, this list is not reduced by the suite's\n`min_severity` / `materiality_threshold` reporting filters. Empty for\nchecks that do not compare two numbers, for periods a check skipped,\nand for reports serialized before this field existed.",
-          "items": {
-            "$ref": "#/$defs/CheckComparison"
-          },
-          "type": "array"
-        },
-        "evaluated": {
-          "description": "Number of periods or cells the check examined.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "findings": {
-          "description": "Findings produced by the check. The suite's `min_severity` and\n`materiality_threshold` filters remove advisory findings only: an\nerror-severity or coverage finding is always retained.",
-          "items": {
-            "$ref": "#/$defs/CheckFinding"
-          },
-          "type": "array"
-        },
-        "outcome": {
-          "$ref": "#/$defs/CheckOutcome",
-          "description": "Verdict of the check, decided from all of its findings before the\nsuite's reporting filters: `fail` on an error-severity finding, else\n`incomplete` on a coverage finding, else `unevaluated` when\n`evaluated` is zero, else `pass`."
-        }
-      },
-      "required": [
-        "check_id",
-        "check_name",
-        "category",
-        "outcome",
-        "evaluated",
-        "findings"
-      ],
-      "type": "object"
-    },
-    "CheckSeverity": {
-      "description": "Severity level for a check finding, ordered from least to most severe.",
-      "oneOf": [
-        {
-          "const": "info",
-          "description": "Informational finding — no action required.",
-          "type": "string"
-        },
-        {
-          "const": "warning",
-          "description": "Warning — review recommended.",
-          "type": "string"
-        },
-        {
-          "const": "error",
-          "description": "Error — indicates a likely problem that should be addressed.",
-          "type": "string"
-        }
-      ]
-    },
-    "CheckSummary": {
-      "description": "Aggregate counts for a completed check run.",
-      "properties": {
-        "errors": {
-          "description": "Total number of error-severity findings across all checks.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "failed": {
-          "description": "Number of checks whose outcome is `fail` (an error-severity finding).",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "incomplete": {
-          "description": "Number of checks whose outcome is `incomplete` (a coverage finding).",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "infos": {
-          "description": "Total number of info-severity findings across all checks.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "passed": {
-          "description": "Number of checks whose outcome is `pass`.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "total_checks": {
-          "description": "Total number of checks executed.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "unevaluated": {
-          "description": "Number of checks whose outcome is `unevaluated` (nothing examined).",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "warnings": {
-          "description": "Total number of warning-severity findings across all checks.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        }
-      },
-      "required": [
-        "total_checks",
-        "passed",
-        "failed",
-        "incomplete",
-        "unevaluated",
-        "errors",
-        "warnings",
-        "infos"
-      ],
-      "type": "object"
-    },
-    "Currency": {
+    "d_7374b4f5bc9b521a55b5": {
       "description": "ISO 4217 currency enumeration",
       "oneOf": [
         {
@@ -1142,17 +1017,443 @@
         }
       ]
     },
-    "DateWire": {
+    "d_897cb2f33ded7ef3d8c5": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/d_f0101272ae2f9a75933d",
+          "description": "Currency-aware amount"
+        },
+        {
+          "description": "Unitless scalar (ratio, percentage, count, etc.)",
+          "format": "double",
+          "type": "number"
+        }
+      ],
+      "description": "Value that can be currency-aware or unitless.\n\nUsed for node values that can represent:\n- **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)\n- **Scalar**: Unitless values (e.g., ratios, percentages, counts)"
+    },
+    "d_8cf6a34771f30e7523cf": {
+      "description": "Aggregate counts for a completed check run.",
+      "properties": {
+        "errors": {
+          "description": "Total number of error-severity findings across all checks.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "failed": {
+          "description": "Number of checks whose outcome is `fail` (an error-severity finding).",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "incomplete": {
+          "description": "Number of checks whose outcome is `incomplete` (a coverage finding).",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "infos": {
+          "description": "Total number of info-severity findings across all checks.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "passed": {
+          "description": "Number of checks whose outcome is `pass`.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "total_checks": {
+          "description": "Total number of checks executed.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unevaluated": {
+          "description": "Number of checks whose outcome is `unevaluated` (nothing examined).",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "warnings": {
+          "description": "Total number of warning-severity findings across all checks.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "total_checks",
+        "passed",
+        "failed",
+        "incomplete",
+        "unevaluated",
+        "errors",
+        "warnings",
+        "infos"
+      ],
+      "type": "object"
+    },
+    "d_a14f8298c0c4b21a1ec6": {
+      "additionalProperties": false,
+      "description": "Dated and reconciled sponsor economics on the same numeraire as entry.",
+      "properties": {
+        "common_equity_residual": {
+          "$ref": "#/$defs/d_f0101272ae2f9a75933d",
+          "description": "Enterprise value less debt and claims, before the equity option floor."
+        },
+        "enterprise_value": {
+          "$ref": "#/$defs/d_f0101272ae2f9a75933d",
+          "description": "Enterprise value at the elected exit date."
+        },
+        "funded_moic": {
+          "description": "Proceeds over actual cash only when the commitment reconciles the uses.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "net_debt": {
+          "$ref": "#/$defs/d_f0101272ae2f9a75933d",
+          "description": "Debt less admitted cash at exit, which may be negative."
+        },
+        "other_claims": {
+          "$ref": "#/$defs/d_f0101272ae2f9a75933d",
+          "description": "Other signed claims deducted ahead of common equity."
+        },
+        "sized_moic": {
+          "description": "Proceeds over implied required cash, when required cash is positive.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "sponsor_proceeds": {
+          "$ref": "#/$defs/d_f0101272ae2f9a75933d",
+          "description": "Common equity distribution floored at zero."
+        }
+      },
+      "required": [
+        "enterprise_value",
+        "net_debt",
+        "other_claims",
+        "common_equity_residual",
+        "sponsor_proceeds"
+      ],
+      "type": "object"
+    },
+    "d_a64e478bd80b60331435": {
+      "description": "Outcome of a single check execution.",
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/d_35ab86546a0fcbee39a6",
+          "description": "Category this check belongs to."
+        },
+        "check_id": {
+          "description": "Identifier of the check.",
+          "type": "string"
+        },
+        "check_name": {
+          "description": "Human-readable name of the check.",
+          "type": "string"
+        },
+        "comparisons": {
+          "description": "Every numeric comparison the check evaluated, passing and failing\nalike, in evaluation order. A passing check therefore still reports\nthe actual value, expected value and tolerance it was judged on.\nUnlike `findings`, this list is not reduced by the suite's\n`min_severity` / `materiality_threshold` reporting filters. Empty for\nchecks that do not compare two numbers, for periods a check skipped,\nand for reports serialized before this field existed.",
+          "items": {
+            "$ref": "#/$defs/d_e423eb660d927a5db922"
+          },
+          "type": "array"
+        },
+        "evaluated": {
+          "description": "Number of periods or cells the check examined.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "findings": {
+          "description": "Findings produced by the check. The suite's `min_severity` and\n`materiality_threshold` filters remove advisory findings only: an\nerror-severity or coverage finding is always retained.",
+          "items": {
+            "$ref": "#/$defs/d_ab7ac1a2678059460e09"
+          },
+          "type": "array"
+        },
+        "outcome": {
+          "$ref": "#/$defs/d_3644af53ded616741924",
+          "description": "Verdict of the check, decided from all of its findings before the\nsuite's reporting filters: `fail` on an error-severity finding, else\n`incomplete` on a coverage finding, else `unevaluated` when\n`evaluated` is zero, else `pass`."
+        }
+      },
+      "required": [
+        "check_id",
+        "check_name",
+        "category",
+        "outcome",
+        "evaluated",
+        "findings"
+      ],
+      "type": "object"
+    },
+    "d_ab7ac1a2678059460e09": {
+      "description": "A single finding produced by a check for a specific period or node.",
+      "properties": {
+        "check_id": {
+          "description": "Identifier of the check that produced this finding.",
+          "type": "string"
+        },
+        "comparison": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_e423eb660d927a5db922"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The failed numeric comparison behind this finding (actual, expected and\ntolerance). `None` for findings that do not compare two numbers:\nskipped periods, missing or non-finite inputs, sign-convention\nwarnings, and formula checks without a tolerance (a formula check\nwith a tolerance compares its value against zero)."
+        },
+        "coverage": {
+          "description": "True for a coverage finding: required data was missing or unavailable,\nso the check could not evaluate the period or cell it names. A\ncoverage finding makes its check incomplete and is never removed by\nthe reporting filters.",
+          "type": "boolean"
+        },
+        "materiality": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_60e7f94bf13dea34e179"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Materiality context, if applicable."
+        },
+        "message": {
+          "description": "Human-readable description of the issue.",
+          "type": "string"
+        },
+        "nodes": {
+          "description": "Node identifiers involved in the finding.",
+          "items": {
+            "$ref": "#/$defs/d_0a9d916a9dc49d94bba5"
+          },
+          "type": "array"
+        },
+        "period": {
+          "description": "Period the finding relates to, if applicable.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "severity": {
+          "$ref": "#/$defs/d_bb30e70a23aaf52a7fe6",
+          "description": "Severity of the finding."
+        }
+      },
+      "required": [
+        "check_id",
+        "severity",
+        "message"
+      ],
+      "type": "object"
+    },
+    "d_bb30e70a23aaf52a7fe6": {
+      "description": "Severity level for a check finding, ordered from least to most severe.",
+      "oneOf": [
+        {
+          "const": "info",
+          "description": "Informational finding — no action required.",
+          "type": "string"
+        },
+        {
+          "const": "warning",
+          "description": "Warning — review recommended.",
+          "type": "string"
+        },
+        {
+          "const": "error",
+          "description": "Error — indicates a likely problem that should be addressed.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_d773306ae7610f4082a7": {
+      "additionalProperties": false,
+      "description": "What a result was evaluated from.\n\nA consumer that is handed a result checks this against the model, period\nplan and run it expects before trusting the cells.",
+      "properties": {
+        "forecast_streams": {
+          "description": "The random stream of every stochastic forecast node in a single run,\nin model node order: enough to replay its draws.",
+          "items": {
+            "$ref": "#/$defs/d_f09b55798f09062eeec4"
+          },
+          "type": "array"
+        },
+        "market_content_hash": {
+          "description": "Canonical snapshot hash of the market held for an explicitly priced run.\nAbsent if the supplied provider cannot furnish a coherent capture.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model_content_hash": {
+          "description": "Canonical content hash of the evaluated model\n([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash)).",
+          "type": "string"
+        },
+        "model_id": {
+          "description": "Identifier of the evaluated model.",
+          "type": "string"
+        },
+        "observation_cutoff": {
+          "$ref": "#/$defs/d_19b12c92850678074471",
+          "description": "Observations the run was allowed to read."
+        },
+        "run_id": {
+          "description": "Identity of this evaluation run: the canonical content hash of the\nfields above, including the market snapshot identity when it was supplied.",
+          "type": "string"
+        },
+        "source_snapshot": {
+          "description": "Identity of the source snapshot the model's observations came from.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "valuation_date": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_eba0e2d64a45982e3f3a"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Valuation date the capital structure was priced at, when the run used\na market."
+        }
+      },
+      "required": [
+        "model_id",
+        "model_content_hash",
+        "observation_cutoff",
+        "run_id"
+      ],
+      "type": "object"
+    },
+    "d_e423eb660d927a5db922": {
+      "description": "The two values a check compared, their difference and the tolerance it\nallowed.\n\nRecorded for every numeric comparison a check performs, whether it passed\nor failed, so the verdict can be reconstructed from exported data: the\ncomparison fails exactly when `|difference| > tolerance`.\n\nEvery value is typed in the units of the compared nodes: exact money in\ntheir currency, or a scalar. `difference` is the one exact residual the\ncheck computed (an exact sum for money), not a difference of the two\nrecorded sides; `tolerance` is an absolute amount in the same units.",
+      "properties": {
+        "actual": {
+          "$ref": "#/$defs/d_897cb2f33ded7ef3d8c5",
+          "description": "Observed (left-hand) value, in the compared nodes' units."
+        },
+        "difference": {
+          "$ref": "#/$defs/d_897cb2f33ded7ef3d8c5",
+          "description": "Signed residual `actual - expected`, in the same units."
+        },
+        "expected": {
+          "$ref": "#/$defs/d_897cb2f33ded7ef3d8c5",
+          "description": "Value the identity requires (right-hand side), in the same units."
+        },
+        "identity": {
+          "description": "Stable snake_case name of the identity that was tested (for example\n`\"balance_sheet_articulation\"` or `\"cash_flow_components\"`); a check\nthat tests several identities per period uses a distinct label for each.",
+          "type": "string"
+        },
+        "period": {
+          "description": "Period the comparison was evaluated for, if it is period-specific.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tolerance": {
+          "$ref": "#/$defs/d_897cb2f33ded7ef3d8c5",
+          "description": "Absolute tolerance applied to `|difference|`, in the same units. This\nis the effective tolerance: the per-check override when one is\nconfigured, otherwise\n`max(default_tolerance, default_relative_tolerance * |reference|)`."
+        }
+      },
+      "required": [
+        "identity",
+        "actual",
+        "expected",
+        "difference",
+        "tolerance"
+      ],
+      "type": "object"
+    },
+    "d_e8db082867bc51eb8a40": {
+      "description": "Reconciled signed funding residual and its separately reported cash and face.",
+      "properties": {
+        "cash_uses": {
+          "$ref": "#/$defs/d_f0101272ae2f9a75933d",
+          "description": "Total transaction cash uses after separately authored credits."
+        },
+        "committed_cash_sources": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_f0101272ae2f9a75933d"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Total explicitly committed cash sources when a sponsor commitment is supplied."
+        },
+        "debt_cash_proceeds": {
+          "$ref": "#/$defs/d_f0101272ae2f9a75933d",
+          "description": "Cash proceeds from all admitted debt sources."
+        },
+        "funding_gap": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_f0101272ae2f9a75933d"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Uses less committed cash sources. A positive amount is a shortage."
+        },
+        "opening_debt_face": {
+          "$ref": "#/$defs/d_f0101272ae2f9a75933d",
+          "description": "Contractual face outstanding at entry, separate from proceeds."
+        },
+        "required_sponsor_cash": {
+          "$ref": "#/$defs/d_f0101272ae2f9a75933d",
+          "description": "Uses less debt cash proceeds, before applying sponsor cash."
+        }
+      },
+      "required": [
+        "cash_uses",
+        "debt_cash_proceeds",
+        "opening_debt_face",
+        "required_sponsor_cash"
+      ],
+      "type": "object"
+    },
+    "d_eba0e2d64a45982e3f3a": {
       "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
       "format": "date",
       "type": "string"
     },
-    "DecimalWire": {
-      "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
-      "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
-      "type": "string"
+    "d_f0101272ae2f9a75933d": {
+      "additionalProperties": false,
+      "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
+      "properties": {
+        "amount": {
+          "$ref": "#/$defs/d_5df3315c25302264a1a6",
+          "description": "Monetary amount, carried on the wire as an exact decimal string rather\nthan a JSON number so no precision is lost in transit. Construction with\nconfiguration applies the selected ingest scale; raw construction does not."
+        },
+        "currency": {
+          "$ref": "#/$defs/d_7374b4f5bc9b521a55b5",
+          "description": "ISO 4217 currency of `amount`. Arithmetic between two `Money` values\nrequires this to match; there is no implicit conversion."
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "type": "object"
     },
-    "ForecastStream": {
+    "d_f09b55798f09062eeec4": {
       "additionalProperties": false,
       "description": "Replay provenance of one stochastic forecast node in a single run.\n\nThe generator is the shared PCG64 started at `state` on stream `stream`\n(`Pcg64Rng::new_with_stream(state, stream)`). Both are derived from the\nversioned key: the key version, the configured seed, the node and the\nsingle-run mode. Unsigned 64-bit values are decimal strings in JSON.",
       "properties": {
@@ -1187,307 +1488,6 @@
         "stream"
       ],
       "type": "object"
-    },
-    "Id": {
-      "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
-      "type": "string"
-    },
-    "LboExitBridge": {
-      "additionalProperties": false,
-      "description": "Dated and reconciled sponsor economics on the same numeraire as entry.",
-      "properties": {
-        "common_equity_residual": {
-          "$ref": "#/$defs/Money",
-          "description": "Enterprise value less debt and claims, before the equity option floor."
-        },
-        "enterprise_value": {
-          "$ref": "#/$defs/Money",
-          "description": "Enterprise value at the elected exit date."
-        },
-        "funded_moic": {
-          "description": "Proceeds over actual cash only when the commitment reconciles the uses.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "net_debt": {
-          "$ref": "#/$defs/Money",
-          "description": "Debt less admitted cash at exit, which may be negative."
-        },
-        "other_claims": {
-          "$ref": "#/$defs/Money",
-          "description": "Other signed claims deducted ahead of common equity."
-        },
-        "sized_moic": {
-          "description": "Proceeds over implied required cash, when required cash is positive.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "sponsor_proceeds": {
-          "$ref": "#/$defs/Money",
-          "description": "Common equity distribution floored at zero."
-        }
-      },
-      "required": [
-        "enterprise_value",
-        "net_debt",
-        "other_claims",
-        "common_equity_residual",
-        "sponsor_proceeds"
-      ],
-      "type": "object"
-    },
-    "LboFundingResult": {
-      "description": "Reconciled signed funding residual and its separately reported cash and face.",
-      "properties": {
-        "cash_uses": {
-          "$ref": "#/$defs/Money",
-          "description": "Total transaction cash uses after separately authored credits."
-        },
-        "committed_cash_sources": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Money"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Total explicitly committed cash sources when a sponsor commitment is supplied."
-        },
-        "debt_cash_proceeds": {
-          "$ref": "#/$defs/Money",
-          "description": "Cash proceeds from all admitted debt sources."
-        },
-        "funding_gap": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Money"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Uses less committed cash sources. A positive amount is a shortage."
-        },
-        "opening_debt_face": {
-          "$ref": "#/$defs/Money",
-          "description": "Contractual face outstanding at entry, separate from proceeds."
-        },
-        "required_sponsor_cash": {
-          "$ref": "#/$defs/Money",
-          "description": "Uses less debt cash proceeds, before applying sponsor cash."
-        }
-      },
-      "required": [
-        "cash_uses",
-        "debt_cash_proceeds",
-        "opening_debt_face",
-        "required_sponsor_cash"
-      ],
-      "type": "object"
-    },
-    "Materiality": {
-      "description": "Materiality context attached to a finding, describing its quantitative\nsignificance.",
-      "properties": {
-        "absolute": {
-          "description": "Absolute amount of the discrepancy.",
-          "format": "double",
-          "type": "number"
-        },
-        "reference_label": {
-          "description": "Human-readable label for the reference (e.g. \"total_assets\").",
-          "type": "string"
-        },
-        "reference_value": {
-          "description": "The reference (denominator) value used when computing `relative`.",
-          "format": "double",
-          "type": "number"
-        },
-        "relative": {
-          "description": "Discrepancy as a decimal fraction of the reference value (0.025 is 2.5%);\n`None` when the fraction is undefined (a zero reference) or does not apply.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "absolute",
-        "reference_value",
-        "reference_label"
-      ],
-      "type": "object"
-    },
-    "Money": {
-      "additionalProperties": false,
-      "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
-      "properties": {
-        "amount": {
-          "$ref": "#/$defs/DecimalWire",
-          "description": "Monetary amount, carried on the wire as an exact decimal string rather\nthan a JSON number so no precision is lost in transit. Construction with\nconfiguration applies the selected ingest scale; raw construction does not."
-        },
-        "currency": {
-          "$ref": "#/$defs/Currency",
-          "description": "ISO 4217 currency of `amount`. Arithmetic between two `Money` values\nrequires this to match; there is no implicit conversion."
-        }
-      },
-      "required": [
-        "amount",
-        "currency"
-      ],
-      "type": "object"
-    },
-    "ObservationCutoff": {
-      "description": "Which explicit observations an evaluation may read.\n\nOn the wire: `\"full_snapshot\"`, or `{\"through\": \"2025-04-25\"}`.",
-      "oneOf": [
-        {
-          "const": "full_snapshot",
-          "description": "Read every observation in the model's snapshot, with no publication\ncutoff.",
-          "type": "string"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Read an observation only when its availability date is on or before\nthis date, inclusive through the end of the day.",
-          "properties": {
-            "through": {
-              "$ref": "#/$defs/DateWire"
-            }
-          },
-          "required": [
-            "through"
-          ],
-          "type": "object"
-        }
-      ]
-    },
-    "RunProvenance": {
-      "additionalProperties": false,
-      "description": "What a result was evaluated from.\n\nA consumer that is handed a result checks this against the model, period\nplan and run it expects before trusting the cells.",
-      "properties": {
-        "forecast_streams": {
-          "description": "The random stream of every stochastic forecast node in a single run,\nin model node order: enough to replay its draws.",
-          "items": {
-            "$ref": "#/$defs/ForecastStream"
-          },
-          "type": "array"
-        },
-        "market_content_hash": {
-          "description": "Canonical snapshot hash of the market held for an explicitly priced run.\nAbsent if the supplied provider cannot furnish a coherent capture.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "model_content_hash": {
-          "description": "Canonical content hash of the evaluated model\n([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash)).",
-          "type": "string"
-        },
-        "model_id": {
-          "description": "Identifier of the evaluated model.",
-          "type": "string"
-        },
-        "observation_cutoff": {
-          "$ref": "#/$defs/ObservationCutoff",
-          "description": "Observations the run was allowed to read."
-        },
-        "run_id": {
-          "description": "Identity of this evaluation run: the canonical content hash of the\nfields above, including the market snapshot identity when it was supplied.",
-          "type": "string"
-        },
-        "source_snapshot": {
-          "description": "Identity of the source snapshot the model's observations came from.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "valuation_date": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/DateWire"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Valuation date the capital structure was priced at, when the run used\na market."
-        }
-      },
-      "required": [
-        "model_id",
-        "model_content_hash",
-        "observation_cutoff",
-        "run_id"
-      ],
-      "type": "object"
     }
-  },
-  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dated_lbo_result.schema.json",
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": false,
-  "description": "Reconciled sources and uses and qualified sponsor returns.",
-  "properties": {
-    "checks": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/CheckReport"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "Verdict and evidence from the elected statement checks."
-    },
-    "entry_date": {
-      "$ref": "#/$defs/DateWire",
-      "description": "Effective closing date used for the initial funding bridge."
-    },
-    "entry_earnings": {
-      "$ref": "#/$defs/Money",
-      "description": "Resolved reported entry earnings in the transaction currency."
-    },
-    "entry_enterprise_value": {
-      "$ref": "#/$defs/Money",
-      "description": "Entry enterprise value from the elected purchase multiple."
-    },
-    "exit": {
-      "$ref": "#/$defs/LboExitBridge",
-      "description": "Signed exit residual and applicable sponsor returns."
-    },
-    "exit_earnings": {
-      "$ref": "#/$defs/Money",
-      "description": "Projected earnings in the same currency."
-    },
-    "exit_valuation_date": {
-      "$ref": "#/$defs/DateWire",
-      "description": "Projected exit date used for the common-equity bridge."
-    },
-    "funding": {
-      "$ref": "#/$defs/LboFundingResult",
-      "description": "Reconciled initial uses, cash proceeds, opening face and funding gap."
-    },
-    "run": {
-      "$ref": "#/$defs/RunProvenance",
-      "description": "Accepted statement run for all financial inputs and checks."
-    }
-  },
-  "required": [
-    "run",
-    "entry_date",
-    "exit_valuation_date",
-    "entry_earnings",
-    "entry_enterprise_value",
-    "funding",
-    "exit_earnings",
-    "exit"
-  ],
-  "title": "DatedLboResult",
-  "type": "object"
+  }
 }
