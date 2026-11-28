@@ -2,6 +2,24 @@
 
 ## Itemized changes
 
+### UI: the LBO report runs the dated evaluator
+
+`LboReport`, `useEvaluateLbo` and the statements workbench's LBO panel now
+edit a `DatedLboRequest` and call `statements_analytics.evaluateDatedLbo`.
+The report shows the funding reconciliation, the exit bridge with its signed
+residual and floored sponsor proceeds, the sized and funded MOIC, and the
+statement run. The hook and registry ids keep their names. Changed for a
+host:
+
+- `EvaluateLboRequest.configJson` → `requestJson` (a `DatedLboRequest`)
+- `LboReport` prop `defaultConfig` → `defaultRequest`; its result is a `DatedLboResult`
+- the contracts `lbo_config` / `lbo_result` → `dated_lbo_request` / `dated_lbo_result`
+- the panel needs a model with a source snapshot and an actual entry period whose observations are available by the entry date; Rust's refusal is shown otherwise
+
+The analyst fixture's deal now enters at 2025Q1 and nets exit debt against
+cash: a 1.131x funded MOIC, where the old fixture showed 1.080x for a
+2024Q1 entry with gross debt.
+
 ### Statements: a dated LBO can run the LBO model check suite
 
 `DatedLboRequest.checks.suite` is now a tagged choice, so the dated evaluator

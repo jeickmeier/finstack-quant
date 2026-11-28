@@ -645,7 +645,7 @@
     {
       "name": "lbo-report",
       "type": "registry:component",
-      "docs": "Edit an LboConfig with the schema form over the generated lbo_config contract, every string *_node field as an id-combobox over the supplied model node ids. The facade has no standalone LboConfig parse, so the config is checked structurally here and validated by Rust (unknown keys included) when it is evaluated; Evaluate LBO passes the JSON to the caller (usually the useEvaluateLbo request). The native LboResult (statements_analytics.evaluateLbo) is shown as returned: equity check, exit equity proceeds and MOIC tiles, the sources and uses (debt, equity check, totals, entry enterprise value, the balanced flag), the entry and exit metrics, enterprise values and exit net debt, and the statement-check-report of the LBO checks when the config maps them. Returns are MOIC only: IRR is not part of the native result (Rust points to portfolio.mwrXirr). Nothing is calculated. Accepts defaultConfig, nodeIds, onSubmit, result, loading, error, formatValue and density props.",
+      "docs": "Edit a DatedLboRequest with the schema form over the generated dated_lbo_request contract, every string node field as an id-combobox over the supplied model node ids. The facade has no standalone DatedLboRequest parse, so the request is checked structurally here and validated by Rust (unknown keys included) when it is evaluated; Evaluate LBO passes the JSON to the caller (usually the useEvaluateLbo request). The native DatedLboResult (statements_analytics.evaluateDatedLbo) is shown as returned: required sponsor cash, sponsor proceeds and the sized and funded MOIC tiles, the sources and uses (cash uses, debt proceeds and face, required sponsor cash, committed sources and the funding gap), the entry and exit dates, earnings and enterprise values with the exit net debt, other claims, signed residual and floored sponsor proceeds, the statement run the figures come from, and the statement-check-report when the request elects a check suite. A value Rust does not report (a funded MOIC with an open funding gap, the commitment figures of a sizing-only request) is shown as undefined. Rust needs a model with a source snapshot and an actual entry period whose observations are available by the entry date, and returns its refusal otherwise. Returns are MOIC only: IRR is not part of the native result. Nothing is calculated. Accepts defaultRequest, nodeIds, onSubmit, result, loading, error, formatValue and density props.",
       "worker": "none"
     },
     {
@@ -1593,6 +1593,14 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-dated-lbo-request",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-dated-lbo-result",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-dcf-options",
       "type": "registry:lib"
     },
@@ -1602,14 +1610,6 @@
     },
     {
       "name": "contract-forecast-metrics",
-      "type": "registry:lib"
-    },
-    {
-      "name": "contract-lbo-config",
-      "type": "registry:lib"
-    },
-    {
-      "name": "contract-lbo-result",
       "type": "registry:lib"
     },
     {
@@ -1907,12 +1907,12 @@
       "sha256": "9fd078e6604b6765e0de97cb79f30fe73e414c64d9258e261d3cdd1caced444b"
     },
     {
-      "path": "finstack-quant-ui/src/fixtures/statements/analyst-lbo-config.json",
-      "sha256": "e1d8175d45c3f56cc53447b33d2a4c770108f64b421437f7c386716f0d6152df"
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-lbo-request.json",
+      "sha256": "cb9efef460079e6a699f2433e203f5871461efcedde731e4be86a866459d6392"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-lbo.json",
-      "sha256": "da1f09c578e63320cae9ee2797a72814ae655ef60d60e46d53ae481af7600108"
+      "sha256": "650cd50903c71bc23d337abda66365ee78d7b446abd5fe432a97c623738d94bf"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-sensitivity-run.json",

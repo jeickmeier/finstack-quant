@@ -33,7 +33,6 @@ import type {
   CurrencyLadder,
   CreditAssessment,
   DcfSensitivityResult,
-  LboResult,
   SensitivityResult,
   TornadoEntry,
   GoalSeekResult,
@@ -325,12 +324,17 @@ export interface EvaluateDcfRequest extends DcfSensitivityRequest {
 export type CorporateValuationResult = ReturnType<
   typeof statements_analytics.evaluateDcf
 >;
-/** A leveraged buyout of the statement model under Rust LboConfig JSON. */
+/** A dated leveraged buyout of the statement model under Rust DatedLboRequest JSON. */
 export interface EvaluateLboRequest {
+  /** FinancialModelSpec JSON; it needs a source snapshot and observations available by the entry date. */
   readonly modelJson: string;
-  /** Rust LboConfig JSON; Rust rejects unknown keys. */
-  readonly configJson: string;
+  /** Rust DatedLboRequest JSON; Rust rejects unknown keys. */
+  readonly requestJson: string;
 }
+/** Native DatedLboResult (not a top-level package export). */
+export type DatedLboResult = ReturnType<
+  typeof statements_analytics.evaluateDatedLbo
+>;
 /** Native CapitalStructureSummary (not a top-level package export). */
 export type CapitalStructureSummary = ReturnType<
   typeof statements_analytics.capitalStructureSummary
@@ -1541,8 +1545,8 @@ export interface StatementsApi {
   dcfSensitivity(
     request: DcfSensitivityRequest,
   ): Promise<Envelope<DcfSensitivityResult>>;
-  /** statements_analytics.evaluateLbo: entry and exit values, sources and uses, MOIC and the optional LBO check report. */
-  evaluateLbo(request: EvaluateLboRequest): Promise<Envelope<LboResult>>;
+  /** statements_analytics.evaluateDatedLbo: the funding reconciliation, the exit bridge, the sized and funded MOIC, the statement run and the optional check report. */
+  evaluateLbo(request: EvaluateLboRequest): Promise<Envelope<DatedLboResult>>;
   /** statements_analytics.capitalStructureSummary: the debt stack by seniority, leverage and coverage through each class, and the maturity wall. */
   capitalStructureSummary(
     request: CapitalStructureSummaryRequest,

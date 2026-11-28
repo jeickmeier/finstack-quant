@@ -11,12 +11,13 @@ import {
 } from "@testing-library/react";
 import { QueryClient, hashKey } from "@tanstack/react-query";
 import model from "../../src/fixtures/statements/analyst-model.json";
-import config from "../../src/fixtures/statements/analyst-lbo-config.json";
+import request from "../../src/fixtures/statements/analyst-lbo-request.json";
 import captured from "../../src/fixtures/statements/analyst-lbo.json";
 import checkReport from "../../src/fixtures/statements/analyst-check-report.json";
 import { LboReport } from "@/components/finstack/statements/components/lbo-report/lbo-report";
 import { evaluateLboOptions } from "@/hooks/statements/use-evaluate-lbo/use-evaluate-lbo";
-import type { LboResultWire } from "@/lib/finstack/generated/types/lbo_result";
+import type { DatedLboRequestWire } from "@/lib/finstack/generated/types/dated_lbo_request";
+import type { DatedLboResultWire } from "@/lib/finstack/generated/types/dated_lbo_result";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import {
   unwrap,
@@ -34,8 +35,9 @@ const native = createRequire(import.meta.url)(
 const modelJson: string = native.validateFinancialModelJson(
   JSON.stringify(model),
 );
-const configJson = JSON.stringify(config);
-const result = captured as unknown as LboResultWire;
+const requestJson = JSON.stringify(request);
+const defaultRequest = request as unknown as DatedLboRequestWire;
+const result = captured as unknown as DatedLboResultWire;
 let harness: Awaited<ReturnType<typeof startWorker>>;
 beforeAll(async () => {
   harness = await startWorker();
@@ -59,36 +61,48 @@ function recordingClient() {
 }
 
 it(
-  "evaluates the LBO through the real worker exactly as the facade returns it",
+  "evaluates the dated LBO through the real worker exactly as the facade returns it",
   async () => {
     const { client, calls } = recordingClient();
-    const request = { modelJson, configJson };
-    const options = evaluateLboOptions(client, 1, request);
-    request.configJson = "changed after snapshot";
+    const evaluation = { modelJson, requestJson };
+    const options = evaluateLboOptions(client, 1, evaluation);
+    evaluation.requestJson = "changed after snapshot";
     const query = new QueryClient();
     try {
       const returned = await query.fetchQuery(options);
       expect(serializeHost(returned)).toBe(
-        serializeHost(native.evaluateLbo(modelJson, configJson)),
+        serializeHost(native.evaluateDatedLbo(modelJson, requestJson)),
       );
       // The captured gallery fixture is this same native result.
       expect(JSON.parse(serializeHost(returned))).toEqual(captured);
-      expect(calls).toEqual([["evaluateLbo", { modelJson, configJson }]]);
+      expect(calls).toEqual([["evaluateLbo", { modelJson, requestJson }]]);
       const fails = (overrides: Record<string, unknown>) =>
         query.fetchQuery(
           evaluateLboOptions(client, 1, {
             modelJson,
-            configJson: JSON.stringify({ ...config, ...overrides }),
+            requestJson: JSON.stringify({ ...request, ...overrides }),
           }),
         );
-      // Unknown keys, a missing node and a non-positive equity check are rejected natively.
+      // Unknown keys, a missing node, and an entry the model's observations
+      // cannot support are rejected natively.
       await expect(fails({ bogus: 1 })).rejects.toThrow(/unknown field/);
-      await expect(fails({ exit_net_debt_node: "net_debt" })).rejects.toThrow(
+      await expect(fails({ exit_debt_node: "net_debt" })).rejects.toThrow(
         /net_debt/,
       );
       await expect(
-        fails({ sources: [{ name: "Unitranche", amount: 400000000 }] }),
-      ).rejects.toThrow(/strictly positive equity check/);
+        fails({ funding: { ...request.funding, date: "2025-03-30" } }),
+      ).rejects.toThrow(/matching entry and funding dates/);
+      await expect(
+        fails({
+          cut: {
+            ...request.cut,
+            as_of: "2024-03-31",
+            observed_through: "2024-03-31",
+          },
+          funding: { ...request.funding, date: "2024-03-31" },
+          entry: { ...request.entry, period: "2024Q1" },
+        }),
+      ).rejects.toThrow(/hidden_by_cutoff/);
     } finally {
       query.clear();
     }
@@ -98,57 +112,58 @@ it(
 
 it("keys the query by every request field and the worker session, and disables a null request", () => {
   const { client } = recordingClient();
-  const request = { modelJson, configJson };
-  const key = hashKey(evaluateLboOptions(client, 1, request).queryKey);
-  expect(hashKey(evaluateLboOptions(client, 2, request).queryKey)).not.toBe(
+  const evaluation = { modelJson, requestJson };
+  const key = hashKey(evaluateLboOptions(client, 1, evaluation).queryKey);
+  expect(hashKey(evaluateLboOptions(client, 2, evaluation).queryKey)).not.toBe(
     key,
   );
-  for (const field of Object.keys(request))
+  for (const field of Object.keys(evaluation))
     expect(
       hashKey(
-        evaluateLboOptions(client, 1, { ...request, [field]: "changed" })
+        evaluateLboOptions(client, 1, { ...evaluation, [field]: "changed" })
           .queryKey,
       ),
     ).not.toBe(key);
-  expect(evaluateLboOptions(client, 1, request).enabled).toBe(true);
+  expect(evaluateLboOptions(client, 1, evaluation).enabled).toBe(true);
   expect(evaluateLboOptions(client, 1, null).enabled).toBe(false);
 });
 
-it("edits the config with node fields as comboboxes and submits it unchanged", async () => {
+it("edits the request with node fields as comboboxes and submits it unchanged", async () => {
   const submit = vi.fn<(json: string) => void>();
   render(
     <LboReport
-      defaultConfig={config}
+      defaultRequest={defaultRequest}
       nodeIds={Object.keys(model.nodes)}
       onSubmit={submit}
       result={null}
     />,
   );
-  for (const name of [
-    "Entry metric node",
-    "Exit metric node",
-    "Exit net debt node",
-  ])
+  for (const [name, value] of [
+    ["Exit debt node", request.exit_debt_node],
+    ["Exit cash node", request.exit_cash_node],
+  ] as const)
     expect(
       (screen.getByRole("combobox", { name }) as HTMLInputElement).value,
-    ).toBe(
-      config[
-        name.toLowerCase().replaceAll(" ", "_") as keyof typeof config
-      ] as string,
-    );
+    ).toBe(value);
+  // The entry and the exit earnings each name a node.
+  expect(
+    screen
+      .getAllByRole("combobox", { name: "Node" })
+      .map((input) => (input as HTMLInputElement).value),
+  ).toEqual([request.entry.node, request.exit.node]);
   const evaluate = screen.getByRole("button", { name: "Evaluate LBO" });
   await waitFor(() => {
     fireEvent.click(evaluate);
     expect(submit).toHaveBeenCalled();
   });
-  expect(JSON.parse(submit.mock.lastCall![0])).toEqual(config);
+  expect(JSON.parse(submit.mock.lastCall![0])).toEqual(request);
   expect(screen.getByText("No LBO evaluation available.")).toBeTruthy();
 });
 
-it("presents the returned result as returned, with MOIC only and no checks", () => {
+it("presents the returned result as returned, with both MOICs and no checks", () => {
   render(
     <LboReport
-      defaultConfig={config}
+      defaultRequest={defaultRequest}
       nodeIds={[]}
       onSubmit={() => {}}
       result={result}
@@ -156,66 +171,92 @@ it("presents the returned result as returned, with MOIC only and no checks", () 
   );
   const tile = (name: string) =>
     screen.getByRole("region", { name }).querySelector("p")!.textContent;
-  expect(tile("Equity check")).toBe(formatRawMoney(result.equity_check));
-  expect(tile("Exit equity proceeds")).toBe(
-    formatRawMoney(result.exit_equity_proceeds),
+  expect(tile("Required sponsor cash")).toBe(
+    formatRawMoney(result.funding.required_sponsor_cash),
   );
-  expect(tile("MOIC")).toBe("1.0802243251029884");
+  expect(tile("Sponsor proceeds")).toBe(
+    formatRawMoney(result.exit.sponsor_proceeds),
+  );
+  expect(tile("Sized MOIC")).toBe("1.1309070545377986");
+  expect(tile("Funded MOIC")).toBe("1.1309070545377986");
   expect(
     within(screen.getByLabelText("Returned sources and uses"))
       .getAllByRole("definition")
       .map((value) => value.textContent),
   ).toEqual([
-    formatRawMoney(result.debt_total),
-    formatRawMoney(result.equity_check),
-    formatRawMoney(result.sources_total),
-    formatRawMoney(result.entry_enterprise_value),
-    formatRawMoney(result.uses_total),
-    "Yes",
+    formatRawMoney(result.funding.cash_uses),
+    formatRawMoney(result.funding.debt_cash_proceeds),
+    formatRawMoney(result.funding.opening_debt_face),
+    formatRawMoney(result.funding.required_sponsor_cash),
+    formatRawMoney(result.funding.committed_cash_sources!),
+    formatRawMoney(result.funding.funding_gap!),
   ]);
   expect(
     within(screen.getByLabelText("Returned entry and exit"))
       .getAllByRole("definition")
       .map((value) => value.textContent),
   ).toEqual([
-    "40,160,000",
+    "2025-03-31",
+    formatRawMoney(result.entry_earnings),
     formatRawMoney(result.entry_enterprise_value),
-    "61,383,803.27707497",
-    formatRawMoney(result.exit_enterprise_value),
-    formatRawMoney(result.exit_net_debt),
-    formatRawMoney(result.exit_equity_proceeds),
-    "1.0802243251029884",
+    "2025-12-31",
+    formatRawMoney(result.exit_earnings),
+    formatRawMoney(result.exit.enterprise_value),
+    formatRawMoney(result.exit.net_debt),
+    formatRawMoney(result.exit.other_claims),
+    formatRawMoney(result.exit.common_equity_residual),
+    formatRawMoney(result.exit.sponsor_proceeds),
+    "1.1309070545377986",
+    "1.1309070545377986",
+  ]);
+  expect(
+    within(screen.getByLabelText("Returned statement run"))
+      .getAllByRole("definition")
+      .map((value) => value.textContent),
+  ).toEqual([
+    "ACME-SOFTWARE-3STMT",
+    "analyst-published-2025Q1",
+    "2025-03-31",
+    result.run.model_content_hash,
   ]);
   expect(
     screen.getByText(/IRR is\s+not part of the native LBO result/),
   ).toBeTruthy();
   expect(
     within(screen.getByRole("region", { name: "LBO checks" })).getByText(
-      /the config maps no LBO checks/,
+      /the request elects no check suite/,
     ),
   ).toBeTruthy();
 });
 
-it("shows a returned check report, an unbalanced flag and native errors", () => {
+it("shows a returned check report, returns Rust withholds and native errors", () => {
   const { rerender } = render(
     <LboReport
       nodeIds={[]}
       onSubmit={() => {}}
       result={{
         ...result,
-        sources_uses_balanced: false,
-        checks: checkReport as unknown as LboResultWire["checks"],
+        funding: {
+          ...result.funding,
+          committed_cash_sources: null,
+          funding_gap: null,
+        },
+        exit: { ...result.exit, funded_moic: null },
+        checks: checkReport as unknown as DatedLboResultWire["checks"],
       }}
     />,
   );
-  // The empty config form reports its own structural errors; the result's alert is separate.
+  // A sizing-only result has no commitment, gap or funded return: each shows as undefined.
   expect(
-    screen
-      .getAllByRole("alert")
-      .some((alert) =>
-        /sources do not reconcile to uses/.test(alert.textContent!),
-      ),
-  ).toBe(true);
+    screen.getByRole("region", { name: "Funded MOIC" }).querySelector("p")!
+      .textContent,
+  ).toBe("Undefined");
+  expect(
+    within(screen.getByLabelText("Returned sources and uses"))
+      .getAllByRole("definition")
+      .slice(-2)
+      .map((value) => value.textContent),
+  ).toEqual(["Undefined", "Undefined"]);
   expect(
     within(screen.getByRole("region", { name: "LBO checks" })).getAllByRole(
       "table",
@@ -226,10 +267,12 @@ it("shows a returned check report, an unbalanced flag and native errors", () => 
       nodeIds={[]}
       onSubmit={() => {}}
       result={null}
-      error="Evaluation error: LBO exit bridge requires node 'net_debt'"
+      error="Evaluation error: Node 'net_debt' at 2025Q4 must be monetary in USD"
     />,
   );
   expect(
     screen.getAllByRole("alert").map((alert) => alert.textContent),
-  ).toContain("Evaluation error: LBO exit bridge requires node 'net_debt'");
+  ).toContain(
+    "Evaluation error: Node 'net_debt' at 2025Q4 must be monetary in USD",
+  );
 });

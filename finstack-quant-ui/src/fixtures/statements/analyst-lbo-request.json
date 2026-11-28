@@ -1,0 +1,41 @@
+{
+  "cut": {
+    "as_of": "2025-03-31",
+    "observed_through": "2025-03-31",
+    "currency": "USD"
+  },
+  "exit_valuation_date": "2025-12-31",
+  "entry": {
+    "node": "ebitda",
+    "period": "2025Q1",
+    "multiple": "8.5",
+    "basis": "as_observed"
+  },
+  "funding": {
+    "date": "2025-03-31",
+    "acquisition": { "kind": "cash_free_debt_free" },
+    "transaction_fees": { "amount": "12000000", "currency": "USD" },
+    "closing_credits": { "amount": "0", "currency": "USD" },
+    "debt": [
+      {
+        "name": "Term loan B",
+        "cash_proceeds": { "amount": "180000000", "currency": "USD" },
+        "opening_face": { "amount": "180000000", "currency": "USD" }
+      },
+      {
+        "name": "Senior notes",
+        "cash_proceeds": { "amount": "60000000", "currency": "USD" },
+        "opening_face": { "amount": "60000000", "currency": "USD" }
+      }
+    ],
+    "sponsor_commitment": { "amount": "208730000", "currency": "USD" }
+  },
+  "exit": {
+    "node": "ebitda",
+    "period": "2025Q4",
+    "multiple": "9",
+    "basis": "as_observed"
+  },
+  "exit_debt_node": "total_debt",
+  "exit_cash_node": "cash"
+}

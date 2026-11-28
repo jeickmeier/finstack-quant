@@ -82,7 +82,7 @@ const sources = {
   statementDcf: "src/fixtures/statements/analyst-dcf.json",
   statementDcfSensitivity:
     "src/fixtures/statements/analyst-dcf-sensitivity.json",
-  statementLboConfig: "src/fixtures/statements/analyst-lbo-config.json",
+  statementLboRequest: "src/fixtures/statements/analyst-lbo-request.json",
   statementLbo: "src/fixtures/statements/analyst-lbo.json",
   statementSensitivityRun:
     "src/fixtures/statements/analyst-sensitivity-run.json",

@@ -1,39 +1,78 @@
 {
+  "run": {
+    "model_id": "ACME-SOFTWARE-3STMT",
+    "model_content_hash": "sha256:26672c308d30598faa33e7e382cec9e16f4fa3f656cfce7ba5cf91366110c0f9",
+    "source_snapshot": "analyst-published-2025Q1",
+    "observation_cutoff": {
+      "through": "2025-03-31"
+    },
+    "valuation_date": "2025-03-31",
+    "market_content_hash": "sha256:3b61d6d907002a1ceb52e85384017f811218f6d652aeef0034a002c03ff53aa7",
+    "run_id": "sha256:0e78874774fefc144a09dc9df444e34666139f97a7d28728f959d2b26e644ebe"
+  },
+  "entry_date": "2025-03-31",
+  "exit_valuation_date": "2025-12-31",
+  "entry_earnings": {
+    "amount": "51380000",
+    "currency": "USD"
+  },
   "entry_enterprise_value": {
-    "amount": "341360000",
+    "amount": "436730000",
     "currency": "USD"
   },
-  "entry_metric": 40160000,
-  "debt_total": {
-    "amount": "240000000",
+  "funding": {
+    "cash_uses": {
+      "amount": "448730000",
+      "currency": "USD"
+    },
+    "debt_cash_proceeds": {
+      "amount": "240000000",
+      "currency": "USD"
+    },
+    "opening_debt_face": {
+      "amount": "240000000",
+      "currency": "USD"
+    },
+    "required_sponsor_cash": {
+      "amount": "208730000",
+      "currency": "USD"
+    },
+    "committed_cash_sources": {
+      "amount": "448730000",
+      "currency": "USD"
+    },
+    "funding_gap": {
+      "amount": "0",
+      "currency": "USD"
+    }
+  },
+  "exit_earnings": {
+    "amount": "61383803.277074970125",
     "currency": "USD"
   },
-  "equity_check": {
-    "amount": "113360000",
-    "currency": "USD"
+  "exit": {
+    "enterprise_value": {
+      "amount": "552454229.493674731125",
+      "currency": "USD"
+    },
+    "net_debt": {
+      "amount": "316400000",
+      "currency": "USD"
+    },
+    "other_claims": {
+      "amount": "0",
+      "currency": "USD"
+    },
+    "common_equity_residual": {
+      "amount": "236054229.493674731125",
+      "currency": "USD"
+    },
+    "sponsor_proceeds": {
+      "amount": "236054229.493674731125",
+      "currency": "USD"
+    },
+    "sized_moic": 1.1309070545377986,
+    "funded_moic": 1.1309070545377986
   },
-  "sources_total": {
-    "amount": "353360000",
-    "currency": "USD"
-  },
-  "uses_total": {
-    "amount": "353360000",
-    "currency": "USD"
-  },
-  "sources_uses_balanced": true,
-  "exit_enterprise_value": {
-    "amount": "552454229.4936748",
-    "currency": "USD"
-  },
-  "exit_metric": 61383803.27707497,
-  "exit_net_debt": {
-    "amount": "430000000",
-    "currency": "USD"
-  },
-  "exit_equity_proceeds": {
-    "amount": "122454229.49367476",
-    "currency": "USD"
-  },
-  "moic": 1.0802243251029884,
   "checks": null
 }

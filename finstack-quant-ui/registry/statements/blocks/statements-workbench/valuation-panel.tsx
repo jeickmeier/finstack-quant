@@ -49,9 +49,9 @@ export function ValuationPanel({
   const [waccText, setWaccText] = useState<string | undefined>(undefined);
   const [waccInputs, setWaccInputs] = useState<WaccRequest | null>(null);
   const calculated = useWacc(waccInputs);
-  const [lboConfigJson, setLboConfigJson] = useState<string | null>(null);
+  const [lboRequestJson, setLboRequestJson] = useState<string | null>(null);
   const lbo = useEvaluateLbo(
-    lboConfigJson ? { modelJson, configJson: lboConfigJson } : null,
+    lboRequestJson ? { modelJson, requestJson: lboRequestJson } : null,
   );
   return (
     <div className="max-w-5xl space-y-6">
@@ -109,14 +109,16 @@ export function ValuationPanel({
         <div className="space-y-1">
           <h3 className="text-base font-medium">Leveraged buyout</h3>
           <p className="text-sm text-muted-foreground">
-            Evaluates a sponsor buyout of the model natively
-            (statements_analytics.evaluateLbo) from the transaction config.
+            Evaluates a dated sponsor buyout of the model natively
+            (statements_analytics.evaluateDatedLbo) from the transaction
+            request. The model needs a source snapshot and an actual entry
+            period whose observations are available by the entry date.
           </p>
         </div>
         <LboReport
           nodeIds={nodeIds}
-          onSubmit={setLboConfigJson}
-          result={lboConfigJson ? lbo.data : null}
+          onSubmit={setLboRequestJson}
+          result={lboRequestJson ? lbo.data : null}
           loading={lbo.isFetching}
           error={lbo.error?.message}
           density={density}

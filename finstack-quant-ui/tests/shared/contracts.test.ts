@@ -150,7 +150,7 @@ describe("discovered canonical fixtures", () => {
     // CovenantReport, CovenantTemplate, DatedCovenantReports, FutureBreach,
     // the five credit-scoring inputs, ArbitrageReport, MertonModel, RecoveryClaim,
     // WorkoutLgd, SeniorityCalibration, CreditAssessment,
-    // DcfOptions, DcfSensitivityResult, LboConfig, LboResult, ScenarioSet,
+    // DcfOptions, DcfSensitivityResult, DatedLboRequest, DatedLboResult, ScenarioSet,
     // ScenarioDiff, SensitivityResult, BridgeChart, ForecastMetrics,
     // VarianceConfig, CapitalStructureSummary or RelativeValueReport, nor their
     // configs; every other root carries one.
@@ -175,11 +175,11 @@ describe("discovered canonical fixtures", () => {
       "schemas/capital_structure_summary_config.json",
       "schemas/capital_structure_summary.json",
       "schemas/credit_assessment.json",
+      "schemas/dated_lbo_request.json",
+      "schemas/dated_lbo_result.json",
       "schemas/dcf_options.json",
       "schemas/dcf_sensitivity_result.json",
       "schemas/forecast_metrics.json",
-      "schemas/lbo_config.json",
-      "schemas/lbo_result.json",
       "schemas/relative_value_report_config.json",
       "schemas/relative_value_report.json",
       "schemas/scenario_diff.json",
@@ -235,8 +235,8 @@ describe("discovered canonical fixtures", () => {
   it("accepts the LBO config input and the captured native LBO result under their generated schemas unchanged", async () => {
     const generated = resolve(repo, "finstack-quant-ui/src/generated");
     for (const [schemaName, fixtureName] of [
-      ["schemas/lbo_config.json", "analyst-lbo-config.json"],
-      ["schemas/lbo_result.json", "analyst-lbo.json"],
+      ["schemas/dated_lbo_request.json", "analyst-lbo-request.json"],
+      ["schemas/dated_lbo_result.json", "analyst-lbo.json"],
     ]) {
       const validator = z.fromJSONSchema(
         converterSchema(

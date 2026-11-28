@@ -81,13 +81,14 @@ await write(
   "analyst-dcf-sensitivity.json",
   serializeHost(native.dcfSensitivity(...dcfArguments)),
 );
-// Native evaluateLbo of the analyst model under the illustrative transaction
-// in analyst-lbo-config.json (no check_mappings: the model has no balance
-// sheet to map, so checks is null).
+// Native evaluateDatedLbo of the analyst model under the illustrative dated
+// transaction in analyst-lbo-request.json: entry at the last actual quarter,
+// a sponsor commitment equal to the required cash, and no check suite (the
+// model has no balance sheet to map, so checks is null).
 await write(
   "analyst-lbo.json",
   serializeHost(
-    native.evaluateLbo(modelJson, await read("analyst-lbo-config.json")),
+    native.evaluateDatedLbo(modelJson, await read("analyst-lbo-request.json")),
   ),
 );
 // Native sensitivity of the analyst model under analyst-sensitivity-run.json

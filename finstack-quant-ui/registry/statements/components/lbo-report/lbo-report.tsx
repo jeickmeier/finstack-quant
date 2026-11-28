@@ -1,8 +1,9 @@
 "use client";
 import { useCallback, useState } from "react";
 import type { MoneyValue as Money } from "finstack-quant-wasm";
-import type { LboResultWire } from "@/lib/finstack/generated/types/lbo_result";
-import { formatExact } from "@/lib/finstack/format/format";
+import type { DatedLboRequestWire } from "@/lib/finstack/generated/types/dated_lbo_request";
+import type { DatedLboResultWire } from "@/lib/finstack/generated/types/dated_lbo_result";
+import { formatExact, formatRaw } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import {
   SchemaForm,
@@ -11,24 +12,23 @@ import {
 import { IdCombobox } from "@/components/finstack/shared/primitives/id-combobox/id-combobox";
 import { MoneyValue } from "@/components/finstack/core/primitives/money-value/money-value";
 import { StatementCheckReport } from "@/components/finstack/statements/components/statement-diagnostics/statement-check-report";
-import { lboConfigModule } from "./lbo-config";
+import { lboRequestModule } from "./lbo-request";
 import {
   Pairs,
   passThrough,
   ReportSection,
-  yesNo,
+  UndefinedValue,
 } from "@/components/finstack/shared/primitives/native-display/native-display";
-import type { LboConfigWire } from "@/lib/finstack/generated/types/lbo_config";
 
 export interface LboReportProps {
-  /** Initial LboConfig; remount to load another. Omitted starts empty. */
-  defaultConfig?: LboConfigWire;
-  /** Model node ids offered for every `*_node` field of the config. */
+  /** Initial DatedLboRequest; remount to load another. Omitted starts empty. */
+  defaultRequest?: DatedLboRequestWire;
+  /** Model node ids offered for every node field of the request. */
   nodeIds: readonly string[];
-  /** Receives the structurally valid LboConfig JSON on Evaluate; Rust validates it. */
-  onSubmit(configJson: string): void;
-  /** Native LboResult; null while none is available. */
-  result: LboResultWire | null | undefined;
+  /** Receives the structurally valid DatedLboRequest JSON on Evaluate; Rust validates it. */
+  onSubmit(requestJson: string): void;
+  /** Native DatedLboResult; null while none is available. */
+  result: DatedLboResultWire | null | undefined;
   loading?: boolean;
   /** Native error, shown as returned. */
   error?: string;
@@ -37,14 +37,16 @@ export interface LboReportProps {
   density?: "compact" | "comfortable";
 }
 /**
- * Edits a Rust LboConfig with the schema form over the generated contract
- * (node fields as id-comboboxes over the model's nodes) and presents the
- * native LboResult as returned: entry valuation, sources and uses, exit
- * returns as MOIC, and the native LBO check report when the config maps
- * one. Nothing is calculated here; IRR is not part of the result.
+ * Edits a Rust DatedLboRequest with the schema form over the generated
+ * contract (node fields as id-comboboxes over the model's nodes) and presents
+ * the native DatedLboResult as returned: the funding reconciliation, the exit
+ * bridge with its signed residual and floored sponsor proceeds, the sized and
+ * funded MOIC, the statement run the figures come from, and the check report
+ * when the request elects one. Nothing is calculated here; a return Rust does
+ * not report is shown as undefined, and IRR is not part of the result.
  */
 export function LboReport({
-  defaultConfig,
+  defaultRequest,
   nodeIds,
   onSubmit,
   result,
@@ -53,10 +55,11 @@ export function LboReport({
   formatValue = formatExact,
   density = "compact",
 }: LboReportProps) {
-  const [initial] = useState(() => defaultConfig);
+  const [initial] = useState(() => defaultRequest);
   const nodeField = useCallback<NonNullable<SchemaFormProps["renderField"]>>(
     ({ form, path, label, value, location }) =>
-      /(^|\.)[a-z_]+_node$/.test(path) && location.schema.type === "string" ? (
+      /(^|\.)([a-z_]+_)?node$/.test(path) &&
+      location.schema.type === "string" ? (
         <IdCombobox
           label={label}
           help={
@@ -71,9 +74,28 @@ export function LboReport({
       ) : undefined,
     [nodeIds],
   );
-  const money = (value: Money | null | undefined) => (
-    <MoneyValue value={value ?? null} />
-  );
+  const money = (value: Money | null | undefined) =>
+    value ? (
+      <MoneyValue value={value} />
+    ) : (
+      <UndefinedValue reason="Rust reports this amount only when a sponsor commitment is supplied" />
+    );
+  const multiple = (value: number | null | undefined, reason: string) =>
+    typeof value === "number" ? (
+      <span className="finstack-numeric">{formatValue(value)}</span>
+    ) : (
+      <UndefinedValue reason={reason} />
+    );
+  const sized = (value: number | null | undefined) =>
+    multiple(
+      value,
+      "Rust sizes a return only on positive required sponsor cash",
+    );
+  const funded = (value: number | null | undefined) =>
+    multiple(
+      value,
+      "Rust reports a funded return only when the commitment closes the funding gap",
+    );
   return (
     <section
       aria-label="Leveraged buyout"
@@ -81,7 +103,7 @@ export function LboReport({
       className="@container min-w-0 space-y-6 font-sans text-sm text-foreground"
     >
       <SchemaForm
-        module={lboConfigModule}
+        module={lboRequestModule}
         defaultValues={initial}
         layout="full"
         explicitNull={false}
@@ -100,17 +122,16 @@ export function LboReport({
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-2 @lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 @lg:grid-cols-4">
             {(
               [
-                ["equity_check", money(result.equity_check)],
-                ["exit_equity_proceeds", money(result.exit_equity_proceeds)],
                 [
-                  "moic",
-                  <span className="finstack-numeric">
-                    {formatValue(result.moic)}
-                  </span>,
+                  "required_sponsor_cash",
+                  money(result.funding.required_sponsor_cash),
                 ],
+                ["sponsor_proceeds", money(result.exit.sponsor_proceeds)],
+                ["sized_moic", sized(result.exit.sized_moic)],
+                ["funded_moic", funded(result.exit.funded_moic)],
               ] as const
             ).map(([name, body]) => (
               <section
@@ -126,27 +147,34 @@ export function LboReport({
             ))}
           </div>
           <p className="text-xs text-muted-foreground">
-            Returns are the multiple of invested capital Rust reports; IRR is
-            not part of the native LBO result (pair the exit equity proceeds
-            with the equity check in portfolio.mwrXirr).
+            Returns are the multiples of invested capital Rust reports; IRR is
+            not part of the native LBO result (pair the sponsor proceeds on the
+            exit date with the required sponsor cash on the entry date in
+            portfolio.mwrXirr).
           </p>
           <div className="grid gap-6 @lg:grid-cols-2">
             <ReportSection title="Sources and uses">
               <Pairs
                 label="Returned sources and uses"
                 rows={[
-                  [labelFor("debt_total"), money(result.debt_total)],
-                  [labelFor("equity_check"), money(result.equity_check)],
-                  [labelFor("sources_total"), money(result.sources_total)],
+                  [labelFor("cash_uses"), money(result.funding.cash_uses)],
                   [
-                    labelFor("entry_enterprise_value"),
-                    money(result.entry_enterprise_value),
+                    labelFor("debt_cash_proceeds"),
+                    money(result.funding.debt_cash_proceeds),
                   ],
-                  [labelFor("uses_total"), money(result.uses_total)],
                   [
-                    labelFor("sources_uses_balanced"),
-                    yesNo(result.sources_uses_balanced),
+                    labelFor("opening_debt_face"),
+                    money(result.funding.opening_debt_face),
                   ],
+                  [
+                    labelFor("required_sponsor_cash"),
+                    money(result.funding.required_sponsor_cash),
+                  ],
+                  [
+                    labelFor("committed_cash_sources"),
+                    money(result.funding.committed_cash_sources),
+                  ],
+                  [labelFor("funding_gap"), money(result.funding.funding_gap)],
                 ]}
               />
             </ReportSection>
@@ -154,38 +182,63 @@ export function LboReport({
               <Pairs
                 label="Returned entry and exit"
                 rows={[
-                  [labelFor("entry_metric"), formatValue(result.entry_metric)],
+                  [labelFor("entry_date"), formatRaw(result.entry_date)],
+                  [labelFor("entry_earnings"), money(result.entry_earnings)],
                   [
                     labelFor("entry_enterprise_value"),
                     money(result.entry_enterprise_value),
                   ],
-                  [labelFor("exit_metric"), formatValue(result.exit_metric)],
+                  [
+                    labelFor("exit_valuation_date"),
+                    formatRaw(result.exit_valuation_date),
+                  ],
+                  [labelFor("exit_earnings"), money(result.exit_earnings)],
                   [
                     labelFor("exit_enterprise_value"),
-                    money(result.exit_enterprise_value),
+                    money(result.exit.enterprise_value),
                   ],
-                  [labelFor("exit_net_debt"), money(result.exit_net_debt)],
+                  [labelFor("net_debt"), money(result.exit.net_debt)],
+                  [labelFor("other_claims"), money(result.exit.other_claims)],
                   [
-                    labelFor("exit_equity_proceeds"),
-                    money(result.exit_equity_proceeds),
+                    labelFor("common_equity_residual"),
+                    money(result.exit.common_equity_residual),
                   ],
-                  [labelFor("moic"), formatValue(result.moic)],
+                  [
+                    labelFor("sponsor_proceeds"),
+                    money(result.exit.sponsor_proceeds),
+                  ],
+                  [labelFor("sized_moic"), sized(result.exit.sized_moic)],
+                  [labelFor("funded_moic"), funded(result.exit.funded_moic)],
                 ]}
               />
             </ReportSection>
           </div>
-          {result.sources_uses_balanced === false && (
-            <p role="alert" className="text-sm text-error">
-              Rust reports that sources do not reconcile to uses: the capital
-              structure is numerically degenerate.
-            </p>
-          )}
+          <ReportSection title="Statement run">
+            <Pairs
+              label="Returned statement run"
+              rows={[
+                [labelFor("model_id"), formatRaw(result.run.model_id)],
+                [
+                  labelFor("source_snapshot"),
+                  formatRaw(result.run.source_snapshot),
+                ],
+                [
+                  labelFor("valuation_date"),
+                  formatRaw(result.run.valuation_date),
+                ],
+                [
+                  labelFor("model_content_hash"),
+                  formatRaw(result.run.model_content_hash),
+                ],
+              ]}
+            />
+          </ReportSection>
           <ReportSection title="LBO checks">
             {result.checks ? (
               <StatementCheckReport report={result.checks} density={density} />
             ) : (
               <p className="text-sm text-muted-foreground">
-                No check report: the config maps no LBO checks (check_mappings).
+                No check report: the request elects no check suite (checks).
               </p>
             )}
           </ReportSection>

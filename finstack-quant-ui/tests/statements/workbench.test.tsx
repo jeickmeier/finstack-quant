@@ -140,7 +140,7 @@ beforeEach(() => {
           arg.optionsJson,
         );
       case "evaluateLbo":
-        return native.evaluateLbo(arg.modelJson, arg.configJson);
+        return native.evaluateDatedLbo(arg.modelJson, arg.requestJson);
       case "capitalStructureSummary":
         return native.capitalStructureSummary(
           arg.resultJson,
@@ -874,12 +874,12 @@ it("values the current model with a native DCF, tornado and LBO in Valuation", a
       name: "Enterprise value change by assumption",
     }),
   ).toBeTruthy();
-  // The LBO config starts empty and nothing is evaluated until it is submitted.
+  // The LBO request starts empty and nothing is evaluated until it is submitted.
   const lbo = screen.getByRole("region", { name: "Leveraged buyout" });
   expect(
     (
       within(lbo).getByRole("combobox", {
-        name: "Entry metric node",
+        name: "Exit debt node",
       }) as HTMLInputElement
     ).value,
   ).toBe("");
