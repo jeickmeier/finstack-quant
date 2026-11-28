@@ -1,7 +1,7 @@
 # STATEMENTS-ANALYTICS-VALUATION-03: LBO entry funding bridge and exit equity multiple
 
 - **Decision status:** Accepted for the full Statements LBO contract (2026-11-15).
-- **Implementation status:** The accepted contract is implemented by `evaluate_lbo`. The legacy `evaluate_lbo`, which the audited sections below describe, was removed on 2026-11-27.
+- **Implementation status:** The accepted contract is implemented by `evaluate_lbo` (named `evaluate_dated_lbo` before 2026-11-27). The legacy function of the same name, which the audited sections below describe, was removed on 2026-11-27.
 - **Validation status:** Existing evidence mapped. Independent qualification pending.
 - **Audit date/source revision:** 2026-11-05; `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 - **Scope:** [Inventory](README.md); [source coverage](coverage.json).
