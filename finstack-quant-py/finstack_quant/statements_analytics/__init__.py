@@ -57,7 +57,6 @@ LboFundingResult = _sa.LboFundingResult
 LboExitBridge = _sa.LboExitBridge
 DatedLboResult = _sa.DatedLboResult
 evaluate_dated_lbo = _sa.evaluate_dated_lbo
-evaluate_lbo = _sa.evaluate_lbo
 WaccInputs = _sa.WaccInputs
 wacc = _sa.wacc
 run_corporate_analysis = _sa.run_corporate_analysis
@@ -169,7 +168,6 @@ ForecastMetrics = _sa.ForecastMetrics
 GoalSeekResult = _sa.GoalSeekResult
 GoalSeekSpec = _sa.GoalSeekSpec
 LboCheckMappings = _sa.LboCheckMappings
-LboResult = _sa.LboResult
 PLSummaryReport = _sa.PLSummaryReport
 ParameterSpec = _sa.ParameterSpec
 PeerFilter = _sa.PeerFilter
@@ -253,7 +251,6 @@ __all__: list[str] = [
     "LboExitBridge",
     "LboFunding",
     "LboFundingResult",
-    "LboResult",
     "LeaseGrowthConvention",
     "LeaseSpec",
     "ManagementFeeBase",
@@ -333,7 +330,6 @@ __all__: list[str] = [
     "evaluate_dcf",
     "evaluate_dcf_from_results",
     "evaluate_dcf_monte_carlo",
-    "evaluate_lbo",
     "evaluate_scenario_set",
     "evaluate_scenario_set_with_market",
     "explain_formula",

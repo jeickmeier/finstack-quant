@@ -611,7 +611,7 @@
       "finstack_quant.statements_analytics.add_roll_forward_with_opening",
       "finstack_quant.statements_analytics.dcf_sensitivity",
       "finstack_quant.statements_analytics.evaluate_dcf",
-      "finstack_quant.statements_analytics.evaluate_lbo",
+      "finstack_quant.statements_analytics.evaluate_dated_lbo",
       "finstack_quant.statements_analytics.evaluate_scenario_set",
       "finstack_quant.statements_analytics.generate_tornado_entries",
       "finstack_quant.statements_analytics.goal_seek",
@@ -627,7 +627,7 @@
       "finstack_quant.statements_analytics.SensitivityResult",
       "finstack_quant.statements_analytics.ScenarioResults",
       "finstack_quant.statements_analytics.GoalSeekResult",
-      "finstack_quant.statements_analytics.LboResult",
+      "finstack_quant.statements_analytics.DatedLboResult",
       "finstack_quant.statements_analytics.BridgeChart",
       "finstack_quant.statements.MonteCarloResults"
     ],
@@ -638,7 +638,7 @@
       "A native DCF grid and DcfSensitivityResult measure value effects; the separate operating tornado measures one-quarter UFCF and is labelled separately.",
       "ScenarioSet changes forecast driver levels only; every native scenario UFCF path is repriced through evaluate_dcf, preserving the base result.",
       "The bounded native goal_seek changes only perpetual terminal growth and is validated by a native DCF reprice against the market-equity target.",
-      "Native LBO sources/uses, debt roll-forward, after-tax cash feasibility and an independent equity-profit bridge are checked. All cash is reserved for operating liquidity, with no interim distributions or excess-cash credit; entry latest-actual EBITDA is explicitly pinned because evaluate_lbo reads the first model period.",
+      "Native LBO sources/uses, debt roll-forward, after-tax cash feasibility and an independent equity-profit bridge are checked. All cash is reserved for operating liquidity, with no interim distributions or excess-cash credit; entry EBITDA is read at the actual period the dated request names.",
       "ForecastSpec.log_normal and Evaluator.evaluate_monte_carlo are the supported APIs. Retained joint quarterly UFCF paths are individually repriced by native DCF; marginal percentiles are never stitched into a fake path."
     ]
   },

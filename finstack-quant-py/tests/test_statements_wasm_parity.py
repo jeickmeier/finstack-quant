@@ -291,8 +291,6 @@ def analytics_cases() -> dict[str, Any]:
         )
 
     samples: list[list[float]] = INPUTS["comps_samples"]
-    lbo_model = st.FinancialModelSpec.from_json(json.dumps(INPUTS["lbo_model"]))
-    lbo_config: dict[str, Any] = INPUTS["lbo_config"]
     dcf_spec = st.FinancialModelSpec.from_json(json.dumps(INPUTS["dcf_model"]))
     dated_lbo_model = st.FinancialModelSpec.from_json(json.dumps(INPUTS["dated_lbo_model"]))
 
@@ -402,10 +400,6 @@ def analytics_cases() -> dict[str, Any]:
             "peer_stats": [None if stats is None else doc(stats) for stats in map(sa.peer_stats, samples)],
             "percentile_rank": [sa.percentile_rank(sample, 2.5) for sample in samples],
             "z_score": [sa.z_score(sample, 2.5) for sample in samples],
-        },
-        "lbo": {
-            "plain": doc(sa.evaluate_lbo(lbo_model, lbo_config)),
-            "checked": doc(sa.evaluate_lbo(lbo_model, {**lbo_config, "check_mappings": INPUTS["lbo_check_mappings"]})),
         },
         # The record's worked example (STATEMENTS-ANALYTICS-VALUATION-03): uses 820, debt proceeds 500,
         # required sponsor cash 320. Sizing only, a 300 commitment (a 20 gap), a 320 commitment

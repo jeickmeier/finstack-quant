@@ -234,13 +234,6 @@ test('statements_analytics matches the cross-host golden', () => {
       percentile_rank: INPUTS.comps_samples.map((sample) => orNull(sa.percentileRank(sample, 2.5))),
       z_score: INPUTS.comps_samples.map((sample) => orNull(sa.zScore(sample, 2.5))),
     },
-    lbo: {
-      plain: sa.evaluateLbo(INPUTS.lbo_model, INPUTS.lbo_config),
-      checked: sa.evaluateLbo(INPUTS.lbo_model, {
-        ...INPUTS.lbo_config,
-        check_mappings: INPUTS.lbo_check_mappings,
-      }),
-    },
     // The record's worked example (STATEMENTS-ANALYTICS-VALUATION-03): uses 820, debt
     // proceeds 500, required sponsor cash 320. Sizing only, a 300 commitment (a 20 gap), a
     // 320 commitment (funded, 2.125x), and a 3x exit whose negative residual is floored.

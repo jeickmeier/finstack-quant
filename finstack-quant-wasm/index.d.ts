@@ -10198,30 +10198,6 @@ export interface StatementsAnalyticsNamespace {
    */
   readonly evaluateDatedLbo: typeof wasm.evaluateDatedLbo;
   /**
-   * Evaluate a leveraged-buyout transaction against a statement model.
-   *
-   * Entry enterprise value is priced at the explicitly selected entry period, the sponsor
-   * equity check is solved as the sources-and-uses residual, and exit proceeds
-   * are the exit enterprise value less the modelled net debt at the exit
-   * period. When the config carries `check_mappings`, the Rust LBO check suite
-   * runs against the same evaluation and fills `checks`; otherwise `checks` is
-   * `null`. IRR is out of scope: pair the returned `exit_equity_proceeds` with
-   * the equity outflow at close and call `portfolio.mwrXirr`.
-   *
-   * # Errors
-   *
-   * Rejects malformed model or config JSON (unknown config or mapping keys
-   * included), an invalid `exit_period`, model evaluation or lookup failures, a
-   * missing model currency or period, non-finite transaction inputs or model
-   * values, negative tranche amounts, a non-positive sponsor equity check,
-   * check-suite failures, or failure to serialize the result to JavaScript.
-   * The result is a structured JavaScript object.
-   * @param modelJson - Financial-model specification JSON.
-   * @param configJson - Rust `LboConfig` JSON: `entry_multiple` (8.5 = 8.5x), `entry_metric_node`, `entry_period` (existing period used to read entry earnings), `transaction_fees` (model currency), `sources` (`[{"name", "amount"}]` funded at close, model currency), `exit_multiple`, `exit_metric_node`, `exit_net_debt_node`, `exit_period` (e.g. "2029"), and optional `check_mappings` (`{"three_statement", "credit"}`). Every field except `check_mappings` is required.
-   * @returns Leveraged-buyout evaluation result against the statement model.
-   */
-  readonly evaluateLbo: typeof wasm.evaluateLbo;
-  /**
    * Compute weighted-average cost of capital (WACC) using exact capital weights.
    *
    * The costs of equity and debt are annual effective rates above -100%. The

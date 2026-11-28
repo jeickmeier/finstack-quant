@@ -406,15 +406,6 @@
       "type_name": "InterestExpenseReconciliation"
     },
     {
-      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json",
-      "bytes": 42538,
-      "kind": "input",
-      "path": "schemas/statements_analytics/1/lbo_config.schema.json",
-      "summary": "Transaction assumptions for an LBO evaluation.",
-      "title": "LboConfig",
-      "type_name": "LboConfig"
-    },
-    {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_debt_funding.schema.json",
       "bytes": 22166,
       "kind": "component",
@@ -458,15 +449,6 @@
       "summary": "Reconciled funding gap and identified debt proportions.",
       "title": "LboFundingResult",
       "type_name": "LboFundingResult"
-    },
-    {
-      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json",
-      "bytes": 39075,
-      "kind": "output",
-      "path": "schemas/statements_analytics/1/lbo_result.schema.json",
-      "summary": "Outputs of an LBO evaluation.",
-      "title": "LboResult",
-      "type_name": "LboResult"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lease_spec.schema.json",

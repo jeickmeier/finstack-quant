@@ -3,7 +3,7 @@
 Mirrors ``finstack-quant-wasm/tests/facade/statements_rust_owned.test.mjs``:
 the same inputs go through the Python bindings and must produce the same
 results (model ingest and validation, ``GoalSeekResult``, ``DependencyTree``,
-``LboConfig`` / ``DcfOptions`` inputs, non-finite sentinels, strict mappings).
+``DcfOptions`` inputs, non-finite sentinels, strict mappings).
 """
 
 from __future__ import annotations
@@ -28,13 +28,11 @@ from finstack_quant.statements_analytics import (
     ForecastMetrics,
     GoalSeekResult,
     GoalSeekSpec,
-    LboCheckMappings,
     ThreeStatementMapping,
     backtest_forecast,
     compute_multiple,
     dcf_sensitivity,
     evaluate_dcf,
-    evaluate_lbo,
     explain_formula,
     goal_seek,
     percentile_rank,
@@ -70,54 +68,6 @@ def goal_seek_model() -> FinancialModelSpec:
         },
     })
     return FinancialModelSpec.from_json(document)
-
-
-def lbo_model() -> FinancialModelSpec:
-    ids = ["2025Q1", "2025Q2", "2025Q3", "2025Q4", "2026Q1"]
-
-    def series(values: list[float]) -> dict[str, dict[str, str]]:
-        return {pid: usd(v) for pid, v in zip(ids, values, strict=True)}
-
-    document = json.dumps({
-        "id": "lbo",
-        "schema_version": 1,
-        "meta": {"currency": "USD"},
-        "periods": {
-            "calendar": "gregorian",
-            "periods": [quarter(1), quarter(2), quarter(3), quarter(4), quarter(1, 2026)],
-        },
-        "nodes": {
-            "ebitda": {"node_id": "ebitda", "node_type": "value", "values": series([100, 100, 100, 100, 120])},
-            "net_debt": {"node_id": "net_debt", "node_type": "value", "values": series([300, 300, 300, 300, 200])},
-            "equity": {"node_id": "equity", "node_type": "value", "values": series([-200, -200, -200, -200, -80])},
-        },
-    })
-    return FinancialModelSpec.from_json(document)
-
-
-LBO_CONFIG = {
-    "entry_multiple": 8.0,
-    "entry_metric_node": "ebitda",
-    "entry_period": "2025Q1",
-    "transaction_fees": 0.0,
-    "sources": [{"name": "debt", "amount": 500.0}],
-    "exit_multiple": 9.0,
-    "exit_metric_node": "ebitda",
-    "exit_net_debt_node": "net_debt",
-    "exit_period": "2026Q1",
-}
-
-LBO_CHECK_MAPPINGS = {
-    "three_statement": {
-        "assets_nodes": ["ebitda"],
-        "liabilities_nodes": ["net_debt"],
-        "equity_nodes": ["equity"],
-        "cash_node": "net_debt",
-        "retained_earnings_node": "equity",
-        "net_income_node": "ebitda",
-    },
-    "credit": {"debt_node": "net_debt", "ebitda_node": "ebitda", "interest_expense_node": "ebitda"},
-}
 
 
 def dcf_model() -> FinancialModelSpec:
@@ -216,33 +166,6 @@ def test_goal_seek_returns_the_rust_result_with_one_update_model_owner() -> None
                 observed_through="2024-12-31",
             ),
         )
-
-
-def test_evaluate_lbo_takes_the_rust_lbo_config_and_runs_its_check_suite() -> None:
-    plain = evaluate_lbo(lbo_model(), LBO_CONFIG)
-    # MOIC = (9 x 120 - 200) / (8 x 100 - 500) = 880 / 300.
-    assert plain.moic == pytest.approx(880 / 300, abs=1e-12)
-    assert plain.checks is None
-
-    checked = evaluate_lbo(lbo_model(), {**LBO_CONFIG, "check_mappings": LBO_CHECK_MAPPINGS})
-    assert checked.checks is not None
-    assert checked.checks.total_checks > 0
-    # A typed LboCheckMappings may sit in place of its dict.
-    typed = evaluate_lbo(
-        lbo_model(),
-        {**LBO_CONFIG, "check_mappings": LboCheckMappings.from_json(json.dumps(LBO_CHECK_MAPPINGS))},
-    )
-    assert json.loads(typed.to_json())["checks"] == json.loads(checked.to_json())["checks"]
-    # JSON text is refused; its `json.loads` form is the dict.
-    assert evaluate_lbo(lbo_model(), json.loads(json.dumps(LBO_CONFIG))).moic == pytest.approx(plain.moic)
-    with pytest.raises(ValueError, match="invalid config: invalid type: string"):
-        evaluate_lbo(lbo_model(), json.dumps(LBO_CONFIG))
-
-    with pytest.raises(ValueError, match="transaction_fee"):
-        evaluate_lbo(lbo_model(), {**LBO_CONFIG, "transaction_fee": 1.0})
-    missing_fees = {key: value for key, value in LBO_CONFIG.items() if key != "transaction_fees"}
-    with pytest.raises(ValueError, match="transaction_fees"):
-        evaluate_lbo(lbo_model(), missing_fees)
 
 
 def test_dcf_sensitivity_takes_the_rust_dcf_options() -> None:

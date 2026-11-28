@@ -2,6 +2,47 @@
 
 ## Itemized changes
 
+### Statements: `evaluate_lbo` is removed; the dated evaluator is the only LBO evaluator
+
+`evaluate_lbo` (WASM `evaluateLbo`), `LboConfig`, `LboTranche` and `LboResult`
+are removed from Rust, Python and WASM, with the `lbo_config` and `lbo_result`
+schemas. `evaluate_dated_lbo` (WASM `evaluateDatedLbo`) is the LBO evaluator.
+`LboCheckMappings` stays. There is no conversion from an `LboConfig`: the dated
+request needs dates and funding terms the old config never carried, so a caller
+authors a `DatedLboRequest`.
+
+Request fields, `LboConfig` → `DatedLboRequest`:
+
+- `entry_multiple`, `entry_metric_node`, `entry_period` → `entry: {multiple, node, period, basis}`
+- `exit_multiple`, `exit_metric_node`, `exit_period` → `exit: {multiple, node, period, basis}`
+- `transaction_fees` (number) → `funding.transaction_fees` (money)
+- `sources: [{name, amount}]` → `funding.debt: [{name, cash_proceeds, opening_face}]`
+- `exit_net_debt_node` → `exit_debt_node` and `exit_cash_node`; net debt is debt less cash. `exit_claims_node` is optional
+- `check_mappings` → `checks: {suite: {kind: "lbo", mappings}, required}`
+
+Inputs the old config did not have, which a caller must now supply:
+
+- `cut: {as_of, observed_through, currency}` and `exit_valuation_date`
+- `funding.date` (equal to `cut.as_of`), `funding.acquisition` and `funding.closing_credits`. `{"kind": "cash_free_debt_free"}` with zero credits gives the old uses, enterprise value plus fees
+- `basis` on each earnings read. `as_observed` reads the one period, as the old evaluator did
+- optionally `funding.sponsor_commitment`. Without it the result sizes the deal and reports no funded return
+- a model with a source snapshot, an actual entry period that ends on the entry date, a projected exit period that ends on the exit date, and an availability date on or before the entry date for every observed value
+
+Result fields, `LboResult` → `DatedLboResult`:
+
+- `entry_enterprise_value` → `entry_enterprise_value`
+- `entry_metric`, `exit_metric` (numbers) → `entry_earnings`, `exit_earnings` (money)
+- `uses_total` → `funding.cash_uses`
+- `debt_total` → `funding.debt_cash_proceeds`; the face is `funding.opening_debt_face`
+- `equity_check` → `funding.required_sponsor_cash`
+- `sources_total`, `sources_uses_balanced` → `funding.committed_cash_sources` and `funding.funding_gap`, present when a sponsor commitment is given
+- `exit_enterprise_value` → `exit.enterprise_value`
+- `exit_net_debt` → `exit.net_debt`; other claims are `exit.other_claims`
+- `exit_equity_proceeds` → `exit.common_equity_residual` (signed) and `exit.sponsor_proceeds` (floored at zero)
+- `moic` → `exit.sized_moic` (proceeds over required sponsor cash) and `exit.funded_moic` (proceeds over the commitment, only when the commitment covers the uses)
+- `checks` → `checks`
+- new: `run`, `entry_date`, `exit_valuation_date`
+
 ### UI: the LBO report runs the dated evaluator
 
 `LboReport`, `useEvaluateLbo` and the statements workbench's LBO panel now

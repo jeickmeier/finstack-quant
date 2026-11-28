@@ -72,12 +72,11 @@ use crate::{
     analysis::Explanation, analysis::Exposure, analysis::FcfSignCheck, analysis::ForecastMetrics,
     analysis::GoalSeekResult, analysis::GoalSeekSpec, analysis::GrowthRateConsistency,
     analysis::ImpairedEclResult, analysis::ImpairedEclScenario, analysis::ImpairedExposure,
-    analysis::InterestExpenseReconciliation, analysis::LboConfig, analysis::LboDebtFunding,
-    analysis::LboEarnings, analysis::LboExitBridge, analysis::LboFunding,
-    analysis::LboFundingResult, analysis::LboResult, analysis::LeverageRangeCheck,
-    analysis::LiquidityRunwayCheck, analysis::PeerFilter, analysis::PeerSet, analysis::PeerStats,
-    analysis::RatingPdMap, analysis::RecoveryEvidence, analysis::RegressionResult,
-    analysis::RelativeValueReport, analysis::RelativeValueReportConfig,
+    analysis::InterestExpenseReconciliation, analysis::LboDebtFunding, analysis::LboEarnings,
+    analysis::LboExitBridge, analysis::LboFunding, analysis::LboFundingResult,
+    analysis::LeverageRangeCheck, analysis::LiquidityRunwayCheck, analysis::PeerFilter,
+    analysis::PeerSet, analysis::PeerStats, analysis::RatingPdMap, analysis::RecoveryEvidence,
+    analysis::RegressionResult, analysis::RelativeValueReport, analysis::RelativeValueReportConfig,
     analysis::RelativeValueResult, analysis::ScenarioDiff, analysis::ScenarioResults,
     analysis::ScenarioSet, analysis::ScoringDimension, analysis::SensitivityResult,
     analysis::StageResult, analysis::StatementCovenantAssessment,
@@ -538,22 +537,6 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "impaired_ecl_scenario",
         Input,
         "Exact scenario probability and its scoped dated expected recovery."
-    )
-    .with_packager(package_schema),
-    finstack_quant_core::schema_artifact!(
-        LboConfig,
-        "statements_analytics",
-        "lbo_config",
-        Input,
-        "Transaction assumptions for an LBO evaluation."
-    )
-    .with_packager(package_schema),
-    finstack_quant_core::schema_artifact!(
-        LboResult,
-        "statements_analytics",
-        "lbo_result",
-        Output,
-        "Outputs of an LBO evaluation."
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(

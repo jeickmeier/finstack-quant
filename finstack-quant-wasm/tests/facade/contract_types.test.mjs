@@ -537,19 +537,6 @@ test('namespace results match their published result types', () => {
     statements_analytics.peerStats([1.0, 2.0, 3.0, 4.0]),
   ]);
 
-  // LboResult and DcfSensitivityResult, with their nullable members both null
-  // and populated (`checks`, `terminal_growth_up`).
-  const lbo = (config) => statements_analytics.evaluateLbo(PARITY_INPUTS.lbo_model, config);
-  const plainLbo = lbo(PARITY_INPUTS.lbo_config);
-  const checkedLbo = lbo({
-    ...PARITY_INPUTS.lbo_config,
-    check_mappings: PARITY_INPUTS.lbo_check_mappings,
-  });
-  assert.equal(plainLbo.checks, null);
-  assert.ok(checkedLbo.checks.results.length > 0);
-  declarations.push(['lbo', 'fq.LboResult', plainLbo]);
-  declarations.push(['lbo_checked', 'fq.LboResult', checkedLbo]);
-
   // DatedLboResult with its nullable members null (sizing only) and populated (a
   // funded deal that runs a check suite).
   const datedRequest = (commitment, checks) => ({
@@ -588,6 +575,7 @@ test('namespace results match their published result types', () => {
     'types.statements_analytics.DatedLboRequest',
     PARITY_INPUTS.dated_lbo_checked_request,
   ]);
+  // DcfSensitivityResult, with its nullable `terminal_growth_up` both null and populated.
   const tornado = (terminalValue, options) =>
     statements_analytics.dcfSensitivity(
       PARITY_INPUTS.dcf_model,

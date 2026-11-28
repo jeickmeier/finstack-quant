@@ -1,8 +1,8 @@
 /**
  * Statements and statements-analytics behaviour that Rust owns for both
  * hosts: model ingest and validation, result shapes (`GoalSeekResult`,
- * `DependencyTree`, `LboResult.checks`), Rust config types as inputs
- * (`DcfOptions`, `LboConfig`), non-finite sentinels and strict mappings.
+ * `DependencyTree`), Rust config types as inputs (`DcfOptions`), non-finite
+ * sentinels and strict mappings.
  *
  * `finstack-quant-py/tests/test_statements_rust_owned.py` asserts the same
  * cases against the Python bindings with the same inputs and numbers.
@@ -63,58 +63,6 @@ function goalSeekModel() {
   };
 }
 
-/** The Python `evaluate_lbo` doctest model, with monetary USD values. */
-function lboModel() {
-  const ids = ['2025Q1', '2025Q2', '2025Q3', '2025Q4', '2026Q1'];
-  const series = (values) => Object.fromEntries(ids.map((id, i) => [id, usd(values[i])]));
-  return {
-    id: 'lbo',
-    schema_version: 1,
-    meta: { currency: 'USD' },
-    periods: {
-      calendar: 'gregorian',
-      periods: [quarter(1), quarter(2), quarter(3), quarter(4), quarter(1, 2026)],
-    },
-    nodes: {
-      ebitda: { node_id: 'ebitda', node_type: 'value', values: series([100, 100, 100, 100, 120]) },
-      net_debt: {
-        node_id: 'net_debt',
-        node_type: 'value',
-        values: series([300, 300, 300, 300, 200]),
-      },
-      equity: {
-        node_id: 'equity',
-        node_type: 'value',
-        values: series([-200, -200, -200, -200, -80]),
-      },
-    },
-  };
-}
-
-const LBO_CONFIG = {
-  entry_multiple: 8.0,
-  entry_metric_node: 'ebitda',
-  entry_period: '2025Q1',
-  transaction_fees: 0.0,
-  sources: [{ name: 'debt', amount: 500.0 }],
-  exit_multiple: 9.0,
-  exit_metric_node: 'ebitda',
-  exit_net_debt_node: 'net_debt',
-  exit_period: '2026Q1',
-};
-
-const LBO_CHECK_MAPPINGS = {
-  three_statement: {
-    assets_nodes: ['ebitda'],
-    liabilities_nodes: ['net_debt'],
-    equity_nodes: ['equity'],
-    cash_node: 'net_debt',
-    retained_earnings_node: 'equity',
-    net_income_node: 'ebitda',
-  },
-  credit: { debt_node: 'net_debt', ebitda_node: 'ebitda', interest_expense_node: 'ebitda' },
-};
-
 /** Two annual forecast periods with USD ufcf and ebitda flows. */
 function dcfModel() {
   const annual = (year) => ({
@@ -172,29 +120,6 @@ test('goalSeek requires an explicit update election and valid bounded search', (
   assert.throws(
     () => sa.goalSeekSpec(goalSeekSpec({ target_tolerance: -1e-6 })),
     (e) => e instanceof Error && e.kind === 'validation' && /tolerance/.test(e.message)
-  );
-});
-
-test('evaluateLbo takes the Rust LboConfig and runs its check suite', () => {
-  const plain = sa.evaluateLbo(lboModel(), LBO_CONFIG);
-  // MOIC = (9 x 120 - 200) / (8 x 100 - 500) = 880 / 300.
-  assert.ok(Math.abs(plain.moic - 880 / 300) < 1e-12);
-  assert.equal(plain.checks, null);
-
-  const checked = sa.evaluateLbo(lboModel(), { ...LBO_CONFIG, check_mappings: LBO_CHECK_MAPPINGS });
-  assert.ok(Math.abs(checked.moic - plain.moic) < 1e-12);
-  assert.ok(checked.checks.results.length > 0);
-  assert.equal(typeof checked.checks.summary.total_checks, 'number');
-
-  assert.throws(
-    () => sa.evaluateLbo(lboModel(), { ...LBO_CONFIG, transaction_fee: 1.0 }),
-    (e) => e.kind === 'validation' && /transaction_fee/.test(e.message)
-  );
-  const missingFees = { ...LBO_CONFIG };
-  delete missingFees.transaction_fees;
-  assert.throws(
-    () => sa.evaluateLbo(lboModel(), missingFees),
-    (e) => e.kind === 'validation' && /transaction_fees/.test(e.message)
   );
 });
 

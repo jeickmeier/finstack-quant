@@ -23,6 +23,7 @@ from finstack_quant.statements import FinancialModelSpec
 from finstack_quant.statements_analytics import (
     DatedLboRequest,
     DatedLboResult,
+    LboCheckMappings,
     evaluate_dated_lbo,
 )
 
@@ -254,6 +255,24 @@ def test_the_lbo_arm_runs_the_lbo_model_check_suite_from_node_mappings() -> None
     assert report["summary"]["total_checks"] == 9
     assert report["summary"]["warnings"] == 5
     assert result.exit.sized_moic == pytest.approx(880 / 310)
+
+
+def test_a_typed_check_mapping_may_sit_in_place_of_its_dict_and_json_text_is_refused() -> None:
+    model = FinancialModelSpec.from_json(json.dumps(INPUTS["dated_lbo_checked_model"]))
+    document = copy.deepcopy(INPUTS["dated_lbo_checked_request"])
+    from_dict = evaluate_dated_lbo(model, DatedLboRequest(**document))
+
+    document["checks"]["suite"]["mappings"] = LboCheckMappings.from_json(
+        json.dumps(document["checks"]["suite"]["mappings"])
+    )
+    typed = evaluate_dated_lbo(model, DatedLboRequest(**document))
+    assert json.loads(typed.checks.to_json()) == json.loads(from_dict.checks.to_json())
+    assert typed.exit.sized_moic == from_dict.exit.sized_moic
+
+    # JSON text is refused; its `json.loads` form is the dict.
+    checks_text = json.dumps(INPUTS["dated_lbo_checked_request"]["checks"])
+    with pytest.raises(ValueError, match="invalid DatedLboRequest: invalid type: string"):
+        DatedLboRequest(**{**document, "checks": checks_text})
 
 
 @pytest.mark.parametrize(

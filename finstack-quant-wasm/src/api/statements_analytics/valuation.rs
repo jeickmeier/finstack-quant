@@ -1,4 +1,4 @@
-//! DCF, LBO, WACC, goal-seek, formula explanation, and report WASM entry points.
+//! DCF, WACC, goal-seek, formula explanation, and report WASM entry points.
 
 use crate::utils::input::{
     from_js_json, js_f64, js_opt_f64, js_opt_string, js_string, js_string_seq, json_text,
@@ -76,47 +76,6 @@ pub fn dcf_sensitivity(
 
     // Serde form of the Rust `DcfSensitivityResult`; `baseline_enterprise_value`
     // is a `Money` wire object (`{amount, currency}`).
-    to_js_value(&result)
-}
-
-/// Evaluate a leveraged-buyout transaction against a statement model.
-///
-/// Entry enterprise value is priced at the explicitly selected entry period, the sponsor
-/// equity check is solved as the sources-and-uses residual, and exit proceeds
-/// are the exit enterprise value less the modelled net debt at the exit
-/// period. When the config carries `check_mappings`, the Rust LBO check suite
-/// runs against the same evaluation and fills `checks`; otherwise `checks` is
-/// `null`. IRR is out of scope: pair the returned `exit_equity_proceeds` with
-/// the equity outflow at close and call `portfolio.mwrXirr`.
-///
-/// # Errors
-///
-/// Rejects malformed model or config JSON (unknown config or mapping keys
-/// included), an invalid `exit_period`, model evaluation or lookup failures, a
-/// missing model currency or period, non-finite transaction inputs or model
-/// values, negative tranche amounts, a non-positive sponsor equity check,
-/// check-suite failures, or failure to serialize the result to JavaScript.
-/// The result is a structured JavaScript object.
-/// @param modelJson - Financial-model specification JSON.
-/// @param configJson - Rust `LboConfig` JSON: `entry_multiple` (8.5 = 8.5x), `entry_metric_node`, `entry_period` (existing period used to read entry earnings), `transaction_fees` (model currency), `sources` (`[{"name", "amount"}]` funded at close, model currency), `exit_multiple`, `exit_metric_node`, `exit_net_debt_node`, `exit_period` (e.g. "2029"), and optional `check_mappings` (`{"three_statement", "credit"}`). Every field except `check_mappings` is required.
-/// @returns Leveraged-buyout evaluation result against the statement model.
-#[wasm_bindgen(js_name = evaluateLbo, unchecked_return_type = "LboResult")]
-pub fn evaluate_lbo(
-    #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
-    #[wasm_bindgen(js_name = "configJson", unchecked_param_type = "JsonInput")]
-    config_json: JsValue,
-) -> Result<JsValue, JsValue> {
-    let model_json: &str = &json_text(&model_json, "modelJson")?;
-    let config_json: &str = &json_text(&config_json, "configJson")?;
-    let model = crate::api::statements::load_model_text(model_json)?;
-    let config: finstack_quant_statements_analytics::analysis::LboConfig =
-        serde_json::from_str(config_json).map_err(to_js_err)?;
-
-    let result = finstack_quant_statements_analytics::analysis::evaluate_lbo(&model, &config)
-        .map_err(to_js_err)?;
-
-    // Serde form of the Rust `LboResult`; monetary fields are `Money` wire
-    // objects (`{amount, currency}`).
     to_js_value(&result)
 }
 

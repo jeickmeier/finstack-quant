@@ -1,18 +1,18 @@
-//! Python bindings for DCF, LBO and the orchestrated corporate analysis.
+//! Python bindings for DCF, WACC and the orchestrated corporate analysis.
 //!
 //! Typed inputs (`TerminalValueSpec`, `EquityBridge`, `ValuationDiscounts`,
 //! `LboCheckMappings`) and typed results (`CorporateValuationResult`,
-//! `DcfSensitivityResult`, `LboResult`, `CorporateAnalysis`) wrap the Rust
-//! types one-to-one. The Rust config types (`DcfOptions`, `LboConfig`) are
-//! taken in their serde form (dict), where a typed input may
-//! sit in place of its nested dict. A string is a value, never JSON text.
+//! `DcfSensitivityResult`, `CorporateAnalysis`) wrap the Rust types one-to-one.
+//! The Rust config type `DcfOptions` is taken in its serde form (dict), where a
+//! typed input may sit in place of its nested dict. A string is a value, never
+//! JSON text.
 
 mod corporate;
 mod inputs;
 mod sensitivity;
 
-pub use corporate::{PyCorporateAnalysis, PyLboCheckMappings, PyLboResult, PyWaccInputs};
-use corporate::{dcf_sensitivity, evaluate_dcf, evaluate_lbo, run_corporate_analysis, wacc};
+pub use corporate::{PyCorporateAnalysis, PyLboCheckMappings, PyWaccInputs};
+use corporate::{dcf_sensitivity, evaluate_dcf, run_corporate_analysis, wacc};
 pub(crate) use inputs::PyStatementValuationCut;
 use inputs::{
     PyCorporateDcfRequest, PyDcfInputs, PyDcfOptions, PyDcfProjection, PyTerminalFcffBasis,
@@ -48,12 +48,10 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCorporateValuationResult>()?;
     m.add_class::<PyDcfSensitivityResult>()?;
     m.add_class::<PyLboCheckMappings>()?;
-    m.add_class::<PyLboResult>()?;
     m.add_class::<PyCorporateAnalysis>()?;
     m.add_class::<PyWaccInputs>()?;
     m.add_function(pyo3::wrap_pyfunction!(evaluate_dcf, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(dcf_sensitivity, m)?)?;
-    m.add_function(pyo3::wrap_pyfunction!(evaluate_lbo, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(wacc, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(run_corporate_analysis, m)?)?;
     Ok(())

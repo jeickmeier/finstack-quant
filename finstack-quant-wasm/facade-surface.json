@@ -4246,7 +4246,6 @@
       "evaluateDcf",
       "evaluateDcfFromResults",
       "evaluateDcfMonteCarlo",
-      "evaluateLbo",
       "evaluateScenarioSet",
       "evaluateScenarioSetWithMarket",
       "explainFormula",
@@ -4346,9 +4345,6 @@
     "kind": "function"
   },
   "statements_analytics.evaluateDatedLbo": {
-    "kind": "function"
-  },
-  "statements_analytics.evaluateLbo": {
     "kind": "function"
   },
   "statements_analytics.wacc": {
