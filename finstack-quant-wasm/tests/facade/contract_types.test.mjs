@@ -549,6 +549,31 @@ test('namespace results match their published result types', () => {
   assert.ok(checkedLbo.checks.results.length > 0);
   declarations.push(['lbo', 'fq.LboResult', plainLbo]);
   declarations.push(['lbo_checked', 'fq.LboResult', checkedLbo]);
+
+  // DatedLboResult with its nullable members null (sizing only) and populated (a
+  // funded deal that runs a check suite).
+  const datedRequest = (commitment, checks) => ({
+    ...PARITY_INPUTS.dated_lbo_request,
+    funding: { ...PARITY_INPUTS.dated_lbo_request.funding, sponsor_commitment: commitment },
+    checks,
+  });
+  const sizedLbo = statements_analytics.evaluateDatedLbo(
+    PARITY_INPUTS.dated_lbo_model,
+    datedRequest(null, null)
+  );
+  const fundedLbo = statements_analytics.evaluateDatedLbo(
+    PARITY_INPUTS.dated_lbo_model,
+    datedRequest(
+      { amount: '320', currency: 'USD' },
+      { suite: PARITY_INPUTS.dated_lbo_check_suite, required: true }
+    )
+  );
+  assert.equal(sizedLbo.exit.funded_moic, null);
+  assert.equal(sizedLbo.checks, null);
+  assert.equal(fundedLbo.exit.funded_moic, 2.125);
+  assert.equal(fundedLbo.checks.outcome, 'pass');
+  declarations.push(['dated_lbo_sized', 'types.statements_analytics.DatedLboResult', sizedLbo]);
+  declarations.push(['dated_lbo_funded', 'types.statements_analytics.DatedLboResult', fundedLbo]);
   const tornado = (terminalValue, options) =>
     statements_analytics.dcfSensitivity(
       PARITY_INPUTS.dcf_model,

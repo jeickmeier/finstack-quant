@@ -317,6 +317,13 @@ impl PyDatedLboResult {
     }
 }
 
+crate::bindings::macros::wire_methods!(
+    PyDatedLboResult,
+    native::DatedLboResult,
+    "DatedLboResult",
+    module = "finstack_quant.statements_analytics._lbo"
+);
+
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "evaluate_dated_lbo")]
 #[pyfunction]
 #[pyo3(signature = (model, request, market=None))]

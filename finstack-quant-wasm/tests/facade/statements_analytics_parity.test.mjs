@@ -53,6 +53,18 @@ function evaluatedCapitalStructure() {
   }
 }
 
+/** The shared dated buyout, with an optional sponsor commitment (USD) and exit multiple. */
+function datedLbo(commitment, exitMultiple) {
+  const request = structuredClone(INPUTS.dated_lbo_request);
+  if (commitment !== undefined) {
+    request.funding.sponsor_commitment = { amount: commitment, currency: 'USD' };
+  }
+  if (exitMultiple !== undefined) {
+    request.exit.multiple = exitMultiple;
+  }
+  return sa.evaluateDatedLbo(INPUTS.dated_lbo_model, request);
+}
+
 const valueOf = (model, node, period) =>
   orNull(statements.statementResultGet(evaluate(model), node, period));
 
@@ -228,6 +240,15 @@ test('statements_analytics matches the cross-host golden', () => {
         ...INPUTS.lbo_config,
         check_mappings: INPUTS.lbo_check_mappings,
       }),
+    },
+    // The record's worked example (STATEMENTS-ANALYTICS-VALUATION-03): uses 820, debt
+    // proceeds 500, required sponsor cash 320. Sizing only, a 300 commitment (a 20 gap), a
+    // 320 commitment (funded, 2.125x), and a 3x exit whose negative residual is floored.
+    dated_lbo: {
+      sized: datedLbo(),
+      short: datedLbo('300'),
+      funded: datedLbo('320'),
+      insolvent: datedLbo('320', '3'),
     },
     capital_structure_summary: {
       full_year: sa.capitalStructureSummary(capitalStructure.results, capitalStructure.model, {

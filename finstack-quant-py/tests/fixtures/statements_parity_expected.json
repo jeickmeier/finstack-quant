@@ -820,6 +820,314 @@
       "equity": null,
       "node_count": 4
     },
+    "dated_lbo": {
+      "funded": {
+        "checks": null,
+        "entry_date": "2025-12-31",
+        "entry_earnings": {
+          "amount": "100",
+          "currency": "USD"
+        },
+        "entry_enterprise_value": {
+          "amount": "800",
+          "currency": "USD"
+        },
+        "exit": {
+          "common_equity_residual": {
+            "amount": "680",
+            "currency": "USD"
+          },
+          "enterprise_value": {
+            "amount": "1080",
+            "currency": "USD"
+          },
+          "funded_moic": 2.125,
+          "net_debt": {
+            "amount": "400",
+            "currency": "USD"
+          },
+          "other_claims": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "sized_moic": 2.125,
+          "sponsor_proceeds": {
+            "amount": "680",
+            "currency": "USD"
+          }
+        },
+        "exit_earnings": {
+          "amount": "120",
+          "currency": "USD"
+        },
+        "exit_valuation_date": "2028-12-31",
+        "funding": {
+          "cash_uses": {
+            "amount": "820",
+            "currency": "USD"
+          },
+          "committed_cash_sources": {
+            "amount": "820",
+            "currency": "USD"
+          },
+          "debt_cash_proceeds": {
+            "amount": "500",
+            "currency": "USD"
+          },
+          "funding_gap": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "opening_debt_face": {
+            "amount": "520",
+            "currency": "USD"
+          },
+          "required_sponsor_cash": {
+            "amount": "320",
+            "currency": "USD"
+          }
+        },
+        "run": {
+          "market_content_hash": "sha256:3b61d6d907002a1ceb52e85384017f811218f6d652aeef0034a002c03ff53aa7",
+          "model_content_hash": "sha256:6039a1316962222d72960b7820bef1252cb6925484962285a26e18d913c40da3",
+          "model_id": "dated-buyout",
+          "observation_cutoff": {
+            "through": "2025-12-31"
+          },
+          "run_id": "sha256:d1b99ea4f4532495f6d1046ca15866bcd39cf453ce670c1afb078a5a846267d0",
+          "source_snapshot": "training-borrower-2025-close",
+          "valuation_date": "2025-12-31"
+        }
+      },
+      "insolvent": {
+        "checks": null,
+        "entry_date": "2025-12-31",
+        "entry_earnings": {
+          "amount": "100",
+          "currency": "USD"
+        },
+        "entry_enterprise_value": {
+          "amount": "800",
+          "currency": "USD"
+        },
+        "exit": {
+          "common_equity_residual": {
+            "amount": "-40",
+            "currency": "USD"
+          },
+          "enterprise_value": {
+            "amount": "360",
+            "currency": "USD"
+          },
+          "funded_moic": 0.0,
+          "net_debt": {
+            "amount": "400",
+            "currency": "USD"
+          },
+          "other_claims": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "sized_moic": 0.0,
+          "sponsor_proceeds": {
+            "amount": "0",
+            "currency": "USD"
+          }
+        },
+        "exit_earnings": {
+          "amount": "120",
+          "currency": "USD"
+        },
+        "exit_valuation_date": "2028-12-31",
+        "funding": {
+          "cash_uses": {
+            "amount": "820",
+            "currency": "USD"
+          },
+          "committed_cash_sources": {
+            "amount": "820",
+            "currency": "USD"
+          },
+          "debt_cash_proceeds": {
+            "amount": "500",
+            "currency": "USD"
+          },
+          "funding_gap": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "opening_debt_face": {
+            "amount": "520",
+            "currency": "USD"
+          },
+          "required_sponsor_cash": {
+            "amount": "320",
+            "currency": "USD"
+          }
+        },
+        "run": {
+          "market_content_hash": "sha256:3b61d6d907002a1ceb52e85384017f811218f6d652aeef0034a002c03ff53aa7",
+          "model_content_hash": "sha256:6039a1316962222d72960b7820bef1252cb6925484962285a26e18d913c40da3",
+          "model_id": "dated-buyout",
+          "observation_cutoff": {
+            "through": "2025-12-31"
+          },
+          "run_id": "sha256:d1b99ea4f4532495f6d1046ca15866bcd39cf453ce670c1afb078a5a846267d0",
+          "source_snapshot": "training-borrower-2025-close",
+          "valuation_date": "2025-12-31"
+        }
+      },
+      "short": {
+        "checks": null,
+        "entry_date": "2025-12-31",
+        "entry_earnings": {
+          "amount": "100",
+          "currency": "USD"
+        },
+        "entry_enterprise_value": {
+          "amount": "800",
+          "currency": "USD"
+        },
+        "exit": {
+          "common_equity_residual": {
+            "amount": "680",
+            "currency": "USD"
+          },
+          "enterprise_value": {
+            "amount": "1080",
+            "currency": "USD"
+          },
+          "funded_moic": null,
+          "net_debt": {
+            "amount": "400",
+            "currency": "USD"
+          },
+          "other_claims": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "sized_moic": 2.125,
+          "sponsor_proceeds": {
+            "amount": "680",
+            "currency": "USD"
+          }
+        },
+        "exit_earnings": {
+          "amount": "120",
+          "currency": "USD"
+        },
+        "exit_valuation_date": "2028-12-31",
+        "funding": {
+          "cash_uses": {
+            "amount": "820",
+            "currency": "USD"
+          },
+          "committed_cash_sources": {
+            "amount": "800",
+            "currency": "USD"
+          },
+          "debt_cash_proceeds": {
+            "amount": "500",
+            "currency": "USD"
+          },
+          "funding_gap": {
+            "amount": "20",
+            "currency": "USD"
+          },
+          "opening_debt_face": {
+            "amount": "520",
+            "currency": "USD"
+          },
+          "required_sponsor_cash": {
+            "amount": "320",
+            "currency": "USD"
+          }
+        },
+        "run": {
+          "market_content_hash": "sha256:3b61d6d907002a1ceb52e85384017f811218f6d652aeef0034a002c03ff53aa7",
+          "model_content_hash": "sha256:6039a1316962222d72960b7820bef1252cb6925484962285a26e18d913c40da3",
+          "model_id": "dated-buyout",
+          "observation_cutoff": {
+            "through": "2025-12-31"
+          },
+          "run_id": "sha256:d1b99ea4f4532495f6d1046ca15866bcd39cf453ce670c1afb078a5a846267d0",
+          "source_snapshot": "training-borrower-2025-close",
+          "valuation_date": "2025-12-31"
+        }
+      },
+      "sized": {
+        "checks": null,
+        "entry_date": "2025-12-31",
+        "entry_earnings": {
+          "amount": "100",
+          "currency": "USD"
+        },
+        "entry_enterprise_value": {
+          "amount": "800",
+          "currency": "USD"
+        },
+        "exit": {
+          "common_equity_residual": {
+            "amount": "680",
+            "currency": "USD"
+          },
+          "enterprise_value": {
+            "amount": "1080",
+            "currency": "USD"
+          },
+          "funded_moic": null,
+          "net_debt": {
+            "amount": "400",
+            "currency": "USD"
+          },
+          "other_claims": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "sized_moic": 2.125,
+          "sponsor_proceeds": {
+            "amount": "680",
+            "currency": "USD"
+          }
+        },
+        "exit_earnings": {
+          "amount": "120",
+          "currency": "USD"
+        },
+        "exit_valuation_date": "2028-12-31",
+        "funding": {
+          "cash_uses": {
+            "amount": "820",
+            "currency": "USD"
+          },
+          "committed_cash_sources": null,
+          "debt_cash_proceeds": {
+            "amount": "500",
+            "currency": "USD"
+          },
+          "funding_gap": null,
+          "opening_debt_face": {
+            "amount": "520",
+            "currency": "USD"
+          },
+          "required_sponsor_cash": {
+            "amount": "320",
+            "currency": "USD"
+          }
+        },
+        "run": {
+          "market_content_hash": "sha256:3b61d6d907002a1ceb52e85384017f811218f6d652aeef0034a002c03ff53aa7",
+          "model_content_hash": "sha256:6039a1316962222d72960b7820bef1252cb6925484962285a26e18d913c40da3",
+          "model_id": "dated-buyout",
+          "observation_cutoff": {
+            "through": "2025-12-31"
+          },
+          "run_id": "sha256:d1b99ea4f4532495f6d1046ca15866bcd39cf453ce670c1afb078a5a846267d0",
+          "source_snapshot": "training-borrower-2025-close",
+          "valuation_date": "2025-12-31"
+        }
+      }
+    },
     "dcf": {
       "currency": "USD",
       "enterprise_value": 1341.4281163299675,

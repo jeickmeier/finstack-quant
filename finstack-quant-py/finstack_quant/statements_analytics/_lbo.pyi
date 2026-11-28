@@ -739,6 +739,58 @@ class DatedLboResult:
         """
         ...
 
+    def to_json(self) -> str:
+        """Encode this result using the canonical wire format.
+
+        Returns
+        -------
+        str
+            JSON holding the run's provenance, both dates, the entry and exit
+            earnings and values, the funding reconciliation, the exit bridge
+            and the check report. It is the object WASM ``evaluateDatedLbo``
+            returns.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be encoded.
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> DatedLboResult:
+        """Rebuild a dated LBO result from its JSON record.
+
+        Parameters
+        ----------
+        json : str
+            JSON written by :meth:`to_json`. Unknown fields are rejected.
+
+        Returns
+        -------
+        DatedLboResult
+            Decoded result. Nothing is recomputed.
+
+        Raises
+        ------
+        ValueError
+            If the JSON syntax or field values are invalid.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import DatedLboResult
+        >>> try:
+        ...     DatedLboResult.from_json("null")
+        ... except ValueError:
+        ...     print("A record is required")
+        A record is required
+        """
+        ...
+
+    def __reduce__(self) -> tuple[object, tuple[str]]:
+        """Return the reconstruction callable and native JSON arguments for pickle."""
+        ...
+
 def evaluate_dated_lbo(
     model: FinancialModelSpec,
     request: DatedLboRequest,

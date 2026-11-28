@@ -1588,5 +1588,220 @@
       }
     },
     "schema_version": 1
+  },
+  "dated_lbo_model": {
+    "id": "dated-buyout",
+    "periods": {
+      "calendar": "gregorian",
+      "periods": [
+        {
+          "id": "2025",
+          "start": "2025-01-01",
+          "end": "2026-01-01",
+          "is_actual": true
+        },
+        {
+          "id": "2026",
+          "start": "2026-01-01",
+          "end": "2027-01-01",
+          "is_actual": false
+        },
+        {
+          "id": "2027",
+          "start": "2027-01-01",
+          "end": "2028-01-01",
+          "is_actual": false
+        },
+        {
+          "id": "2028",
+          "start": "2028-01-01",
+          "end": "2029-01-01",
+          "is_actual": false
+        }
+      ]
+    },
+    "nodes": {
+      "ebitda": {
+        "node_id": "ebitda",
+        "node_type": "value",
+        "values": {
+          "2025": {
+            "amount": "100",
+            "currency": "USD"
+          },
+          "2028": {
+            "amount": "120",
+            "currency": "USD"
+          }
+        },
+        "availability_dates": {
+          "2025": "2025-12-31"
+        },
+        "value_type": {
+          "type": "monetary",
+          "currency": "USD"
+        }
+      },
+      "eligible_cash": {
+        "node_id": "eligible_cash",
+        "node_type": "value",
+        "values": {
+          "2028": {
+            "amount": "40",
+            "currency": "USD"
+          }
+        },
+        "value_type": {
+          "type": "monetary",
+          "currency": "USD"
+        }
+      },
+      "term_amortization": {
+        "node_id": "term_amortization",
+        "node_type": "value",
+        "values": {
+          "2025": 0.0,
+          "2026": 30.0,
+          "2027": 30.0,
+          "2028": 20.0
+        },
+        "availability_dates": {
+          "2025": "2025-12-31"
+        },
+        "value_type": {
+          "type": "scalar"
+        }
+      },
+      "term_beg": {
+        "node_id": "term_beg",
+        "name": "term (Beginning)",
+        "node_type": "calculated",
+        "formula_text": "coalesce(lag(term_end, 1), 420.0)",
+        "value_type": {
+          "type": "scalar"
+        }
+      },
+      "term_end": {
+        "node_id": "term_end",
+        "name": "term (Ending)",
+        "node_type": "calculated",
+        "formula_text": "term_beg - (term_amortization)",
+        "value_type": {
+          "type": "scalar"
+        }
+      },
+      "junior_beg": {
+        "node_id": "junior_beg",
+        "name": "junior (Beginning)",
+        "node_type": "calculated",
+        "formula_text": "coalesce(lag(junior_end, 1), 100.0)",
+        "value_type": {
+          "type": "scalar"
+        }
+      },
+      "junior_end": {
+        "node_id": "junior_end",
+        "name": "junior (Ending)",
+        "node_type": "calculated",
+        "formula_text": "junior_beg",
+        "value_type": {
+          "type": "scalar"
+        }
+      },
+      "closing_debt": {
+        "node_id": "closing_debt",
+        "node_type": "calculated",
+        "formula_text": "as_money((term_end + junior_end), USD)",
+        "value_type": {
+          "type": "monetary",
+          "currency": "USD"
+        }
+      }
+    },
+    "source_snapshot": "training-borrower-2025-close",
+    "meta": {
+      "currency": "USD"
+    },
+    "schema_version": 1
+  },
+  "dated_lbo_request": {
+    "cut": {
+      "as_of": "2025-12-31",
+      "observed_through": "2025-12-31",
+      "currency": "USD"
+    },
+    "exit_valuation_date": "2028-12-31",
+    "entry": {
+      "node": "ebitda",
+      "period": "2025",
+      "multiple": "8",
+      "basis": "as_observed"
+    },
+    "funding": {
+      "date": "2025-12-31",
+      "acquisition": {
+        "kind": "cash_free_debt_free"
+      },
+      "transaction_fees": {
+        "amount": "20",
+        "currency": "USD"
+      },
+      "closing_credits": {
+        "amount": "0",
+        "currency": "USD"
+      },
+      "debt": [
+        {
+          "name": "term",
+          "cash_proceeds": {
+            "amount": "405",
+            "currency": "USD"
+          },
+          "opening_face": {
+            "amount": "420",
+            "currency": "USD"
+          }
+        },
+        {
+          "name": "junior",
+          "cash_proceeds": {
+            "amount": "95",
+            "currency": "USD"
+          },
+          "opening_face": {
+            "amount": "100",
+            "currency": "USD"
+          }
+        }
+      ],
+      "sponsor_commitment": null
+    },
+    "exit": {
+      "node": "ebitda",
+      "period": "2028",
+      "multiple": "9",
+      "basis": "as_observed"
+    },
+    "exit_debt_node": "closing_debt",
+    "exit_cash_node": "eligible_cash",
+    "exit_claims_node": null,
+    "checks": null
+  },
+  "dated_lbo_check_suite": {
+    "name": "lbo",
+    "builtin_checks": [],
+    "formula_checks": [
+      {
+        "id": "amortization",
+        "name": "Amortization bound",
+        "category": "internal_consistency",
+        "severity": "error",
+        "mode": "predicate",
+        "scope": "all_periods",
+        "formula": "term_amortization >= 0",
+        "message_template": "Amortization out of bounds in {period}",
+        "tolerance": null
+      }
+    ]
   }
 }

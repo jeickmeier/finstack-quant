@@ -2,6 +2,14 @@
 
 ## Itemized changes
 
+### Statements: the dated LBO result round-trips through JSON in Python
+
+Python `DatedLboResult` gains `to_json()`, `from_json(text)` and pickle
+support, as every other result has. `to_json()` writes the object WASM
+`evaluateDatedLbo` returns. The dated evaluator now has Python and WASM tests
+and a shared cross-host golden built on the worked example of
+STATEMENTS-ANALYTICS-VALUATION-03.
+
 ### Portfolio: one `scenario_pnl`, taking a list of scenarios
 
 `scenario_pnl` now takes a list of one or more scenarios and returns one
