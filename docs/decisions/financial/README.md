@@ -508,7 +508,7 @@ Implementation reconciliation and independent qualification remain pending.
 The Statements LBO contract was accepted on 2026-11-15. It covers dated
 transaction and earnings inputs, checked sponsor funding, the exit equity
 bridge, funded and implied MOIC, and required-check coverage.
-Implementation reconciliation and independent qualification remain pending.
+Independent qualification remains pending.
 [STATEMENTS-ANALYTICS-VALUATION-03](statements-analytics-valuation/03-lbo.md#accepted-decision-for-statements-lbo-funding-and-returns).
 
 The Statements corporate-analysis and typed reporting contract was accepted

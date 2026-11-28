@@ -1,7 +1,7 @@
 # STATEMENTS-ANALYTICS-VALUATION-03: LBO entry funding bridge and exit equity multiple
 
 - **Decision status:** Accepted for the full Statements LBO contract (2026-11-15).
-- **Implementation status:** Reconciliation pending.
+- **Implementation status:** The accepted contract is implemented by `evaluate_dated_lbo`. The legacy `evaluate_lbo`, which the audited sections below describe, was removed on 2026-11-27.
 - **Validation status:** Existing evidence mapped. Independent qualification pending.
 - **Audit date/source revision:** 2026-11-05; `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 - **Scope:** [Inventory](README.md); [source coverage](coverage.json).
@@ -16,6 +16,8 @@
 For example, USD 820 of uses and USD 500 of debt proceeds require USD 320 of sponsor equity. A USD 300 commitment leaves a USD 20 shortfall. With USD 320 invested, USD 1,080 of exit enterprise value less USD 400 of net debt yields USD 680 of common equity proceeds and a 2.125× MOIC.
 
 ## Audited choice, domain and selection
+
+The text below describes the removed `evaluate_lbo` at the audit revision. It is kept as the record of what was audited.
 
 [LBO evaluation](../../../../finstack-quant/statements-analytics/src/analysis/valuation/lbo.rs) is an entry/exit transaction arithmetic layer over evaluated statements. The entry metric is from the **first model period**, not an automatically constructed LTM period. Exit metric and net debt come from the configured exit period. Currency metadata and finite monetary node values in that currency are mandatory.
 
